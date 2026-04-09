@@ -10,9 +10,15 @@ from .base import BaseAdapter
 
 class DeepSeekAdapter(BaseAdapter):
     provider_name = "deepseek"
+    supports_vision = False   # deepseek-chat is text-only; deepseek-vl is a separate model
     BASE_URL = "https://api.deepseek.com/v1/chat/completions"
 
-    def _call_api(self, system_prompt: str, user_prompt: str) -> tuple[str, str]:
+    def _call_api(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        images: list[bytes] | None = None,  # accepted but ignored — text-only model
+    ) -> tuple[str, str]:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             raise RuntimeError("DEEPSEEK_API_KEY not set")

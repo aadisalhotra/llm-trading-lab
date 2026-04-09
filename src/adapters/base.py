@@ -33,22 +33,43 @@ class DecisionResult:
 
 
 class BaseAdapter(ABC):
-    """All provider adapters subclass this and implement `_call_api`."""
+    """All provider adapters subclass this and implement `_call_api`.
+
+    Vision-capable adapters override `supports_vision = True` and accept an
+    `images` argument in `_call_api`. Text-only adapters ignore the images
+    list — the caller can blindly pass images to every adapter without
+    branching on capability.
+    """
 
     provider_name: str = "base"
+    supports_vision: bool = False
 
     def __init__(self, model: str):
         self.model = model
 
     @abstractmethod
-    def _call_api(self, system_prompt: str, user_prompt: str) -> tuple[str, str]:
+    def _call_api(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        images: list[bytes] | None = None,
+    ) -> tuple[str, str]:
         """Make the actual provider API call.
+
+        `images` is an optional list of raw PNG bytes. Adapters that support
+        vision should attach them to the user message in their provider's
+        native format. Text-only adapters should ignore the argument.
 
         Returns (raw_text_response, model_id_returned_by_api).
         Must raise on failure.
         """
 
-    def generate_decision(self, system_prompt: str, user_prompt: str) -> DecisionResult:
+    def generate_decision(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        images: list[bytes] | None = None,
+    ) -> DecisionResult:
         """Top-level call. Times the API hit, parses JSON, returns DecisionResult.
 
         Never raises — failures are returned as `success=False` so one bad
@@ -56,7 +77,7 @@ class BaseAdapter(ABC):
         """
         start = time.perf_counter()
         try:
-            raw, returned_id = self._call_api(system_prompt, user_prompt)
+            raw, returned_id = self._call_api(system_prompt, user_prompt, images)
             latency = time.perf_counter() - start
             parsed = self._parse_response(raw)
             return DecisionResult(
