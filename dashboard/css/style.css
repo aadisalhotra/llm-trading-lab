@@ -545,25 +545,90 @@ body {
 /* ===== Trade feed ===== */
 .trade-feed {
   font-size: 11px;
-  max-height: 380px;
+  max-height: 480px;
   overflow-y: auto;
 }
 .trade-row {
-  padding: 5px 0;
+  padding: 7px 4px 8px 4px;
   border-bottom: 1px solid var(--bg-row);
+}
+.trade-row:hover { background: var(--bg-row); }
+.trade-row .trade-line {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.trade-row:hover { background: var(--bg-row); }
 .trade-row .ts { color: var(--text-dim); }
 .trade-row .model { color: var(--accent-bright); font-weight: 700; padding: 0 6px; }
 .trade-row .side-buy { color: var(--green); font-weight: 700; padding: 0 4px; }
 .trade-row .side-sell { color: var(--red); font-weight: 700; padding: 0 4px; }
 .trade-row .ticker { color: var(--text-bright); font-weight: 700; }
 .trade-row .price { color: var(--text); }
-.trade-row .conf { color: var(--amber); }
-.trade-row .reason { color: var(--text-dim); font-style: italic; }
+.trade-row .conf {
+  color: var(--amber);
+  margin-left: 8px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.trade-row .trade-summary {
+  color: var(--text);
+  font-style: italic;
+  font-size: 11px;
+  margin-top: 3px;
+  padding-left: 14px;
+  border-left: 1px solid var(--accent-dim);
+  white-space: normal;
+  line-height: 1.45;
+}
+
+/* ===== Leaderboard hover tooltip ===== */
+.leaderboard-tooltip {
+  position: fixed;
+  z-index: 9000;
+  background: rgba(5, 7, 11, 0.97);
+  border: 1px solid var(--accent-dim);
+  border-left: 2px solid var(--accent);
+  padding: 10px 12px;
+  min-width: 320px;
+  max-width: 460px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.7);
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--text);
+}
+.leaderboard-tooltip .lt-header {
+  color: var(--accent-bright);
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-size: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-bright);
+}
+.leaderboard-tooltip .lt-trade {
+  margin: 6px 0;
+}
+.leaderboard-tooltip .lt-trade-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+.leaderboard-tooltip .lt-trade-head .ts { color: var(--text-dim); }
+.leaderboard-tooltip .lt-trade-head .ticker { color: var(--text-bright); font-weight: 700; }
+.leaderboard-tooltip .lt-trade-head .side-buy { color: var(--green); font-weight: 700; }
+.leaderboard-tooltip .lt-trade-head .side-sell { color: var(--red); font-weight: 700; }
+.leaderboard-tooltip .lt-trade-head .conf { color: var(--amber); }
+.leaderboard-tooltip .lt-trade-summary {
+  color: var(--text);
+  font-style: italic;
+  font-size: 11px;
+  padding-left: 8px;
+  border-left: 1px solid var(--accent-dim);
+  line-height: 1.4;
+}
+.leaderboard tr { cursor: pointer; }
 
 /* ===== Version ticker ===== */
 .version-ticker {

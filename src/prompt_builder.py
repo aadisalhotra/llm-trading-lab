@@ -27,6 +27,7 @@ import pandas as pd
 
 from .charts import build_universe_overview_png
 from .config_loader import PROMPTS_DIR, load_settings, load_universe
+from .data.sentiment import sentiment_label
 
 logger = logging.getLogger("llmlab.prompt")
 
@@ -96,6 +97,60 @@ def _format_portfolio_block(portfolio_state: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_news_block(
+    news: dict[str, Any] | None,
+    sentiment: dict[str, float] | None,
+    universe_symbols: list[str],
+) -> str:
+    """Per-stock sentiment + top headlines, ready to drop into the user prompt.
+
+    Layout: one stanza per ticker that has at least one headline. Sentiment
+    appears as both the raw -1..+1 score and a categorical label so models
+    that aren't great at calibrating numerical signals still get the gist.
+    """
+    if not news:
+        return "CURRENT EVENTS & NEWS:\n  (no news data available — pipeline running on technicals only)"
+
+    sentiment = sentiment or {}
+    lines = ["CURRENT EVENTS & NEWS (per-stock sentiment + top headlines):"]
+    rendered_any = False
+    for sym in universe_symbols:
+        items = news.get(sym) or []
+        if not items:
+            continue
+        rendered_any = True
+        score = float(sentiment.get(sym, 0.0))
+        label = sentiment_label(score)
+        lines.append(f"  {sym}  [sentiment: {score:+.2f} ({label})]")
+        for item in items:
+            ts = (item.get("datetime") or "")[:16].replace("T", " ")
+            src = item.get("source", "?")
+            title = item.get("title", "")
+            lines.append(f"    - [{ts}] {src}: {title}")
+    if not rendered_any:
+        lines.append("  (no per-stock headlines for any universe symbol this run)")
+    return "\n".join(lines)
+
+
+def _format_macro_block(news: dict[str, Any] | None, sentiment: dict[str, float] | None) -> str:
+    """Top market-wide headlines that aren't stock-specific."""
+    if not news:
+        return ""
+    macro = news.get("macro") or []
+    if not macro:
+        return "MARKET-WIDE CONTEXT:\n  (no macro headlines available this run)"
+    sentiment = sentiment or {}
+    macro_score = float(sentiment.get("macro", 0.0))
+    label = sentiment_label(macro_score)
+    lines = [f"MARKET-WIDE CONTEXT  [aggregate sentiment: {macro_score:+.2f} ({label})]:"]
+    for item in macro:
+        ts = (item.get("datetime") or "")[:16].replace("T", " ")
+        src = item.get("source", "?")
+        title = item.get("title", "")
+        lines.append(f"  - [{ts}] {src}: {title}")
+    return "\n".join(lines)
+
+
 def _format_intraday_context_block(
     run_timestamp: datetime,
     trades_executed_today: int,
@@ -158,11 +213,14 @@ def build_prompts(
     runs_today: int = 0,
     is_eod: bool = False,
     include_chart_image: bool = True,
+    news_data: dict[str, Any] | None = None,
+    sentiment_data: dict[str, float] | None = None,
 ) -> tuple[str, str, str, list[bytes]]:
     """Build (system_prompt, user_prompt, prompt_version, images).
 
     The system prompt is the raw template — identical across all models and runs.
-    The user prompt is the per-run text context.
+    The user prompt is the per-run text context (universe, market data, portfolio,
+    news headlines + sentiment).
     The images list contains a single composite candlestick PNG of the universe
     when `include_chart_image` is True (vision-capable adapters use it).
     """
@@ -171,6 +229,7 @@ def build_prompts(
     version = settings["prompt_version"]
     system_prompt = load_prompt_template(version)
     max_trades = int(settings["portfolio_rules"]["max_trades_per_day"])
+    universe_syms = [t["symbol"] for t in universe["tickers"]]
 
     parts = [
         f"DATE: {run_date.strftime('%Y-%m-%d')}",
@@ -191,14 +250,19 @@ def build_prompts(
         "",
         _format_portfolio_block(portfolio_state),
         "",
+        _format_news_block(news_data, sentiment_data, universe_syms),
+        "",
+        _format_macro_block(news_data, sentiment_data),
+        "",
         (
+            "Consider the news context alongside technical data. Headlines may signal "
+            "fundamental changes that technicals have not yet fully priced in. "
             "A composite candlestick chart of the universe is attached above for "
             "vision-capable models. Each panel shows the last 30 trading bars with "
-            "a 20-period SMA overlay. Use it to reason about chart patterns, trend, "
-            "and support/resistance — not just the numerical table below."
+            "a 20-period SMA overlay."
         ),
         "",
-        "Output your decisions now as a single JSON object conforming to the schema in the system prompt.",
+        "Output your decisions now as a single JSON object conforming to the schema in the system prompt. Every decision must include a one-sentence `summary` field.",
     ]
     user_prompt = "\n".join(parts)
 

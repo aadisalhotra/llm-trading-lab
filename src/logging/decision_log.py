@@ -39,6 +39,8 @@ def log_decision_run(
     data_inputs_hash: str,
     execution_mode: str,
     inception_date: str,
+    news_headlines_hash: str = "",
+    news_sentiment: dict[str, float] | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,6 +68,11 @@ def log_decision_run(
         "input_tokens": md.get("input_tokens"),
         "output_tokens": md.get("output_tokens"),
         "cost_usd": md.get("cost_usd"),
+        # News context — hash of the headline set the model saw, plus the
+        # per-ticker compound sentiment dict at decision time. Lets us
+        # correlate trades back to the exact news inputs they were made on.
+        "news_headlines_hash": news_headlines_hash,
+        "news_sentiment": news_sentiment or {},
         "overall_reasoning": decision_result.overall_reasoning,
         "raw_decisions": decision_result.decisions,
         "accepted_decisions": accepted_decisions,

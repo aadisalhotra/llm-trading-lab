@@ -490,6 +490,8 @@ function renderLeaderboard(d) {
       <td class="num">${row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) : "—"}</td>
       <td class="num">${fmtMoney(row.current_value)}</td>
     `;
+    // Hover tooltip — show last 3 trade summaries for this model
+    attachLeaderboardTooltip(tr, displayName, row.recent_summaries || []);
     tbody.appendChild(tr);
   });
 
@@ -568,23 +570,88 @@ function renderTradeFeed(d) {
     feed.innerHTML = `<div class="trade-row"><span class="reason">// no trades yet</span></div>`;
     return;
   }
+  const modelsCfg = d.models || {};
   trades.forEach(t => {
     const row = document.createElement("div");
     row.className = "trade-row";
     const sideClass = t.side === "BUY" ? "side-buy" : "side-sell";
     const ts = (t.timestamp || "").replace("T", " ").slice(0, 19);
-    const reason = (t.reasoning || "").slice(0, 80);
+    // Prefer the new one-sentence summary; fall back to truncated reasoning
+    const summary = (t.summary || t.reasoning || "").trim();
+    const cfg = modelsCfg[t.model_key] || {};
+    const modelLabel = cfg.display_name || t.model_key.toUpperCase();
     row.innerHTML = `
-      <span class="ts">[${ts}]</span>
-      <span class="model">${t.model_key.toUpperCase()}</span>
-      <span class="${sideClass}">${t.side}</span>
-      <span class="ticker">${t.ticker}</span>
-      x${fmtNum(t.shares, 2)}
-      @ <span class="price">$${fmtNum(t.fill_price)}</span>
-      ${t.confidence != null ? `<span class="conf">[c${t.confidence}]</span>` : ""}
-      <span class="reason"> // ${reason}</span>
+      <div class="trade-line">
+        <span class="ts">[${ts}]</span>
+        <span class="model">${modelLabel}</span>
+        <span class="${sideClass}">${t.side}</span>
+        <span class="ticker">${t.ticker}</span>
+        x${fmtNum(t.shares, 2)}
+        @ <span class="price">$${fmtNum(t.fill_price)}</span>
+        ${t.confidence != null ? `<span class="conf">Confidence: ${t.confidence}/10</span>` : ""}
+      </div>
+      ${summary ? `<div class="trade-summary">"${escapeHtml(summary)}"</div>` : ""}
     `;
     feed.appendChild(row);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ===== Leaderboard hover tooltip — shows last 3 trade summaries =====
+let _leaderboardTooltip = null;
+function _ensureLeaderboardTooltip() {
+  if (_leaderboardTooltip) return _leaderboardTooltip;
+  _leaderboardTooltip = document.createElement("div");
+  _leaderboardTooltip.className = "leaderboard-tooltip";
+  _leaderboardTooltip.style.display = "none";
+  document.body.appendChild(_leaderboardTooltip);
+  return _leaderboardTooltip;
+}
+
+function attachLeaderboardTooltip(tr, modelLabel, summaries) {
+  if (!summaries || !summaries.length) return;
+  const tip = _ensureLeaderboardTooltip();
+  tr.addEventListener("mouseenter", (e) => {
+    const rows = summaries.map(s => {
+      const ts = (s.timestamp || "").replace("T", " ").slice(0, 16);
+      const sideClass = s.side === "BUY" ? "side-buy" : "side-sell";
+      const conf = s.confidence != null ? `<span class="conf">[c${s.confidence}]</span>` : "";
+      return `
+        <div class="lt-trade">
+          <div class="lt-trade-head">
+            <span class="ts">${ts}</span>
+            <span class="${sideClass}">${s.side}</span>
+            <span class="ticker">${escapeHtml(s.ticker)}</span>
+            ${conf}
+          </div>
+          <div class="lt-trade-summary">"${escapeHtml(s.summary || "")}"</div>
+        </div>
+      `;
+    }).join("");
+    tip.innerHTML = `
+      <div class="lt-header">${escapeHtml(modelLabel)} // LAST ${summaries.length} TRADES</div>
+      ${rows}
+    `;
+    tip.style.display = "block";
+  });
+  tr.addEventListener("mousemove", (e) => {
+    // Position tooltip near cursor, clamped to viewport
+    const margin = 14;
+    let x = e.clientX + margin;
+    let y = e.clientY + margin;
+    const rect = tip.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth - 8) x = e.clientX - rect.width - margin;
+    if (y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - margin;
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  });
+  tr.addEventListener("mouseleave", () => {
+    tip.style.display = "none";
   });
 }
 

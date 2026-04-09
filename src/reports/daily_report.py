@@ -30,12 +30,14 @@ from ..analytics import (
 from ..config_loader import (
     INTRADAY_DIR,
     LEADERBOARD_DIR,
+    NEWS_CACHE_DIR,
     PERFORMANCE_DIR,
     REPORTS_DIR,
     TRADES_DIR,
     load_settings,
     load_universe,
 )
+from ..data.sentiment import score_headline, sentiment_label
 from ..portfolio import load_portfolio
 
 logger = logging.getLogger("llmlab.reports")
@@ -193,6 +195,23 @@ def _read_today_trade_records(model_key: str, run_date: datetime) -> list[dict[s
                 out.append(rec)
     out.sort(key=lambda r: r.get("timestamp", ""))
     return out
+
+
+def _read_news_cache() -> dict[str, Any]:
+    """Read the on-disk news cache file produced by src/data/news.py.
+
+    Returns the raw cache dict {fetched_at, stocks, macro, ...} or {} if
+    no cache exists. The daily report uses this to surface the headlines
+    that were active on the trading day without needing to rehit any APIs.
+    """
+    cache_file = NEWS_CACHE_DIR / "cache.json"
+    if not cache_file.exists():
+        return {}
+    try:
+        with open(cache_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def _read_intraday_curve(model_key: str, run_date: datetime) -> list[dict[str, Any]]:
@@ -566,7 +585,48 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
         s5 = f"Risk filter rejected {len(violations)} decision(s): {', '.join(rules)}."
 
     sentences = [s for s in (s1, s2, s3, s4, s5) if s]
-    return " ".join(sentences)
+    prose = " ".join(sentences)
+
+    # All trades today (across intraday ticks) with their one-sentence summaries
+    trades_block = _format_trade_summaries_for_model(model_key, run_date)
+    if trades_block:
+        return f"{prose}\n\n{trades_block}"
+    return prose
+
+
+def _format_trade_summaries_for_model(model_key: str, run_date: datetime) -> str:
+    """Build the bulleted "Today's trades" list for one model.
+
+    Walks every intraday tick of the trading day and lists each executed
+    BUY/SELL with its one-sentence summary, side, ticker, share count, fill
+    price, and confidence. Empty string if the model held all day.
+    """
+    records = _read_today_trade_records(model_key, run_date)
+    lines: list[str] = []
+    for rec in records:
+        ts_full = rec.get("timestamp", "")
+        for ex in rec.get("executions", []):
+            if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+                continue
+            decision = ex.get("decision") or {}
+            summary = (decision.get("summary") or "").strip()
+            # Fallback when an older log row has no summary field — slice the
+            # longer reasoning so the report still has *something* per trade
+            if not summary:
+                summary = ((decision.get("reasoning") or "").strip()[:160]) or "_no summary recorded_"
+            conf = decision.get("confidence")
+            conf_str = f"c{conf}/10" if conf is not None else "c?"
+            ticker = ex.get("ticker", "")
+            shares = ex.get("shares", 0) or 0
+            shares_str = f"{shares:.0f}" if shares >= 1 else f"{shares:.4f}"
+            price = ex.get("fill_price", 0) or 0
+            ts_short = (ex.get("timestamp", ts_full) or "")[:16].replace("T", " ")
+            lines.append(
+                f"- `{ts_short}`  **{ex['side']} {ticker}** × {shares_str} @ {_money(price)}  ({conf_str}) — {summary}"
+            )
+    if not lines:
+        return ""
+    return "**Today's trades:**\n\n" + "\n".join(lines)
 
 
 # ===========================================================================
@@ -646,6 +706,92 @@ def _build_intraday_session_table(
         return "_No intraday tick data recorded for this session._"
 
     return _format_table(headers, rows, aligns=["L", "C", "R", "R", "R", "R", "R", "R", "R"])
+
+
+# ===========================================================================
+# NEWS CONTEXT — top headlines from the cached news payload + which models
+#                actually traded the affected tickers
+# ===========================================================================
+
+def _build_news_context_block(
+    model_keys: list[str],
+    run_date: datetime,
+) -> str:
+    """Surface the most impactful headlines from the active news cache.
+
+    "Impactful" = highest absolute VADER sentiment magnitude. For each top
+    headline we list which models executed BUY/SELL on the affected ticker
+    today, so the report shows the news → reaction linkage even though
+    nothing in the pipeline causally proves the news drove the trade.
+
+    Returns a markdown block ready to drop into the Market Summary section.
+    """
+    cache = _read_news_cache()
+    stocks = (cache.get("stocks") or {}) if cache else {}
+    macro = (cache.get("macro") or []) if cache else []
+    if not stocks and not macro:
+        return "_News context unavailable for this session — pipeline ran on technicals only._"
+
+    # Map each universe ticker to the set of models that traded it today
+    target_date = run_date.strftime("%Y-%m-%d")
+    traders_by_ticker: dict[str, set[str]] = {}
+    settings = load_settings()
+    for key in model_keys:
+        records = _read_today_trade_records(key, run_date)
+        for rec in records:
+            for ex in rec.get("executions", []):
+                if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+                    continue
+                t = ex.get("ticker", "")
+                if not t:
+                    continue
+                label = settings["models"].get(key, {}).get("display_name", key.upper())
+                traders_by_ticker.setdefault(t, set()).add(label)
+
+    # Score every per-stock headline, keep the top 5 by absolute magnitude
+    scored: list[tuple[float, str, dict[str, Any]]] = []
+    for ticker, items in stocks.items():
+        for it in items or []:
+            title = it.get("title", "")
+            if not title:
+                continue
+            score = score_headline(title)
+            scored.append((abs(score), ticker, {**it, "score": score}))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = scored[:5]
+
+    parts: list[str] = []
+    if top:
+        parts.append("**Most impactful per-stock headlines (by sentiment magnitude):**")
+        parts.append("")
+        for _, ticker, item in top:
+            score = item.get("score", 0.0)
+            label = sentiment_label(score)
+            ts = (item.get("datetime") or "")[:16].replace("T", " ")
+            src = item.get("source", "?")
+            title = item.get("title", "")
+            traders = traders_by_ticker.get(ticker)
+            traders_str = (
+                f"  Models that traded {ticker} today: {', '.join(sorted(traders))}"
+                if traders else f"  No models traded {ticker} today."
+            )
+            parts.append(
+                f"- **{ticker}**  [`{score:+.2f}` {label}]  _{ts} {src}_:  {title}"
+            )
+            parts.append(traders_str)
+        parts.append("")
+
+    if macro:
+        parts.append("**Top macro headlines:**")
+        parts.append("")
+        for it in macro[:5]:
+            ts = (it.get("datetime") or "")[:16].replace("T", " ")
+            src = it.get("source", "?")
+            title = it.get("title", "")
+            score = score_headline(title)
+            parts.append(f"- _{ts} {src}_  [`{score:+.2f}`]:  {title}")
+
+    return "\n".join(parts) if parts else "_No headlines in cache._"
 
 
 # ===========================================================================
@@ -1019,6 +1165,7 @@ def generate_daily_report(
     breakdown_section = "\n\n".join(breakdown_blocks)
 
     intraday_session_tbl = _build_intraday_session_table(model_keys, run_date)
+    news_context_block = _build_news_context_block(model_keys, run_date)
     expansion_cohort_section = _build_expansion_cohort_section(settings, run_date)
     leaderboard_tbl = _build_leaderboard_table(model_keys, run_date)
     health_section = _build_health_section(model_keys, run_date)
@@ -1060,6 +1207,10 @@ def generate_daily_report(
         market_prose if market_prose else "_Market data unavailable for this session._",
         "",
         index_tbl,
+        "",
+        "### News Context",
+        "",
+        news_context_block,
         "",
         "---",
         "",

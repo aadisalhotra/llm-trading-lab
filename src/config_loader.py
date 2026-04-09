@@ -33,6 +33,7 @@ INTRADAY_DIR = DATA_DIR / "intraday"
 LEADERBOARD_DIR = DATA_DIR / "leaderboard"
 MODEL_VERSIONS_DIR = DATA_DIR / "model_versions"
 STATE_DIR = DATA_DIR / "state"
+NEWS_CACHE_DIR = DATA_DIR / "news_cache"
 
 _LOG_CONFIGURED = False
 
@@ -47,6 +48,7 @@ def ensure_dirs() -> None:
         LEADERBOARD_DIR,
         MODEL_VERSIONS_DIR,
         STATE_DIR,
+        NEWS_CACHE_DIR,
         LOGS_DIR,
         REPORTS_DIR,
     ):

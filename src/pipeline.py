@@ -46,10 +46,13 @@ from .dashboard import build_dashboard_payload
 from .data import (
     fetch_index_data,
     fetch_intraday_data,
+    fetch_news,
     fetch_universe_data,
+    hash_news_payload,
     is_market_open_now,
     is_market_open_today,
 )
+from .data.sentiment import compute_sentiment_dict
 from .logging import log_decision_run, log_daily_snapshot, log_intraday_snapshot
 from .reports import generate_daily_report
 from .model_versions import detect_monthly_transition, record_observation
@@ -82,6 +85,9 @@ def run_one_model(
     settings: dict[str, Any],
     logger: logging.Logger,
     is_eod: bool,
+    news_data: dict[str, Any] | None = None,
+    sentiment_data: dict[str, float] | None = None,
+    news_hash: str = "",
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -105,7 +111,8 @@ def run_one_model(
         forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP")
 
     # Build prompts + call model. Pass intraday context so the model paces
-    # its 30-trade budget across the remaining session ticks.
+    # its 30-trade budget across the remaining session ticks, and news
+    # context so it can react to fundamentals not just charts.
     snapshot_before = portfolio.snapshot(prices)
     system_prompt, user_prompt, prompt_version, images = build_prompts(
         snapshot_before,
@@ -115,6 +122,8 @@ def run_one_model(
         runs_today=portfolio.intraday.runs_today,
         is_eod=is_eod,
         include_chart_image=True,
+        news_data=news_data,
+        sentiment_data=sentiment_data,
     )
     data_hash = hash_inputs(market_data)
 
@@ -143,6 +152,8 @@ def run_one_model(
             portfolio_snapshot_after=portfolio.snapshot(prices),
             prompt_version=prompt_version, data_inputs_hash=data_hash,
             execution_mode=settings["mode"], inception_date=portfolio.inception_date,
+            news_headlines_hash=news_hash,
+            news_sentiment=sentiment_data or {},
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -197,6 +208,8 @@ def run_one_model(
         portfolio_snapshot_after=snapshot_after,
         prompt_version=prompt_version, data_inputs_hash=data_hash,
         execution_mode=settings["mode"], inception_date=portfolio.inception_date,
+        news_headlines_hash=news_hash,
+        news_sentiment=sentiment_data or {},
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])
@@ -284,6 +297,26 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
         send_alert("CRITICAL", "Market data failure", "No prices for any symbol")
         return 1
 
+    # Fetch news intelligence ONCE per pipeline tick — not per model — so all
+    # 6 models see the same headline set on the same tick. The news module
+    # caches to disk with a TTL so the actual provider call only fires when
+    # the cache is stale (default: every 60 minutes).
+    news_data: dict[str, Any] = {}
+    sentiment_data: dict[str, float] = {}
+    news_hash = ""
+    try:
+        news_data = fetch_news(symbols=universe_symbols(), settings=settings)
+        if news_data:
+            sentiment_data = compute_sentiment_dict(news_data)
+            news_hash = hash_news_payload(news_data)
+            n_stocks_with_news = sum(1 for k, v in news_data.items() if k != "macro" and v)
+            logger.info("News context: %d stocks with headlines, %d macro headlines, hash=%s",
+                        n_stocks_with_news, len(news_data.get("macro", [])), news_hash)
+        else:
+            logger.info("News context: empty (no provider key, cache miss, or all providers failed) — pipeline runs without headlines")
+    except Exception as e:
+        logger.exception("News fetch failed unexpectedly: %s — pipeline continues without headlines", e)
+
     executor = Executor()
 
     # Run each enabled model
@@ -293,7 +326,13 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
             logger.info("[%s] disabled — skipping", model_key)
             continue
         try:
-            r = run_one_model(model_key, cfg, market_data, prices, executor, run_date, settings, logger, is_eod=is_eod)
+            r = run_one_model(
+                model_key, cfg, market_data, prices, executor, run_date, settings, logger,
+                is_eod=is_eod,
+                news_data=news_data,
+                sentiment_data=sentiment_data,
+                news_hash=news_hash,
+            )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
             send_alert("CRITICAL", f"Unhandled error in {model_key}", str(e), {"model": model_key})

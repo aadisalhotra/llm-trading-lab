@@ -159,11 +159,18 @@ class BaseAdapter(ABC):
             except (TypeError, ValueError):
                 confidence = 5
             confidence = max(1, min(10, confidence))
+            # `summary` is the new one-sentence plain-English explanation
+            # that surfaces in the dashboard trade feed and report breakdown.
+            # Models that don't produce one (older prompt versions, retried
+            # calls, etc.) get a defaulted blank — the rest of the pipeline
+            # tolerates an empty summary.
+            summary = str(d.get("summary", "")).strip()
             normalized.append({
                 "action": action,
                 "ticker": ticker,
                 "target_weight": max(0.0, min(1.0, target_weight)),
                 "confidence": confidence,
+                "summary": summary,
                 "reasoning": str(d.get("reasoning", "")).strip(),
             })
 

@@ -47,6 +47,7 @@ def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any
                     for ex in rec.get("executions", []):
                         if not ex.get("executed") or ex.get("side") in ("HOLD", "SKIP"):
                             continue
+                        decision = ex.get("decision", {}) or {}
                         all_records.append({
                             "timestamp": ex.get("timestamp", rec["timestamp"]),
                             "date": rec["date"],
@@ -56,11 +57,58 @@ def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any
                             "shares": ex["shares"],
                             "fill_price": ex["fill_price"],
                             "notional": ex["notional"],
-                            "confidence": ex.get("decision", {}).get("confidence"),
-                            "reasoning": ex.get("decision", {}).get("reasoning", ""),
+                            "confidence": decision.get("confidence"),
+                            "summary": decision.get("summary", ""),
+                            "reasoning": decision.get("reasoning", ""),
                         })
     all_records.sort(key=lambda r: r["timestamp"], reverse=True)
     return all_records[:limit]
+
+
+def _recent_summaries_per_model(
+    model_keys: list[str],
+    n: int = 3,
+) -> dict[str, list[dict[str, Any]]]:
+    """Last N trade summaries for each model — drives the leaderboard hover tooltip.
+
+    Returns {model_key: [{timestamp, side, ticker, confidence, summary}, ...]}
+    sorted newest-first per model. Only counts BUY/SELL executions (no HOLDs).
+    """
+    out: dict[str, list[dict[str, Any]]] = {}
+    if not TRADES_DIR.exists():
+        return {k: [] for k in model_keys}
+    for key in model_keys:
+        pattern = re.compile(rf"^{re.escape(key)}_\d{{4}}-\d{{2}}\.jsonl$")
+        files = sorted(
+            (fp for fp in TRADES_DIR.iterdir() if fp.is_file() and pattern.match(fp.name)),
+            key=lambda fp: fp.name,
+        )
+        records: list[dict[str, Any]] = []
+        for fp in files[-2:]:
+            with open(fp, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    for ex in rec.get("executions", []):
+                        if not ex.get("executed") or ex.get("side") in ("HOLD", "SKIP"):
+                            continue
+                        decision = ex.get("decision", {}) or {}
+                        summary = decision.get("summary", "") or (decision.get("reasoning", "") or "")[:160]
+                        records.append({
+                            "timestamp": ex.get("timestamp", rec.get("timestamp", "")),
+                            "side": ex.get("side", ""),
+                            "ticker": ex.get("ticker", ""),
+                            "confidence": decision.get("confidence"),
+                            "summary": summary,
+                        })
+        records.sort(key=lambda r: r["timestamp"], reverse=True)
+        out[key] = records[:n]
+    return out
 
 
 def _equity_curve(model_key: str) -> list[dict[str, Any]]:
@@ -114,13 +162,16 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     model_keys = list(settings["models"].keys())
 
     leaderboard = build_leaderboard(model_keys)
-    # Annotate each leaderboard row with cohort + display_name from settings
-    # so the frontend can render badges and pretty labels without re-reading
-    # the config.
+    # Recent trade summaries per model — used by the leaderboard hover tooltip
+    summaries_by_key = _recent_summaries_per_model(model_keys, n=3)
+    # Annotate each leaderboard row with cohort, display_name, and recent
+    # summaries so the frontend can render badges + tooltips without
+    # re-reading the config or re-walking the trade log.
     for row in leaderboard:
         cfg = settings["models"].get(row["model_key"], {})
         row["cohort"] = cfg.get("cohort", "core")
         row["display_name"] = cfg.get("display_name", row["model_key"].upper())
+        row["recent_summaries"] = summaries_by_key.get(row["model_key"], [])
 
     portfolios: list[dict[str, Any]] = []
     for key in model_keys:
