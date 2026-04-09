@@ -23,6 +23,7 @@ import pandas as pd
 
 from ..analytics import build_leaderboard, load_performance_history
 from ..config_loader import (
+    INTRADAY_DIR,
     LEADERBOARD_DIR,
     PERFORMANCE_DIR,
     REPORTS_DIR,
@@ -159,6 +160,53 @@ def _read_today_trade_record(model_key: str, run_date: datetime) -> dict[str, An
             if rec.get("date") == target_date:
                 last_match = rec
     return last_match
+
+
+def _read_today_trade_records(model_key: str, run_date: datetime) -> list[dict[str, Any]]:
+    """ALL decision-log entries for this model on run_date.
+
+    Intraday-aware version of `_read_today_trade_record` — the daily report
+    needs every tick to count total trades and aggregate reasoning, not just
+    the last one. Sorted by timestamp ascending.
+    """
+    month_str = run_date.strftime("%Y-%m")
+    path = TRADES_DIR / f"{model_key}_{month_str}.jsonl"
+    if not path.exists():
+        return []
+    target_date = run_date.strftime("%Y-%m-%d")
+    out: list[dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("date") == target_date:
+                out.append(rec)
+    out.sort(key=lambda r: r.get("timestamp", ""))
+    return out
+
+
+def _read_intraday_curve(model_key: str, run_date: datetime) -> list[dict[str, Any]]:
+    """Read /data/intraday/{model}_{date}.jsonl for today's tick-by-tick valuations."""
+    date_str = run_date.strftime("%Y-%m-%d")
+    path = INTRADAY_DIR / f"{model_key}_{date_str}.jsonl"
+    if not path.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return out
 
 
 def _daily_pnl(model_key: str) -> tuple[float | None, float | None]:
@@ -352,14 +400,15 @@ def _build_performance_table(
         cum_ret = float(df["cumulative_return"].iloc[-1])
         daily_pnl, daily_pct = _daily_pnl(key)
 
-        # Trades executed today from the trade log
-        record = _read_today_trade_record(key, run_date)
+        # Total trades today across ALL intraday ticks (not just the last one)
+        records = _read_today_trade_records(key, run_date)
         n_trades = 0
-        if record:
-            n_trades = sum(
-                1 for e in record.get("executions", [])
-                if e.get("executed") and e.get("side") in ("BUY", "SELL")
-            )
+        for rec in records:
+            for e in rec.get("executions", []):
+                if e.get("executed") and e.get("side") in ("BUY", "SELL"):
+                    n_trades += 1
+        # Keep `record` pointing at the most recent tick for api_success display
+        record = records[-1] if records else None
 
         # Alpha vs SPY for the run
         alpha = None
@@ -509,6 +558,79 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
 
     sentences = [s for s in (s1, s2, s3, s4, s5) if s]
     return " ".join(sentences)
+
+
+# ===========================================================================
+# INTRADAY SESSION SUMMARY — aggregates all 15-min ticks of the day
+# ===========================================================================
+
+def _build_intraday_session_table(
+    model_keys: list[str],
+    run_date: datetime,
+) -> str:
+    """One row per model showing the day's intraday activity profile.
+
+    Pulls from both the intraday valuation log (high/low/range) and the
+    decision log (trades, runs, first/last tick) so every column comes
+    straight from the source-of-truth files.
+    """
+    headers = ["Model", "Ticks", "Trades", "First Tick", "Last Tick",
+               "Intraday High", "Intraday Low", "Range %"]
+    rows: list[list[str]] = []
+    any_data = False
+
+    for key in model_keys:
+        ticks = _read_intraday_curve(key, run_date)
+        records = _read_today_trade_records(key, run_date)
+        n_runs = len(ticks) or len(records)
+        if n_runs == 0:
+            continue
+        any_data = True
+
+        # Trade total across all ticks of the day
+        n_trades = 0
+        for rec in records:
+            for e in rec.get("executions", []):
+                if e.get("executed") and e.get("side") in ("BUY", "SELL"):
+                    n_trades += 1
+
+        # Intraday high/low/range from the valuation snapshots
+        if ticks:
+            values = [float(t.get("total_value", 0)) for t in ticks if t.get("total_value")]
+            hi = max(values) if values else None
+            lo = min(values) if values else None
+            range_pct = ((hi - lo) / lo) if (hi is not None and lo and lo > 0) else None
+            first_ts = ticks[0].get("timestamp", "")
+            last_ts = ticks[-1].get("timestamp", "")
+        else:
+            hi = lo = range_pct = None
+            first_ts = records[0].get("timestamp", "") if records else ""
+            last_ts = records[-1].get("timestamp", "") if records else ""
+
+        # Compact HH:MM ET-ish display — strip down ISO timestamps
+        def _short_ts(ts: str) -> str:
+            if not ts:
+                return "—"
+            # ISO format like 2026-04-09T14:23:11-04:00
+            if "T" in ts:
+                return ts.split("T", 1)[1][:5]
+            return ts[-8:-3] if len(ts) >= 8 else ts
+
+        rows.append([
+            key.upper(),
+            str(n_runs),
+            str(n_trades),
+            _short_ts(first_ts),
+            _short_ts(last_ts),
+            _money(hi) if hi is not None else "—",
+            _money(lo) if lo is not None else "—",
+            _pct(range_pct, sign=False) if range_pct is not None else "—",
+        ])
+
+    if not any_data:
+        return "_No intraday tick data recorded for this session._"
+
+    return _format_table(headers, rows, aligns=["L", "R", "R", "R", "R", "R", "R", "R"])
 
 
 # ===========================================================================
@@ -666,6 +788,7 @@ def generate_daily_report(
         breakdown_blocks.append(f"### {key.upper()}\n\n{_model_breakdown(key, run_date)}")
     breakdown_section = "\n\n".join(breakdown_blocks)
 
+    intraday_session_tbl = _build_intraday_session_table(model_keys, run_date)
     leaderboard_tbl = _build_leaderboard_table(model_keys, run_date)
     health_section = _build_health_section(model_keys, run_date)
 
@@ -718,6 +841,12 @@ def generate_daily_report(
         "## Model-by-Model Breakdown",
         "",
         breakdown_section,
+        "",
+        "---",
+        "",
+        "## Intraday Session Profile",
+        "",
+        intraday_session_tbl,
         "",
         "---",
         "",

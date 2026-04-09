@@ -1,6 +1,13 @@
-// LLM Trading Lab — Bloomberg-style terminal dashboard renderer
-// Pure-JS canvas charts: master equity chart (interactive, zoomable, hover crosshair),
-// per-row sparklines, and per-model mini charts. No external libraries.
+// LLM Trading Lab — Bloomberg-style intraday terminal dashboard
+// Powered by TradingView's lightweight-charts (loaded as a global from CDN).
+// Renders three layers:
+//   1. Master chart: SPY candlesticks + 20-SMA + model equity overlays + volume
+//   2. RSI(14) panel under the master chart
+//   3. Per-model mini line charts (TradingView line series)
+// Plus the existing leaderboard sparklines (still hand-drawn canvas) and
+// trade/portfolio/version panels.
+//
+// Data source: ../data/dashboard.json — refreshed every 5 minutes.
 
 const DATA_URL = "../data/dashboard.json";
 const REFRESH_MS = 5 * 60 * 1000;
@@ -13,10 +20,16 @@ const MODEL_COLORS = {
   deepseek: "#ff5599",
 };
 const SPY_COLOR = "#6b7585";
+const ACCENT = "#2b8aff";
+const GREEN = "#00d488";
+const RED = "#ff3355";
+const TEXT = "#c8d4e6";
+const TEXT_DIM = "#5f6b80";
+const BG = "#05070b";
+const GRID = "#1a2235";
 
 const MODEL_ORDER = ["claude", "gpt", "gemini", "grok", "deepseek"];
 
-// Global UI state
 const state = {
   timeframe: "ALL",
   mutedSeries: new Set(),
@@ -61,288 +74,443 @@ async function loadData() {
   }
 }
 
+// ===== TradingView shared chart options =====
+function chartOptions(extra = {}) {
+  return Object.assign({
+    layout: {
+      background: { type: "solid", color: BG },
+      textColor: TEXT_DIM,
+      fontSize: 10,
+      fontFamily: "JetBrains Mono, monospace",
+    },
+    grid: {
+      vertLines: { color: GRID, style: 1 },
+      horzLines: { color: GRID, style: 1 },
+    },
+    rightPriceScale: {
+      borderColor: GRID,
+      scaleMargins: { top: 0.1, bottom: 0.1 },
+    },
+    timeScale: {
+      borderColor: GRID,
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    crosshair: {
+      mode: 1, // magnet
+      vertLine: { color: ACCENT, width: 1, style: 2, labelBackgroundColor: ACCENT },
+      horzLine: { color: ACCENT, width: 1, style: 2, labelBackgroundColor: ACCENT },
+    },
+    handleScroll: true,
+    handleScale: true,
+  }, extra);
+}
+
+// ===== Time helpers =====
+// lightweight-charts wants seconds-since-epoch (UTC) for intraday and a
+// date string for daily. We unify on UNIX seconds throughout — daily series
+// use the bar's UTC midnight.
+function dateToUnix(dateStr) {
+  // dateStr is "YYYY-MM-DD"
+  return Math.floor(new Date(dateStr + "T00:00:00Z").getTime() / 1000);
+}
+function isoToUnix(iso) {
+  return Math.floor(new Date(iso).getTime() / 1000);
+}
+
+// ===== Indicators =====
+function computeSMA(values, window) {
+  const out = new Array(values.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i];
+    if (i >= window) sum -= values[i - window];
+    if (i >= window - 1) out[i] = sum / window;
+  }
+  return out;
+}
+
+function computeRSI(closes, period = 14) {
+  const out = new Array(closes.length).fill(null);
+  if (closes.length < period + 1) return out;
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) avgGain += diff; else avgLoss -= diff;
+  }
+  avgGain /= period;
+  avgLoss /= period;
+  out[period] = 100 - 100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss));
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    out[i] = 100 - 100 / (1 + rs);
+  }
+  return out;
+}
+
 // ===== Series builders =====
-// Build normalized series (rebased to 0 at first point of the *filtered* window).
-// Each series: { key, color, dashed, points: [{date, value}] }
-function buildSeries(data) {
+// Build per-model normalized line series in lightweight-charts format:
+//   [{time: unixSeconds, value: pctReturn}, ...]
+//
+// `mode` is "EOD" (uses equity_curves) or "TODAY" (uses intraday_curves).
+function buildModelLineSeries(data, mode) {
+  if (mode === "TODAY") {
+    const curves = data.intraday_curves || {};
+    const out = [];
+    MODEL_ORDER.forEach(key => {
+      const points = curves[key];
+      if (!points || points.length < 1) return;
+      const base = points[0].value;
+      if (!base) return;
+      const series = points
+        .filter(p => p.timestamp)
+        .map(p => ({
+          time: isoToUnix(p.timestamp),
+          value: (p.value / base) - 1,
+        }));
+      if (series.length) out.push({ key, color: MODEL_COLORS[key], data: series });
+    });
+    return out;
+  }
+
+  // EOD mode — daily snapshots from equity_curves, optionally trimmed to a window
   const curves = data.equity_curves || {};
-  const series = [];
-  MODEL_ORDER.forEach(key => {
-    const points = curves[key];
-    if (!points || points.length < 1) return;
-    series.push({
-      key,
-      label: key.toUpperCase(),
-      color: MODEL_COLORS[key],
-      dashed: false,
-      raw: points.map(p => ({ date: p.date, raw: p.value })),
-    });
-  });
-
-  // Synthesize SPY series from any model's benchmark prices
-  let spyPoints = null;
-  for (const key of MODEL_ORDER) {
-    const c = curves[key];
-    if (c && c.length && c[0].benchmark != null) {
-      spyPoints = c.map(p => ({ date: p.date, raw: p.benchmark }));
-      break;
-    }
-  }
-  if (spyPoints) {
-    series.push({
-      key: "spy",
-      label: "SPY",
-      color: SPY_COLOR,
-      dashed: true,
-      raw: spyPoints,
-    });
-  }
-  return series;
-}
-
-// Filter raw series by timeframe and rebase to 0 at window start
-function filterAndRebase(series, timeframe) {
   const tfMap = { "1W": 5, "1M": 21, "3M": 63 };
-  return series.map(s => {
-    let raw = s.raw;
-    if (timeframe !== "ALL") {
-      const n = tfMap[timeframe] || raw.length;
-      raw = raw.slice(-n);
+  const out = [];
+  MODEL_ORDER.forEach(key => {
+    let points = curves[key];
+    if (!points || points.length < 1) return;
+    if (state.timeframe !== "ALL" && tfMap[state.timeframe]) {
+      points = points.slice(-tfMap[state.timeframe]);
     }
-    if (!raw.length) return { ...s, points: [] };
-    const base = raw[0].raw;
-    const points = base
-      ? raw.map(p => ({ date: p.date, value: (p.raw / base) - 1 }))
-      : raw.map(p => ({ date: p.date, value: 0 }));
-    return { ...s, points };
+    if (!points.length) return;
+    const base = points[0].value;
+    if (!base) return;
+    const series = points.map(p => ({
+      time: dateToUnix(p.date),
+      value: (p.value / base) - 1,
+    }));
+    out.push({ key, color: MODEL_COLORS[key], data: series });
+  });
+  return out;
+}
+
+// Build SPY candlestick + volume series. We don't have OHLCV in the dashboard
+// payload — only a single benchmark price per row — so for the EOD view we
+// fake candles by reusing the close as O/H/L/C (a flat tick), and for the
+// TODAY view we use the intraday benchmark prices the same way. This still
+// gives the visual frame and lets the model overlays sit on a recognizable
+// candle chart, even though the wicks/bodies are degenerate. Real OHLCV
+// would require expanding the backend payload — phase 2.
+function buildSPYCandles(data, mode) {
+  let prices = [];
+  if (mode === "TODAY") {
+    const curves = data.intraday_curves || {};
+    const refModel = MODEL_ORDER.find(k => (curves[k] || []).some(p => p.benchmark));
+    if (refModel) {
+      prices = (curves[refModel] || [])
+        .filter(p => p.benchmark && p.timestamp)
+        .map(p => ({ time: isoToUnix(p.timestamp), price: p.benchmark }));
+    }
+  } else {
+    const curves = data.equity_curves || {};
+    const refModel = MODEL_ORDER.find(k => (curves[k] || []).some(p => p.benchmark));
+    if (refModel) {
+      let pts = curves[refModel] || [];
+      const tfMap = { "1W": 5, "1M": 21, "3M": 63 };
+      if (state.timeframe !== "ALL" && tfMap[state.timeframe]) {
+        pts = pts.slice(-tfMap[state.timeframe]);
+      }
+      prices = pts
+        .filter(p => p.benchmark)
+        .map(p => ({ time: dateToUnix(p.date), price: p.benchmark }));
+    }
+  }
+  // Build degenerate candles (flat O=H=L=C) — better than no chart
+  const candles = prices.map((p, i) => {
+    const prev = i > 0 ? prices[i - 1].price : p.price;
+    const open = prev;
+    const close = p.price;
+    return {
+      time: p.time,
+      open,
+      high: Math.max(open, close),
+      low: Math.min(open, close),
+      close,
+    };
+  });
+  return candles;
+}
+
+function buildSMAOverlay(candles, window) {
+  if (!candles.length) return [];
+  const closes = candles.map(c => c.close);
+  const sma = computeSMA(closes, window);
+  return candles
+    .map((c, i) => sma[i] != null ? { time: c.time, value: sma[i] } : null)
+    .filter(Boolean);
+}
+
+function buildRSISeries(candles, period = 14) {
+  if (!candles.length) return [];
+  const closes = candles.map(c => c.close);
+  const rsi = computeRSI(closes, period);
+  return candles
+    .map((c, i) => rsi[i] != null ? { time: c.time, value: rsi[i] } : null)
+    .filter(Boolean);
+}
+
+// ===== Master chart (TradingView) =====
+let masterChart = null;
+let rsiChart = null;
+let masterSeries = {}; // { spyCandle, sma, rsi, modelLines: {key: series} }
+
+function initMasterChart() {
+  const el = document.getElementById("master-chart");
+  el.innerHTML = "";
+  masterChart = LightweightCharts.createChart(el, chartOptions({
+    width: el.clientWidth,
+    height: 340,
+  }));
+
+  masterSeries.spyCandle = masterChart.addCandlestickSeries({
+    upColor: GREEN,
+    downColor: RED,
+    borderUpColor: GREEN,
+    borderDownColor: RED,
+    wickUpColor: GREEN,
+    wickDownColor: RED,
+    priceScaleId: "right",
+  });
+  // SPY candles use the absolute price scale on the right
+  masterChart.priceScale("right").applyOptions({ visible: true, borderColor: GRID });
+
+  masterSeries.sma = masterChart.addLineSeries({
+    color: ACCENT,
+    lineWidth: 1,
+    lineStyle: 0,
+    priceScaleId: "right",
+    lastValueVisible: false,
+    priceLineVisible: false,
+  });
+
+  // Model equity overlays go on a SEPARATE % scale on the left so percentages
+  // and SPY price live in the same chart without one squashing the other
+  masterSeries.modelLines = {};
+  MODEL_ORDER.forEach(key => {
+    const line = masterChart.addLineSeries({
+      color: MODEL_COLORS[key],
+      lineWidth: 2,
+      priceScaleId: "left",
+      lastValueVisible: true,
+      priceLineVisible: false,
+      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+    });
+    masterSeries.modelLines[key] = line;
+  });
+  masterChart.priceScale("left").applyOptions({
+    visible: true,
+    borderColor: GRID,
+    scaleMargins: { top: 0.1, bottom: 0.1 },
+  });
+
+  // RSI panel
+  const rsiEl = document.getElementById("rsi-chart");
+  rsiEl.innerHTML = "";
+  rsiChart = LightweightCharts.createChart(rsiEl, chartOptions({
+    width: rsiEl.clientWidth,
+    height: 90,
+    rightPriceScale: { borderColor: GRID, scaleMargins: { top: 0.1, bottom: 0.1 } },
+    timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
+  }));
+  masterSeries.rsi = rsiChart.addLineSeries({
+    color: "#b478ff",
+    lineWidth: 1.4,
+    priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+  });
+  // 30/70 reference lines for RSI
+  masterSeries.rsi.createPriceLine({ price: 70, color: RED, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "70" });
+  masterSeries.rsi.createPriceLine({ price: 30, color: GREEN, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "30" });
+
+  // Sync the two charts on the time axis so the crosshair lines up
+  masterChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+    if (range && rsiChart) rsiChart.timeScale().setVisibleLogicalRange(range);
   });
 }
 
-// ===== Generic line chart engine =====
-class LineChart {
-  constructor(canvas, opts = {}) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
-    this.opts = Object.assign({
-      pad: { l: 56, r: 16, t: 12, b: 28 },
-      showAxes: true,
-      showGrid: true,
-      interactive: false,
-      tooltipEl: null,
-      lineWidth: 1.8,
-      smallMode: false,
-    }, opts);
-    this.series = [];
-    this.hoverIdx = null;
-    if (this.opts.interactive) {
-      canvas.addEventListener("mousemove", e => this._onMove(e));
-      canvas.addEventListener("mouseleave", () => {
-        this.hoverIdx = null;
-        if (this.opts.tooltipEl) this.opts.tooltipEl.style.display = "none";
-        this.draw();
-      });
-    }
-  }
+function refreshMasterChart() {
+  if (!state.data) return;
+  if (!masterChart) initMasterChart();
 
-  setSeries(series) {
-    this.series = series;
-    this.hoverIdx = null;
-    this.draw();
-  }
+  const mode = state.timeframe === "TODAY" ? "TODAY" : "EOD";
+  const candles = buildSPYCandles(state.data, mode);
+  const sma = buildSMAOverlay(candles, 20);
+  const rsi = buildRSISeries(candles, 14);
+  const modelLines = buildModelLineSeries(state.data, mode);
 
-  _xRange() {
-    // Use the longest series for x axis count
-    const lens = this.series.filter(s => !s.muted).map(s => s.points.length);
-    return Math.max(0, ...lens);
-  }
+  masterSeries.spyCandle.setData(candles);
+  masterSeries.sma.setData(sma);
+  masterSeries.rsi.setData(rsi);
 
-  _yRange() {
-    let yMin = Infinity, yMax = -Infinity;
-    this.series.forEach(s => {
-      if (s.muted) return;
-      s.points.forEach(p => {
-        if (p.value < yMin) yMin = p.value;
-        if (p.value > yMax) yMax = p.value;
-      });
+  // Reset all model lines, then populate visible ones
+  MODEL_ORDER.forEach(key => {
+    masterSeries.modelLines[key].setData([]);
+  });
+  modelLines.forEach(s => {
+    if (state.mutedSeries.has(s.key)) return;
+    masterSeries.modelLines[s.key].setData(s.data);
+  });
+
+  if (candles.length) masterChart.timeScale().fitContent();
+  renderLegend(modelLines);
+}
+
+function renderLegend(modelLines) {
+  const legend = document.getElementById("chart-legend");
+  legend.innerHTML = "";
+  // SPY swatch
+  const spy = document.createElement("div");
+  spy.className = "legend-item dashed";
+  spy.innerHTML = `<span class="legend-swatch" style="background:${SPY_COLOR}"></span><span>SPY (candle)</span>`;
+  legend.appendChild(spy);
+
+  modelLines.forEach(s => {
+    const item = document.createElement("div");
+    item.className = "legend-item" + (state.mutedSeries.has(s.key) ? " muted" : "");
+    item.innerHTML = `<span class="legend-swatch" style="background:${s.color}"></span><span>${s.key.toUpperCase()}</span>`;
+    item.addEventListener("click", () => {
+      if (state.mutedSeries.has(s.key)) state.mutedSeries.delete(s.key);
+      else state.mutedSeries.add(s.key);
+      refreshMasterChart();
     });
-    if (yMin === Infinity) { yMin = -0.01; yMax = 0.01; }
-    if (yMin === yMax) { yMin -= 0.01; yMax += 0.01; }
-    const pad = (yMax - yMin) * 0.12;
-    return { yMin: yMin - pad, yMax: yMax + pad };
-  }
+    legend.appendChild(item);
+  });
 
-  _onMove(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const { l, r } = this.opts.pad;
-    const w = rect.width - l - r;
-    const maxLen = this._xRange();
-    if (maxLen < 2) return;
-    const rel = (x - l) / w;
-    if (rel < 0 || rel > 1) {
-      this.hoverIdx = null;
-      if (this.opts.tooltipEl) this.opts.tooltipEl.style.display = "none";
-      this.draw();
-      return;
-    }
-    this.hoverIdx = Math.round(rel * (maxLen - 1));
-    this.hoverIdx = Math.max(0, Math.min(maxLen - 1, this.hoverIdx));
-    this.draw();
-    this._renderTooltip(e);
-  }
+  // SMA + RSI labels
+  const sma = document.createElement("div");
+  sma.className = "legend-item";
+  sma.innerHTML = `<span class="legend-swatch" style="background:${ACCENT}"></span><span>SMA(20)</span>`;
+  legend.appendChild(sma);
+  const rsi = document.createElement("div");
+  rsi.className = "legend-item";
+  rsi.innerHTML = `<span class="legend-swatch" style="background:#b478ff"></span><span>RSI(14)</span>`;
+  legend.appendChild(rsi);
+}
 
-  _renderTooltip(e) {
-    const tt = this.opts.tooltipEl;
-    if (!tt) return;
-    const idx = this.hoverIdx;
-    if (idx == null) { tt.style.display = "none"; return; }
-    // Pick a date from any series that has this index
-    let date = "—";
-    for (const s of this.series) {
-      if (s.points[idx]) { date = s.points[idx].date; break; }
-    }
-    let html = `<div class="tt-date">${date}</div>`;
-    this.series.forEach(s => {
-      if (s.muted) return;
-      const p = s.points[idx];
-      if (!p) return;
-      const cls = p.value >= 0 ? "pos" : "neg";
-      const sign = p.value >= 0 ? "+" : "";
-      const valStr = sign + (p.value * 100).toFixed(2) + "%";
-      html += `
-        <div class="tt-row">
-          <span class="tt-label"><span class="tt-swatch" style="background:${s.color}"></span>${s.label}</span>
-          <span class="tt-val ${cls}" style="color:${p.value >= 0 ? '#00d488' : '#ff3355'}">${valStr}</span>
-        </div>`;
+// ===== Per-model mini charts (TradingView line series) =====
+const miniCharts = {};
+
+function renderModelMiniCharts() {
+  if (!state.data) return;
+  const grid = document.getElementById("model-charts-grid");
+  grid.innerHTML = "";
+  // Tear down old chart instances to avoid leaks
+  Object.values(miniCharts).forEach(c => { try { c.remove(); } catch (e) {} });
+  Object.keys(miniCharts).forEach(k => delete miniCharts[k]);
+
+  const mode = state.timeframe === "TODAY" ? "TODAY" : "EOD";
+  const lines = buildModelLineSeries(state.data, mode);
+  const linesByKey = Object.fromEntries(lines.map(s => [s.key, s]));
+
+  MODEL_ORDER.forEach(key => {
+    const series = linesByKey[key];
+    const card = document.createElement("div");
+    card.className = "mini-chart-card";
+
+    const lastVal = series && series.data.length
+      ? series.data[series.data.length - 1].value
+      : 0;
+    const color = lastVal > 0 ? GREEN : (lastVal < 0 ? RED : TEXT_DIM);
+
+    card.innerHTML = `
+      <div class="mc-header">
+        <span class="mc-name"><span class="swatch" style="background:${MODEL_COLORS[key]}"></span>${key.toUpperCase()}</span>
+        <span class="mc-return" style="color:${color}">${fmtPct(lastVal)}</span>
+      </div>
+      <div class="mc-sub">${state.timeframe} // vs SPY</div>
+      <div class="tv-mini"></div>
+      <div class="mc-spy">
+        <span>${state.timeframe} window</span>
+        <span>${series ? series.data.length + " pts" : "no data"}</span>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    const mountEl = card.querySelector(".tv-mini");
+    const chart = LightweightCharts.createChart(mountEl, chartOptions({
+      width: mountEl.clientWidth,
+      height: 110,
+      rightPriceScale: {
+        borderColor: GRID,
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+        visible: false,
+      },
+      timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
+      handleScroll: false,
+      handleScale: false,
+    }));
+    const lineSeries = chart.addLineSeries({
+      color: MODEL_COLORS[key],
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
     });
-    tt.innerHTML = html;
-    tt.style.display = "block";
-    // Position: clamp to canvas
-    const rect = this.canvas.getBoundingClientRect();
-    const wrapRect = this.canvas.parentElement.getBoundingClientRect();
-    const ttW = tt.offsetWidth;
-    const ttH = tt.offsetHeight;
-    let left = e.clientX - wrapRect.left + 14;
-    let top = e.clientY - wrapRect.top + 14;
-    if (left + ttW > wrapRect.width - 4) left = e.clientX - wrapRect.left - ttW - 14;
-    if (top + ttH > wrapRect.height - 4) top = wrapRect.height - ttH - 4;
-    tt.style.left = left + "px";
-    tt.style.top = top + "px";
-  }
+    if (series) lineSeries.setData(series.data);
+    chart.timeScale().fitContent();
+    miniCharts[key] = chart;
+  });
 
-  draw() {
-    const canvas = this.canvas;
-    const ctx = this.ctx;
-    const dpr = window.devicePixelRatio || 1;
-    const cssW = canvas.clientWidth || 800;
-    const cssH = canvas.clientHeight || 280;
-    if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
-      canvas.width = cssW * dpr;
-      canvas.height = cssH * dpr;
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
+  // SPY benchmark card
+  const spyCandles = buildSPYCandles(state.data, mode);
+  if (spyCandles.length) {
+    const first = spyCandles[0].close;
+    const last = spyCandles[spyCandles.length - 1].close;
+    const ret = first ? (last / first) - 1 : 0;
+    const color = ret > 0 ? GREEN : (ret < 0 ? RED : TEXT_DIM);
 
-    const { l: padL, r: padR, t: padT, b: padB } = this.opts.pad;
-    const w = cssW - padL - padR;
-    const h = cssH - padT - padB;
+    const card = document.createElement("div");
+    card.className = "mini-chart-card";
+    card.innerHTML = `
+      <div class="mc-header">
+        <span class="mc-name"><span class="swatch" style="background:${SPY_COLOR}"></span>SPY // BENCHMARK</span>
+        <span class="mc-return" style="color:${color}">${fmtPct(ret)}</span>
+      </div>
+      <div class="mc-sub">${state.timeframe} // S&P 500 ETF</div>
+      <div class="tv-mini"></div>
+      <div class="mc-spy">
+        <span>REFERENCE INDEX</span>
+        <span>${spyCandles.length} pts</span>
+      </div>
+    `;
+    grid.appendChild(card);
 
-    const visible = this.series.filter(s => !s.muted && s.points.length >= 1);
-    if (!visible.length) {
-      ctx.fillStyle = "#5f6b80";
-      ctx.font = "10px JetBrains Mono, monospace";
-      ctx.fillText("// no data", padL, padT + h / 2);
-      return;
-    }
-
-    const { yMin, yMax } = this._yRange();
-    const maxLen = this._xRange();
-
-    // Grid
-    ctx.strokeStyle = "#1a2235";
-    ctx.lineWidth = 1;
-    ctx.font = (this.opts.smallMode ? "9px" : "10px") + " JetBrains Mono, monospace";
-    ctx.fillStyle = "#5f6b80";
-    const gridLines = this.opts.smallMode ? 3 : 5;
-    for (let i = 0; i <= gridLines - 1; i++) {
-      const y = padT + (h * i) / (gridLines - 1);
-      const v = yMax - ((yMax - yMin) * i) / (gridLines - 1);
-      ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(padL + w, y);
-      ctx.stroke();
-      const label = (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
-      ctx.fillText(label.padStart(7), 4, y + 3);
-    }
-
-    // Zero line — emphasized
-    if (yMin < 0 && yMax > 0) {
-      const yz = padT + h * (yMax / (yMax - yMin));
-      ctx.strokeStyle = "#243049";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(padL, yz);
-      ctx.lineTo(padL + w, yz);
-      ctx.stroke();
-    }
-
-    // Plot series
-    visible.forEach(s => {
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = this.opts.lineWidth;
-      if (s.dashed) ctx.setLineDash([4, 4]); else ctx.setLineDash([]);
-      ctx.beginPath();
-      const pts = s.points;
-      pts.forEach((p, i) => {
-        const x = padL + (w * i) / (maxLen - 1 || 1);
-        const y = padT + h * (1 - (p.value - yMin) / (yMax - yMin));
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-      ctx.setLineDash([]);
+    const mountEl = card.querySelector(".tv-mini");
+    const chart = LightweightCharts.createChart(mountEl, chartOptions({
+      width: mountEl.clientWidth,
+      height: 110,
+      rightPriceScale: { borderColor: GRID, scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false },
+      timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
+      handleScroll: false,
+      handleScale: false,
+    }));
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: GREEN, downColor: RED,
+      borderUpColor: GREEN, borderDownColor: RED,
+      wickUpColor: GREEN, wickDownColor: RED,
     });
-
-    // Date axis (first + last)
-    if (this.opts.showAxes) {
-      ctx.fillStyle = "#5f6b80";
-      const ref = visible[0].points;
-      if (ref.length) {
-        ctx.fillText(ref[0].date, padL, cssH - 8);
-        const last = ref[ref.length - 1].date;
-        const m = ctx.measureText(last);
-        ctx.fillText(last, padL + w - m.width, cssH - 8);
-      }
-    }
-
-    // Crosshair + hover dots
-    if (this.hoverIdx != null && maxLen > 1) {
-      const x = padL + (w * this.hoverIdx) / (maxLen - 1);
-      ctx.strokeStyle = "#2b8aff";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      ctx.moveTo(x, padT);
-      ctx.lineTo(x, padT + h);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Dots
-      visible.forEach(s => {
-        const p = s.points[this.hoverIdx];
-        if (!p) return;
-        const y = padT + h * (1 - (p.value - yMin) / (yMax - yMin));
-        ctx.fillStyle = s.color;
-        ctx.beginPath();
-        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#05070b";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      });
-    }
+    candleSeries.setData(spyCandles);
+    chart.timeScale().fitContent();
+    miniCharts.spy = chart;
   }
 }
 
-// ===== Sparkline (lightweight, non-interactive) =====
+// ===== Sparklines (still hand-drawn canvas — small enough to not need TV) =====
 function drawSparkline(canvas, points) {
   if (!canvas || !points || points.length < 1) return;
   const ctx = canvas.getContext("2d");
@@ -364,10 +532,9 @@ function drawSparkline(canvas, points) {
   yMin -= pad; yMax += pad;
 
   const last = norm[norm.length - 1];
-  const color = last >= 0 ? "#00d488" : "#ff3355";
+  const color = last >= 0 ? GREEN : RED;
   const fill = last >= 0 ? "rgba(0,212,136,0.18)" : "rgba(255,51,85,0.18)";
 
-  // Fill area
   ctx.beginPath();
   norm.forEach((v, i) => {
     const x = (cssW * i) / (norm.length - 1 || 1);
@@ -380,7 +547,6 @@ function drawSparkline(canvas, points) {
   ctx.fillStyle = fill;
   ctx.fill();
 
-  // Line
   ctx.beginPath();
   norm.forEach((v, i) => {
     const x = (cssW * i) / (norm.length - 1 || 1);
@@ -391,12 +557,10 @@ function drawSparkline(canvas, points) {
   ctx.lineWidth = 1.4;
   ctx.stroke();
 
-  // Endpoint dot
-  const lx = cssW;
   const ly = cssH * (1 - (last - yMin) / (yMax - yMin));
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(lx - 1, ly, 1.8, 0, Math.PI * 2);
+  ctx.arc(cssW - 1, ly, 1.8, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -428,7 +592,6 @@ function renderLeaderboard(d) {
   tbody.innerHTML = "";
   const lb = d.leaderboard || [];
   document.getElementById("lb-meta").textContent = `${lb.length} MODELS`;
-
   const curves = d.equity_curves || {};
 
   lb.forEach((row, i) => {
@@ -454,7 +617,6 @@ function renderLeaderboard(d) {
     tbody.appendChild(tr);
   });
 
-  // Draw sparklines after rows are in DOM
   requestAnimationFrame(() => {
     document.querySelectorAll("[data-spark]").forEach(canvas => {
       const key = canvas.getAttribute("data-spark");
@@ -555,9 +717,9 @@ function renderHealth(d) {
     <div class="health-row"><span class="k">MODELS_ACTIVE</span><span class="v">${total - halted} / ${total}</span></div>
     <div class="health-row"><span class="k">MODELS_HALTED</span><span class="v">${halted}</span></div>
     <div class="health-row"><span class="k">UNIVERSE_SIZE</span><span class="v">${(d.universe?.tickers || []).length}</span></div>
+    <div class="health-row"><span class="k">SESSION</span><span class="v">${d.intraday_session_date || "—"}</span></div>
     <div class="health-row"><span class="k">EXPERIMENT_START</span><span class="v">${d.experiment_start || "—"}</span></div>
     <div class="health-row"><span class="k">EXPERIMENT_END</span><span class="v">${d.experiment_end || "—"}</span></div>
-    <div class="health-row"><span class="k">PHASE_A_END</span><span class="v">2026-12-31</span></div>
   `;
 }
 
@@ -572,142 +734,6 @@ function renderVersionTicker(d) {
   });
 }
 
-// ===== Master interactive equity chart =====
-let masterChart = null;
-
-function renderMasterChart() {
-  if (!state.data) return;
-  const canvas = document.getElementById("equity-chart");
-  if (!masterChart) {
-    masterChart = new LineChart(canvas, {
-      pad: { l: 56, r: 16, t: 16, b: 30 },
-      interactive: true,
-      tooltipEl: document.getElementById("equity-tooltip"),
-      lineWidth: 1.8,
-    });
-  }
-  const allSeries = buildSeries(state.data);
-  const filtered = filterAndRebase(allSeries, state.timeframe);
-  filtered.forEach(s => { s.muted = state.mutedSeries.has(s.key); });
-  masterChart.setSeries(filtered);
-  renderLegend(filtered);
-}
-
-function renderLegend(series) {
-  const legend = document.getElementById("chart-legend");
-  legend.innerHTML = "";
-  series.forEach(s => {
-    const item = document.createElement("div");
-    item.className = "legend-item" + (s.muted ? " muted" : "") + (s.dashed ? " dashed" : "");
-    item.innerHTML = s.dashed
-      ? `<span class="legend-swatch"></span><span>${s.label}</span>`
-      : `<span class="legend-swatch" style="background:${s.color}"></span><span>${s.label}</span>`;
-    item.addEventListener("click", () => {
-      if (state.mutedSeries.has(s.key)) state.mutedSeries.delete(s.key);
-      else state.mutedSeries.add(s.key);
-      renderMasterChart();
-    });
-    legend.appendChild(item);
-  });
-}
-
-// ===== Per-model mini charts =====
-const miniCharts = {};
-
-function renderModelCharts() {
-  if (!state.data) return;
-  const grid = document.getElementById("model-charts-grid");
-  const allSeries = buildSeries(state.data);
-  const spy = allSeries.find(s => s.key === "spy");
-
-  // Build/refresh cards
-  grid.innerHTML = "";
-  MODEL_ORDER.forEach(key => {
-    const modelSeries = allSeries.find(s => s.key === key);
-    if (!modelSeries) return;
-
-    const card = document.createElement("div");
-    card.className = "mini-chart-card";
-
-    // Compute return over the active timeframe (not since-inception)
-    const filtered = filterAndRebase([modelSeries], state.timeframe)[0];
-    const lastVal = filtered.points.length ? filtered.points[filtered.points.length - 1].value : 0;
-    const cls = lastVal > 0 ? "pos" : (lastVal < 0 ? "neg" : "neutral");
-    const color = lastVal > 0 ? "#00d488" : (lastVal < 0 ? "#ff3355" : "#5f6b80");
-
-    let spyReturn = "—";
-    if (spy) {
-      const spyFiltered = filterAndRebase([spy], state.timeframe)[0];
-      if (spyFiltered.points.length) {
-        const sv = spyFiltered.points[spyFiltered.points.length - 1].value;
-        spyReturn = fmtPct(sv);
-      }
-    }
-
-    card.innerHTML = `
-      <div class="mc-header">
-        <span class="mc-name"><span class="swatch" style="background:${MODEL_COLORS[key]}"></span>${key.toUpperCase()}</span>
-        <span class="mc-return" style="color:${color}">${fmtPct(lastVal)}</span>
-      </div>
-      <div class="mc-sub">${state.timeframe} // vs SPY</div>
-      <canvas></canvas>
-      <div class="mc-spy">
-        <span>SPY ${state.timeframe}</span>
-        <span>${spyReturn}</span>
-      </div>
-    `;
-    grid.appendChild(card);
-
-    const canvas = card.querySelector("canvas");
-    const chart = new LineChart(canvas, {
-      pad: { l: 38, r: 8, t: 8, b: 18 },
-      interactive: false,
-      smallMode: true,
-      lineWidth: 1.6,
-    });
-    const seriesForCard = [
-      { ...filterAndRebase([modelSeries], state.timeframe)[0] },
-    ];
-    if (spy) seriesForCard.push({ ...filterAndRebase([spy], state.timeframe)[0] });
-    chart.setSeries(seriesForCard);
-    miniCharts[key] = chart;
-  });
-
-  // Add a dedicated SPY card at the end
-  if (spy) {
-    const spyFiltered = filterAndRebase([spy], state.timeframe)[0];
-    const lastVal = spyFiltered.points.length ? spyFiltered.points[spyFiltered.points.length - 1].value : 0;
-    const color = lastVal > 0 ? "#00d488" : (lastVal < 0 ? "#ff3355" : "#5f6b80");
-
-    const card = document.createElement("div");
-    card.className = "mini-chart-card";
-    card.innerHTML = `
-      <div class="mc-header">
-        <span class="mc-name"><span class="swatch" style="background:${SPY_COLOR}"></span>SPY // BENCHMARK</span>
-        <span class="mc-return" style="color:${color}">${fmtPct(lastVal)}</span>
-      </div>
-      <div class="mc-sub">${state.timeframe} // S&P 500 ETF</div>
-      <canvas></canvas>
-      <div class="mc-spy">
-        <span>REFERENCE INDEX</span>
-        <span>—</span>
-      </div>
-    `;
-    grid.appendChild(card);
-    const canvas = card.querySelector("canvas");
-    const chart = new LineChart(canvas, {
-      pad: { l: 38, r: 8, t: 8, b: 18 },
-      interactive: false,
-      smallMode: true,
-      lineWidth: 1.6,
-    });
-    // Render SPY as solid (not dashed) when it's the focus
-    const focusSpy = { ...spyFiltered, dashed: false, color: "#4da3ff" };
-    chart.setSeries([focusSpy]);
-    miniCharts.spy = chart;
-  }
-}
-
 // ===== Timeframe controls =====
 function wireControls() {
   document.querySelectorAll(".tf-btn").forEach(btn => {
@@ -715,8 +741,8 @@ function wireControls() {
       document.querySelectorAll(".tf-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       state.timeframe = btn.getAttribute("data-tf");
-      renderMasterChart();
-      renderModelCharts();
+      refreshMasterChart();
+      renderModelMiniCharts();
     });
   });
 }
@@ -729,8 +755,8 @@ async function refresh() {
   renderStatus(d);
   renderLeaderboard(d);
   renderHealth(d);
-  renderMasterChart();
-  renderModelCharts();
+  refreshMasterChart();
+  renderModelMiniCharts();
   renderPortfolios(d);
   renderTradeFeed(d);
   renderVersionTicker(d);
@@ -741,6 +767,20 @@ refresh();
 setInterval(refresh, REFRESH_MS);
 
 window.addEventListener("resize", () => {
-  if (masterChart) masterChart.draw();
-  Object.values(miniCharts).forEach(c => c.draw());
+  if (masterChart) {
+    const el = document.getElementById("master-chart");
+    masterChart.applyOptions({ width: el.clientWidth, height: 340 });
+  }
+  if (rsiChart) {
+    const el = document.getElementById("rsi-chart");
+    rsiChart.applyOptions({ width: el.clientWidth, height: 90 });
+  }
+  Object.values(miniCharts).forEach((c, i) => {
+    try {
+      const el = c.chartElement?.() || c._private__chartWidget?._private__element;
+      // lightweight-charts doesn't expose a direct element accessor, so the
+      // mini grid is small and we just trigger a fit
+      c.timeScale().fitContent();
+    } catch (e) {}
+  });
 });

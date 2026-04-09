@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
+  <!-- TradingView lightweight-charts: free, MIT, ~45kb gzipped -->
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div class="scanlines"></div>
@@ -16,7 +18,7 @@
     <div class="brand">
       <span class="logo">▍</span>
       <span class="title">LLM_TRADING_LAB</span>
-      <span class="subtitle">// AUTONOMOUS // 5-MODEL HEAD-TO-HEAD</span>
+      <span class="subtitle">// AUTONOMOUS // 5-MODEL HEAD-TO-HEAD // INTRADAY</span>
     </div>
     <div class="status">
       <div class="status-item"><span class="label">PHASE</span><span id="phase" class="value">—</span></div>
@@ -55,22 +57,21 @@
       </table>
     </section>
 
-    <!-- ROW 2: Master equity chart + system health -->
+    <!-- ROW 2: Master TradingView chart + system health -->
     <section class="row">
       <div class="panel chart-panel">
         <div class="panel-header">
-          <span class="panel-title">▍ CUMULATIVE RETURN</span>
+          <span class="panel-title">▍ EQUITY CURVES // SPY CANDLES + MODEL OVERLAYS</span>
           <div class="chart-controls" id="tf-controls">
+            <button class="tf-btn" data-tf="TODAY">TODAY</button>
             <button class="tf-btn" data-tf="1W">1W</button>
             <button class="tf-btn" data-tf="1M">1M</button>
             <button class="tf-btn" data-tf="3M">3M</button>
             <button class="tf-btn active" data-tf="ALL">ALL</button>
           </div>
         </div>
-        <div class="chart-wrap">
-          <canvas id="equity-chart"></canvas>
-          <div class="chart-tooltip" id="equity-tooltip"></div>
-        </div>
+        <div id="master-chart" class="tv-chart"></div>
+        <div id="rsi-chart" class="tv-chart tv-rsi"></div>
         <div class="legend" id="chart-legend"></div>
       </div>
 
@@ -82,10 +83,10 @@
       </div>
     </section>
 
-    <!-- ROW 3: Per-model charts + SPY chart -->
+    <!-- ROW 3: Per-model mini charts + SPY -->
     <section class="panel model-charts-panel">
       <div class="panel-header">
-        <span class="panel-title">▍ MODEL CHARTS // INDIVIDUAL CURVES vs SPY</span>
+        <span class="panel-title">▍ MODEL CHARTS // INDIVIDUAL CURVES</span>
         <span class="panel-meta">REBASED PER WINDOW</span>
       </div>
       <div class="model-charts-grid" id="model-charts-grid"></div>

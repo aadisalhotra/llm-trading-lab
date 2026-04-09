@@ -1,0 +1,134 @@
+name: Intraday Trading Pipeline
+
+on:
+  schedule:
+    # Intraday ticks: every 15 minutes from 13:00 to 20:45 UTC, Mon-Fri.
+    # That window covers 09:00-16:45 ET in DST and 08:00-15:45 ET in standard
+    # time, so the cron always overlaps the NYSE 09:30-16:00 ET session
+    # regardless of DST. The pipeline itself uses is_market_open_now() to
+    # skip silently outside the actual session window.
+    - cron: "*/15 13-20 * * 1-5"
+    # End-of-day wrap-up: writes the EOD perf row, generates the daily
+    # report, and sends the daily summary alert. Fires at 21:30 UTC =
+    # 17:30 ET in DST / 16:30 ET in standard time — both safely after close.
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode: intraday | end-of-day"
+        required: false
+        default: "intraday"
+        type: choice
+        options:
+          - intraday
+          - end-of-day
+      force:
+        description: "Bypass market-open check"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Stop overlapping ticks from racing to commit data — if a previous run is
+# still going, the new one waits its turn.
+concurrency:
+  group: intraday-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve run mode
+        id: mode
+        run: |
+          # The 21:30 UTC cron is the EOD wrap-up; everything else is intraday.
+          # workflow_dispatch overrides via the `mode` input.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+            echo "force=${{ github.event.inputs.force }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "30 21 * * 1-5" ]; then
+            echo "mode=end-of-day" >> $GITHUB_OUTPUT
+            echo "force=false" >> $GITHUB_OUTPUT
+          else
+            echo "mode=intraday" >> $GITHUB_OUTPUT
+            echo "force=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          FORCE="${{ steps.mode.outputs.force }}"
+          ARGS=""
+          if [ "$MODE" = "end-of-day" ]; then
+            ARGS="--end-of-day"
+          else
+            ARGS="--intraday"
+          fi
+          if [ "$FORCE" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          echo "Running: python -m src.pipeline $ARGS"
+          python -m src.pipeline $ARGS
+
+      - name: Commit + push updated data
+        run: |
+          git config user.name "llm-trading-lab-bot"
+          git config user.email "actions@github.com"
+          git pull --rebase origin main || true
+          git add data/ logs/ reports/daily/ docs/MODEL_CHANGELOG.md || true
+          if git diff --cached --quiet; then
+            echo "No data changes to commit"
+          else
+            MODE="${{ steps.mode.outputs.mode }}"
+            git commit -m "${MODE} tick $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi
+
+  pages:
+    needs: run
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload dashboard artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

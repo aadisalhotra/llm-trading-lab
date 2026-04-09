@@ -218,6 +218,23 @@ body {
   height: 320px;
   cursor: crosshair;
 }
+
+/* TradingView lightweight-charts containers */
+.tv-chart {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  position: relative;
+}
+#master-chart { height: 340px; }
+.tv-rsi {
+  height: 90px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border-bright);
+}
+.tv-chart .tv-lightweight-charts {
+  background: var(--bg) !important;
+}
 .chart-tooltip {
   position: absolute;
   background: rgba(5, 7, 11, 0.96);
@@ -330,6 +347,10 @@ body {
   width: 100%;
   height: 110px;
   display: block;
+}
+.mini-chart-card .tv-mini {
+  width: 100%;
+  height: 110px;
 }
 .mini-chart-card .mc-spy {
   font-size: 9px;

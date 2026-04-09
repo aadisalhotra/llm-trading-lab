@@ -7,17 +7,21 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from ..analytics import build_leaderboard, load_performance_history
 from ..config_loader import (
     DATA_DIR,
+    INTRADAY_DIR,
     LEADERBOARD_DIR,
     TRADES_DIR,
     load_settings,
     load_universe,
 )
 from ..portfolio import load_portfolio
+
+EASTERN = ZoneInfo("America/New_York")
 
 
 def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any]]:
@@ -65,6 +69,37 @@ def _equity_curve(model_key: str) -> list[dict[str, Any]]:
     ]
 
 
+def _intraday_curve(model_key: str, session_date: str) -> list[dict[str, Any]]:
+    """Read /data/intraday/{model}_{session_date}.jsonl for the live tick chart.
+
+    Returns one entry per pipeline tick: timestamp + value + benchmark price.
+    Frontend rebases this to 0 at the first point of the day for the TODAY
+    chart view. Empty list if no intraday file exists yet (pre-market or
+    first run of the session).
+    """
+    path = INTRADAY_DIR / f"{model_key}_{session_date}.jsonl"
+    if not path.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            out.append({
+                "timestamp": rec.get("timestamp"),
+                "value": float(rec.get("total_value", 0.0)),
+                "benchmark": float(rec["benchmark_value"]) if rec.get("benchmark_value") else None,
+                "trades_today": int(rec.get("trades_executed_today", 0)),
+                "runs_today": int(rec.get("runs_today", 0)),
+            })
+    return out
+
+
 def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
@@ -83,6 +118,12 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         portfolios.append(snap)
 
     equity_curves = {key: _equity_curve(key) for key in model_keys}
+
+    # Intraday curves are keyed by the *current ET trading day* so the
+    # frontend's TODAY view always shows live ticks for today, never a
+    # stale day's intraday file.
+    session_date = datetime.now(EASTERN).strftime("%Y-%m-%d")
+    intraday_curves = {key: _intraday_curve(key, session_date) for key in model_keys}
 
     today = datetime.utcnow()
     inception_str = settings["experiment_start_date"]
@@ -107,6 +148,8 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "portfolios": portfolios,
         "recent_trades": _recent_trades(model_keys, limit=50),
         "equity_curves": equity_curves,
+        "intraday_curves": intraday_curves,
+        "intraday_session_date": session_date,
         "universe": universe,
         "models": settings["models"],
         "benchmark_ticker": settings["benchmark_ticker"],
