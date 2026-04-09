@@ -27,12 +27,18 @@ def validate_decisions(
     decisions: list[dict[str, Any]],
     portfolio: Portfolio,
     prices: dict[str, float],
+    trades_already_executed_today: int = 0,
 ) -> tuple[list[dict[str, Any]], list[RiskViolation]]:
     """Filter decisions against the rule book.
 
     Returns (accepted_decisions, violations). Violations are logged but other
     decisions still execute. Order matters: BUYs that would push the portfolio
     over the 10-position cap or 20% allocation cap are dropped.
+
+    `trades_already_executed_today` is the persistent count of buys+sells the
+    model has used so far this trading session (across prior intraday runs).
+    The cap enforced is `max_trades_per_day - trades_already_executed_today`,
+    so the 30-trade ceiling applies to the *whole day*, not per call.
     """
     settings = load_settings()
     rules = settings["portfolio_rules"]
@@ -50,11 +56,17 @@ def validate_decisions(
 
     # Project state forward as we accept decisions
     projected_holdings = set(portfolio.holdings.keys())
-    trades_today = 0
+    trades_today = max(0, int(trades_already_executed_today))
+    initial_trades_today = trades_today
 
     for i, d in enumerate(decisions):
         if trades_today >= max_trades_per_day:
-            violations.append(RiskViolation(i, "DAILY_TRADE_CAP", f"Already at {max_trades_per_day} trades today"))
+            violations.append(RiskViolation(
+                i, "DAILY_TRADE_CAP",
+                f"Already at {max_trades_per_day} trades today "
+                f"({initial_trades_today} from prior intraday runs + "
+                f"{trades_today - initial_trades_today} this run)",
+            ))
             continue
 
         ticker = d["ticker"]

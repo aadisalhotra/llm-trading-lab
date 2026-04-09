@@ -39,6 +39,21 @@ class Holding:
 
 
 @dataclass
+class IntradayState:
+    """Per-session intraday counters.
+
+    Persisted alongside the portfolio so the trade cap survives across the
+    many runs that happen in a single trading day. Auto-resets when
+    `session_date` no longer matches the current ET trading day.
+    """
+    session_date: str = ""           # YYYY-MM-DD in US/Eastern
+    trades_executed_today: int = 0
+    runs_today: int = 0
+    first_run_at: str = ""           # ISO timestamp
+    last_run_at: str = ""            # ISO timestamp
+
+
+@dataclass
 class Portfolio:
     model_key: str
     cash: float
@@ -47,6 +62,26 @@ class Portfolio:
     inception_value: float = 0.0
     inception_date: str = ""
     last_updated: str = ""
+    intraday: IntradayState = field(default_factory=IntradayState)
+
+    # ----- intraday session helpers -----
+    def reset_intraday_if_new_session(self, session_date: str) -> bool:
+        """Zero the intraday counters when a new ET trading day begins.
+
+        Returns True if a reset happened (caller may want to log this).
+        """
+        if self.intraday.session_date != session_date:
+            self.intraday = IntradayState(session_date=session_date)
+            return True
+        return False
+
+    def record_intraday_run(self, timestamp_iso: str, trades_executed: int) -> None:
+        """Bump intraday counters after a successful run."""
+        if not self.intraday.first_run_at:
+            self.intraday.first_run_at = timestamp_iso
+        self.intraday.last_run_at = timestamp_iso
+        self.intraday.runs_today += 1
+        self.intraday.trades_executed_today += trades_executed
 
     # ----- valuation -----
     def total_value(self, prices: dict[str, float]) -> float:
@@ -163,6 +198,14 @@ def load_portfolio(model_key: str) -> Portfolio:
         t: Holding(ticker=t, shares=h["shares"], avg_cost=h["avg_cost"])
         for t, h in data.get("holdings", {}).items()
     }
+    raw_intraday = data.get("intraday") or {}
+    intraday = IntradayState(
+        session_date=str(raw_intraday.get("session_date", "")),
+        trades_executed_today=int(raw_intraday.get("trades_executed_today", 0)),
+        runs_today=int(raw_intraday.get("runs_today", 0)),
+        first_run_at=str(raw_intraday.get("first_run_at", "")),
+        last_run_at=str(raw_intraday.get("last_run_at", "")),
+    )
     return Portfolio(
         model_key=data["model_key"],
         cash=float(data["cash"]),
@@ -171,6 +214,7 @@ def load_portfolio(model_key: str) -> Portfolio:
         inception_value=float(data.get("inception_value", data["cash"])),
         inception_date=data.get("inception_date", ""),
         last_updated=data.get("last_updated", ""),
+        intraday=intraday,
     )
 
 
@@ -184,6 +228,13 @@ def save_portfolio(p: Portfolio) -> None:
         "inception_date": p.inception_date,
         "last_updated": p.last_updated,
         "holdings": {t: {"shares": h.shares, "avg_cost": h.avg_cost} for t, h in p.holdings.items()},
+        "intraday": {
+            "session_date": p.intraday.session_date,
+            "trades_executed_today": p.intraday.trades_executed_today,
+            "runs_today": p.intraday.runs_today,
+            "first_run_at": p.intraday.first_run_at,
+            "last_run_at": p.intraday.last_run_at,
+        },
     }
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(_state_path(p.model_key), "w", encoding="utf-8") as f:

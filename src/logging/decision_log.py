@@ -1,8 +1,9 @@
 """Append-only structured logs for decisions and daily snapshots.
 
-Two log streams:
-- /data/trades/{model}_{YYYY-MM}.jsonl  — every decision + execution result, one per line
-- /data/performance/{model}.jsonl       — daily portfolio snapshots, one per day per model
+Three log streams:
+- /data/trades/{model}_{YYYY-MM}.jsonl              — every decision + execution result
+- /data/performance/{model}.jsonl                   — EOD portfolio snapshots, one per trading day
+- /data/intraday/{model}_{YYYY-MM-DD}.jsonl         — intraday valuation snapshots within a day
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..config_loader import TRADES_DIR, PERFORMANCE_DIR
+from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR
 
 
 def _month_tag(d: datetime, inception_date: str) -> str:
@@ -94,7 +95,12 @@ def log_daily_snapshot(
     benchmark_value: float | None,
     api_success: bool = True,
 ) -> None:
-    """Append daily portfolio value to /data/performance/{model}.jsonl."""
+    """Append EOD portfolio value to /data/performance/{model}.jsonl.
+
+    Called once per trading day from the EOD pipeline pass — never from
+    intraday runs (which would create duplicate same-date rows and break
+    every analytics calc that assumes one row per day).
+    """
     PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
     path = PERFORMANCE_DIR / f"{model_key}.jsonl"
     record = {
@@ -107,6 +113,46 @@ def log_daily_snapshot(
         "cumulative_return": snapshot["cumulative_return"],
         "halted": snapshot["halted"],
         "benchmark_value": benchmark_value,
+        "api_success": api_success,
+    }
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+
+def log_intraday_snapshot(
+    model_key: str,
+    run_timestamp: datetime,
+    snapshot: dict[str, Any],
+    benchmark_value: float | None,
+    trades_executed_this_run: int,
+    trades_executed_today: int,
+    runs_today: int,
+    api_success: bool = True,
+) -> None:
+    """Append a per-run intraday valuation row to /data/intraday/{model}_{date}.jsonl.
+
+    One file per (model, trading day). Each row is one 15-minute pipeline tick:
+    timestamp, mark-to-market value, benchmark price, and the running trade
+    counter so the dashboard can chart intraday equity vs SPY without having
+    to rejoin against the trade log.
+    """
+    INTRADAY_DIR.mkdir(parents=True, exist_ok=True)
+    date_str = run_timestamp.strftime("%Y-%m-%d")
+    path = INTRADAY_DIR / f"{model_key}_{date_str}.jsonl"
+    record = {
+        "timestamp": run_timestamp.isoformat(),
+        "date": date_str,
+        "model_key": model_key,
+        "total_value": snapshot["total_value"],
+        "cash": snapshot["cash"],
+        "cash_pct": snapshot["cash_pct"],
+        "num_positions": len(snapshot["holdings"]),
+        "cumulative_return": snapshot["cumulative_return"],
+        "halted": snapshot["halted"],
+        "benchmark_value": benchmark_value,
+        "trades_executed_this_run": trades_executed_this_run,
+        "trades_executed_today": trades_executed_today,
+        "runs_today": runs_today,
         "api_success": api_success,
     }
     with open(path, "a", encoding="utf-8") as f:

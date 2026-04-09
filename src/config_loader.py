@@ -29,6 +29,7 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 # Subdirs under data/
 TRADES_DIR = DATA_DIR / "trades"
 PERFORMANCE_DIR = DATA_DIR / "performance"
+INTRADAY_DIR = DATA_DIR / "intraday"
 LEADERBOARD_DIR = DATA_DIR / "leaderboard"
 MODEL_VERSIONS_DIR = DATA_DIR / "model_versions"
 STATE_DIR = DATA_DIR / "state"
@@ -42,6 +43,7 @@ def ensure_dirs() -> None:
         DATA_DIR,
         TRADES_DIR,
         PERFORMANCE_DIR,
+        INTRADAY_DIR,
         LEADERBOARD_DIR,
         MODEL_VERSIONS_DIR,
         STATE_DIR,
