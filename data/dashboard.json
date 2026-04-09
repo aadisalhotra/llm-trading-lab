@@ -1,34 +1,1427 @@
 {
-  "generated_at": "2026-04-08T00:00:00",
+  "generated_at": "2026-04-09T03:11:25.907251",
   "phase": "Phase 1 - Infrastructure Build",
   "mode": "paper",
-  "experiment_day": 0,
+  "experiment_day": 1,
   "experiment_total_days": 580,
   "experiment_start": "2026-07-01",
   "experiment_end": "2028-01-31",
   "leaderboard": [
-    {"rank": 1, "model_key": "claude",   "cumulative_return": 0, "sharpe_30d": null, "max_drawdown": 0, "alpha_vs_spy": null, "current_value": 100000, "current_cash_pct": 1.0, "num_positions": 0, "halted": false, "days": 0},
-    {"rank": 2, "model_key": "gpt",      "cumulative_return": 0, "sharpe_30d": null, "max_drawdown": 0, "alpha_vs_spy": null, "current_value": 100000, "current_cash_pct": 1.0, "num_positions": 0, "halted": false, "days": 0},
-    {"rank": 3, "model_key": "gemini",   "cumulative_return": 0, "sharpe_30d": null, "max_drawdown": 0, "alpha_vs_spy": null, "current_value": 100000, "current_cash_pct": 1.0, "num_positions": 0, "halted": false, "days": 0},
-    {"rank": 4, "model_key": "grok",     "cumulative_return": 0, "sharpe_30d": null, "max_drawdown": 0, "alpha_vs_spy": null, "current_value": 100000, "current_cash_pct": 1.0, "num_positions": 0, "halted": false, "days": 0},
-    {"rank": 5, "model_key": "deepseek", "cumulative_return": 0, "sharpe_30d": null, "max_drawdown": 0, "alpha_vs_spy": null, "current_value": 100000, "current_cash_pct": 1.0, "num_positions": 0, "halted": false, "days": 0}
+    {
+      "model_key": "claude",
+      "days": 3,
+      "cumulative_return": 2.220446049250313e-16,
+      "sharpe_30d": null,
+      "sharpe_90d": null,
+      "max_drawdown": 0.0,
+      "alpha_vs_spy": 2.220446049250313e-16,
+      "current_value": 100000.00000000001,
+      "current_cash_pct": 0.280001812506607,
+      "num_positions": 8,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 1
+    },
+    {
+      "model_key": "gpt",
+      "days": 3,
+      "cumulative_return": 2.220446049250313e-16,
+      "sharpe_30d": null,
+      "sharpe_90d": null,
+      "max_drawdown": 0.0,
+      "alpha_vs_spy": 2.220446049250313e-16,
+      "current_value": 100000.00000000003,
+      "current_cash_pct": 5.212852488966745e-08,
+      "num_positions": 10,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 2
+    },
+    {
+      "model_key": "deepseek",
+      "days": 3,
+      "cumulative_return": 0.0,
+      "sharpe_30d": null,
+      "sharpe_90d": null,
+      "max_drawdown": 0.0,
+      "alpha_vs_spy": 0.0,
+      "current_value": 100000.0,
+      "current_cash_pct": 1.5429363861039747e-06,
+      "num_positions": 10,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 3
+    },
+    {
+      "model_key": "gemini",
+      "days": 3,
+      "cumulative_return": 0.0,
+      "sharpe_30d": null,
+      "sharpe_90d": null,
+      "max_drawdown": 0.0,
+      "alpha_vs_spy": 0.0,
+      "current_value": 99999.99999999999,
+      "current_cash_pct": 2.122784027051239e-06,
+      "num_positions": 8,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 4
+    },
+    {
+      "model_key": "grok",
+      "days": 3,
+      "cumulative_return": -1.1102230246251565e-16,
+      "sharpe_30d": null,
+      "sharpe_90d": null,
+      "max_drawdown": -1.4551915228366853e-16,
+      "alpha_vs_spy": -1.1102230246251565e-16,
+      "current_value": 99999.99999999999,
+      "current_cash_pct": 7.44855193715921e-08,
+      "num_positions": 8,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 5
+    }
   ],
   "portfolios": [
-    {"model_key": "claude",   "provider": "anthropic", "model_id": "claude-opus-4-6",    "total_value": 100000, "cash": 100000, "cash_pct": 1.0, "holdings": [], "halted": false, "cumulative_return": 0, "inception_value": 100000, "inception_date": "2026-07-01"},
-    {"model_key": "gpt",      "provider": "openai",    "model_id": "gpt-5.4",            "total_value": 100000, "cash": 100000, "cash_pct": 1.0, "holdings": [], "halted": false, "cumulative_return": 0, "inception_value": 100000, "inception_date": "2026-07-01"},
-    {"model_key": "gemini",   "provider": "google",    "model_id": "gemini-3.1-pro",     "total_value": 100000, "cash": 100000, "cash_pct": 1.0, "holdings": [], "halted": false, "cumulative_return": 0, "inception_value": 100000, "inception_date": "2026-07-01"},
-    {"model_key": "grok",     "provider": "xai",       "model_id": "grok-4",             "total_value": 100000, "cash": 100000, "cash_pct": 1.0, "holdings": [], "halted": false, "cumulative_return": 0, "inception_value": 100000, "inception_date": "2026-07-01"},
-    {"model_key": "deepseek", "provider": "deepseek",  "model_id": "deepseek-v4",        "total_value": 100000, "cash": 100000, "cash_pct": 1.0, "holdings": [], "halted": false, "cumulative_return": 0, "inception_value": 100000, "inception_date": "2026-07-01"}
+    {
+      "model_key": "claude",
+      "total_value": 100000.00000000001,
+      "cash": 28000.181250660702,
+      "cash_pct": 0.280001812506607,
+      "holdings": [
+        {
+          "ticker": "GOOGL",
+          "shares": 37.8167,
+          "avg_cost": 317.32000732421875,
+          "current_price": 317.32000732421875,
+          "market_value": 11999.995520977782,
+          "weight": 0.1199999552097778,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AMZN",
+          "shares": 45.1977,
+          "avg_cost": 221.25,
+          "current_price": 221.25,
+          "market_value": 9999.991124999999,
+          "weight": 0.09999991124999998,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AVGO",
+          "shares": 28.52,
+          "avg_cost": 350.6300048828125,
+          "current_price": 350.6300048828125,
+          "market_value": 9999.967739257812,
+          "weight": 0.0999996773925781,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "UNH",
+          "shares": 26.1454,
+          "avg_cost": 305.9800109863281,
+          "current_price": 305.9800109863281,
+          "market_value": 7999.969779241943,
+          "weight": 0.07999969779241942,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "META",
+          "shares": 16.3286,
+          "avg_cost": 612.4199829101562,
+          "current_price": 612.4199829101562,
+          "market_value": 9999.960932946778,
+          "weight": 0.09999960932946778,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "JPM",
+          "shares": 25.9765,
+          "avg_cost": 307.9700012207031,
+          "current_price": 307.9700012207031,
+          "market_value": 7999.982736709595,
+          "weight": 0.07999982736709593,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "WMT",
+          "shares": 55.0054,
+          "avg_cost": 127.26000213623047,
+          "current_price": 127.26000213623047,
+          "market_value": 6999.987321504212,
+          "weight": 0.06999987321504211,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "COST",
+          "shares": 6.7943,
+          "avg_cost": 1030.27001953125,
+          "current_price": 1030.27001953125,
+          "market_value": 6999.963593701172,
+          "weight": 0.06999963593701171,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        }
+      ],
+      "halted": false,
+      "inception_value": 100000.0,
+      "inception_date": "2026-07-01",
+      "cumulative_return": 2.220446049250313e-16,
+      "provider": "anthropic",
+      "model_id": "claude-opus-4-6",
+      "enabled": true
+    },
+    {
+      "model_key": "gpt",
+      "total_value": 100000.00000000003,
+      "cash": 0.005212852488966746,
+      "cash_pct": 5.212852488966745e-08,
+      "holdings": [
+        {
+          "ticker": "AVGO",
+          "shares": 39.9281,
+          "avg_cost": 350.6300048828125,
+          "current_price": 350.6300048828125,
+          "market_value": 13999.989897961426,
+          "weight": 0.13999989897961423,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "GOOGL",
+          "shares": 44.1194,
+          "avg_cost": 317.32000732421875,
+          "current_price": 317.32000732421875,
+          "market_value": 13999.968331140137,
+          "weight": 0.13999968331140134,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AMZN",
+          "shares": 54.2372,
+          "avg_cost": 221.25,
+          "current_price": 221.25,
+          "market_value": 11999.9805,
+          "weight": 0.11999980499999996,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "NVDA",
+          "shares": 65.905,
+          "avg_cost": 182.0800018310547,
+          "current_price": 182.0800018310547,
+          "market_value": 11999.98252067566,
+          "weight": 0.11999982520675656,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "JPM",
+          "shares": 32.4706,
+          "avg_cost": 307.9700012207031,
+          "current_price": 307.9700012207031,
+          "market_value": 9999.970721636962,
+          "weight": 0.0999997072163696,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "UNH",
+          "shares": 32.6818,
+          "avg_cost": 305.9800109863281,
+          "current_price": 305.9800109863281,
+          "market_value": 9999.97752305298,
+          "weight": 0.09999977523052976,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "WMT",
+          "shares": 62.8634,
+          "avg_cost": 127.26000213623047,
+          "current_price": 127.26000213623047,
+          "market_value": 7999.996418290711,
+          "weight": 0.07999996418290709,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "CAT",
+          "shares": 10.3683,
+          "avg_cost": 771.5800170898438,
+          "current_price": 771.5800170898438,
+          "market_value": 7999.973091192626,
+          "weight": 0.07999973091192623,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "META",
+          "shares": 16.3286,
+          "avg_cost": 612.4199829101562,
+          "current_price": 612.4199829101562,
+          "market_value": 9999.960932946778,
+          "weight": 0.09999960932946776,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "MSFT",
+          "shares": 5.3434,
+          "avg_cost": 374.3299865722656,
+          "current_price": 374.3299865722656,
+          "market_value": 2000.1948502502441,
+          "weight": 0.020001948502502434,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        }
+      ],
+      "halted": false,
+      "inception_value": 100000.0,
+      "inception_date": "2026-07-01",
+      "cumulative_return": 2.220446049250313e-16,
+      "provider": "openai",
+      "model_id": "gpt-5.4",
+      "enabled": true
+    },
+    {
+      "model_key": "gemini",
+      "total_value": 99999.99999999999,
+      "cash": 0.21227840270512388,
+      "cash_pct": 2.122784027051239e-06,
+      "holdings": [
+        {
+          "ticker": "AVGO",
+          "shares": 42.7801,
+          "avg_cost": 350.6300048828125,
+          "current_price": 350.6300048828125,
+          "market_value": 14999.986671887205,
+          "weight": 0.14999986671887208,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "UNH",
+          "shares": 32.6819,
+          "avg_cost": 305.9800109863281,
+          "current_price": 305.9800109863281,
+          "market_value": 10000.008121054077,
+          "weight": 0.10000008121054078,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "GOOGL",
+          "shares": 47.2708,
+          "avg_cost": 317.32000732421875,
+          "current_price": 317.32000732421875,
+          "market_value": 14999.97060222168,
+          "weight": 0.14999970602221682,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AMZN",
+          "shares": 67.7966,
+          "avg_cost": 221.25,
+          "current_price": 221.25,
+          "market_value": 14999.99775,
+          "weight": 0.14999997750000002,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "CAT",
+          "shares": 12.9604,
+          "avg_cost": 771.5800170898438,
+          "current_price": 771.5800170898438,
+          "market_value": 9999.98565349121,
+          "weight": 0.09999985653491213,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "JPM",
+          "shares": 32.4706,
+          "avg_cost": 307.9700012207031,
+          "current_price": 307.9700012207031,
+          "market_value": 9999.970721636962,
+          "weight": 0.09999970721636964,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "COST",
+          "shares": 14.5592,
+          "avg_cost": 1030.2700195312498,
+          "current_price": 1030.27001953125,
+          "market_value": 14999.907268359375,
+          "weight": 0.14999907268359378,
+          "unrealized_pl": 3.3103788155131043e-12,
+          "unrealized_pl_pct": 2.220446049250313e-16
+        },
+        {
+          "ticker": "META",
+          "shares": 16.3286,
+          "avg_cost": 612.4199829101562,
+          "current_price": 612.4199829101562,
+          "market_value": 9999.960932946778,
+          "weight": 0.0999996093294678,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        }
+      ],
+      "halted": false,
+      "inception_value": 100000.0,
+      "inception_date": "2026-07-01",
+      "cumulative_return": -1.1102230246251565e-16,
+      "provider": "google",
+      "model_id": "gemini-3.1-pro-preview",
+      "enabled": true
+    },
+    {
+      "model_key": "grok",
+      "total_value": 99999.99999999999,
+      "cash": 0.007448551937159209,
+      "cash_pct": 7.44855193715921e-08,
+      "holdings": [
+        {
+          "ticker": "GOOGL",
+          "shares": 47.2708,
+          "avg_cost": 317.32000732421875,
+          "current_price": 317.32000732421875,
+          "market_value": 14999.97060222168,
+          "weight": 0.14999970602221682,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AVGO",
+          "shares": 42.7801,
+          "avg_cost": 350.6300048828125,
+          "current_price": 350.6300048828125,
+          "market_value": 14999.986671887205,
+          "weight": 0.14999986671887208,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AMZN",
+          "shares": 67.7966,
+          "avg_cost": 221.25,
+          "current_price": 221.25,
+          "market_value": 14999.99775,
+          "weight": 0.14999997750000002,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "UNH",
+          "shares": 49.0228,
+          "avg_cost": 305.9800109863281,
+          "current_price": 305.9800109863281,
+          "market_value": 14999.996882580564,
+          "weight": 0.14999996882580566,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "CAT",
+          "shares": 19.4407,
+          "avg_cost": 771.5800170898438,
+          "current_price": 771.5800170898438,
+          "market_value": 15000.055638238526,
+          "weight": 0.15000055638238527,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "META",
+          "shares": 24.4929,
+          "avg_cost": 612.4199829101562,
+          "current_price": 612.4199829101562,
+          "market_value": 14999.941399420166,
+          "weight": 0.1499994139942017,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "JPM",
+          "shares": 16.2357,
+          "avg_cost": 307.9700012207031,
+          "current_price": 307.9700012207031,
+          "market_value": 5000.10854881897,
+          "weight": 0.05000108548818971,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "NVDA",
+          "shares": 27.4601,
+          "avg_cost": 182.0800018310547,
+          "current_price": 182.0800018310547,
+          "market_value": 4999.935058280945,
+          "weight": 0.04999935058280945,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        }
+      ],
+      "halted": false,
+      "inception_value": 100000.0,
+      "inception_date": "2026-07-01",
+      "cumulative_return": -1.1102230246251565e-16,
+      "provider": "xai",
+      "model_id": "grok-4",
+      "enabled": true
+    },
+    {
+      "model_key": "deepseek",
+      "total_value": 100000.0,
+      "cash": 0.15429363861039747,
+      "cash_pct": 1.5429363861039747e-06,
+      "holdings": [
+        {
+          "ticker": "GOOGL",
+          "shares": 31.514000000000003,
+          "avg_cost": 317.32000732421875,
+          "current_price": 317.32000732421875,
+          "market_value": 10000.02271081543,
+          "weight": 0.1000002271081543,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AMZN",
+          "shares": 45.1978,
+          "avg_cost": 221.25,
+          "current_price": 221.25,
+          "market_value": 10000.01325,
+          "weight": 0.1000001325,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "AVGO",
+          "shares": 34.2241,
+          "avg_cost": 350.6300048828125,
+          "current_price": 350.6300048828125,
+          "market_value": 11999.996350109863,
+          "weight": 0.11999996350109862,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "UNH",
+          "shares": 39.2182,
+          "avg_cost": 305.9800109863281,
+          "current_price": 305.9800109863281,
+          "market_value": 11999.985266864014,
+          "weight": 0.11999985266864015,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "JPM",
+          "shares": 32.4706,
+          "avg_cost": 307.9700012207031,
+          "current_price": 307.9700012207031,
+          "market_value": 9999.970721636962,
+          "weight": 0.09999970721636962,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "WMT",
+          "shares": 78.5792,
+          "avg_cost": 127.26000213623047,
+          "current_price": 127.26000213623047,
+          "market_value": 9999.989159863282,
+          "weight": 0.09999989159863282,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "COST",
+          "shares": 9.7061,
+          "avg_cost": 1030.27001953125,
+          "current_price": 1030.27001953125,
+          "market_value": 9999.903836572264,
+          "weight": 0.09999903836572265,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "CAT",
+          "shares": 10.3683,
+          "avg_cost": 771.5800170898438,
+          "current_price": 771.5800170898438,
+          "market_value": 7999.973091192626,
+          "weight": 0.07999973091192626,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "V",
+          "shares": 25.8933,
+          "avg_cost": 308.9599914550781,
+          "current_price": 308.9599914550781,
+          "market_value": 7999.993746743774,
+          "weight": 0.07999993746743773,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        },
+        {
+          "ticker": "NVDA",
+          "shares": 54.9209,
+          "avg_cost": 182.0800018310547,
+          "current_price": 182.0800018310547,
+          "market_value": 9999.997572563172,
+          "weight": 0.09999997572563173,
+          "unrealized_pl": 0.0,
+          "unrealized_pl_pct": 0.0
+        }
+      ],
+      "halted": false,
+      "inception_value": 100000.0,
+      "inception_date": "2026-07-01",
+      "cumulative_return": 0.0,
+      "provider": "deepseek",
+      "model_id": "deepseek-chat",
+      "enabled": true
+    }
   ],
-  "recent_trades": [],
-  "equity_curves": {"claude": [], "gpt": [], "gemini": [], "grok": [], "deepseek": []},
-  "universe": {"tickers": []},
+  "recent_trades": [
+    {
+      "timestamp": "2026-04-09T03:11:01.082257",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "NVDA",
+      "shares": 27.4601,
+      "fill_price": 182.0800018310547,
+      "notional": 4999.935058280945,
+      "confidence": 7,
+      "reasoning": "NVDA is showing positive momentum with 2.23% daily and 4.40% 5-day gains in the semiconductor sector, complementing existing AVGO holding, and this small entry uses the freed cash to increase tech exposure."
+    },
+    {
+      "timestamp": "2026-04-09T03:11:01.082232",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "SELL",
+      "ticker": "CAT",
+      "shares": 6.4801,
+      "fill_price": 771.5800170898438,
+      "notional": 4999.915668743896,
+      "confidence": 8,
+      "reasoning": "CAT has performed strongly with 6.51% daily and 8.91% 5-day gains, but trimming from 20% to 15% maintains exposure while freeing up approximately 5% cash for diversification without exceeding position limits."
+    },
+    {
+      "timestamp": "2026-04-09T03:10:24.044607",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "COST",
+      "shares": 4.8531,
+      "fill_price": 1030.27001953125,
+      "notional": 5000.00343178711,
+      "confidence": 8,
+      "reasoning": "COST is demonstrating excellent relative strength, closing essentially at its 30-day high with consistent positive returns. Increasing weight to capture steady, low-volatility momentum."
+    },
+    {
+      "timestamp": "2026-04-09T03:10:24.044593",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "SELL",
+      "ticker": "UNH",
+      "shares": 16.3409,
+      "fill_price": 305.9800109863281,
+      "notional": 4999.98876152649,
+      "confidence": 7,
+      "reasoning": "UNH lagged the broader market rally today (-0.57% vs SPY +2.55%) following a massive 5-day surge. Trimming the position to manage risk and lock in recent outperformance."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625393",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "COST",
+      "shares": 6.7943,
+      "fill_price": 1030.27001953125,
+      "notional": 6999.963593701172,
+      "confidence": 5,
+      "reasoning": "Trading at 30D highs (1030.46 vs 1030.27), positive 30D return (+3.57%). Defensive quality name that has held up well through recent volatility. Complements WMT for consumer staples exposure."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625387",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "WMT",
+      "shares": 55.0054,
+      "fill_price": 127.26000213623047,
+      "notional": 6999.987321504212,
+      "confidence": 6,
+      "reasoning": "Defensive consumer staples allocation. Strong daily move (+3.89%), positive 30D (+1.20%), and trading at 30D highs (128.75). Provides portfolio stability if market weakens again."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625382",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "JPM",
+      "shares": 25.9765,
+      "fill_price": 307.9700012207031,
+      "notional": 7999.982736709595,
+      "confidence": 6,
+      "reasoning": "Financial sector exposure with solid fundamentals. Up +4.69% over 5D with positive 30D return (+1.54%). Trading near 30D highs. Earnings season approaching should be a catalyst."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625376",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "META",
+      "shares": 16.3286,
+      "fill_price": 612.4199829101562,
+      "notional": 9999.960932946778,
+      "confidence": 6,
+      "reasoning": "Strong single-day bounce (+6.50%) and 5D momentum (+7.04%). Still -6.3% over 30D meaning potential recovery room. Advertising business remains strong with AI monetization upside."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625370",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "UNH",
+      "shares": 26.1454,
+      "fill_price": 305.9800109863281,
+      "notional": 7999.969779241943,
+      "confidence": 7,
+      "reasoning": "Massive 5D rebound (+13.08%) and strong 30D gain (+7.66%). Healthcare provides defensive diversification. Recovering strongly from recent lows near 256 to 306."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625362",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "AVGO",
+      "shares": 28.52,
+      "fill_price": 350.6300048828125,
+      "notional": 9999.967739257812,
+      "confidence": 7,
+      "reasoning": "Best 5D return in universe (+13.29%) with positive 30D performance (+5.51%). AI/semiconductor demand narrative intact. Trading near 30D high of 354, suggesting strong buying pressure."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625353",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "AMZN",
+      "shares": 45.1977,
+      "fill_price": 221.25,
+      "notional": 9999.991124999999,
+      "confidence": 7,
+      "reasoning": "Solid 5D momentum (+6.23%), positive 30D return (+5.04%), and trading near 30D highs (226 vs 221.25). Consumer discretionary leader with cloud tailwinds. Relatively resilient in the recent selloff."
+    },
+    {
+      "timestamp": "2026-04-09T03:09:45.625335",
+      "date": "2026-04-08",
+      "model_key": "claude",
+      "side": "BUY",
+      "ticker": "GOOGL",
+      "shares": 37.8167,
+      "fill_price": 317.32000732421875,
+      "notional": 11999.995520977782,
+      "confidence": 8,
+      "reasoning": "Strongest 5D momentum (+10.35%) in the universe, trading near 30D highs at 322.05 vs current 317.32. Positive 30D return (+1.41%) shows relative outperformance vs most peers. Communication services showing leadership."
+    },
+    {
+      "timestamp": "2026-04-09T03:06:15.836390",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "NVDA",
+      "shares": 54.9209,
+      "fill_price": 182.0800018310547,
+      "notional": 9999.997572563172,
+      "confidence": 8,
+      "reasoning": "NVDA has strong recent performance (+4.40% 5D%) and high average volume, indicating liquidity and interest; adding at 10% weight capitalizes on semiconductor sector strength."
+    },
+    {
+      "timestamp": "2026-04-09T03:06:15.836380",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "SELL",
+      "ticker": "AMZN",
+      "shares": 22.5988,
+      "fill_price": 221.25,
+      "notional": 4999.9845000000005,
+      "confidence": 7,
+      "reasoning": "AMZN shows positive momentum with +6.23% 5D%, but at 15% weight, it's overweight; reducing to 10% helps manage concentration risk while maintaining exposure."
+    },
+    {
+      "timestamp": "2026-04-09T03:06:15.836365",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "SELL",
+      "ticker": "GOOGL",
+      "shares": 15.7568,
+      "fill_price": 317.32000732421875,
+      "notional": 4999.94789140625,
+      "confidence": 7,
+      "reasoning": "GOOGL has a strong 5D% gain of +10.35%, but current weight is 15%, exceeding optimal diversification; trimming to 10% locks in profits and frees up capital for other opportunities."
+    },
+    {
+      "timestamp": "2026-04-09T03:05:49.133580",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "JPM",
+      "shares": 16.2357,
+      "fill_price": 307.9700012207031,
+      "notional": 5000.10854881897,
+      "confidence": 7,
+      "reasoning": "JPM gained 3.55% today and 4.69% over 5 days, indicating resilience in financials amid improving economic signals, providing diversification from tech-heavy holdings."
+    },
+    {
+      "timestamp": "2026-04-09T03:05:49.133572",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "META",
+      "shares": 24.4929,
+      "fill_price": 612.4199829101562,
+      "notional": 14999.941399420166,
+      "confidence": 8,
+      "reasoning": "META is up 6.50% today and 7.04% over 5 days, driven by positive communication services trends and lower relative volatility compared to peers."
+    },
+    {
+      "timestamp": "2026-04-09T03:05:49.133559",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "CAT",
+      "shares": 6.4802,
+      "fill_price": 771.5800170898438,
+      "notional": 4999.992826745605,
+      "confidence": 9,
+      "reasoning": "CAT has surged 6.51% today and 8.91% over 5 days, reflecting strong industrial momentum amid infrastructure themes. Increasing to 20% weight leverages this high-conviction rally while staying within limits."
+    },
+    {
+      "timestamp": "2026-04-09T03:04:49.031370",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "MSFT",
+      "shares": 5.3434,
+      "fill_price": 374.3299865722656,
+      "notional": 2000.1948502502441,
+      "confidence": 7,
+      "reasoning": "MSFT has lagged the fastest-moving growth names over the past month but is stabilizing with positive 1-day and 5-day returns from a level well below its 30-day high. This offers a balanced way to deploy cash into a mega-cap compounder with lower volatility than the semiconductor names already held."
+    },
+    {
+      "timestamp": "2026-04-09T03:04:49.031353",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "META",
+      "shares": 16.3286,
+      "fill_price": 612.4199829101562,
+      "notional": 9999.960932946778,
+      "confidence": 8,
+      "reasoning": "META has strong near-term momentum with +6.50% in 1 day and +7.04% in 5 days, while still remaining below its 30-day high, suggesting upside continuation without being fully extended. It adds another high-quality large-cap growth exposure alongside existing tech leaders."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118894",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "V",
+      "shares": 25.8933,
+      "fill_price": 308.9599914550781,
+      "notional": 7999.993746743774,
+      "confidence": 5,
+      "reasoning": "V shows modest gains (+2.22% 5D%) and is below its 30-day high, offering a value opportunity in financials with stable volume and defensive traits."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118889",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "CAT",
+      "shares": 10.3683,
+      "fill_price": 771.5800170898438,
+      "notional": 7999.973091192626,
+      "confidence": 5,
+      "reasoning": "CAT has strong short-term momentum (+8.91% 5D%) and positive 30D% return, indicating recovery in industrials, though volume is lower, warranting moderate confidence."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118883",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "COST",
+      "shares": 9.7061,
+      "fill_price": 1030.27001953125,
+      "notional": 9999.903836572264,
+      "confidence": 6,
+      "reasoning": "COST shows consistent growth (+3.40% 5D%, +3.57% 30D%) and is at its 30-day high, reflecting strong performance in consumer staples with low volatility."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118877",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "WMT",
+      "shares": 78.5792,
+      "fill_price": 127.26000213623047,
+      "notional": 9999.989159863282,
+      "confidence": 6,
+      "reasoning": "WMT has steady gains (+2.40% 5D%, +1.20% 30D%) and is near its 30-day high, offering stability in consumer staples with defensive characteristics."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118869",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "JPM",
+      "shares": 32.4706,
+      "fill_price": 307.9700012207031,
+      "notional": 9999.970721636962,
+      "confidence": 6,
+      "reasoning": "JPM shows positive momentum (+4.69% 5D%, +1.54% 30D%) and is close to its 30-day high, indicating strength in financials with reasonable volume for entry."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118864",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "UNH",
+      "shares": 39.2182,
+      "fill_price": 305.9800109863281,
+      "notional": 11999.985266864014,
+      "confidence": 7,
+      "reasoning": "UNH has strong recent gains (+13.08% 5D%, +7.66% 30D%) and is near its 30-day high, showing stability and growth in healthcare, a defensive sector."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118857",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "AVGO",
+      "shares": 34.2241,
+      "fill_price": 350.6300048828125,
+      "notional": 11999.996350109863,
+      "confidence": 7,
+      "reasoning": "AVGO demonstrates robust performance (+13.29% 5D%, +5.51% 30D%) in semiconductors, a key tech sector, with high momentum and volume indicating investor interest."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118850",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "AMZN",
+      "shares": 67.7966,
+      "fill_price": 221.25,
+      "notional": 14999.99775,
+      "confidence": 8,
+      "reasoning": "AMZN has solid gains (+6.23% 5D%, +5.04% 30D%) and is near its 30-day high, reflecting strong consumer discretionary demand and growth prospects."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:51.118838",
+      "date": "2026-04-08",
+      "model_key": "deepseek",
+      "side": "BUY",
+      "ticker": "GOOGL",
+      "shares": 47.2708,
+      "fill_price": 317.32000732421875,
+      "notional": 14999.97060222168,
+      "confidence": 8,
+      "reasoning": "GOOGL shows strong momentum with +10.35% over 5 days and positive 30D% return, indicating resilience in communication services; high average volume supports liquidity for entry."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:31.178372",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "CAT",
+      "shares": 19.4406,
+      "fill_price": 771.5800170898438,
+      "notional": 14999.978480236816,
+      "confidence": 7,
+      "reasoning": "CAT's 8.91% 5-day gain and 6.51% 1-day surge indicate industrial sector strength, near its 30-day high. This aligns with infrastructure build themes in the phase."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:31.178361",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "UNH",
+      "shares": 49.0228,
+      "fill_price": 305.9800109863281,
+      "notional": 14999.996882580564,
+      "confidence": 8,
+      "reasoning": "UNH exhibits impressive 13.08% 5-day and 7.66% 30-day gains, driven by healthcare sector stability and recent highs. This makes it a defensive yet growing position in the current environment."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:31.178350",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "AMZN",
+      "shares": 67.7966,
+      "fill_price": 221.25,
+      "notional": 14999.99775,
+      "confidence": 7,
+      "reasoning": "AMZN's 6.23% 5-day and 5.04% 30-day increases reflect consumer discretionary resilience and e-commerce growth. Trading near its 30-day high with high volume supports a bullish entry."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:31.178336",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "AVGO",
+      "shares": 42.7801,
+      "fill_price": 350.6300048828125,
+      "notional": 14999.986671887205,
+      "confidence": 9,
+      "reasoning": "AVGO leads with 13.29% 5-day and 5.51% 30-day gains, benefiting from semiconductor sector strength and proximity to its 30-day high. This positions it well for further appreciation in a recovering market."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:31.178315",
+      "date": "2026-04-08",
+      "model_key": "grok",
+      "side": "BUY",
+      "ticker": "GOOGL",
+      "shares": 47.2708,
+      "fill_price": 317.32000732421875,
+      "notional": 14999.97060222168,
+      "confidence": 8,
+      "reasoning": "GOOGL has shown strong 5-day gains of 10.35% and positive 30-day performance of 1.41%, indicating robust momentum in communication services amid broader tech recovery. The stock is near its 30-day high, suggesting potential for continued upside."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284041",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "META",
+      "shares": 16.3286,
+      "fill_price": 612.4199829101562,
+      "notional": 9999.960932946778,
+      "confidence": 7,
+      "reasoning": "Meta is showing a strong 7.04% 5-day recovery from its recent pullback, offering an attractive entry point for the communication services sector."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284035",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "COST",
+      "shares": 9.7061,
+      "fill_price": 1030.27001953125,
+      "notional": 9999.903836572264,
+      "confidence": 9,
+      "reasoning": "Costco is the ultimate defensive compounder, hitting its 30-day high today and showing resilience regardless of broader market fluctuations."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284029",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "JPM",
+      "shares": 32.4706,
+      "fill_price": 307.9700012207031,
+      "notional": 9999.970721636962,
+      "confidence": 8,
+      "reasoning": "JPMorgan provides stable financial exposure, grinding steadily higher with a 4.69% 5-day return and positive 30-day momentum."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284024",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "CAT",
+      "shares": 12.9604,
+      "fill_price": 771.5800170898438,
+      "notional": 9999.98565349121,
+      "confidence": 7,
+      "reasoning": "Caterpillar is showing excellent cyclical strength, up nearly 9% over the last 5 days and sitting just below its 30-day high."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284018",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "AMZN",
+      "shares": 67.7966,
+      "fill_price": 221.25,
+      "notional": 14999.99775,
+      "confidence": 8,
+      "reasoning": "Amazon is demonstrating steady, consistent momentum across both 5-day and 30-day timeframes, acting as a reliable consumer discretionary leader."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284011",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "GOOGL",
+      "shares": 47.2708,
+      "fill_price": 317.32000732421875,
+      "notional": 14999.97060222168,
+      "confidence": 8,
+      "reasoning": "Alphabet is the strongest mega-cap tech performer over the recent bounce, jumping 10.35% in 5 days and fully erasing its 30-day drawdown."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.284004",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "UNH",
+      "shares": 49.0228,
+      "fill_price": 305.9800109863281,
+      "notional": 14999.996882580564,
+      "confidence": 9,
+      "reasoning": "UNH is staging a massive recovery with a 13.08% 5-day gain, providing defensive healthcare exposure while outperforming the broader market."
+    },
+    {
+      "timestamp": "2026-04-09T02:45:09.283992",
+      "date": "2026-04-08",
+      "model_key": "gemini",
+      "side": "BUY",
+      "ticker": "AVGO",
+      "shares": 42.7801,
+      "fill_price": 350.6300048828125,
+      "notional": 14999.986671887205,
+      "confidence": 9,
+      "reasoning": "AVGO is displaying outstanding relative strength in the semiconductor space, surging 13.29% over the last 5 days and nearing its 30-day high."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638734",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "CAT",
+      "shares": 10.3683,
+      "fill_price": 771.5800170898438,
+      "notional": 7999.973091192626,
+      "confidence": 6,
+      "reasoning": "CAT posted one of the strongest daily and weekly moves in the universe and is effectively at its 30-day high, indicating strong cyclical momentum. This gives the portfolio industrial exposure tied to improving risk appetite."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638727",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "WMT",
+      "shares": 62.8634,
+      "fill_price": 127.26000213623047,
+      "notional": 7999.996418290711,
+      "confidence": 6,
+      "reasoning": "WMT is a defensive name with positive returns across all observed periods and is trading near its 30-day high. It helps balance the portfolio's growth tilt with a steadier consumer staples exposure."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638721",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "UNH",
+      "shares": 32.6818,
+      "fill_price": 305.9800109863281,
+      "notional": 9999.97752305298,
+      "confidence": 6,
+      "reasoning": "UNH has the strongest 30-day performance among the healthcare names and a very strong +13.08% 5-day move, signaling improving relative strength. Despite a small down day, it remains close to its 30-day high and diversifies sector exposure."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638714",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "JPM",
+      "shares": 32.4706,
+      "fill_price": 307.9700012207031,
+      "notional": 9999.970721636962,
+      "confidence": 7,
+      "reasoning": "JPM is participating in the broad rally with positive 1-day, 5-day, and 30-day performance and is trading near its 30-day high. It adds financial exposure with comparatively stable trend characteristics."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638707",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "NVDA",
+      "shares": 65.905,
+      "fill_price": 182.0800018310547,
+      "notional": 11999.98252067566,
+      "confidence": 7,
+      "reasoning": "NVDA has rebounded with +4.40% over 5 days after a weaker 30-day period, suggesting a potential continuation recovery within a leading sector. The stock remains below its 30-day high, which provides upside if semiconductor strength persists."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638699",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "AMZN",
+      "shares": 54.2372,
+      "fill_price": 221.25,
+      "notional": 11999.9805,
+      "confidence": 7,
+      "reasoning": "AMZN has positive returns across 5-day and 30-day windows and is closing close to its recent high, indicating steady trend strength. It adds exposure to consumer and cloud-related growth without concentrating further in semiconductors."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638689",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "GOOGL",
+      "shares": 44.1194,
+      "fill_price": 317.32000732421875,
+      "notional": 13999.968331140137,
+      "confidence": 8,
+      "reasoning": "GOOGL is showing strong acceleration with +10.35% over 5 days and is trading just below its 30-day high while still only +1.41% over 30 days, suggesting improving momentum without being overly stretched. This offers a favorable entry into a liquid megacap leader."
+    },
+    {
+      "timestamp": "2026-04-09T02:43:41.638669",
+      "date": "2026-04-08",
+      "model_key": "gpt",
+      "side": "BUY",
+      "ticker": "AVGO",
+      "shares": 39.9281,
+      "fill_price": 350.6300048828125,
+      "notional": 13999.989897961426,
+      "confidence": 8,
+      "reasoning": "AVGO has the strongest short-term momentum in the universe with +13.29% over 5 days and +5.51% over 30 days, and it is closing near its 30-day high. The combination of relative strength and semiconductor leadership supports an overweight starter position."
+    }
+  ],
+  "equity_curves": {
+    "claude": [
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.00000000001,
+        "benchmark": 676.010009765625
+      }
+    ],
+    "gpt": [
+      {
+        "date": "2026-04-08",
+        "value": 100000.00000000001,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.00000000003,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.00000000003,
+        "benchmark": 676.010009765625
+      }
+    ],
+    "gemini": [
+      {
+        "date": "2026-04-08",
+        "value": 99999.99999999999,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 99999.99999999999,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 99999.99999999999,
+        "benchmark": 676.010009765625
+      }
+    ],
+    "grok": [
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 99999.99999999999,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 99999.99999999999,
+        "benchmark": 676.010009765625
+      }
+    ],
+    "deepseek": [
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      },
+      {
+        "date": "2026-04-08",
+        "value": 100000.0,
+        "benchmark": 676.010009765625
+      }
+    ]
+  },
+  "universe": {
+    "version": "v1",
+    "effective_date": "2026-04-08",
+    "description": "Default 20-name universe: mega-cap leaders across all major sectors. Liquid, well-covered, large-cap U.S. equities.",
+    "tickers": [
+      {
+        "symbol": "AAPL",
+        "name": "Apple",
+        "sector": "Technology"
+      },
+      {
+        "symbol": "MSFT",
+        "name": "Microsoft",
+        "sector": "Technology"
+      },
+      {
+        "symbol": "NVDA",
+        "name": "NVIDIA",
+        "sector": "Semiconductors"
+      },
+      {
+        "symbol": "GOOGL",
+        "name": "Alphabet",
+        "sector": "Communication Services"
+      },
+      {
+        "symbol": "META",
+        "name": "Meta Platforms",
+        "sector": "Communication Services"
+      },
+      {
+        "symbol": "AMZN",
+        "name": "Amazon",
+        "sector": "Consumer Discretionary"
+      },
+      {
+        "symbol": "AVGO",
+        "name": "Broadcom",
+        "sector": "Semiconductors"
+      },
+      {
+        "symbol": "TSLA",
+        "name": "Tesla",
+        "sector": "Consumer Discretionary"
+      },
+      {
+        "symbol": "JPM",
+        "name": "JPMorgan Chase",
+        "sector": "Financials"
+      },
+      {
+        "symbol": "BRK-B",
+        "name": "Berkshire Hathaway",
+        "sector": "Financials"
+      },
+      {
+        "symbol": "V",
+        "name": "Visa",
+        "sector": "Financials"
+      },
+      {
+        "symbol": "UNH",
+        "name": "UnitedHealth",
+        "sector": "Healthcare"
+      },
+      {
+        "symbol": "LLY",
+        "name": "Eli Lilly",
+        "sector": "Healthcare"
+      },
+      {
+        "symbol": "JNJ",
+        "name": "Johnson & Johnson",
+        "sector": "Healthcare"
+      },
+      {
+        "symbol": "WMT",
+        "name": "Walmart",
+        "sector": "Consumer Staples"
+      },
+      {
+        "symbol": "COST",
+        "name": "Costco",
+        "sector": "Consumer Staples"
+      },
+      {
+        "symbol": "HD",
+        "name": "Home Depot",
+        "sector": "Consumer Discretionary"
+      },
+      {
+        "symbol": "XOM",
+        "name": "Exxon Mobil",
+        "sector": "Energy"
+      },
+      {
+        "symbol": "CVX",
+        "name": "Chevron",
+        "sector": "Energy"
+      },
+      {
+        "symbol": "CAT",
+        "name": "Caterpillar",
+        "sector": "Industrials"
+      }
+    ]
+  },
   "models": {
-    "claude":   {"provider": "anthropic", "model": "claude-opus-4-6",   "enabled": true},
-    "gpt":      {"provider": "openai",    "model": "gpt-5.4",           "enabled": true},
-    "gemini":   {"provider": "google",    "model": "gemini-3.1-pro",    "enabled": true},
-    "grok":     {"provider": "xai",       "model": "grok-4",            "enabled": true},
-    "deepseek": {"provider": "deepseek",  "model": "deepseek-v4",       "enabled": true}
+    "claude": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-6",
+      "enabled": true
+    },
+    "gpt": {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "enabled": true
+    },
+    "gemini": {
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "enabled": true
+    },
+    "grok": {
+      "provider": "xai",
+      "model": "grok-4",
+      "enabled": true
+    },
+    "deepseek": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "enabled": true
+    }
   },
   "benchmark_ticker": "SPY",
   "prompt_version": "v1"
