@@ -21,7 +21,12 @@ from typing import Any
 
 import pandas as pd
 
-from ..analytics import build_leaderboard, load_performance_history
+from ..analytics import (
+    build_leaderboard,
+    compute_api_cost_summary,
+    compute_metrics,
+    load_performance_history,
+)
 from ..config_loader import (
     INTRADAY_DIR,
     LEADERBOARD_DIR,
@@ -441,15 +446,19 @@ def _build_performance_table(
         r["model_key"],
     ))
 
-    headers = ["#", "Model", "Value", "Daily P&L", "Daily %", "Cum. Return", "Alpha vs SPY", "Trades", "Cash %"]
+    headers = ["#", "Model", "Cohort", "Value", "Daily P&L", "Daily %", "Cum. Return", "Alpha vs SPY", "Trades", "Cash %"]
+    models_cfg = settings.get("models", {})
     rows: list[list[str]] = []
     for i, r in enumerate(rows_data, 1):
-        name = r["model_key"].upper()
+        cfg = models_cfg.get(r["model_key"], {})
+        name = cfg.get("display_name", r["model_key"].upper())
+        cohort_label = "EXP" if cfg.get("cohort") == "expansion" else "core"
         if i == 1:
             name = f"**{name}**"
         rows.append([
             str(i),
             name,
+            cohort_label,
             _money(r["value"]),
             _signed_money(r["daily_pnl"]),
             _pct(r["daily_pct"]),
@@ -459,7 +468,7 @@ def _build_performance_table(
             _pct(r["cash_pct"], sign=False),
         ])
 
-    table = _format_table(headers, rows, aligns=["R", "L", "R", "R", "R", "R", "R", "R", "R"])
+    table = _format_table(headers, rows, aligns=["R", "L", "C", "R", "R", "R", "R", "R", "R", "R"])
     return table, rows_data
 
 
@@ -574,10 +583,12 @@ def _build_intraday_session_table(
     decision log (trades, runs, first/last tick) so every column comes
     straight from the source-of-truth files.
     """
-    headers = ["Model", "Ticks", "Trades", "First Tick", "Last Tick",
+    headers = ["Model", "Cohort", "Ticks", "Trades", "First Tick", "Last Tick",
                "Intraday High", "Intraday Low", "Range %"]
     rows: list[list[str]] = []
     any_data = False
+    settings = load_settings()
+    models_cfg = settings.get("models", {})
 
     for key in model_keys:
         ticks = _read_intraday_curve(key, run_date)
@@ -616,8 +627,12 @@ def _build_intraday_session_table(
                 return ts.split("T", 1)[1][:5]
             return ts[-8:-3] if len(ts) >= 8 else ts
 
+        cfg = models_cfg.get(key, {})
+        label = cfg.get("display_name", key.upper())
+        cohort_label = "EXP" if cfg.get("cohort") == "expansion" else "core"
         rows.append([
-            key.upper(),
+            label,
+            cohort_label,
             str(n_runs),
             str(n_trades),
             _short_ts(first_ts),
@@ -630,7 +645,214 @@ def _build_intraday_session_table(
     if not any_data:
         return "_No intraday tick data recorded for this session._"
 
-    return _format_table(headers, rows, aligns=["L", "R", "R", "R", "R", "R", "R", "R"])
+    return _format_table(headers, rows, aligns=["L", "C", "R", "R", "R", "R", "R", "R", "R"])
+
+
+# ===========================================================================
+# EXPANSION COHORT — Sonnet vs Opus cost-performance comparison
+# ===========================================================================
+
+def _build_expansion_cohort_section(
+    settings: dict[str, Any],
+    run_date: datetime,
+) -> str:
+    """Compare Claude Sonnet (core) vs Claude Opus (expansion) head-to-head.
+
+    The expansion cohort exists to answer one specific research question:
+    is the 5x more expensive Opus actually delivering 5x more trading edge,
+    or is the cheaper Sonnet competitive on a cost-adjusted basis?
+
+    This section pulls performance metrics + cumulative API cost for both
+    models and renders a side-by-side table plus a prose key finding.
+    Returns "" if no expansion cohort entries are configured.
+    """
+    models_cfg = settings.get("models", {})
+    expansion_keys = [k for k, cfg in models_cfg.items() if cfg.get("cohort") == "expansion"]
+    if not expansion_keys:
+        return ""
+
+    # Sonnet anchor: the canonical "claude" key in the core cohort.
+    sonnet_key = "claude" if models_cfg.get("claude", {}).get("cohort") == "core" else None
+    if not sonnet_key:
+        return _expansion_cohort_solo(expansion_keys, models_cfg)
+
+    sonnet_cfg = models_cfg[sonnet_key]
+    sections: list[str] = []
+    for opus_key in expansion_keys:
+        opus_cfg = models_cfg[opus_key]
+        sonnet_metrics = compute_metrics(sonnet_key)
+        opus_metrics = compute_metrics(opus_key)
+        sonnet_cost = compute_api_cost_summary(sonnet_key)
+        opus_cost = compute_api_cost_summary(opus_key)
+
+        sonnet_label = sonnet_cfg.get("display_name", sonnet_key.upper())
+        opus_label = opus_cfg.get("display_name", opus_key.upper())
+
+        headers = ["Metric", sonnet_label, opus_label, "Δ (Opus − Sonnet)"]
+
+        def _delta_pct(opus, sonnet):
+            if opus is None or sonnet is None:
+                return "—"
+            d = opus - sonnet
+            return f"{d*100:+.2f}pp"
+
+        def _delta_num(opus, sonnet, digits=2):
+            if opus is None or sonnet is None:
+                return "—"
+            d = opus - sonnet
+            return f"{d:+.{digits}f}"
+
+        def _delta_money(opus, sonnet):
+            if opus is None or sonnet is None:
+                return "—"
+            d = opus - sonnet
+            sign = "+" if d >= 0 else "-"
+            return f"{sign}${abs(d):,.4f}"
+
+        rows = [
+            ["Cumulative return",
+             _pct(sonnet_metrics.get("cumulative_return")),
+             _pct(opus_metrics.get("cumulative_return")),
+             _delta_pct(opus_metrics.get("cumulative_return"), sonnet_metrics.get("cumulative_return"))],
+            ["Sharpe (30d)",
+             _num(sonnet_metrics.get("sharpe_30d")) if sonnet_metrics.get("sharpe_30d") is not None else "—",
+             _num(opus_metrics.get("sharpe_30d")) if opus_metrics.get("sharpe_30d") is not None else "—",
+             _delta_num(opus_metrics.get("sharpe_30d"), sonnet_metrics.get("sharpe_30d"))],
+            ["Max drawdown",
+             _pct(sonnet_metrics.get("max_drawdown")) if sonnet_metrics.get("max_drawdown") is not None else "—",
+             _pct(opus_metrics.get("max_drawdown")) if opus_metrics.get("max_drawdown") is not None else "—",
+             _delta_pct(opus_metrics.get("max_drawdown"), sonnet_metrics.get("max_drawdown"))],
+            ["Alpha vs SPY",
+             _pct(sonnet_metrics.get("alpha_vs_spy")) if sonnet_metrics.get("alpha_vs_spy") is not None else "—",
+             _pct(opus_metrics.get("alpha_vs_spy")) if opus_metrics.get("alpha_vs_spy") is not None else "—",
+             _delta_pct(opus_metrics.get("alpha_vs_spy"), sonnet_metrics.get("alpha_vs_spy"))],
+            ["Current value",
+             _money(sonnet_metrics.get("current_value")),
+             _money(opus_metrics.get("current_value")),
+             _delta_money(opus_metrics.get("current_value"), sonnet_metrics.get("current_value"))],
+            ["—", "—", "—", "—"],
+            ["API calls",
+             str(sonnet_cost["calls"]),
+             str(opus_cost["calls"]),
+             f"{opus_cost['calls'] - sonnet_cost['calls']:+d}"],
+            ["Total input tokens",
+             f"{sonnet_cost['input_tokens']:,}",
+             f"{opus_cost['input_tokens']:,}",
+             f"{opus_cost['input_tokens'] - sonnet_cost['input_tokens']:+,}"],
+            ["Total output tokens",
+             f"{sonnet_cost['output_tokens']:,}",
+             f"{opus_cost['output_tokens']:,}",
+             f"{opus_cost['output_tokens'] - sonnet_cost['output_tokens']:+,}"],
+            ["Total API cost",
+             f"${sonnet_cost['cost_usd']:,.4f}",
+             f"${opus_cost['cost_usd']:,.4f}",
+             _delta_money(opus_cost["cost_usd"], sonnet_cost["cost_usd"])],
+        ]
+
+        # Cost per dollar of P&L — the actual cost-performance metric.
+        sonnet_ret = sonnet_metrics.get("cumulative_return") or 0.0
+        opus_ret = opus_metrics.get("cumulative_return") or 0.0
+        sonnet_cur = float(sonnet_metrics.get("current_value", 0) or 0)
+        opus_cur = float(opus_metrics.get("current_value", 0) or 0)
+        sonnet_pnl = (sonnet_ret * sonnet_cur / (1 + sonnet_ret)) if sonnet_ret else 0.0
+        opus_pnl = (opus_ret * opus_cur / (1 + opus_ret)) if opus_ret else 0.0
+
+        rows.append([
+            "Cost / $ of P&L",
+            f"${(sonnet_cost['cost_usd'] / sonnet_pnl):,.4f}" if sonnet_pnl > 0 else "—",
+            f"${(opus_cost['cost_usd'] / opus_pnl):,.4f}" if opus_pnl > 0 else "—",
+            "lower = better",
+        ])
+
+        table = _format_table(headers, rows, aligns=["L", "R", "R", "R"])
+
+        finding = _expansion_cohort_finding(
+            sonnet_label=sonnet_label,
+            opus_label=opus_label,
+            sonnet_metrics=sonnet_metrics,
+            opus_metrics=opus_metrics,
+            sonnet_cost=sonnet_cost,
+            opus_cost=opus_cost,
+        )
+
+        sections.append(
+            f"### {sonnet_label}  vs  {opus_label}\n\n"
+            f"{finding}\n\n"
+            f"{table}"
+        )
+
+    return "\n\n".join(sections)
+
+
+def _expansion_cohort_solo(
+    expansion_keys: list[str],
+    models_cfg: dict[str, Any],
+) -> str:
+    """Fallback when there's no Sonnet anchor — just list expansion entries."""
+    lines = ["_No Sonnet anchor in core cohort; expansion entries listed without head-to-head comparison._\n"]
+    for key in expansion_keys:
+        m = compute_metrics(key)
+        c = compute_api_cost_summary(key)
+        label = models_cfg[key].get("display_name", key.upper())
+        lines.append(
+            f"- **{label}**: cum. return {_pct(m.get('cumulative_return'))}, "
+            f"{c['calls']} calls, ${c['cost_usd']:,.4f} spent."
+        )
+    return "\n".join(lines)
+
+
+def _expansion_cohort_finding(
+    sonnet_label: str,
+    opus_label: str,
+    sonnet_metrics: dict[str, Any],
+    opus_metrics: dict[str, Any],
+    sonnet_cost: dict[str, Any],
+    opus_cost: dict[str, Any],
+) -> str:
+    """Synthesize the prose 'key finding' for the cost-performance comparison."""
+    sonnet_ret = sonnet_metrics.get("cumulative_return")
+    opus_ret = opus_metrics.get("cumulative_return")
+
+    if sonnet_ret is None or opus_ret is None:
+        return f"_Insufficient performance data to compare {sonnet_label} and {opus_label} on a cost-adjusted basis._"
+
+    if sonnet_cost["calls"] == 0 or opus_cost["calls"] == 0:
+        return (
+            f"_Cost data not yet available for both models — comparison will activate "
+            f"once {sonnet_label} and {opus_label} have each completed at least one tick._"
+        )
+
+    cost_ratio = opus_cost["cost_usd"] / sonnet_cost["cost_usd"] if sonnet_cost["cost_usd"] > 0 else None
+    return_delta_pp = (opus_ret - sonnet_ret) * 100
+    cost_ratio_str = f"{cost_ratio:.1f}x" if cost_ratio else "—"
+
+    if abs(return_delta_pp) < 0.05:
+        return (
+            f"**Key finding:** {opus_label} and {sonnet_label} are running essentially flat "
+            f"on cumulative return ({_pct(opus_ret)} vs {_pct(sonnet_ret)}, Δ {return_delta_pp:+.2f}pp), "
+            f"but {opus_label} has cost {cost_ratio_str} as much in API spend "
+            f"(${opus_cost['cost_usd']:,.4f} vs ${sonnet_cost['cost_usd']:,.4f}). "
+            f"At current performance the expansion cohort is **not earning its premium** — "
+            f"the cheaper Sonnet variant is delivering equivalent edge for a fraction of the spend."
+        )
+    elif return_delta_pp > 0:
+        return (
+            f"**Key finding:** {opus_label} is outperforming {sonnet_label} by "
+            f"{return_delta_pp:+.2f}pp on cumulative return ({_pct(opus_ret)} vs {_pct(sonnet_ret)}). "
+            f"It's also costing {cost_ratio_str} as much in API spend "
+            f"(${opus_cost['cost_usd']:,.4f} vs ${sonnet_cost['cost_usd']:,.4f}). "
+            f"Whether the premium is justified depends on the magnitude of the lead vs the "
+            f"cost gap — track this trend over the coming weeks before drawing conclusions."
+        )
+    else:
+        return (
+            f"**Key finding:** {sonnet_label} is currently **beating** {opus_label} by "
+            f"{abs(return_delta_pp):.2f}pp on cumulative return "
+            f"({_pct(sonnet_ret)} vs {_pct(opus_ret)}) while costing {cost_ratio_str} less in API spend "
+            f"(${sonnet_cost['cost_usd']:,.4f} vs ${opus_cost['cost_usd']:,.4f}). "
+            f"If this holds, the cheaper model is dominating the expensive one on both axes — "
+            f"a meaningful signal that raw model capability isn't the bottleneck on this task."
+        )
 
 
 # ===========================================================================
@@ -643,8 +865,10 @@ def _build_leaderboard_table(
 ) -> str:
     leaderboard = build_leaderboard(model_keys)
     prev_ranks = _previous_leaderboard(run_date) or {}
+    settings = load_settings()
+    models_cfg = settings.get("models", {})
 
-    headers = ["#", "Δ", "Model", "Cum. Return", "Sharpe (30d)", "Max DD", "Days"]
+    headers = ["#", "Δ", "Model", "Cohort", "Cum. Return", "Sharpe (30d)", "Max DD", "Days"]
     rows: list[list[str]] = []
     for row in leaderboard:
         key = row["model_key"]
@@ -659,7 +883,9 @@ def _build_leaderboard_table(
         else:
             arrow = "–"
 
-        name = key.upper()
+        cfg = models_cfg.get(key, {})
+        name = cfg.get("display_name", key.upper())
+        cohort_label = "EXP" if cfg.get("cohort") == "expansion" else "core"
         if cur_rank == 1:
             name = f"**{name}**"
 
@@ -667,12 +893,13 @@ def _build_leaderboard_table(
             str(cur_rank),
             arrow,
             name,
+            cohort_label,
             _pct(row.get("cumulative_return")),
             _num(row["sharpe_30d"]) if row.get("sharpe_30d") is not None else "—",
             _pct(row["max_drawdown"]) if row.get("max_drawdown") is not None else "—",
             str(row.get("days", 0)),
         ])
-    return _format_table(headers, rows, aligns=["R", "C", "L", "R", "R", "R", "R"])
+    return _format_table(headers, rows, aligns=["R", "C", "L", "C", "R", "R", "R", "R"])
 
 
 # ===========================================================================
@@ -785,10 +1012,14 @@ def generate_daily_report(
 
     breakdown_blocks: list[str] = []
     for key in model_keys:
-        breakdown_blocks.append(f"### {key.upper()}\n\n{_model_breakdown(key, run_date)}")
+        cfg = settings["models"].get(key, {})
+        label = cfg.get("display_name", key.upper())
+        cohort_tag = " _(expansion)_" if cfg.get("cohort") == "expansion" else ""
+        breakdown_blocks.append(f"### {label}{cohort_tag}\n\n{_model_breakdown(key, run_date)}")
     breakdown_section = "\n\n".join(breakdown_blocks)
 
     intraday_session_tbl = _build_intraday_session_table(model_keys, run_date)
+    expansion_cohort_section = _build_expansion_cohort_section(settings, run_date)
     leaderboard_tbl = _build_leaderboard_table(model_keys, run_date)
     health_section = _build_health_section(model_keys, run_date)
 
@@ -847,6 +1078,12 @@ def generate_daily_report(
         "## Intraday Session Profile",
         "",
         intraday_session_tbl,
+        "",
+        "---",
+        "",
+        "## Expansion Cohort — Cost-Performance",
+        "",
+        expansion_cohort_section if expansion_cohort_section else "_No expansion cohort entries configured._",
         "",
         "---",
         "",

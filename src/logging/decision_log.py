@@ -45,6 +45,7 @@ def log_decision_run(
     month_str = run_date.strftime("%Y-%m")
     path = TRADES_DIR / f"{model_key}_{month_str}.jsonl"
 
+    md = decision_result.metadata or {}
     record = {
         "date": run_date.strftime("%Y-%m-%d"),
         "timestamp": datetime.utcnow().isoformat(),
@@ -59,6 +60,12 @@ def log_decision_run(
         "api_success": decision_result.success,
         "api_error": decision_result.error,
         "api_latency_seconds": decision_result.latency_seconds,
+        # Token usage + USD cost — drives the cost-performance comparison
+        # in the daily report's expansion cohort section. None for failed
+        # calls or providers we don't have a rate table for.
+        "input_tokens": md.get("input_tokens"),
+        "output_tokens": md.get("output_tokens"),
+        "cost_usd": md.get("cost_usd"),
         "overall_reasoning": decision_result.overall_reasoning,
         "raw_decisions": decision_result.decisions,
         "accepted_decisions": accepted_decisions,

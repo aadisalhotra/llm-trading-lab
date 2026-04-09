@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from ..config_loader import PERFORMANCE_DIR
+from ..config_loader import PERFORMANCE_DIR, TRADES_DIR
 
 
 def load_performance_history(model_key: str) -> pd.DataFrame:
@@ -96,6 +97,63 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
         "num_positions": int(df["num_positions"].iloc[-1]),
         "halted": bool(df["halted"].iloc[-1]),
         "last_api_success": last_api_success,
+    }
+
+
+def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
+    """Sum token usage and USD cost across every decision-log entry for a model.
+
+    Walks /data/trades/{model_key}_YYYY-MM.jsonl files (using a regex match
+    rather than a glob so prefix-collision keys like "claude" / "claude_opus"
+    don't cross-pollute). Returns:
+        {
+          "calls": int,
+          "input_tokens": int,
+          "output_tokens": int,
+          "total_tokens": int,
+          "cost_usd": float,           # 0.0 if no rates known
+          "cost_known": bool,          # True if every call had a cost rate
+        }
+    """
+    pattern = re.compile(rf"^{re.escape(model_key)}_\d{{4}}-\d{{2}}\.jsonl$")
+    files = sorted(
+        fp for fp in TRADES_DIR.iterdir()
+        if fp.is_file() and pattern.match(fp.name)
+    ) if TRADES_DIR.exists() else []
+
+    calls = 0
+    in_tok = 0
+    out_tok = 0
+    cost = 0.0
+    unknown_cost_calls = 0
+    for fp in files:
+        with open(fp, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not rec.get("api_success"):
+                    continue
+                calls += 1
+                in_tok += int(rec.get("input_tokens") or 0)
+                out_tok += int(rec.get("output_tokens") or 0)
+                c = rec.get("cost_usd")
+                if c is None:
+                    unknown_cost_calls += 1
+                else:
+                    cost += float(c)
+    return {
+        "calls": calls,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": in_tok + out_tok,
+        "cost_usd": cost,
+        "cost_known": unknown_cost_calls == 0 and calls > 0,
+        "unknown_cost_calls": unknown_cost_calls,
     }
 
 

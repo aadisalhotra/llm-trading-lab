@@ -22,11 +22,12 @@
     "halt_on_stop_loss": true
   },
   "models": {
-    "claude":   {"provider": "anthropic", "model": "claude-opus-4-6",        "enabled": true,  "vision_capable": true},
-    "gpt":      {"provider": "openai",    "model": "gpt-5.4",                "enabled": true,  "vision_capable": true},
-    "gemini":   {"provider": "google",    "model": "gemini-3.1-pro-preview", "enabled": true,  "vision_capable": true},
-    "grok":     {"provider": "xai",       "model": "grok-4",                 "enabled": true,  "vision_capable": true},
-    "deepseek": {"provider": "deepseek",  "model": "deepseek-chat",          "enabled": true,  "vision_capable": false}
+    "claude":      {"provider": "anthropic", "model": "claude-sonnet-4-6", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "Claude Sonnet 4.6"},
+    "gpt":         {"provider": "openai",    "model": "gpt-5.4",           "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "GPT-5.4"},
+    "gemini":      {"provider": "google",    "model": "gemini-3.1-pro-preview", "enabled": true, "vision_capable": true,  "cohort": "core", "display_name": "Gemini 3.1 Pro"},
+    "grok":        {"provider": "xai",       "model": "grok-4",                 "enabled": true, "vision_capable": true,  "cohort": "core", "display_name": "Grok 4"},
+    "deepseek":    {"provider": "deepseek",  "model": "deepseek-chat",          "enabled": true, "vision_capable": false, "cohort": "core", "display_name": "DeepSeek V4"},
+    "claude_opus": {"provider": "anthropic", "model": "claude-opus-4-6",   "enabled": true, "vision_capable": true,  "cohort": "expansion", "display_name": "Claude Opus 4.6"}
   },
   "benchmark_ticker": "SPY",
   "prompt_version": "v1",

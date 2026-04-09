@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import base64
 import os
+from typing import Any
 
+from ..analytics.cost_rates import compute_call_cost_usd
 from .base import BaseAdapter
 
 
@@ -16,7 +18,7 @@ class OpenAIAdapter(BaseAdapter):
         system_prompt: str,
         user_prompt: str,
         images: list[bytes] | None = None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, dict[str, Any]]:
         from openai import OpenAI
 
         api_key = os.getenv("OPENAI_API_KEY")
@@ -53,4 +55,15 @@ class OpenAIAdapter(BaseAdapter):
         )
         text = response.choices[0].message.content or ""
         returned_id = getattr(response, "model", self.model)
-        return text, returned_id
+
+        # OpenAI exposes usage on every successful chat completion
+        usage = getattr(response, "usage", None)
+        in_tok = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+        out_tok = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+        cost = compute_call_cost_usd(returned_id, in_tok, out_tok)
+        metadata: dict[str, Any] = {
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cost_usd": cost,
+        }
+        return text, returned_id, metadata

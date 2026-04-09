@@ -423,6 +423,45 @@ body {
   letter-spacing: 1.5px;
 }
 
+/* ===== Cohort badges ===== */
+.cohort-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-left: 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-radius: 0;
+  vertical-align: 1px;
+}
+.cohort-badge.cohort-core {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+}
+.cohort-badge.cohort-exp {
+  background: var(--accent-glow);
+  color: var(--accent-bright);
+  border: 1px solid var(--accent-dim);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+/* Subtle visual differentiation for expansion-cohort rows/cards */
+.leaderboard tr.cohort-expansion td {
+  border-left: 1px dotted var(--accent-dim);
+}
+.leaderboard tr.cohort-expansion td:first-child {
+  border-left: 2px solid var(--accent-dim);
+}
+.portfolio-card.cohort-expansion {
+  border-left: 2px solid var(--accent-dim);
+}
+.mini-chart-card.cohort-expansion {
+  border-left: 2px solid var(--accent-dim);
+}
+.version-item.cohort-expansion .k {
+  color: var(--accent-bright);
+}
+
 /* ===== Trade feed ===== */
 .trade-feed {
   font-size: 11px;

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import base64
 import os
+from typing import Any
 
+from ..analytics.cost_rates import compute_call_cost_usd
 from .base import BaseAdapter
 
 
@@ -16,7 +18,7 @@ class AnthropicAdapter(BaseAdapter):
         system_prompt: str,
         user_prompt: str,
         images: list[bytes] | None = None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, dict[str, Any]]:
         import anthropic  # local import so other providers still work without this dep
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -54,4 +56,17 @@ class AnthropicAdapter(BaseAdapter):
                 parts.append(block.text)
         text = "".join(parts)
         returned_id = getattr(response, "model", self.model)
-        return text, returned_id
+
+        # Capture token usage + USD cost — drives the Sonnet vs Opus
+        # cost-performance comparison in the daily report's expansion cohort
+        # section. Anthropic returns usage on every successful response.
+        usage = getattr(response, "usage", None)
+        in_tok = int(getattr(usage, "input_tokens", 0) or 0) if usage else 0
+        out_tok = int(getattr(usage, "output_tokens", 0) or 0) if usage else 0
+        cost = compute_call_cost_usd(returned_id, in_tok, out_tok)
+        metadata: dict[str, Any] = {
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cost_usd": cost,
+        }
+        return text, returned_id, metadata

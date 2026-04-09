@@ -13,11 +13,12 @@ const DATA_URL = "../data/dashboard.json";
 const REFRESH_MS = 5 * 60 * 1000;
 
 const MODEL_COLORS = {
-  claude:   "#ff7733",
-  gpt:      "#00d4aa",
-  gemini:   "#ffd23f",
-  grok:     "#b478ff",
-  deepseek: "#ff5599",
+  claude:      "#ff7733",  // Sonnet 4.6 — core Anthropic
+  gpt:         "#00d4aa",
+  gemini:      "#ffd23f",
+  grok:        "#b478ff",
+  deepseek:    "#ff5599",
+  claude_opus: "#cc4411",  // Opus 4.6 — expansion cohort, darker burnt-orange
 };
 const SPY_COLOR = "#6b7585";
 const ACCENT = "#2b8aff";
@@ -28,7 +29,9 @@ const TEXT_DIM = "#5f6b80";
 const BG = "#05070b";
 const GRID = "#1a2235";
 
-const MODEL_ORDER = ["claude", "gpt", "gemini", "grok", "deepseek"];
+// Core 5 first, expansion at the end. The leaderboard sorts by performance
+// so this ordering only matters for the model chart grid layout below.
+const MODEL_ORDER = ["claude", "gpt", "gemini", "grok", "deepseek", "claude_opus"];
 
 const state = {
   timeframe: "ALL",
@@ -417,19 +420,31 @@ function renderModelMiniCharts() {
   const lines = buildModelLineSeries(state.data, mode);
   const linesByKey = Object.fromEntries(lines.map(s => [s.key, s]));
 
+  const modelsCfg = state.data.models || {};
   MODEL_ORDER.forEach(key => {
     const series = linesByKey[key];
+    const cfg = modelsCfg[key] || {};
+    const cohort = cfg.cohort || "core";
+    const displayName = cfg.display_name || key.toUpperCase();
     const card = document.createElement("div");
     card.className = "mini-chart-card";
+    if (cohort === "expansion") card.classList.add("cohort-expansion");
 
     const lastVal = series && series.data.length
       ? series.data[series.data.length - 1].value
       : 0;
     const color = lastVal > 0 ? GREEN : (lastVal < 0 ? RED : TEXT_DIM);
 
+    const cohortBadge = cohort === "expansion"
+      ? `<span class="cohort-badge cohort-exp">EXP</span>`
+      : "";
+
     card.innerHTML = `
       <div class="mc-header">
-        <span class="mc-name"><span class="swatch" style="background:${MODEL_COLORS[key]}"></span>${key.toUpperCase()}</span>
+        <span class="mc-name">
+          <span class="swatch" style="background:${MODEL_COLORS[key]}"></span>${displayName}
+          ${cohortBadge}
+        </span>
         <span class="mc-return" style="color:${color}">${fmtPct(lastVal)}</span>
       </div>
       <div class="mc-sub">${state.timeframe} // vs SPY</div>
@@ -591,19 +606,31 @@ function renderLeaderboard(d) {
   const tbody = document.getElementById("leaderboard-body");
   tbody.innerHTML = "";
   const lb = d.leaderboard || [];
-  document.getElementById("lb-meta").textContent = `${lb.length} MODELS`;
+  const coreCount = lb.filter(r => (r.cohort || "core") === "core").length;
+  const expCount = lb.length - coreCount;
+  document.getElementById("lb-meta").textContent =
+    `${lb.length} MODELS  //  ${coreCount} CORE  //  ${expCount} EXPANSION`;
   const curves = d.equity_curves || {};
 
   lb.forEach((row, i) => {
     const tr = document.createElement("tr");
     if (i === 0) tr.className = "rank-1";
+    const cohort = row.cohort || "core";
+    if (cohort === "expansion") tr.classList.add("cohort-expansion");
     const cfg = (d.models || {})[row.model_key] || {};
     const ret = row.cumulative_return;
     const alpha = row.alpha_vs_spy;
     const dd = row.max_drawdown;
+    const displayName = row.display_name || cfg.display_name || row.model_key.toUpperCase();
+    const cohortBadge = cohort === "expansion"
+      ? `<span class="cohort-badge cohort-exp">EXP</span>`
+      : `<span class="cohort-badge cohort-core">CORE</span>`;
     tr.innerHTML = `
       <td>${row.rank}</td>
-      <td><span class="model-name">${row.model_key.toUpperCase()}</span></td>
+      <td>
+        <span class="model-name">${displayName}</span>
+        ${cohortBadge}
+      </td>
       <td><span class="model-version">${cfg.model || "—"}</span></td>
       <td class="num ${colorClass(ret)}">${fmtPct(ret)}</td>
       <td class="spark-cell"><canvas data-spark="${row.model_key}"></canvas></td>
@@ -632,7 +659,12 @@ function renderPortfolios(d) {
   (d.portfolios || []).forEach(p => {
     const card = document.createElement("div");
     card.className = "portfolio-card";
+    if ((p.cohort || "core") === "expansion") card.classList.add("cohort-expansion");
     const halted = p.halted ? `<span class="halted-badge">HALTED</span>` : "";
+    const cohortBadge = (p.cohort || "core") === "expansion"
+      ? `<span class="cohort-badge cohort-exp">EXP</span>`
+      : "";
+    const displayName = p.display_name || p.model_key.toUpperCase();
     let holdingsTbl = "";
     if (p.holdings && p.holdings.length) {
       holdingsTbl = `
@@ -661,7 +693,8 @@ function renderPortfolios(d) {
     card.innerHTML = `
       <div class="card-header">
         <div>
-          <span class="name">${p.model_key.toUpperCase()}</span>
+          <span class="name">${displayName}</span>
+          ${cohortBadge}
           <span class="provider"> // ${p.provider || ""} ${p.model_id || ""}</span>
         </div>
         ${halted}
@@ -729,7 +762,9 @@ function renderVersionTicker(d) {
   Object.entries(d.models || {}).forEach(([key, cfg]) => {
     const div = document.createElement("div");
     div.className = "version-item";
-    div.innerHTML = `<span class="k">${key.toUpperCase()}</span><span class="v">${cfg.model}</span>`;
+    if ((cfg.cohort || "core") === "expansion") div.classList.add("cohort-expansion");
+    const label = cfg.display_name || key.toUpperCase();
+    div.innerHTML = `<span class="k">${label}</span><span class="v">${cfg.model}</span>`;
     t.appendChild(div);
   });
 }

@@ -6,6 +6,7 @@ The frontend is purely static; everything dynamic flows through this JSON.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Any
@@ -28,7 +29,14 @@ def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any
     """Pull the most recent N trade events across all models, newest first."""
     all_records: list[dict[str, Any]] = []
     for key in model_keys:
-        files = sorted(TRADES_DIR.glob(f"{key}_*.jsonl"))
+        # Use a regex instead of glob so model keys that are prefixes of other
+        # keys (e.g. "claude" vs "claude_opus") don't accidentally cross-match.
+        # The expected filename shape is exactly {key}_YYYY-MM.jsonl.
+        pattern = re.compile(rf"^{re.escape(key)}_\d{{4}}-\d{{2}}\.jsonl$")
+        files = sorted(
+            (fp for fp in TRADES_DIR.iterdir() if fp.is_file() and pattern.match(fp.name)),
+            key=lambda fp: fp.name,
+        )
         for fp in files[-3:]:  # last 3 months only — cheap
             with open(fp, "r", encoding="utf-8") as f:
                 for line in f:
@@ -106,6 +114,13 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     model_keys = list(settings["models"].keys())
 
     leaderboard = build_leaderboard(model_keys)
+    # Annotate each leaderboard row with cohort + display_name from settings
+    # so the frontend can render badges and pretty labels without re-reading
+    # the config.
+    for row in leaderboard:
+        cfg = settings["models"].get(row["model_key"], {})
+        row["cohort"] = cfg.get("cohort", "core")
+        row["display_name"] = cfg.get("display_name", row["model_key"].upper())
 
     portfolios: list[dict[str, Any]] = []
     for key in model_keys:
@@ -115,6 +130,8 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         snap["provider"] = cfg["provider"]
         snap["model_id"] = cfg["model"]
         snap["enabled"] = cfg["enabled"]
+        snap["cohort"] = cfg.get("cohort", "core")
+        snap["display_name"] = cfg.get("display_name", key.upper())
         portfolios.append(snap)
 
     equity_curves = {key: _equity_curve(key) for key in model_keys}

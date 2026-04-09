@@ -53,14 +53,16 @@ class BaseAdapter(ABC):
         system_prompt: str,
         user_prompt: str,
         images: list[bytes] | None = None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, dict[str, Any]]:
         """Make the actual provider API call.
 
         `images` is an optional list of raw PNG bytes. Adapters that support
         vision should attach them to the user message in their provider's
         native format. Text-only adapters should ignore the argument.
 
-        Returns (raw_text_response, model_id_returned_by_api).
+        Returns (raw_text_response, model_id_returned_by_api, metadata).
+        `metadata` is a free-form dict where adapters can stash usage info
+        (input_tokens, output_tokens, cost_usd, etc.) for the decision log.
         Must raise on failure.
         """
 
@@ -77,7 +79,7 @@ class BaseAdapter(ABC):
         """
         start = time.perf_counter()
         try:
-            raw, returned_id = self._call_api(system_prompt, user_prompt, images)
+            raw, returned_id, metadata = self._call_api(system_prompt, user_prompt, images)
             latency = time.perf_counter() - start
             parsed = self._parse_response(raw)
             return DecisionResult(
@@ -89,6 +91,7 @@ class BaseAdapter(ABC):
                 raw_response=raw,
                 latency_seconds=latency,
                 success=True,
+                metadata=metadata or {},
             )
         except Exception as e:
             latency = time.perf_counter() - start

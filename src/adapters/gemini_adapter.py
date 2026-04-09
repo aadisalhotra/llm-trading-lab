@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
+from ..analytics.cost_rates import compute_call_cost_usd
 from .base import BaseAdapter
 
 
@@ -15,7 +17,7 @@ class GeminiAdapter(BaseAdapter):
         system_prompt: str,
         user_prompt: str,
         images: list[bytes] | None = None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, dict[str, Any]]:
         import google.generativeai as genai
 
         api_key = os.getenv("GOOGLE_API_KEY")
@@ -45,4 +47,20 @@ class GeminiAdapter(BaseAdapter):
             response = model.generate_content(user_prompt)
 
         text = getattr(response, "text", "") or ""
-        return text, self.model  # Gemini SDK doesn't echo the model id back
+
+        # Gemini exposes usage_metadata on responses with prompt_token_count
+        # and candidates_token_count. Names differ slightly across SDK
+        # versions; tolerate both.
+        usage = getattr(response, "usage_metadata", None)
+        in_tok = 0
+        out_tok = 0
+        if usage:
+            in_tok = int(getattr(usage, "prompt_token_count", 0) or 0)
+            out_tok = int(getattr(usage, "candidates_token_count", 0) or 0)
+        cost = compute_call_cost_usd(self.model, in_tok, out_tok)
+        metadata: dict[str, Any] = {
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cost_usd": cost,
+        }
+        return text, self.model, metadata  # Gemini SDK doesn't echo the model id back
