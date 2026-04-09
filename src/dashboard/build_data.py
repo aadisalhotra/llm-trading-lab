@@ -11,7 +11,11 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Any
 
-from ..analytics import build_leaderboard, load_performance_history
+from ..analytics import (
+    build_leaderboard,
+    compute_spy_benchmark_metrics,
+    load_performance_history,
+)
 from ..config_loader import (
     DATA_DIR,
     INTRADAY_DIR,
@@ -173,6 +177,21 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         row["display_name"] = cfg.get("display_name", row["model_key"].upper())
         row["recent_summaries"] = summaries_by_key.get(row["model_key"], [])
 
+    # Append the SPY buy-and-hold benchmark as a non-competing row at the
+    # very bottom of the leaderboard. The "benchmark" cohort tag tells the
+    # frontend to render it with neutral gray styling and pin it below
+    # all model rows regardless of sort.
+    starting_capital = float(settings.get("starting_capital", {}).get(
+        settings.get("mode", "paper"), 100_000.0
+    ))
+    spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital)
+    if spy_metrics is not None:
+        spy_metrics["rank"] = len(leaderboard) + 1   # nominal — frontend pins to bottom anyway
+        spy_metrics["cohort"] = "benchmark"
+        spy_metrics["display_name"] = "SPY (Benchmark)"
+        spy_metrics["recent_summaries"] = []
+        leaderboard.append(spy_metrics)
+
     portfolios: list[dict[str, Any]] = []
     for key in model_keys:
         p = load_portfolio(key)
@@ -186,6 +205,32 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         portfolios.append(snap)
 
     equity_curves = {key: _equity_curve(key) for key in model_keys}
+    # Synthetic SPY buy-and-hold equity curve for the leaderboard sparkline.
+    # Built from the benchmark_value field of whichever model has the LONGEST
+    # benchmark series (model perf logs differ in length — Sonnet was added
+    # mid-experiment so its log only has 1 row, but the older models have
+    # the full history). All benchmark prices are identical since the
+    # pipeline fetches one SPY price per tick, so we just need the longest.
+    spy_curve: list[dict[str, Any]] = []
+    spy_start_capital = float(settings.get("starting_capital", {}).get(
+        settings.get("mode", "paper"), 100_000.0
+    ))
+    longest_bench: list[dict[str, Any]] = []
+    for key in model_keys:
+        candidate = equity_curves.get(key) or []
+        bench_points = [p for p in candidate if p.get("benchmark") not in (None, 0)]
+        if len(bench_points) > len(longest_bench):
+            longest_bench = bench_points
+    if longest_bench:
+        base = longest_bench[0]["benchmark"]
+        if base and base > 0:
+            shares = spy_start_capital / base
+            spy_curve = [
+                {"date": p["date"], "value": p["benchmark"] * shares, "benchmark": p["benchmark"]}
+                for p in longest_bench
+            ]
+    if spy_curve:
+        equity_curves["spy_benchmark"] = spy_curve
 
     # Intraday curves are keyed by the *current ET trading day* so the
     # frontend's TODAY view always shows live ticks for today, never a

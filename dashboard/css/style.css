@@ -525,12 +525,37 @@ body {
   border: 1px solid var(--accent-dim);
   text-shadow: 0 0 6px var(--accent-glow);
 }
+.cohort-badge.cohort-bench {
+  background: rgba(154, 164, 184, 0.10);
+  color: var(--text-dim);
+  border: 1px solid var(--text-dim);
+}
 /* Subtle visual differentiation for expansion-cohort rows/cards */
 .leaderboard tr.cohort-expansion td {
   border-left: 1px dotted var(--accent-dim);
 }
 .leaderboard tr.cohort-expansion td:first-child {
   border-left: 2px solid var(--accent-dim);
+}
+
+/* Benchmark row — neutral gray, dotted top separator from competing models,
+   no hover highlight (it's not a competing entry, it's a reference line) */
+.leaderboard tr.cohort-benchmark td {
+  color: var(--text-dim) !important;
+  background: rgba(154, 164, 184, 0.04);
+  border-top: 1px dashed var(--border-bright);
+}
+.leaderboard tr.cohort-benchmark td .model-name {
+  color: var(--text-dim) !important;
+  font-weight: 600;
+}
+.leaderboard tr.cohort-benchmark td.num.pos,
+.leaderboard tr.cohort-benchmark td.num.neg,
+.leaderboard tr.cohort-benchmark td.num.neutral {
+  color: var(--text-dim) !important;
+}
+.leaderboard tr.cohort-benchmark:hover td {
+  background: rgba(154, 164, 184, 0.06);
 }
 .portfolio-card.cohort-expansion {
   border-left: 2px solid var(--accent-dim);

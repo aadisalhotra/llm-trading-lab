@@ -25,6 +25,7 @@ from ..analytics import (
     build_leaderboard,
     compute_api_cost_summary,
     compute_metrics,
+    compute_spy_benchmark_metrics,
     load_performance_history,
 )
 from ..config_loader import (
@@ -1014,7 +1015,7 @@ def _build_leaderboard_table(
     settings = load_settings()
     models_cfg = settings.get("models", {})
 
-    headers = ["#", "Δ", "Model", "Cohort", "Cum. Return", "Sharpe (30d)", "Max DD", "Days"]
+    headers = ["#", "Δ", "Model", "Cohort", "Cum. Return", "Daily P&L", "Sharpe (30d)", "Max DD", "Win Rate", "Days"]
     rows: list[list[str]] = []
     for row in leaderboard:
         key = row["model_key"]
@@ -1041,11 +1042,36 @@ def _build_leaderboard_table(
             name,
             cohort_label,
             _pct(row.get("cumulative_return")),
+            _pct(row.get("daily_pnl_pct")) if row.get("daily_pnl_pct") is not None else "—",
             _num(row["sharpe_30d"]) if row.get("sharpe_30d") is not None else "—",
             _pct(row["max_drawdown"]) if row.get("max_drawdown") is not None else "—",
+            _pct(row.get("win_rate"), sign=False) if row.get("win_rate") is not None else "—",
             str(row.get("days", 0)),
         ])
-    return _format_table(headers, rows, aligns=["R", "C", "L", "C", "R", "R", "R", "R"])
+
+    # Append the SPY buy-and-hold benchmark as a non-competing reference row
+    # at the bottom. Renders in the same column shape as the model rows but
+    # marked with a "BENCH" cohort tag and italicized name to visually
+    # separate it from the competing entries.
+    starting_capital = float(settings.get("starting_capital", {}).get(
+        settings.get("mode", "paper"), 100_000.0
+    ))
+    spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital)
+    if spy_metrics is not None:
+        rows.append([
+            "—",
+            "–",
+            "_SPY (Benchmark)_",
+            "BENCH",
+            _pct(spy_metrics.get("cumulative_return")),
+            _pct(spy_metrics.get("daily_pnl_pct")) if spy_metrics.get("daily_pnl_pct") is not None else "—",
+            _num(spy_metrics["sharpe_30d"]) if spy_metrics.get("sharpe_30d") is not None else "—",
+            _pct(spy_metrics["max_drawdown"]) if spy_metrics.get("max_drawdown") is not None else "—",
+            _pct(spy_metrics.get("win_rate"), sign=False) if spy_metrics.get("win_rate") is not None else "—",
+            str(spy_metrics.get("days", 0)),
+        ])
+
+    return _format_table(headers, rows, aligns=["R", "C", "L", "C", "R", "R", "R", "R", "R", "R"])
 
 
 # ===========================================================================

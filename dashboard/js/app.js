@@ -454,44 +454,78 @@ function renderStatus(d) {
 function renderLeaderboard(d) {
   const tbody = document.getElementById("leaderboard-body");
   tbody.innerHTML = "";
-  const lb = d.leaderboard || [];
-  const coreCount = lb.filter(r => (r.cohort || "core") === "core").length;
-  const expCount = lb.length - coreCount;
-  document.getElementById("lb-meta").textContent =
-    `${lb.length} MODELS  //  ${coreCount} CORE  //  ${expCount} EXPANSION`;
-  const curves = d.equity_curves || {};
+  const lbAll = d.leaderboard || [];
 
-  lb.forEach((row, i) => {
+  // Split competing models from benchmark rows. Benchmarks are pinned to the
+  // bottom regardless of sort order — they're not competing for rank.
+  const competing = lbAll.filter(r => (r.cohort || "core") !== "benchmark");
+  const benchmarks = lbAll.filter(r => (r.cohort || "core") === "benchmark");
+
+  const coreCount = competing.filter(r => (r.cohort || "core") === "core").length;
+  const expCount = competing.length - coreCount;
+  const benchLabel = benchmarks.length ? `  +  ${benchmarks.length} BENCHMARK` : "";
+  document.getElementById("lb-meta").textContent =
+    `${competing.length} MODELS  //  ${coreCount} CORE  //  ${expCount} EXPANSION${benchLabel}`;
+
+  const curves = d.equity_curves || {};
+  const ordered = [...competing, ...benchmarks];
+
+  ordered.forEach((row, i) => {
     const tr = document.createElement("tr");
-    if (i === 0) tr.className = "rank-1";
     const cohort = row.cohort || "core";
+    if (i === 0 && cohort !== "benchmark") tr.className = "rank-1";
     if (cohort === "expansion") tr.classList.add("cohort-expansion");
+    if (cohort === "benchmark") tr.classList.add("cohort-benchmark");
+
     const cfg = (d.models || {})[row.model_key] || {};
     const ret = row.cumulative_return;
+    const dailyPnl = row.daily_pnl_pct;
+    const winRate = row.win_rate;
     const alpha = row.alpha_vs_spy;
     const dd = row.max_drawdown;
     const displayName = row.display_name || cfg.display_name || row.model_key.toUpperCase();
-    const cohortBadge = cohort === "expansion"
-      ? `<span class="cohort-badge cohort-exp">EXP</span>`
-      : `<span class="cohort-badge cohort-core">CORE</span>`;
+
+    let badge;
+    if (cohort === "benchmark") badge = `<span class="cohort-badge cohort-bench">BENCH</span>`;
+    else if (cohort === "expansion") badge = `<span class="cohort-badge cohort-exp">EXP</span>`;
+    else badge = `<span class="cohort-badge cohort-core">CORE</span>`;
+
+    // Benchmarks render in neutral gray — no green/red coloring on the
+    // return columns since they aren't competing for performance.
+    const numClass = (val) => cohort === "benchmark" ? "num neutral" : `num ${colorClass(val)}`;
+
+    const versionLabel = cohort === "benchmark"
+      ? `<span class="model-version">S&amp;P 500 ETF</span>`
+      : `<span class="model-version">${cfg.model || "—"}</span>`;
+
+    const positionsCell = cohort === "benchmark" ? "—" : (row.num_positions ?? "—");
+    const cashCell = cohort === "benchmark"
+      ? "—"
+      : (row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) : "—");
+    const rankCell = cohort === "benchmark" ? "—" : row.rank;
+
     tr.innerHTML = `
-      <td>${row.rank}</td>
+      <td>${rankCell}</td>
       <td>
         <span class="model-name">${displayName}</span>
-        ${cohortBadge}
+        ${badge}
       </td>
-      <td><span class="model-version">${cfg.model || "—"}</span></td>
-      <td class="num ${colorClass(ret)}">${fmtPct(ret)}</td>
+      <td>${versionLabel}</td>
+      <td class="${numClass(ret)}">${fmtPct(ret)}</td>
+      <td class="${numClass(dailyPnl)}">${dailyPnl != null ? fmtPct(dailyPnl) : "—"}</td>
       <td class="spark-cell"><canvas data-spark="${row.model_key}"></canvas></td>
       <td class="num">${row.sharpe_30d != null ? fmtNum(row.sharpe_30d) : "—"}</td>
-      <td class="num ${dd != null && dd < 0 ? "neg" : "neutral"}">${dd != null ? fmtPct(dd) : "—"}</td>
-      <td class="num ${colorClass(alpha)}">${alpha != null ? fmtPct(alpha) : "—"}</td>
-      <td class="num">${row.num_positions ?? "—"}</td>
-      <td class="num">${row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) : "—"}</td>
+      <td class="num ${cohort === "benchmark" ? "neutral" : (dd != null && dd < 0 ? "neg" : "neutral")}">${dd != null ? fmtPct(dd) : "—"}</td>
+      <td class="num">${winRate != null ? fmtPct(winRate, false) : "—"}</td>
+      <td class="${numClass(alpha)}">${alpha != null ? fmtPct(alpha) : "—"}</td>
+      <td class="num">${positionsCell}</td>
+      <td class="num">${cashCell}</td>
       <td class="num">${fmtMoney(row.current_value)}</td>
     `;
-    // Hover tooltip — show last 3 trade summaries for this model
-    attachLeaderboardTooltip(tr, displayName, row.recent_summaries || []);
+    // Hover tooltip — only for competing models (benchmarks have no trades)
+    if (cohort !== "benchmark") {
+      attachLeaderboardTooltip(tr, displayName, row.recent_summaries || []);
+    }
     tbody.appendChild(tr);
   });
 
