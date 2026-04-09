@@ -6,7 +6,7 @@
   <title>LLM TRADING LAB // LIVE TERMINAL</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
   </header>
 
   <main>
-    <!-- ROW 1: Leaderboard -->
+    <!-- ROW 1: Leaderboard with sparklines -->
     <section class="panel leaderboard-panel">
       <div class="panel-header">
         <span class="panel-title">▍ LEADERBOARD</span>
@@ -42,10 +42,11 @@
             <th>MODEL</th>
             <th>VERSION</th>
             <th class="num">RETURN</th>
+            <th>TREND_30D</th>
             <th class="num">SHARPE_30</th>
             <th class="num">MAX_DD</th>
             <th class="num">ALPHA</th>
-            <th class="num">POSITIONS</th>
+            <th class="num">POS</th>
             <th class="num">CASH</th>
             <th class="num">VALUE</th>
           </tr>
@@ -54,14 +55,22 @@
       </table>
     </section>
 
-    <!-- ROW 2: Equity curves + system health -->
+    <!-- ROW 2: Master equity chart + system health -->
     <section class="row">
       <div class="panel chart-panel">
         <div class="panel-header">
           <span class="panel-title">▍ CUMULATIVE RETURN</span>
-          <span class="panel-meta">SINCE INCEPTION</span>
+          <div class="chart-controls" id="tf-controls">
+            <button class="tf-btn" data-tf="1W">1W</button>
+            <button class="tf-btn" data-tf="1M">1M</button>
+            <button class="tf-btn" data-tf="3M">3M</button>
+            <button class="tf-btn active" data-tf="ALL">ALL</button>
+          </div>
         </div>
-        <canvas id="equity-chart" width="900" height="280"></canvas>
+        <div class="chart-wrap">
+          <canvas id="equity-chart"></canvas>
+          <div class="chart-tooltip" id="equity-tooltip"></div>
+        </div>
         <div class="legend" id="chart-legend"></div>
       </div>
 
@@ -73,10 +82,19 @@
       </div>
     </section>
 
-    <!-- ROW 3: Per-model portfolio panels -->
+    <!-- ROW 3: Per-model charts + SPY chart -->
+    <section class="panel model-charts-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ MODEL CHARTS // INDIVIDUAL CURVES vs SPY</span>
+        <span class="panel-meta">REBASED PER WINDOW</span>
+      </div>
+      <div class="model-charts-grid" id="model-charts-grid"></div>
+    </section>
+
+    <!-- ROW 4: Per-model portfolio panels -->
     <section class="portfolio-grid" id="portfolio-grid"></section>
 
-    <!-- ROW 4: Trade feed -->
+    <!-- ROW 5: Trade feed -->
     <section class="panel feed-panel">
       <div class="panel-header">
         <span class="panel-title">▍ TRADE FEED</span>
@@ -85,7 +103,7 @@
       <div id="trade-feed" class="trade-feed"></div>
     </section>
 
-    <!-- ROW 5: Model version ticker -->
+    <!-- ROW 6: Model version ticker -->
     <section class="panel version-panel">
       <div class="panel-header">
         <span class="panel-title">▍ MODEL VERSIONS</span>
