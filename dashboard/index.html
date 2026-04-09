@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM TRADING LAB // LIVE TERMINAL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="scanlines"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▍</span>
+      <span class="title">LLM_TRADING_LAB</span>
+      <span class="subtitle">// AUTONOMOUS // 5-MODEL HEAD-TO-HEAD</span>
+    </div>
+    <div class="status">
+      <div class="status-item"><span class="label">PHASE</span><span id="phase" class="value">—</span></div>
+      <div class="status-item"><span class="label">MODE</span><span id="mode" class="value">—</span></div>
+      <div class="status-item"><span class="label">DAY</span><span id="day" class="value">—</span></div>
+      <div class="status-item"><span class="label">MARKET</span><span id="market" class="value">—</span></div>
+      <div class="status-item"><span class="label">LAST_RUN</span><span id="lastrun" class="value">—</span></div>
+      <div class="status-item"><span class="label">SYSTEM</span><span id="system" class="value online">ONLINE</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ROW 1: Leaderboard -->
+    <section class="panel leaderboard-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ LEADERBOARD</span>
+        <span class="panel-meta" id="lb-meta">—</span>
+      </div>
+      <table class="leaderboard">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>MODEL</th>
+            <th>VERSION</th>
+            <th class="num">RETURN</th>
+            <th class="num">SHARPE_30</th>
+            <th class="num">MAX_DD</th>
+            <th class="num">ALPHA</th>
+            <th class="num">POSITIONS</th>
+            <th class="num">CASH</th>
+            <th class="num">VALUE</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+    </section>
+
+    <!-- ROW 2: Equity curves + system health -->
+    <section class="row">
+      <div class="panel chart-panel">
+        <div class="panel-header">
+          <span class="panel-title">▍ CUMULATIVE RETURN</span>
+          <span class="panel-meta">SINCE INCEPTION</span>
+        </div>
+        <canvas id="equity-chart" width="900" height="280"></canvas>
+        <div class="legend" id="chart-legend"></div>
+      </div>
+
+      <div class="panel health-panel">
+        <div class="panel-header">
+          <span class="panel-title">▍ SYSTEM</span>
+        </div>
+        <div id="health-content"></div>
+      </div>
+    </section>
+
+    <!-- ROW 3: Per-model portfolio panels -->
+    <section class="portfolio-grid" id="portfolio-grid"></section>
+
+    <!-- ROW 4: Trade feed -->
+    <section class="panel feed-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ TRADE FEED</span>
+        <span class="panel-meta">LAST 50</span>
+      </div>
+      <div id="trade-feed" class="trade-feed"></div>
+    </section>
+
+    <!-- ROW 5: Model version ticker -->
+    <section class="panel version-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ MODEL VERSIONS</span>
+      </div>
+      <div id="version-ticker" class="version-ticker"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>LLM_TRADING_LAB // PERSONAL RESEARCH EXPERIMENT // NOT FINANCIAL ADVICE</span>
+    <span id="generated">—</span>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

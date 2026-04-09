@@ -1,0 +1,716 @@
+"""Daily research report generator.
+
+After all models trade and logs are written, this builds a polished one-page
+markdown briefing at /reports/daily/YYYY-MM-DD.md. Every report follows the
+exact same template — same section order, same headings, same tables — so
+Day 1 and Day 180 are visually identical with different data.
+
+Read order (everything is log-driven, single source of truth):
+  - /data/performance/{model}.jsonl   → daily P&L, cumulative return, history
+  - /data/trades/{model}_{YYYY-MM}.jsonl → today's decisions + reasoning
+  - /data/leaderboard/{date}.json     → previous-day ranks for arrow tracking
+  - /data/state/{model}.json          → halted flag
+"""
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from ..analytics import build_leaderboard, load_performance_history
+from ..config_loader import (
+    LEADERBOARD_DIR,
+    PERFORMANCE_DIR,
+    REPORTS_DIR,
+    TRADES_DIR,
+    load_settings,
+    load_universe,
+)
+from ..portfolio import load_portfolio
+
+logger = logging.getLogger("llmlab.reports")
+
+DAILY_REPORTS_DIR = REPORTS_DIR / "daily"
+LATENCY_WARN_THRESHOLD = 30.0  # seconds — flag in health section if exceeded
+
+
+# ===========================================================================
+# TABLE FORMATTER — produces source-aligned markdown tables with consistent
+# column widths so the raw .md is readable AND GitHub renders cleanly.
+# ===========================================================================
+
+def _format_table(headers: list[str], rows: list[list[str]], aligns: list[str]) -> str:
+    """Render a markdown table with padded cells.
+
+    aligns: list of "L" | "R" | "C" matching column count.
+    """
+    cols = len(headers)
+    if any(len(r) != cols for r in rows):
+        raise ValueError("Row width mismatch")
+
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            if len(cell) > widths[i]:
+                widths[i] = len(cell)
+
+    def fmt_cell(cell: str, w: int, align: str) -> str:
+        if align == "R":
+            return cell.rjust(w)
+        if align == "C":
+            return cell.center(w)
+        return cell.ljust(w)
+
+    def fmt_row(cells: list[str]) -> str:
+        return "| " + " | ".join(fmt_cell(c, widths[i], aligns[i]) for i, c in enumerate(cells)) + " |"
+
+    sep_parts = []
+    for w, a in zip(widths, aligns):
+        inner = w + 2  # "| cell |" has 1 space pad each side
+        if a == "R":
+            sep_parts.append("-" * (inner - 1) + ":")
+        elif a == "C":
+            sep_parts.append(":" + "-" * (inner - 2) + ":")
+        else:
+            sep_parts.append(":" + "-" * (inner - 1))
+    sep_line = "|" + "|".join(sep_parts) + "|"
+
+    lines = [fmt_row(headers), sep_line]
+    for row in rows:
+        lines.append(fmt_row(row))
+    return "\n".join(lines)
+
+
+# ===========================================================================
+# FORMATTERS — consistent number/percent/money formatting throughout report
+# ===========================================================================
+
+def _money(x: float | None) -> str:
+    if x is None:
+        return "—"
+    return f"${x:,.2f}"
+
+
+def _pct(x: float | None, sign: bool = True) -> str:
+    if x is None:
+        return "—"
+    s = f"{x*100:+.2f}%" if sign else f"{x*100:.2f}%"
+    return s
+
+
+def _num(x: float | None, digits: int = 2) -> str:
+    if x is None:
+        return "—"
+    return f"{x:,.{digits}f}"
+
+
+def _signed_money(x: float | None) -> str:
+    if x is None:
+        return "—"
+    sign = "+" if x >= 0 else "-"
+    return f"{sign}${abs(x):,.2f}"
+
+
+# ===========================================================================
+# DATA LOADERS — read everything from disk
+# ===========================================================================
+
+def _read_today_trade_record(model_key: str, run_date: datetime) -> dict[str, Any] | None:
+    """Pull the most recent decision log entry for this model on run_date."""
+    month_str = run_date.strftime("%Y-%m")
+    path = TRADES_DIR / f"{model_key}_{month_str}.jsonl"
+    if not path.exists():
+        return None
+    target_date = run_date.strftime("%Y-%m-%d")
+    last_match = None
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("date") == target_date:
+                last_match = rec
+    return last_match
+
+
+def _daily_pnl(model_key: str) -> tuple[float | None, float | None]:
+    """Returns (daily_pnl_dollars, daily_pnl_pct) using the last two perf rows."""
+    df = load_performance_history(model_key)
+    if df.empty:
+        return None, None
+    if len(df) == 1:
+        return 0.0, 0.0
+    today_val = float(df["total_value"].iloc[-1])
+    prev_val = float(df["total_value"].iloc[-2])
+    delta = today_val - prev_val
+    pct = (delta / prev_val) if prev_val else 0.0
+    return delta, pct
+
+
+def _previous_leaderboard(run_date: datetime) -> dict[str, int] | None:
+    """Find the most recent leaderboard snapshot strictly before run_date.
+
+    Returns {model_key: rank} or None if no prior snapshot exists.
+    """
+    if not LEADERBOARD_DIR.exists():
+        return None
+    today_str = run_date.strftime("%Y-%m-%d")
+    candidates = []
+    for fp in LEADERBOARD_DIR.glob("*.json"):
+        stem = fp.stem
+        if stem < today_str:
+            candidates.append((stem, fp))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    _, latest = candidates[0]
+    try:
+        with open(latest, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {row["model_key"]: row["rank"] for row in data}
+    except Exception as e:
+        logger.warning("Failed to read previous leaderboard %s: %s", latest, e)
+        return None
+
+
+# ===========================================================================
+# MARKET SUMMARY — analytical prose synthesized from data
+# ===========================================================================
+
+def _index_table(index_data: dict[str, pd.DataFrame]) -> str:
+    from ..data import INDEX_SYMBOLS
+    headers = ["Index", "Close", "Change", "%"]
+    rows = []
+    for sym, label in INDEX_SYMBOLS.items():
+        df = index_data.get(sym)
+        if df is None or df.empty:
+            rows.append([label, "—", "—", "—"])
+            continue
+        close = float(df["Close"].iloc[-1])
+        prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else close
+        change = close - prev
+        pct = (change / prev) if prev else 0.0
+        rows.append([
+            label,
+            _num(close),
+            f"{'+' if change >= 0 else '-'}{abs(change):,.2f}",
+            _pct(pct),
+        ])
+    return _format_table(headers, rows, aligns=["L", "R", "R", "R"])
+
+
+def _generate_market_prose(
+    index_data: dict[str, pd.DataFrame],
+    market_data: dict[str, pd.DataFrame],
+) -> str:
+    """Synthesize 3-5 sentences of analytical prose about the trading day.
+
+    Pulls only from price data — no fabricated news. Reads like a desk briefing.
+    """
+    universe = load_universe()
+    sector_map = {t["symbol"]: t["sector"] for t in universe["tickers"]}
+
+    # Index moves
+    def _pct_change(df: pd.DataFrame) -> float | None:
+        if df is None or df.empty or len(df) < 2:
+            return None
+        return float(df["Close"].iloc[-1] / df["Close"].iloc[-2] - 1)
+
+    spx = _pct_change(index_data.get("^GSPC", pd.DataFrame()))
+    ndx = _pct_change(index_data.get("^IXIC", pd.DataFrame()))
+    dji = _pct_change(index_data.get("^DJI", pd.DataFrame()))
+
+    # Universe-level stats
+    moves: list[tuple[str, float, str]] = []
+    for sym, df in market_data.items():
+        if sym not in sector_map:
+            continue
+        if df is None or df.empty or len(df) < 2:
+            continue
+        ch = float(df["Close"].iloc[-1] / df["Close"].iloc[-2] - 1)
+        moves.append((sym, ch, sector_map[sym]))
+
+    # Sentence 1 — overall tone
+    if spx is None:
+        s1 = "U.S. equity index data was unavailable for today's session."
+    else:
+        if spx > 0.005:
+            tone = "closed firmly higher"
+        elif spx > 0:
+            tone = "ground out modest gains"
+        elif spx > -0.005:
+            tone = "drifted lower"
+        else:
+            tone = "sold off"
+        s1 = f"U.S. equities {tone} on the session, with the S&P 500 finishing {_pct(spx)}."
+
+    # Sentence 2 — index breakdown
+    if ndx is not None and dji is not None and spx is not None:
+        leaders = []
+        if ndx > spx + 0.001:
+            leaders.append(f"the Nasdaq Composite outperformed at {_pct(ndx)}")
+        elif ndx < spx - 0.001:
+            leaders.append(f"the Nasdaq Composite lagged at {_pct(ndx)}")
+        else:
+            leaders.append(f"the Nasdaq Composite moved in line at {_pct(ndx)}")
+
+        if dji > spx + 0.001:
+            leaders.append(f"the Dow added {_pct(dji)}")
+        elif dji < spx - 0.001:
+            leaders.append(f"the Dow trailed at {_pct(dji)}")
+        else:
+            leaders.append(f"the Dow tracked the broader market at {_pct(dji)}")
+        s2 = " ".join([leaders[0].capitalize() + " while " + leaders[1] + "."])
+    else:
+        s2 = ""
+
+    # Sentence 3 — sector lead/lag
+    s3 = ""
+    if moves:
+        sector_buckets: dict[str, list[float]] = {}
+        for sym, ch, sec in moves:
+            sector_buckets.setdefault(sec, []).append(ch)
+        sector_avgs = {s: sum(v) / len(v) for s, v in sector_buckets.items() if v}
+        if sector_avgs:
+            best_sec = max(sector_avgs.items(), key=lambda x: x[1])
+            worst_sec = min(sector_avgs.items(), key=lambda x: x[1])
+            if best_sec[0] != worst_sec[0]:
+                s3 = (
+                    f"Sector dispersion within the universe favored {best_sec[0]} ({_pct(best_sec[1])}), "
+                    f"while {worst_sec[0]} lagged at {_pct(worst_sec[1])}."
+                )
+
+    # Sentence 4 — top mover / bottom mover
+    s4 = ""
+    if moves:
+        moves_sorted = sorted(moves, key=lambda x: x[1], reverse=True)
+        top = moves_sorted[0]
+        bot = moves_sorted[-1]
+        if top[0] != bot[0]:
+            s4 = (
+                f"{top[0]} led individual names at {_pct(top[1])}, "
+                f"with {bot[0]} the worst performer at {_pct(bot[1])}."
+            )
+
+    # Sentence 5 — breadth
+    s5 = ""
+    if moves:
+        positives = sum(1 for _, ch, _ in moves if ch > 0)
+        total = len(moves)
+        if total:
+            s5 = f"Breadth was {'positive' if positives > total/2 else 'negative' if positives < total/2 else 'flat'} with {positives} of {total} universe names higher on the day."
+
+    sentences = [s for s in (s1, s2, s3, s4, s5) if s]
+    return " ".join(sentences)
+
+
+# ===========================================================================
+# PERFORMANCE TABLE — sorted by today's daily P&L
+# ===========================================================================
+
+def _build_performance_table(
+    model_keys: list[str],
+    run_date: datetime,
+    settings: dict[str, Any],
+) -> tuple[str, list[dict[str, Any]]]:
+    """Returns (markdown_table, rows_data_for_reuse)."""
+    rows_data: list[dict[str, Any]] = []
+    for key in model_keys:
+        df = load_performance_history(key)
+        if df.empty:
+            continue
+        today_val = float(df["total_value"].iloc[-1])
+        cash_pct = float(df["cash_pct"].iloc[-1])
+        cum_ret = float(df["cumulative_return"].iloc[-1])
+        daily_pnl, daily_pct = _daily_pnl(key)
+
+        # Trades executed today from the trade log
+        record = _read_today_trade_record(key, run_date)
+        n_trades = 0
+        if record:
+            n_trades = sum(
+                1 for e in record.get("executions", [])
+                if e.get("executed") and e.get("side") in ("BUY", "SELL")
+            )
+
+        # Alpha vs SPY for the run
+        alpha = None
+        if "benchmark_value" in df.columns and df["benchmark_value"].notna().sum() >= 2:
+            bench = df["benchmark_value"].dropna().astype(float).values
+            if len(bench) >= 2 and bench[0] > 0:
+                alpha = cum_ret - (bench[-1] / bench[0] - 1.0)
+
+        rows_data.append({
+            "model_key": key,
+            "value": today_val,
+            "daily_pnl": daily_pnl,
+            "daily_pct": daily_pct,
+            "cum_return": cum_ret,
+            "alpha": alpha,
+            "trades": n_trades,
+            "cash_pct": cash_pct,
+        })
+
+    # Sort by daily_pct desc (None last)
+    rows_data.sort(key=lambda r: (r["daily_pct"] is None, -(r["daily_pct"] or 0)))
+
+    headers = ["#", "Model", "Value", "Daily P&L", "Daily %", "Cum. Return", "Alpha vs SPY", "Trades", "Cash %"]
+    rows: list[list[str]] = []
+    for i, r in enumerate(rows_data, 1):
+        name = r["model_key"].upper()
+        if i == 1:
+            name = f"**{name}**"
+        rows.append([
+            str(i),
+            name,
+            _money(r["value"]),
+            _signed_money(r["daily_pnl"]),
+            _pct(r["daily_pct"]),
+            _pct(r["cum_return"]),
+            _pct(r["alpha"]) if r["alpha"] is not None else "—",
+            str(r["trades"]),
+            _pct(r["cash_pct"], sign=False),
+        ])
+
+    table = _format_table(headers, rows, aligns=["R", "L", "R", "R", "R", "R", "R", "R", "R"])
+    return table, rows_data
+
+
+# ===========================================================================
+# MODEL-BY-MODEL BREAKDOWN — 3-5 sentence prose per model
+# ===========================================================================
+
+def _model_breakdown(model_key: str, run_date: datetime) -> str:
+    record = _read_today_trade_record(model_key, run_date)
+    portfolio = load_portfolio(model_key)
+    snapshot = portfolio.snapshot({})  # weights based on last avg_cost; only used for structure summary
+
+    if record is None:
+        return f"No decision log entry recorded for {model_key.upper()} today. Likely the model was disabled, the daily run skipped this slot, or the file has not yet been written."
+
+    if not record.get("api_success", True):
+        err = record.get("api_error", "unknown error")
+        return f"API call failed: `{err}`. No trades executed. Portfolio unchanged from prior session."
+
+    executed = [e for e in record.get("executions", [])
+                if e.get("executed") and e.get("side") in ("BUY", "SELL")]
+    overall = record.get("overall_reasoning", "").strip()
+    portfolio_after = record.get("portfolio_after", {})
+    holdings = portfolio_after.get("holdings", []) or snapshot["holdings"]
+    cash_pct = portfolio_after.get("cash_pct", snapshot["cash_pct"])
+    n_pos = len(holdings)
+
+    # Sentence 1 — what it did
+    if not executed:
+        s1 = "Held all positions today; no trades executed."
+    else:
+        buys = [e for e in executed if e["side"] == "BUY"]
+        sells = [e for e in executed if e["side"] == "SELL"]
+        parts = []
+        if buys:
+            top = max(buys, key=lambda e: e.get("notional", 0))
+            shares_str = f"{top['shares']:.0f}" if top["shares"] >= 1 else f"{top['shares']:.4f}"
+            parts.append(f"bought {shares_str} {top['ticker']} at {_money(top['fill_price'])}")
+            if len(buys) > 1:
+                parts.append(f"plus {len(buys)-1} other buy{'s' if len(buys)>2 else ''}")
+        if sells:
+            top = max(sells, key=lambda e: e.get("notional", 0))
+            shares_str = f"{top['shares']:.0f}" if top["shares"] >= 1 else f"{top['shares']:.4f}"
+            verb = "trimmed" if any(h["ticker"] == top["ticker"] for h in holdings) else "exited"
+            parts.append(f"{verb} {top['ticker']} ({shares_str} sh @ {_money(top['fill_price'])})")
+            if len(sells) > 1:
+                parts.append(f"and {len(sells)-1} other sell{'s' if len(sells)>2 else ''}")
+        s1 = "Today: " + ", ".join(parts) + "."
+
+    # Sentence 2 — reasoning anchor (highest confidence executed trade)
+    s2 = ""
+    if executed:
+        anchor = max(executed,
+                     key=lambda e: (e.get("decision") or {}).get("confidence", 0))
+        reason = ((anchor.get("decision") or {}).get("reasoning") or "").strip()
+        conf = (anchor.get("decision") or {}).get("confidence")
+        if reason:
+            reason_short = reason if len(reason) <= 220 else reason[:217] + "…"
+            conf_str = f" (conviction {conf}/10)" if conf else ""
+            s2 = f'Highest-conviction rationale{conf_str}: "{reason_short}"'
+    elif overall:
+        overall_short = overall if len(overall) <= 220 else overall[:217] + "…"
+        s2 = f'Stated view: "{overall_short}"'
+
+    # Sentence 3 — current positioning
+    cash_pct_val = cash_pct if isinstance(cash_pct, (int, float)) else 0
+    if n_pos == 0:
+        s3 = f"Portfolio is now 100% cash."
+    else:
+        # Top concentration
+        top_h = max(holdings, key=lambda h: h.get("weight", 0))
+        sectors = {h.get("ticker"): None for h in holdings}
+        s3 = (
+            f"Now holds {n_pos} position{'s' if n_pos != 1 else ''} "
+            f"with {cash_pct_val*100:.1f}% cash; largest weight is "
+            f"{top_h.get('ticker','?')} at {top_h.get('weight',0)*100:.1f}%."
+        )
+
+    # Sentence 4 — notable behavior flag
+    s4 = ""
+    if cash_pct_val > 0.50:
+        s4 = "Notable: heavy defensive cash positioning."
+    elif n_pos == 1:
+        s4 = "Notable: single-name concentration."
+    elif holdings:
+        top_h = max(holdings, key=lambda h: h.get("weight", 0))
+        if top_h.get("weight", 0) >= 0.18:
+            s4 = f"Notable: at the position-cap on {top_h['ticker']}."
+
+    # Sentence 5 — violations or risk
+    s5 = ""
+    violations = record.get("violations", [])
+    if violations:
+        rules = sorted({v["rule"] for v in violations})
+        s5 = f"Risk filter rejected {len(violations)} decision(s): {', '.join(rules)}."
+
+    sentences = [s for s in (s1, s2, s3, s4, s5) if s]
+    return " ".join(sentences)
+
+
+# ===========================================================================
+# LEADERBOARD with rank arrows
+# ===========================================================================
+
+def _build_leaderboard_table(
+    model_keys: list[str],
+    run_date: datetime,
+) -> str:
+    leaderboard = build_leaderboard(model_keys)
+    prev_ranks = _previous_leaderboard(run_date) or {}
+
+    headers = ["#", "Δ", "Model", "Cum. Return", "Sharpe (30d)", "Max DD", "Days"]
+    rows: list[list[str]] = []
+    for row in leaderboard:
+        key = row["model_key"]
+        cur_rank = row["rank"]
+        prev = prev_ranks.get(key)
+        if prev is None:
+            arrow = "–"
+        elif prev > cur_rank:
+            arrow = f"↑{prev - cur_rank}"
+        elif prev < cur_rank:
+            arrow = f"↓{cur_rank - prev}"
+        else:
+            arrow = "–"
+
+        name = key.upper()
+        if cur_rank == 1:
+            name = f"**{name}**"
+
+        rows.append([
+            str(cur_rank),
+            arrow,
+            name,
+            _pct(row.get("cumulative_return")),
+            _num(row["sharpe_30d"]) if row.get("sharpe_30d") is not None else "—",
+            _pct(row["max_drawdown"]) if row.get("max_drawdown") is not None else "—",
+            str(row.get("days", 0)),
+        ])
+    return _format_table(headers, rows, aligns=["R", "C", "L", "R", "R", "R", "R"])
+
+
+# ===========================================================================
+# RISK & SYSTEM HEALTH
+# ===========================================================================
+
+def _build_health_section(model_keys: list[str], run_date: datetime) -> str:
+    notes: list[str] = []
+
+    for key in model_keys:
+        portfolio = load_portfolio(key)
+        record = _read_today_trade_record(key, run_date)
+
+        if portfolio.halted:
+            notes.append(f"- **{key.upper()}**: portfolio HALTED (hard stop-loss triggered).")
+
+        if record is None:
+            continue
+
+        if not record.get("api_success", True):
+            notes.append(f"- **{key.upper()}**: API failure — `{record.get('api_error', 'unknown')}`.")
+
+        latency = record.get("api_latency_seconds")
+        if isinstance(latency, (int, float)) and latency > LATENCY_WARN_THRESHOLD:
+            notes.append(f"- **{key.upper()}**: high API latency ({latency:.1f}s).")
+
+        # Forced liquidations show up as executions with order_id starting FORCED_
+        forced = [
+            e for e in record.get("executions", [])
+            if str(e.get("order_id", "")).startswith("FORCED_")
+        ]
+        if forced:
+            tickers = ", ".join(e["ticker"] for e in forced)
+            notes.append(f"- **{key.upper()}**: position stop-loss triggered on {tickers}.")
+
+        violations = record.get("violations", [])
+        if violations:
+            critical = [v for v in violations if v["rule"] in ("PORTFOLIO_HALTED", "DAILY_TRADE_CAP")]
+            if critical:
+                rules = ", ".join(sorted({v["rule"] for v in critical}))
+                notes.append(f"- **{key.upper()}**: risk-control violation — {rules}.")
+
+    if not notes:
+        return "No risk events. All systems nominal."
+    return "\n".join(notes)
+
+
+# ===========================================================================
+# HEADER + EXPERIMENT DAY
+# ===========================================================================
+
+def _header(run_date: datetime, settings: dict[str, Any], index_data: dict[str, pd.DataFrame]) -> str:
+    inception_str = settings["experiment_start_date"]
+    end_str = settings["experiment_end_date"]
+    try:
+        inception = datetime.strptime(inception_str, "%Y-%m-%d")
+        end = datetime.strptime(end_str, "%Y-%m-%d")
+        day_num = max(1, (run_date.date() - inception.date()).days + 1)
+        total_days = (end.date() - inception.date()).days + 1
+        day_str = f"Day {day_num} / {total_days}"
+    except ValueError:
+        day_str = "Day —"
+
+    phase = settings["phase"]
+    mode = settings["mode"].upper()
+
+    # Market status: if we have a today-dated index print, treat session as closed
+    target = run_date.strftime("%Y-%m-%d")
+    closed = False
+    spx_df = index_data.get("^GSPC")
+    if spx_df is not None and not spx_df.empty:
+        last_idx_date = pd.to_datetime(spx_df.index[-1]).strftime("%Y-%m-%d")
+        if last_idx_date == target:
+            closed = True
+    market_status = "Closed" if closed else "Mid-session"
+
+    return (
+        f"# Daily Report — {target}\n\n"
+        f"**{day_str}**  ·  **Phase:** {phase}  ·  **Mode:** {mode}  ·  **Market:** {market_status}"
+    )
+
+
+# ===========================================================================
+# MAIN ENTRY POINT
+# ===========================================================================
+
+def generate_daily_report(
+    run_date: datetime,
+    market_data: dict[str, pd.DataFrame],
+    index_data: dict[str, pd.DataFrame],
+    settings: dict[str, Any] | None = None,
+) -> Path:
+    """Build the daily report and write it to /reports/daily/YYYY-MM-DD.md.
+
+    Returns the path to the written file.
+    """
+    if settings is None:
+        settings = load_settings()
+
+    DAILY_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    target_path = DAILY_REPORTS_DIR / f"{run_date.strftime('%Y-%m-%d')}.md"
+
+    model_keys = [k for k, cfg in settings["models"].items() if cfg.get("enabled", True)]
+
+    # ---- Build sections ----
+    header = _header(run_date, settings, index_data)
+    market_prose = _generate_market_prose(index_data, market_data)
+    index_tbl = _index_table(index_data)
+    perf_tbl, perf_rows = _build_performance_table(model_keys, run_date, settings)
+
+    breakdown_blocks: list[str] = []
+    for key in model_keys:
+        breakdown_blocks.append(f"### {key.upper()}\n\n{_model_breakdown(key, run_date)}")
+    breakdown_section = "\n\n".join(breakdown_blocks)
+
+    leaderboard_tbl = _build_leaderboard_table(model_keys, run_date)
+    health_section = _build_health_section(model_keys, run_date)
+
+    generated_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    prompt_version = settings.get("prompt_version", "v1")
+
+    # Machine-readable footer for the analytics aggregator
+    metadata = {
+        "date": run_date.strftime("%Y-%m-%d"),
+        "phase": settings["phase"],
+        "mode": settings["mode"],
+        "prompt_version": prompt_version,
+        "models": [
+            {
+                "key": r["model_key"],
+                "value": r["value"],
+                "daily_pnl": r["daily_pnl"],
+                "daily_pct": r["daily_pct"],
+                "cum_return": r["cum_return"],
+                "alpha": r["alpha"],
+                "trades": r["trades"],
+                "cash_pct": r["cash_pct"],
+            }
+            for r in perf_rows
+        ],
+        "leader": perf_rows[0]["model_key"] if perf_rows else None,
+    }
+    metadata_block = "<!-- METADATA\n" + json.dumps(metadata, indent=2, default=str) + "\n-->"
+
+    # ---- Assemble report ----
+    report = "\n".join([
+        header,
+        "",
+        "---",
+        "",
+        "## Market Summary",
+        "",
+        market_prose if market_prose else "_Market data unavailable for this session._",
+        "",
+        index_tbl,
+        "",
+        "---",
+        "",
+        f"## Model Performance — {run_date.strftime('%Y-%m-%d')}",
+        "",
+        perf_tbl,
+        "",
+        "---",
+        "",
+        "## Model-by-Model Breakdown",
+        "",
+        breakdown_section,
+        "",
+        "---",
+        "",
+        "## Leaderboard — Cumulative",
+        "",
+        leaderboard_tbl,
+        "",
+        "---",
+        "",
+        "## Risk & System Health",
+        "",
+        health_section,
+        "",
+        "---",
+        "",
+        f"*Generated {generated_str}  ·  LLM Trading Lab  ·  Prompt {prompt_version}*",
+        "",
+        metadata_block,
+        "",
+    ])
+
+    with open(target_path, "w", encoding="utf-8") as f:
+        f.write(report)
+
+    logger.info("Daily report written: %s", target_path)
+    return target_path

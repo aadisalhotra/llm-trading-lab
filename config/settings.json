@@ -1,0 +1,38 @@
+{
+  "mode": "paper",
+  "phase": "Phase 1 - Infrastructure Build",
+  "experiment_start_date": "2026-07-01",
+  "experiment_end_date": "2028-01-31",
+  "phase_a_end_date": "2026-12-31",
+  "starting_capital": {
+    "paper": 100000,
+    "live": 1000
+  },
+  "portfolio_rules": {
+    "max_positions": 10,
+    "max_position_pct": 0.20,
+    "max_trades_per_day": 30,
+    "allow_shorting": false,
+    "allow_leverage": false,
+    "allow_options": false
+  },
+  "risk_controls": {
+    "stop_loss_portfolio_pct": 0.30,
+    "stop_loss_position_pct": 0.15,
+    "halt_on_stop_loss": true
+  },
+  "models": {
+    "claude":   {"provider": "anthropic", "model": "claude-opus-4-6",     "enabled": true},
+    "gpt":      {"provider": "openai",    "model": "gpt-5.4",             "enabled": true},
+    "gemini":   {"provider": "google",    "model": "gemini-3.1-pro",      "enabled": true},
+    "grok":     {"provider": "xai",       "model": "grok-4",              "enabled": true},
+    "deepseek": {"provider": "deepseek",  "model": "deepseek-v4",         "enabled": true}
+  },
+  "benchmark_ticker": "SPY",
+  "prompt_version": "v1",
+  "data": {
+    "lookback_days": 30,
+    "include_volume": true,
+    "include_fundamentals": false
+  }
+}
