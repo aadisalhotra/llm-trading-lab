@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-09T22:48:51.932630",
+  "generated_at": "2026-04-09T23:01:53.277850",
   "phase": "Phase 1 - Infrastructure Build",
   "mode": "paper",
   "experiment_day": 1,
@@ -2203,5 +2203,146 @@
     }
   },
   "benchmark_ticker": "SPY",
-  "prompt_version": "v1"
+  "prompt_version": "v1",
+  "cost_tracker": [
+    {
+      "model_key": "claude",
+      "cost_today_usd": 0.1108,
+      "cost_week_usd": 0.1108,
+      "cost_month_usd": 0.1108,
+      "cost_total_usd": 0.1108,
+      "cost_per_trade_usd": 0.0111,
+      "trades_executed_total": 10,
+      "trades_executed_month": 10,
+      "trades_executed_today": 10,
+      "gross_pnl_usd": 35.24,
+      "net_pnl_usd": 35.13,
+      "is_profitable": true
+    },
+    {
+      "model_key": "gpt",
+      "cost_today_usd": 0.0517,
+      "cost_week_usd": 0.0517,
+      "cost_month_usd": 0.0517,
+      "cost_total_usd": 0.0517,
+      "cost_per_trade_usd": 0.0017,
+      "trades_executed_total": 30,
+      "trades_executed_month": 30,
+      "trades_executed_today": 30,
+      "gross_pnl_usd": 1929.57,
+      "net_pnl_usd": 1929.52,
+      "is_profitable": true
+    },
+    {
+      "model_key": "gemini",
+      "cost_today_usd": 0.019,
+      "cost_week_usd": 0.019,
+      "cost_month_usd": 0.019,
+      "cost_total_usd": 0.019,
+      "cost_per_trade_usd": 0.0007,
+      "trades_executed_total": 27,
+      "trades_executed_month": 27,
+      "trades_executed_today": 27,
+      "gross_pnl_usd": 1740.88,
+      "net_pnl_usd": 1740.86,
+      "is_profitable": true
+    },
+    {
+      "model_key": "grok",
+      "cost_today_usd": 0.0299,
+      "cost_week_usd": 0.0299,
+      "cost_month_usd": 0.0299,
+      "cost_total_usd": 0.0299,
+      "cost_per_trade_usd": 0.0014,
+      "trades_executed_total": 21,
+      "trades_executed_month": 21,
+      "trades_executed_today": 21,
+      "gross_pnl_usd": 1756.09,
+      "net_pnl_usd": 1756.06,
+      "is_profitable": true
+    },
+    {
+      "model_key": "deepseek",
+      "cost_today_usd": 0.0021,
+      "cost_week_usd": 0.0021,
+      "cost_month_usd": 0.0021,
+      "cost_total_usd": 0.0021,
+      "cost_per_trade_usd": 0.0001,
+      "trades_executed_total": 25,
+      "trades_executed_month": 25,
+      "trades_executed_today": 25,
+      "gross_pnl_usd": 1487.32,
+      "net_pnl_usd": 1487.32,
+      "is_profitable": true
+    },
+    {
+      "model_key": "claude_opus",
+      "cost_today_usd": 0.1432,
+      "cost_week_usd": 0.1432,
+      "cost_month_usd": 0.1432,
+      "cost_total_usd": 0.1432,
+      "cost_per_trade_usd": 0.0119,
+      "trades_executed_total": 12,
+      "trades_executed_month": 12,
+      "trades_executed_today": 12,
+      "gross_pnl_usd": 1444.74,
+      "net_pnl_usd": 1444.6,
+      "is_profitable": true
+    }
+  ],
+  "budget_status": {
+    "providers": {
+      "anthropic": {
+        "spend_usd": 0.254,
+        "cap_usd": 30.0,
+        "pct_of_cap": 0.0085,
+        "status": "ok",
+        "models": [
+          "claude",
+          "claude_opus"
+        ]
+      },
+      "openai": {
+        "spend_usd": 0.0517,
+        "cap_usd": 20.0,
+        "pct_of_cap": 0.0026,
+        "status": "ok",
+        "models": [
+          "gpt"
+        ]
+      },
+      "google": {
+        "spend_usd": 0.019,
+        "cap_usd": 10.0,
+        "pct_of_cap": 0.0019,
+        "status": "ok",
+        "models": [
+          "gemini"
+        ]
+      },
+      "xai": {
+        "spend_usd": 0.0299,
+        "cap_usd": 15.0,
+        "pct_of_cap": 0.002,
+        "status": "ok",
+        "models": [
+          "grok"
+        ]
+      },
+      "deepseek": {
+        "spend_usd": 0.0021,
+        "cap_usd": 3.0,
+        "pct_of_cap": 0.0007,
+        "status": "ok",
+        "models": [
+          "deepseek"
+        ]
+      }
+    },
+    "any_warn": false,
+    "any_critical": false,
+    "month_start": "2026-04-01T00:00:00+00:00",
+    "warn_threshold_pct": 0.8,
+    "critical_threshold_pct": 1.0
+  }
 }
