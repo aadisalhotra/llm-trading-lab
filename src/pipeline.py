@@ -34,7 +34,7 @@ EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
 from .alerts import send_alert, send_daily_summary
-from .analytics import build_leaderboard
+from .analytics import build_leaderboard, compute_budget_status
 from .config_loader import (
     configure_logging,
     ensure_dirs,
@@ -376,6 +376,38 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
             "leaderboard": leaderboard,
         }
         send_daily_summary(summary)
+
+        # Budget check — month-to-date spend per provider against the
+        # configured monthly cap. Emits WARN at warn_threshold_pct (default
+        # 80%) and CRITICAL at critical_threshold_pct (default 100%). Never
+        # halts trading — this is observability, not enforcement.
+        try:
+            budget = compute_budget_status(settings)
+            if budget["any_critical"] or budget["any_warn"]:
+                lines = []
+                for provider, info in budget["providers"].items():
+                    if info["status"] == "ok":
+                        continue
+                    lines.append(
+                        f"{provider}: ${info['spend_usd']:.2f} / ${info['cap_usd']:.2f} "
+                        f"({info['pct_of_cap']*100:.0f}% of cap, {info['status'].upper()})"
+                    )
+                detail = "; ".join(lines)
+                if budget["any_critical"]:
+                    logger.error("BUDGET CRITICAL — %s", detail)
+                    send_alert("CRITICAL", "Monthly API budget exceeded",
+                               f"One or more providers over their monthly cap (trading continues): {detail}",
+                               {"budget": budget})
+                else:
+                    logger.warning("BUDGET WARN — %s", detail)
+                    send_alert("WARN", "Monthly API budget approaching cap",
+                               f"One or more providers ≥80% of monthly cap: {detail}",
+                               {"budget": budget})
+            else:
+                logger.info("Budget check: all providers below %.0f%% of monthly cap",
+                            budget["warn_threshold_pct"] * 100)
+        except Exception as e:
+            logger.exception("Budget check failed: %s", e)
 
     logger.info("==== Pipeline tick complete ====")
     return 0

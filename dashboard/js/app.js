@@ -689,6 +689,140 @@ function attachLeaderboardTooltip(tr, modelLabel, summaries) {
   });
 }
 
+// ===== API Cost Tracker panel =====
+function renderCostTracker(d) {
+  const tbody = document.getElementById("cost-tracker-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const rows = d.cost_tracker || [];
+  const modelsCfg = d.models || {};
+
+  // Aggregate totals for the panel header
+  let totalToday = 0, totalMonth = 0, totalAll = 0;
+  rows.forEach(r => {
+    totalToday += r.cost_today_usd || 0;
+    totalMonth += r.cost_month_usd || 0;
+    totalAll += r.cost_total_usd || 0;
+  });
+  const meta = document.getElementById("cost-meta");
+  if (meta) {
+    meta.textContent =
+      `TODAY $${totalToday.toFixed(4)}  //  MONTH $${totalMonth.toFixed(2)}  //  TOTAL $${totalAll.toFixed(2)}`;
+  }
+
+  // Find the maximum bar magnitude across rows so the bars are
+  // scaled relative to the largest spender. Min floor of $0.01 so
+  // a single cent renders visibly.
+  let maxMagnitude = 0.01;
+  rows.forEach(r => {
+    if ((r.cost_total_usd || 0) > maxMagnitude) maxMagnitude = r.cost_total_usd;
+    if (r.gross_pnl_usd != null && Math.abs(r.gross_pnl_usd) > maxMagnitude) {
+      maxMagnitude = Math.abs(r.gross_pnl_usd);
+    }
+  });
+
+  // Order: by net P&L descending so the most cost-efficient model floats
+  // to the top of the cost panel (different from the leaderboard sort,
+  // which is on gross return)
+  const ordered = [...rows].sort((a, b) => {
+    const an = a.net_pnl_usd != null ? a.net_pnl_usd : -Infinity;
+    const bn = b.net_pnl_usd != null ? b.net_pnl_usd : -Infinity;
+    return bn - an;
+  });
+
+  ordered.forEach(r => {
+    const tr = document.createElement("tr");
+    const cfg = modelsCfg[r.model_key] || {};
+    const cohort = cfg.cohort || "core";
+    if (cohort === "expansion") tr.classList.add("cohort-expansion");
+    if (r.is_profitable) tr.classList.add("profitable");
+    else if (r.net_pnl_usd != null) tr.classList.add("unprofitable");
+
+    const displayName = cfg.display_name || r.model_key.toUpperCase();
+    const cohortBadge = cohort === "expansion"
+      ? `<span class="cohort-badge cohort-exp">EXP</span>`
+      : "";
+
+    const cost$ = (v) => v != null ? `$${Number(v).toFixed(4)}` : "—";
+    const dollar = (v) => {
+      if (v == null) return "—";
+      const sign = v >= 0 ? "+" : "-";
+      return `${sign}$${Math.abs(v).toFixed(2)}`;
+    };
+
+    tr.innerHTML = `
+      <td>
+        <span class="model-name">${escapeHtml(displayName)}</span>
+        ${cohortBadge}
+      </td>
+      <td class="num">${cost$(r.cost_today_usd)}</td>
+      <td class="num">${cost$(r.cost_week_usd)}</td>
+      <td class="num">${cost$(r.cost_month_usd)}</td>
+      <td class="num">${cost$(r.cost_total_usd)}</td>
+      <td class="num">${r.cost_per_trade_usd != null ? cost$(r.cost_per_trade_usd) : "—"}</td>
+      <td class="num ${r.gross_pnl_usd != null && r.gross_pnl_usd >= 0 ? "pos" : (r.gross_pnl_usd != null ? "neg" : "neutral")}">${dollar(r.gross_pnl_usd)}</td>
+      <td class="num net-cell">${dollar(r.net_pnl_usd)}</td>
+      <td>${_renderRoiBar(r, maxMagnitude)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Budget warnings — surfaced under the table when any provider is at/over
+  // its monthly cap thresholds
+  const warningsEl = document.getElementById("budget-warnings");
+  if (warningsEl) {
+    warningsEl.innerHTML = "";
+    const bs = d.budget_status || {};
+    const providers = bs.providers || {};
+    Object.entries(providers).forEach(([provider, info]) => {
+      if (info.status === "ok") return;
+      const div = document.createElement("div");
+      div.className = info.status === "critical" ? "budget-critical" : "budget-warn";
+      const pct = (info.pct_of_cap * 100).toFixed(0);
+      div.textContent = `${info.status === "critical" ? "[CRITICAL]" : "[WARN]"} ${provider.toUpperCase()} — $${info.spend_usd.toFixed(2)} of $${info.cap_usd.toFixed(2)} monthly cap (${pct}% used). Models: ${(info.models || []).join(", ")}`;
+      warningsEl.appendChild(div);
+    });
+  }
+}
+
+function _renderRoiBar(row, maxMagnitude) {
+  // Two stacked horizontal bars: API cost (amber) and gross P&L (green/red).
+  // Both share the same max-magnitude scale so they're visually comparable.
+  // Whichever bar is longer wins — if P&L > Cost the model is making money
+  // net of API spend. The accent breakeven line marks the cost-equals-pnl
+  // point on the P&L bar.
+  const cost = row.cost_total_usd || 0;
+  const pnl = row.gross_pnl_usd;
+  const scale = (v) => Math.min(100, (Math.abs(v) / maxMagnitude) * 100);
+
+  const costPct = scale(cost);
+  const pnlPct = pnl != null ? scale(pnl) : 0;
+  const pnlClass = pnl != null && pnl >= 0 ? "pnl-pos" : "pnl-neg";
+
+  // Breakeven line position on the P&L bar = where cost magnitude sits on
+  // the same scale. If P&L bar reaches past it, the model is profitable.
+  const breakevenPct = scale(cost);
+
+  return `
+    <div class="roi-bar">
+      <div class="roi-row">
+        <span class="roi-label">COST</span>
+        <div class="roi-track">
+          <div class="roi-fill cost" style="width:${costPct.toFixed(1)}%"></div>
+        </div>
+      </div>
+      <div class="roi-row">
+        <span class="roi-label">P&amp;L</span>
+        <div class="roi-track">
+          <div class="roi-fill ${pnlClass}" style="width:${pnlPct.toFixed(1)}%"></div>
+          <div class="breakeven-line" style="left:${breakevenPct.toFixed(1)}%"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
 function renderHealth(d) {
   const c = document.getElementById("health-content");
   const lb = d.leaderboard || [];
@@ -741,6 +875,7 @@ async function refresh() {
   refreshMasterChart();
   renderHeroMiniCards();
   renderLeaderboard(d);
+  renderCostTracker(d);
   renderHealth(d);
   renderPortfolios(d);
   renderTradeFeed(d);

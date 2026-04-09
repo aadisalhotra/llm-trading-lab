@@ -30,13 +30,37 @@ COST_PER_MTOK: dict[str, dict[str, float]] = {
 }
 
 
+def _resolve_rates(model_id: str) -> dict[str, float] | None:
+    """Look up rates with prefix fallback for versioned model IDs.
+
+    Providers return date-versioned strings like `gpt-5.4-2026-03-05` or
+    `grok-4-0709`. The rate table is keyed by the base model name. We try
+    the full ID first, then progressively shorter dash-delimited prefixes
+    until we find a match. This avoids having to add every datestamped
+    snapshot manually as providers cut new pinned versions.
+
+    Stops at 1 segment to avoid degenerate matches like "gpt" or "grok".
+    """
+    if not model_id:
+        return None
+    if model_id in COST_PER_MTOK:
+        return COST_PER_MTOK[model_id]
+    parts = model_id.split("-")
+    while len(parts) > 1:
+        parts.pop()
+        candidate = "-".join(parts)
+        if candidate in COST_PER_MTOK:
+            return COST_PER_MTOK[candidate]
+    return None
+
+
 def compute_call_cost_usd(model_id: str, input_tokens: int, output_tokens: int) -> float | None:
     """Compute the USD cost of a single API call.
 
     Returns None if we don't have a rate for the model — caller should
     treat that as "unknown" rather than zero so the report can flag it.
     """
-    rates = COST_PER_MTOK.get(model_id)
+    rates = _resolve_rates(model_id)
     if not rates:
         return None
     return (

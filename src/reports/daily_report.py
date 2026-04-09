@@ -24,6 +24,8 @@ import pandas as pd
 from ..analytics import (
     build_leaderboard,
     compute_api_cost_summary,
+    compute_api_cost_summary_window,
+    compute_budget_status,
     compute_metrics,
     compute_spy_benchmark_metrics,
     load_performance_history,
@@ -796,6 +798,39 @@ def _build_news_context_block(
 
 
 # ===========================================================================
+# API COST TODAY — one-line per-model cost breakdown for the daily report
+# ===========================================================================
+
+def _build_api_cost_today_line(
+    model_keys: list[str],
+    settings: dict[str, Any],
+    run_date: datetime,
+) -> str:
+    """Single-line summary of how much each model cost to run today.
+
+    Anchored to the UTC trading day boundary that matches the trade-log
+    timestamps. Renders as a flat key-value list with a TOTAL at the end —
+    deliberately compact so it tucks under the model performance table
+    without taking much vertical space.
+    """
+    from datetime import timezone as _tz, datetime as _dt
+    now = _dt.now(_tz.utc)
+    today_start = _dt(now.year, now.month, now.day, tzinfo=_tz.utc)
+
+    parts: list[str] = []
+    total = 0.0
+    for key in model_keys:
+        cfg = settings["models"].get(key, {})
+        label = cfg.get("display_name", key.upper())
+        window = compute_api_cost_summary_window(key, since=today_start)
+        cost = float(window["cost_usd"])
+        total += cost
+        parts.append(f"**{label}** ${cost:.4f}")
+    parts.append(f"**TOTAL** ${total:.4f}")
+    return "**API Cost Today:** " + "  ·  ".join(parts)
+
+
+# ===========================================================================
 # EXPANSION COHORT — Sonnet vs Opus cost-performance comparison
 # ===========================================================================
 
@@ -1081,6 +1116,28 @@ def _build_leaderboard_table(
 def _build_health_section(model_keys: list[str], run_date: datetime) -> str:
     notes: list[str] = []
 
+    # Budget threshold check — appears at the top of the health section so
+    # it's the first thing the reader sees if any provider is approaching
+    # or over its monthly cap.
+    try:
+        budget = compute_budget_status(load_settings())
+        for provider, info in budget.get("providers", {}).items():
+            status = info.get("status", "ok")
+            if status == "ok":
+                continue
+            pct = (info.get("pct_of_cap", 0) * 100)
+            spend = info.get("spend_usd", 0)
+            cap = info.get("cap_usd", 0)
+            label = "**[CRITICAL]**" if status == "critical" else "**[WARN]**"
+            notes.append(
+                f"- {label} **{provider.upper()}** API spend at "
+                f"${spend:.2f} of ${cap:.2f} monthly cap ({pct:.0f}% used). "
+                f"Models on this provider: {', '.join(info.get('models', []))}. "
+                f"Trading continues — this is observability, not enforcement."
+            )
+    except Exception as e:
+        logger.warning("Budget status check failed in report: %s", e)
+
     for key in model_keys:
         portfolio = load_portfolio(key)
         record = _read_today_trade_record(key, run_date)
@@ -1191,6 +1248,7 @@ def generate_daily_report(
     breakdown_section = "\n\n".join(breakdown_blocks)
 
     intraday_session_tbl = _build_intraday_session_table(model_keys, run_date)
+    api_cost_today_line = _build_api_cost_today_line(model_keys, settings, run_date)
     news_context_block = _build_news_context_block(model_keys, run_date)
     expansion_cohort_section = _build_expansion_cohort_section(settings, run_date)
     leaderboard_tbl = _build_leaderboard_table(model_keys, run_date)
@@ -1243,6 +1301,8 @@ def generate_daily_report(
         f"## Model Performance — {run_date.strftime('%Y-%m-%d')}",
         "",
         perf_tbl,
+        "",
+        api_cost_today_line,
         "",
         "---",
         "",

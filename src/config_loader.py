@@ -25,6 +25,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 LOGS_DIR = PROJECT_ROOT / "logs"
 REPORTS_DIR = PROJECT_ROOT / "reports"
+MONTHLY_REPORTS_DIR = REPORTS_DIR / "monthly"
 
 # Subdirs under data/
 TRADES_DIR = DATA_DIR / "trades"
@@ -51,6 +52,7 @@ def ensure_dirs() -> None:
         NEWS_CACHE_DIR,
         LOGS_DIR,
         REPORTS_DIR,
+        MONTHLY_REPORTS_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 

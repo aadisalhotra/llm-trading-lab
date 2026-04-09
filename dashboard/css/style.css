@@ -567,6 +567,119 @@ body {
   color: var(--accent-bright);
 }
 
+/* ===== API Cost Tracker panel ===== */
+.cost-tracker-panel {
+  border-left: 2px solid var(--amber);
+}
+.cost-tracker-panel .panel-title {
+  color: var(--amber);
+  text-shadow: 0 0 10px rgba(255, 181, 71, 0.20);
+}
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cost-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-bright);
+  font-weight: 600;
+  background: var(--bg);
+}
+.cost-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--bg-row);
+  font-variant-numeric: tabular-nums;
+}
+.cost-table tr:hover td { background: var(--bg-row-hi); }
+.cost-table .num { text-align: right; }
+.cost-table .model-name { color: var(--text-bright); font-weight: 700; }
+.cost-table tr.profitable .net-cell { color: var(--green); font-weight: 700; }
+.cost-table tr.unprofitable .net-cell { color: var(--red); font-weight: 700; }
+.cost-table tr.cohort-expansion td:first-child { border-left: 2px solid var(--accent-dim); }
+
+/* ROI vs cost mini bar — two stacked tiny bars per row showing
+   gross P&L $ vs total API cost $. Green outline if P&L exceeds cost. */
+.roi-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 180px;
+  min-width: 140px;
+}
+.roi-bar .roi-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.roi-bar .roi-label {
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.roi-bar .roi-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(154, 164, 184, 0.08);
+  border: 1px solid var(--border);
+  position: relative;
+}
+.roi-bar .roi-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+}
+.roi-bar .roi-fill.cost { background: rgba(255, 181, 71, 0.55); }
+.roi-bar .roi-fill.pnl-pos { background: rgba(0, 212, 136, 0.65); }
+.roi-bar .roi-fill.pnl-neg { background: rgba(255, 51, 85, 0.65); }
+.roi-bar .roi-fill.pnl-neg.below-zero {
+  /* Anchored from a center axis when P&L is negative — visually shows
+     "behind breakeven" without negative widths */
+  left: auto;
+  right: 50%;
+}
+.roi-bar .breakeven-line {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--accent);
+  z-index: 2;
+}
+
+.budget-warnings {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.budget-warnings .budget-warn,
+.budget-warnings .budget-critical {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  border-left: 2px solid;
+}
+.budget-warnings .budget-warn {
+  background: rgba(255, 181, 71, 0.08);
+  border-left-color: var(--amber);
+  color: var(--amber);
+}
+.budget-warnings .budget-critical {
+  background: rgba(255, 51, 85, 0.10);
+  border-left-color: var(--red);
+  color: var(--red);
+  font-weight: 700;
+}
+
 /* ===== Trade feed ===== */
 .trade-feed {
   font-size: 11px;

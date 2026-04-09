@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any
 
 from ..analytics import (
     build_leaderboard,
+    compute_api_cost_summary,
+    compute_api_cost_summary_window,
+    compute_budget_status,
     compute_spy_benchmark_metrics,
     load_performance_history,
 )
@@ -160,6 +163,73 @@ def _intraday_curve(model_key: str, session_date: str) -> list[dict[str, Any]]:
     return out
 
 
+def _build_cost_tracker(model_keys: list[str], starting_capital: float) -> list[dict[str, Any]]:
+    """Per-model API cost rollups + ROI calc for the dashboard cost panel.
+
+    Returns one row per model with:
+        - model_key
+        - cost_today_usd, cost_week_usd, cost_month_usd, cost_total_usd
+        - cost_per_trade_usd  (None if no trades)
+        - net_pnl_usd         (gross P&L $ minus total API cost)
+        - is_profitable       (True if cumulative return $ > total API cost)
+
+    "Today" / "this week" / "this month" / "total" are all UTC-anchored to
+    keep the math consistent with the trade log timestamps.
+    """
+    now = datetime.now(timezone.utc)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    # Trailing 7-day rolling window for "this week" — calendar weeks would
+    # reset at unintuitive times (Sunday/Monday) and the user-facing label
+    # is "this week's cost" which trailing-7-day satisfies just fine.
+    week_start = today_start - timedelta(days=7)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+
+    out: list[dict[str, Any]] = []
+    for key in model_keys:
+        today = compute_api_cost_summary_window(key, since=today_start)
+        week = compute_api_cost_summary_window(key, since=week_start)
+        month = compute_api_cost_summary_window(key, since=month_start)
+        total = compute_api_cost_summary_window(key, since=None)   # full history
+
+        # Gross P&L $ = current value - inception value, approximated from
+        # the perf log. For models with only one perf row (just initialized
+        # this session), fall back to current_value vs the configured
+        # starting_capital so the day-1 number isn't None.
+        df = load_performance_history(key)
+        gross_pnl_usd: float | None = None
+        if not df.empty:
+            try:
+                current_val = float(df["total_value"].iloc[-1])
+                inception = float(df["total_value"].iloc[0])
+                gross_pnl_usd = current_val - inception
+                if abs(gross_pnl_usd) < 0.001 and len(df) == 1:
+                    gross_pnl_usd = current_val - starting_capital
+            except (KeyError, IndexError, ValueError):
+                pass
+
+        net_pnl_usd = (gross_pnl_usd - total["cost_usd"]) if gross_pnl_usd is not None else None
+
+        cost_per_trade = None
+        if total["trades_executed"] > 0:
+            cost_per_trade = round(float(total["cost_usd"]) / total["trades_executed"], 4)
+
+        out.append({
+            "model_key": key,
+            "cost_today_usd": round(float(today["cost_usd"]), 4),
+            "cost_week_usd": round(float(week["cost_usd"]), 4),
+            "cost_month_usd": round(float(month["cost_usd"]), 4),
+            "cost_total_usd": round(float(total["cost_usd"]), 4),
+            "cost_per_trade_usd": cost_per_trade,
+            "trades_executed_total": int(total["trades_executed"]),
+            "trades_executed_month": int(month["trades_executed"]),
+            "trades_executed_today": int(today["trades_executed"]),
+            "gross_pnl_usd": round(float(gross_pnl_usd), 2) if gross_pnl_usd is not None else None,
+            "net_pnl_usd": round(float(net_pnl_usd), 2) if net_pnl_usd is not None else None,
+            "is_profitable": net_pnl_usd is not None and net_pnl_usd > 0,
+        })
+    return out
+
+
 def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
@@ -249,6 +319,12 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         day_num = 0
         total_days = 0
 
+    cost_tracker = _build_cost_tracker(model_keys, starting_capital)
+    try:
+        budget_status = compute_budget_status(settings)
+    except Exception:
+        budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
+
     payload = {
         "generated_at": today.isoformat(),
         "phase": settings["phase"],
@@ -267,6 +343,8 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "models": settings["models"],
         "benchmark_ticker": settings["benchmark_ticker"],
         "prompt_version": settings["prompt_version"],
+        "cost_tracker": cost_tracker,
+        "budget_status": budget_status,
     }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)

@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 import math
 import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from ..config_loader import PERFORMANCE_DIR, TRADES_DIR
+from ..config_loader import PERFORMANCE_DIR, TRADES_DIR, load_settings
 
 
 def load_performance_history(model_key: str) -> pd.DataFrame:
@@ -240,6 +241,185 @@ def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
         "cost_usd": cost,
         "cost_known": unknown_cost_calls == 0 and calls > 0,
         "unknown_cost_calls": unknown_cost_calls,
+    }
+
+
+def _parse_log_timestamp(ts: str) -> datetime | None:
+    """Parse the various ISO formats the decision log uses into a tz-aware UTC datetime."""
+    if not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def compute_api_cost_summary_window(
+    model_key: str,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> dict[str, Any]:
+    """Time-windowed version of compute_api_cost_summary.
+
+    Walks the same monthly trade-log files but only sums records whose
+    timestamp falls within [since, until). Both bounds are optional —
+    omit either to leave it open. All comparisons are in UTC.
+
+    Cheap defensive guard: only opens monthly files whose YYYY-MM tag
+    overlaps the requested window, so this stays O(window-months) rather
+    than O(all-history) for short windows like "today" or "this week".
+    """
+    pattern = re.compile(rf"^{re.escape(model_key)}_(\d{{4}})-(\d{{2}})\.jsonl$")
+    files: list[Path] = []
+    if TRADES_DIR.exists():
+        for fp in TRADES_DIR.iterdir():
+            if not fp.is_file():
+                continue
+            m = pattern.match(fp.name)
+            if not m:
+                continue
+            year, month = int(m.group(1)), int(m.group(2))
+            month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+            month_end = (month_start + timedelta(days=32)).replace(day=1)
+            # Skip if the file's month is entirely outside the window
+            if since and month_end <= since:
+                continue
+            if until and month_start >= until:
+                continue
+            files.append(fp)
+    files.sort()
+
+    from .cost_rates import compute_call_cost_usd
+
+    calls = 0
+    in_tok = 0
+    out_tok = 0
+    cost = 0.0
+    trades_executed = 0
+    for fp in files:
+        with open(fp, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not rec.get("api_success"):
+                    continue
+                ts = _parse_log_timestamp(rec.get("timestamp", ""))
+                if ts is None:
+                    continue
+                if since and ts < since:
+                    continue
+                if until and ts >= until:
+                    continue
+                calls += 1
+                rec_in = int(rec.get("input_tokens") or 0)
+                rec_out = int(rec.get("output_tokens") or 0)
+                in_tok += rec_in
+                out_tok += rec_out
+                c = rec.get("cost_usd")
+                if c is None and (rec_in > 0 or rec_out > 0):
+                    # Backfill: the record was written before the cost-rates
+                    # prefix-fallback fix landed, but we have token counts.
+                    # Recompute from the rate table now.
+                    c = compute_call_cost_usd(
+                        rec.get("model_id_returned") or rec.get("model_id_configured", ""),
+                        rec_in, rec_out,
+                    )
+                if c is not None:
+                    cost += float(c)
+                # Count BUY/SELL executions for cost-per-trade
+                for ex in rec.get("executions") or []:
+                    if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
+                        trades_executed += 1
+    return {
+        "calls": calls,
+        "trades_executed": trades_executed,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": in_tok + out_tok,
+        "cost_usd": cost,
+        "cost_per_trade_usd": (cost / trades_executed) if trades_executed > 0 else None,
+    }
+
+
+def compute_budget_status(settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Per-provider month-to-date spend vs the configured monthly cap.
+
+    Returns:
+        {
+            "providers": {
+                "anthropic": {
+                    "spend_usd": 0.42, "cap_usd": 30.0, "pct_of_cap": 0.014,
+                    "status": "ok" | "warn" | "critical",
+                    "models": ["claude", "claude_opus"],
+                },
+                ...
+            },
+            "any_warn": bool,
+            "any_critical": bool,
+        }
+
+    "Status" reflects only the cap thresholds — it has nothing to do with
+    whether the provider is *succeeding*, just whether the bill is high.
+    """
+    if settings is None:
+        settings = load_settings()
+    budget_cfg = settings.get("budget", {}) or {}
+    caps = budget_cfg.get("monthly_cap_usd", {}) or {}
+    warn_pct = float(budget_cfg.get("warn_threshold_pct", 0.80))
+    crit_pct = float(budget_cfg.get("critical_threshold_pct", 1.00))
+
+    # Group model_keys by provider so we can attribute spend correctly when
+    # two models share an API (Sonnet + Opus both bill against anthropic).
+    by_provider: dict[str, list[str]] = {}
+    for key, cfg in (settings.get("models") or {}).items():
+        provider = cfg.get("provider", "unknown")
+        by_provider.setdefault(provider, []).append(key)
+
+    now = datetime.now(timezone.utc)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+
+    providers: dict[str, dict[str, Any]] = {}
+    any_warn = False
+    any_critical = False
+    for provider, model_keys in by_provider.items():
+        spend = 0.0
+        for key in model_keys:
+            window = compute_api_cost_summary_window(key, since=month_start)
+            spend += float(window["cost_usd"])
+        cap = float(caps.get(provider, 0.0))
+        pct = (spend / cap) if cap > 0 else 0.0
+        if cap <= 0:
+            status = "ok"
+        elif pct >= crit_pct:
+            status = "critical"
+            any_critical = True
+        elif pct >= warn_pct:
+            status = "warn"
+            any_warn = True
+        else:
+            status = "ok"
+        providers[provider] = {
+            "spend_usd": round(spend, 4),
+            "cap_usd": cap,
+            "pct_of_cap": round(pct, 4),
+            "status": status,
+            "models": sorted(model_keys),
+        }
+    return {
+        "providers": providers,
+        "any_warn": any_warn,
+        "any_critical": any_critical,
+        "month_start": month_start.isoformat(),
+        "warn_threshold_pct": warn_pct,
+        "critical_threshold_pct": crit_pct,
     }
 
 
