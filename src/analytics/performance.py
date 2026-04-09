@@ -37,6 +37,11 @@ def load_performance_history(model_key: str) -> pd.DataFrame:
 def compute_metrics(model_key: str) -> dict[str, Any]:
     df = load_performance_history(model_key)
     if df.empty or len(df) < 2:
+        last_api_success = True
+        if not df.empty and "api_success" in df.columns:
+            v = df["api_success"].iloc[-1]
+            if v is not None and not pd.isna(v):
+                last_api_success = bool(v)
         return {
             "model_key": model_key,
             "days": len(df),
@@ -46,7 +51,10 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
             "max_drawdown": 0.0,
             "alpha_vs_spy": None,
             "current_value": float(df["total_value"].iloc[-1]) if not df.empty else 0.0,
+            "current_cash_pct": float(df["cash_pct"].iloc[-1]) if not df.empty else 1.0,
+            "num_positions": int(df["num_positions"].iloc[-1]) if not df.empty else 0,
             "halted": bool(df["halted"].iloc[-1]) if not df.empty else False,
+            "last_api_success": last_api_success,
         }
 
     values = df["total_value"].astype(float).values
@@ -69,6 +77,12 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
             bench_return = bench[-1] / bench[0] - 1.0
             alpha = cumulative_return - bench_return
 
+    last_api_success = True
+    if "api_success" in df.columns:
+        v = df["api_success"].iloc[-1]
+        if v is not None and not pd.isna(v):
+            last_api_success = bool(v)
+
     return {
         "model_key": model_key,
         "days": int(len(df)),
@@ -81,6 +95,7 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
         "current_cash_pct": float(df["cash_pct"].iloc[-1]),
         "num_positions": int(df["num_positions"].iloc[-1]),
         "halted": bool(df["halted"].iloc[-1]),
+        "last_api_success": last_api_success,
     }
 
 
@@ -95,9 +110,20 @@ def _sharpe(returns: np.ndarray, periods_per_year: int = 252) -> float | None:
 
 
 def build_leaderboard(model_keys: list[str]) -> list[dict[str, Any]]:
-    """Sort by cumulative return descending."""
+    """Sort by cumulative return descending.
+
+    Tiebreakers (in order): halted/failed runs sink to the bottom, then daily
+    cumulative return desc, then alphabetical for stability. This prevents a
+    failed model from anchoring rank #1 on tied 0% days.
+    """
     rows = [compute_metrics(k) for k in model_keys]
-    rows.sort(key=lambda r: (r["cumulative_return"] is None, -(r["cumulative_return"] or 0)))
+    rows.sort(key=lambda r: (
+        bool(r.get("halted", False)),
+        not bool(r.get("last_api_success", True)),
+        r["cumulative_return"] is None,
+        -(r["cumulative_return"] or 0),
+        r["model_key"],
+    ))
     for i, r in enumerate(rows, 1):
         r["rank"] = i
     return rows

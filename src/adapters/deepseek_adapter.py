@@ -31,7 +31,10 @@ class DeepSeekAdapter(BaseAdapter):
             "Content-Type": "application/json",
         }
         r = requests.post(self.BASE_URL, json=payload, headers=headers, timeout=120)
-        r.raise_for_status()
+        if not r.ok:
+            # Surface the response body so the decision log captures the actual error,
+            # not just "400 Bad Request" with no detail.
+            raise RuntimeError(f"DeepSeek API {r.status_code}: {r.text[:500]}")
         data = r.json()
         text = data["choices"][0]["message"]["content"]
         returned_id = data.get("model", self.model)

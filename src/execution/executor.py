@@ -151,7 +151,14 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        error="Insufficient cash for meaningful position")
-            shares = round(delta_notional / price, 4)
+            # Truncate (not round) to 4 decimal places so shares * price is
+            # guaranteed <= delta_notional. round() can round up and trip the
+            # insufficient-cash check on the very last buy in a sequence.
+            shares = int(delta_notional / price * 10000) / 10000
+            if shares <= 0:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Computed share quantity rounded to zero")
             return self._do_buy(portfolio, ticker, shares, price, decision)
 
         if action == "SELL":
@@ -167,7 +174,7 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=True, side="HOLD",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_BELOW_TARGET")
-            shares = min(round(delta_notional / price, 4), h.shares)
+            shares = min(int(delta_notional / price * 10000) / 10000, h.shares)
             return self._do_sell(portfolio, ticker, shares, price, decision)
 
         return ExecutionResult(decision=decision, executed=False, side="SKIP",

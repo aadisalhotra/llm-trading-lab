@@ -17,6 +17,8 @@ class OpenAIAdapter(BaseAdapter):
             raise RuntimeError("OPENAI_API_KEY not set")
 
         client = OpenAI(api_key=api_key)
+        # Newer GPT models reject `max_tokens` and require `max_completion_tokens`.
+        # The OpenAI SDK accepts the new param across all current chat models.
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -24,7 +26,7 @@ class OpenAIAdapter(BaseAdapter):
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            max_tokens=4096,
+            max_completion_tokens=4096,
         )
         text = response.choices[0].message.content or ""
         returned_id = getattr(response, "model", self.model)

@@ -31,7 +31,8 @@ class XAIAdapter(BaseAdapter):
             "Content-Type": "application/json",
         }
         r = requests.post(self.BASE_URL, json=payload, headers=headers, timeout=120)
-        r.raise_for_status()
+        if not r.ok:
+            raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
         text = data["choices"][0]["message"]["content"]
         returned_id = data.get("model", self.model)

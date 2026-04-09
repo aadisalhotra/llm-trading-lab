@@ -26,6 +26,12 @@ import logging
 import sys
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
+
+# All run dates are anchored to US/Eastern — the trading-session calendar.
+# Without this, late-evening local runs would write tomorrow's UTC date for
+# today's trading day.
+EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
 from .alerts import send_alert, send_daily_summary
@@ -115,7 +121,9 @@ def run_one_model(
             execution_mode=settings["mode"], inception_date=portfolio.inception_date,
         )
         save_portfolio(portfolio)
-        log_daily_snapshot(model_key, run_date, portfolio.snapshot(prices), prices.get(settings["benchmark_ticker"]))
+        log_daily_snapshot(model_key, run_date, portfolio.snapshot(prices),
+                           prices.get(settings["benchmark_ticker"]),
+                           api_success=False)
         return {"model_key": model_key, "status": "API_FAIL", "error": decision_result.error}
 
     # Validate against risk rules
@@ -145,7 +153,8 @@ def run_one_model(
         execution_mode=settings["mode"], inception_date=portfolio.inception_date,
     )
     log_daily_snapshot(model_key, run_date, snapshot_after,
-                       prices.get(settings["benchmark_ticker"]))
+                       prices.get(settings["benchmark_ticker"]),
+                       api_success=True)
 
     n_executed = sum(1 for e in all_exec if e.executed and e.side in ("BUY", "SELL"))
     logger.info("[%s] done — %d trades executed, %d violations, value=$%.2f",
@@ -166,7 +175,7 @@ def run_pipeline(force: bool = False) -> int:
     ensure_dirs()
     logger = configure_logging()
     settings = load_settings()
-    run_date = datetime.utcnow()
+    run_date = datetime.now(EASTERN)
 
     logger.info("==== Daily pipeline start: %s | mode=%s | phase=%s ====",
                 run_date.strftime("%Y-%m-%d"), settings["mode"], settings["phase"])

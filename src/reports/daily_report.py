@@ -35,7 +35,8 @@ from ..portfolio import load_portfolio
 logger = logging.getLogger("llmlab.reports")
 
 DAILY_REPORTS_DIR = REPORTS_DIR / "daily"
-LATENCY_WARN_THRESHOLD = 30.0  # seconds — flag in health section if exceeded
+LATENCY_WARN_THRESHOLD = 60.0  # seconds — flag in health section if exceeded
+ERROR_MSG_TRUNCATE = 180        # max chars of error text rendered in the report
 
 
 # ===========================================================================
@@ -113,6 +114,25 @@ def _signed_money(x: float | None) -> str:
         return "—"
     sign = "+" if x >= 0 else "-"
     return f"{sign}${abs(x):,.2f}"
+
+
+def _short_err(msg: str) -> str:
+    """Compact a verbose API error to a single readable line for the report.
+
+    Strips JSON wrapping, request IDs, and trims to ERROR_MSG_TRUNCATE chars.
+    The full error is still preserved in the trade log — this is display only.
+    """
+    if not msg:
+        return "unknown error"
+    s = " ".join(msg.split())  # collapse whitespace
+    # Try to pull a 'message' field from JSON-ish payloads
+    import re
+    m = re.search(r"'message':\s*'([^']+)'", s) or re.search(r'"message":\s*"([^"]+)"', s)
+    if m:
+        s = m.group(1)
+    if len(s) > ERROR_MSG_TRUNCATE:
+        s = s[:ERROR_MSG_TRUNCATE - 1].rstrip() + "…"
+    return s
 
 
 # ===========================================================================
@@ -348,6 +368,7 @@ def _build_performance_table(
             if len(bench) >= 2 and bench[0] > 0:
                 alpha = cum_ret - (bench[-1] / bench[0] - 1.0)
 
+        api_success = bool(record.get("api_success", True)) if record else False
         rows_data.append({
             "model_key": key,
             "value": today_val,
@@ -357,10 +378,19 @@ def _build_performance_table(
             "alpha": alpha,
             "trades": n_trades,
             "cash_pct": cash_pct,
+            "api_success": api_success,
         })
 
-    # Sort by daily_pct desc (None last)
-    rows_data.sort(key=lambda r: (r["daily_pct"] is None, -(r["daily_pct"] or 0)))
+    # Sort: successful runs above failed runs, then by daily_pct desc, then by
+    # trade activity (more trades wins ties), then alphabetically for stability.
+    # This prevents a failed model from anchoring rank #1 on tied 0% days.
+    rows_data.sort(key=lambda r: (
+        not r["api_success"],
+        r["daily_pct"] is None,
+        -(r["daily_pct"] or 0),
+        -r["trades"],
+        r["model_key"],
+    ))
 
     headers = ["#", "Model", "Value", "Daily P&L", "Daily %", "Cum. Return", "Alpha vs SPY", "Trades", "Cash %"]
     rows: list[list[str]] = []
@@ -397,8 +427,8 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
         return f"No decision log entry recorded for {model_key.upper()} today. Likely the model was disabled, the daily run skipped this slot, or the file has not yet been written."
 
     if not record.get("api_success", True):
-        err = record.get("api_error", "unknown error")
-        return f"API call failed: `{err}`. No trades executed. Portfolio unchanged from prior session."
+        err = _short_err(record.get("api_error", "unknown error"))
+        return f"API call failed: _{err}_. No trades executed. Portfolio unchanged from prior session."
 
     executed = [e for e in record.get("executions", [])
                 if e.get("executed") and e.get("side") in ("BUY", "SELL")]
@@ -541,7 +571,7 @@ def _build_health_section(model_keys: list[str], run_date: datetime) -> str:
             continue
 
         if not record.get("api_success", True):
-            notes.append(f"- **{key.upper()}**: API failure — `{record.get('api_error', 'unknown')}`.")
+            notes.append(f"- **{key.upper()}**: API failure — _{_short_err(record.get('api_error', 'unknown'))}_.")
 
         latency = record.get("api_latency_seconds")
         if isinstance(latency, (int, float)) and latency > LATENCY_WARN_THRESHOLD:

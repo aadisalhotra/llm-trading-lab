@@ -92,6 +92,7 @@ def log_daily_snapshot(
     run_date: datetime,
     snapshot: dict[str, Any],
     benchmark_value: float | None,
+    api_success: bool = True,
 ) -> None:
     """Append daily portfolio value to /data/performance/{model}.jsonl."""
     PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
@@ -106,6 +107,7 @@ def log_daily_snapshot(
         "cumulative_return": snapshot["cumulative_return"],
         "halted": snapshot["halted"],
         "benchmark_value": benchmark_value,
+        "api_success": api_success,
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
