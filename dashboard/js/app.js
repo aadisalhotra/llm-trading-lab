@@ -1,11 +1,14 @@
 // LLM Trading Lab — Bloomberg-style intraday terminal dashboard
 // Powered by TradingView's lightweight-charts (loaded as a global from CDN).
-// Renders three layers:
-//   1. Master chart: SPY candlesticks + 20-SMA + model equity overlays + volume
-//   2. RSI(14) panel under the master chart
-//   3. Per-model mini line charts (TradingView line series)
-// Plus the existing leaderboard sparklines (still hand-drawn canvas) and
-// trade/portfolio/version panels.
+//
+// Layout (top → bottom):
+//   1. Hero equity chart: 6 model lines (% return, rebased to 0 at window start)
+//      + dashed SPY benchmark line. Full width, 460px tall — the page hero.
+//   2. Hero mini cards: one per model, big colored return + sparkline.
+//   3. Leaderboard table with per-row 30d sparklines.
+//   4. Per-model portfolio panels.
+//   5. Trade feed.
+//   6. Reference row (system health + version ticker).
 //
 // Data source: ../data/dashboard.json — refreshed every 5 minutes.
 
@@ -20,7 +23,7 @@ const MODEL_COLORS = {
   deepseek:    "#ff5599",
   claude_opus: "#cc4411",  // Opus 4.6 — expansion cohort, darker burnt-orange
 };
-const SPY_COLOR = "#6b7585";
+const SPY_COLOR = "#9aa4b8";   // Lighter gray than text-dim so the dashed line is legible
 const ACCENT = "#2b8aff";
 const GREEN = "#00d488";
 const RED = "#ff3355";
@@ -30,8 +33,12 @@ const BG = "#05070b";
 const GRID = "#1a2235";
 
 // Core 5 first, expansion at the end. The leaderboard sorts by performance
-// so this ordering only matters for the model chart grid layout below.
+// so this ordering only matters for the hero mini-card grid layout.
 const MODEL_ORDER = ["claude", "gpt", "gemini", "grok", "deepseek", "claude_opus"];
+
+// Window slice sizes in trading days. TODAY is special-cased — it sources
+// from intraday_curves rather than slicing equity_curves.
+const TIMEFRAME_DAYS = { "1W": 5, "1M": 21, "3M": 63, "1Y": 252 };
 
 const state = {
   timeframe: "ALL",
@@ -83,7 +90,7 @@ function chartOptions(extra = {}) {
     layout: {
       background: { type: "solid", color: BG },
       textColor: TEXT_DIM,
-      fontSize: 10,
+      fontSize: 11,
       fontFamily: "JetBrains Mono, monospace",
     },
     grid: {
@@ -110,61 +117,23 @@ function chartOptions(extra = {}) {
 }
 
 // ===== Time helpers =====
-// lightweight-charts wants seconds-since-epoch (UTC) for intraday and a
-// date string for daily. We unify on UNIX seconds throughout — daily series
-// use the bar's UTC midnight.
+// lightweight-charts wants seconds-since-epoch (UTC) for intraday, or a
+// date string for daily bars. We unify on UNIX seconds — daily series use
+// the bar's UTC midnight.
 function dateToUnix(dateStr) {
-  // dateStr is "YYYY-MM-DD"
   return Math.floor(new Date(dateStr + "T00:00:00Z").getTime() / 1000);
 }
 function isoToUnix(iso) {
   return Math.floor(new Date(iso).getTime() / 1000);
 }
 
-// ===== Indicators =====
-function computeSMA(values, window) {
-  const out = new Array(values.length).fill(null);
-  let sum = 0;
-  for (let i = 0; i < values.length; i++) {
-    sum += values[i];
-    if (i >= window) sum -= values[i - window];
-    if (i >= window - 1) out[i] = sum / window;
-  }
-  return out;
-}
-
-function computeRSI(closes, period = 14) {
-  const out = new Array(closes.length).fill(null);
-  if (closes.length < period + 1) return out;
-  let avgGain = 0, avgLoss = 0;
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) avgGain += diff; else avgLoss -= diff;
-  }
-  avgGain /= period;
-  avgLoss /= period;
-  out[period] = 100 - 100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss));
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    const gain = diff > 0 ? diff : 0;
-    const loss = diff < 0 ? -diff : 0;
-    avgGain = (avgGain * (period - 1) + gain) / period;
-    avgLoss = (avgLoss * (period - 1) + loss) / period;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    out[i] = 100 - 100 / (1 + rs);
-  }
-  return out;
-}
-
 // ===== Series builders =====
-// Build per-model normalized line series in lightweight-charts format:
-//   [{time: unixSeconds, value: pctReturn}, ...]
-//
-// `mode` is "EOD" (uses equity_curves) or "TODAY" (uses intraday_curves).
+// Each model becomes a {key, color, data: [{time, value}]} where value is
+// the % return rebased to 0 at the first point of the active window.
 function buildModelLineSeries(data, mode) {
+  const out = [];
   if (mode === "TODAY") {
     const curves = data.intraday_curves || {};
-    const out = [];
     MODEL_ORDER.forEach(key => {
       const points = curves[key];
       if (!points || points.length < 1) return;
@@ -183,13 +152,11 @@ function buildModelLineSeries(data, mode) {
 
   // EOD mode — daily snapshots from equity_curves, optionally trimmed to a window
   const curves = data.equity_curves || {};
-  const tfMap = { "1W": 5, "1M": 21, "3M": 63 };
-  const out = [];
   MODEL_ORDER.forEach(key => {
     let points = curves[key];
     if (!points || points.length < 1) return;
-    if (state.timeframe !== "ALL" && tfMap[state.timeframe]) {
-      points = points.slice(-tfMap[state.timeframe]);
+    if (state.timeframe !== "ALL" && TIMEFRAME_DAYS[state.timeframe]) {
+      points = points.slice(-TIMEFRAME_DAYS[state.timeframe]);
     }
     if (!points.length) return;
     const base = points[0].value;
@@ -203,14 +170,10 @@ function buildModelLineSeries(data, mode) {
   return out;
 }
 
-// Build SPY candlestick + volume series. We don't have OHLCV in the dashboard
-// payload — only a single benchmark price per row — so for the EOD view we
-// fake candles by reusing the close as O/H/L/C (a flat tick), and for the
-// TODAY view we use the intraday benchmark prices the same way. This still
-// gives the visual frame and lets the model overlays sit on a recognizable
-// candle chart, even though the wicks/bodies are degenerate. Real OHLCV
-// would require expanding the backend payload — phase 2.
-function buildSPYCandles(data, mode) {
+// SPY benchmark as a single dashed line in the same % space as the model
+// lines. Extracted from the per-curve `benchmark` field already present in
+// equity_curves / intraday_curves so no backend change is required.
+function buildSPYLineSeries(data, mode) {
   let prices = [];
   if (mode === "TODAY") {
     const curves = data.intraday_curves || {};
@@ -225,124 +188,78 @@ function buildSPYCandles(data, mode) {
     const refModel = MODEL_ORDER.find(k => (curves[k] || []).some(p => p.benchmark));
     if (refModel) {
       let pts = curves[refModel] || [];
-      const tfMap = { "1W": 5, "1M": 21, "3M": 63 };
-      if (state.timeframe !== "ALL" && tfMap[state.timeframe]) {
-        pts = pts.slice(-tfMap[state.timeframe]);
+      if (state.timeframe !== "ALL" && TIMEFRAME_DAYS[state.timeframe]) {
+        pts = pts.slice(-TIMEFRAME_DAYS[state.timeframe]);
       }
       prices = pts
         .filter(p => p.benchmark)
         .map(p => ({ time: dateToUnix(p.date), price: p.benchmark }));
     }
   }
-  // Build degenerate candles (flat O=H=L=C) — better than no chart
-  const candles = prices.map((p, i) => {
-    const prev = i > 0 ? prices[i - 1].price : p.price;
-    const open = prev;
-    const close = p.price;
-    return {
-      time: p.time,
-      open,
-      high: Math.max(open, close),
-      low: Math.min(open, close),
-      close,
-    };
-  });
-  return candles;
+  if (!prices.length) return [];
+  const base = prices[0].price;
+  if (!base) return [];
+  return prices.map(p => ({ time: p.time, value: (p.price / base) - 1 }));
 }
 
-function buildSMAOverlay(candles, window) {
-  if (!candles.length) return [];
-  const closes = candles.map(c => c.close);
-  const sma = computeSMA(closes, window);
-  return candles
-    .map((c, i) => sma[i] != null ? { time: c.time, value: sma[i] } : null)
-    .filter(Boolean);
+// Raw equity values (not rebased) for the hand-drawn sparkline canvas. The
+// drawSparkline function expects {raw: numericValue} entries and normalizes
+// internally — same shape used by the leaderboard's per-row sparklines.
+function buildRawPointsForSpark(data, key, mode) {
+  if (mode === "TODAY") {
+    const curves = data.intraday_curves || {};
+    return (curves[key] || []).map(p => ({ raw: p.value }));
+  }
+  const curves = data.equity_curves || {};
+  let points = curves[key] || [];
+  if (state.timeframe !== "ALL" && TIMEFRAME_DAYS[state.timeframe]) {
+    points = points.slice(-TIMEFRAME_DAYS[state.timeframe]);
+  }
+  return points.map(p => ({ raw: p.value }));
 }
 
-function buildRSISeries(candles, period = 14) {
-  if (!candles.length) return [];
-  const closes = candles.map(c => c.close);
-  const rsi = computeRSI(closes, period);
-  return candles
-    .map((c, i) => rsi[i] != null ? { time: c.time, value: rsi[i] } : null)
-    .filter(Boolean);
-}
-
-// ===== Master chart (TradingView) =====
+// ===== Master hero chart (TradingView) =====
 let masterChart = null;
-let rsiChart = null;
-let masterSeries = {}; // { spyCandle, sma, rsi, modelLines: {key: series} }
+let masterSeries = {}; // { spy, modelLines: {key: lineSeries} }
 
 function initMasterChart() {
   const el = document.getElementById("master-chart");
   el.innerHTML = "";
   masterChart = LightweightCharts.createChart(el, chartOptions({
     width: el.clientWidth,
-    height: 340,
+    height: 460,
   }));
 
-  masterSeries.spyCandle = masterChart.addCandlestickSeries({
-    upColor: GREEN,
-    downColor: RED,
-    borderUpColor: GREEN,
-    borderDownColor: RED,
-    wickUpColor: GREEN,
-    wickDownColor: RED,
-    priceScaleId: "right",
-  });
-  // SPY candles use the absolute price scale on the right
-  masterChart.priceScale("right").applyOptions({ visible: true, borderColor: GRID });
-
-  masterSeries.sma = masterChart.addLineSeries({
-    color: ACCENT,
-    lineWidth: 1,
-    lineStyle: 0,
-    priceScaleId: "right",
-    lastValueVisible: false,
-    priceLineVisible: false,
-  });
-
-  // Model equity overlays go on a SEPARATE % scale on the left so percentages
-  // and SPY price live in the same chart without one squashing the other
-  masterSeries.modelLines = {};
-  MODEL_ORDER.forEach(key => {
-    const line = masterChart.addLineSeries({
-      color: MODEL_COLORS[key],
-      lineWidth: 2,
-      priceScaleId: "left",
-      lastValueVisible: true,
-      priceLineVisible: false,
-      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
-    });
-    masterSeries.modelLines[key] = line;
-  });
-  masterChart.priceScale("left").applyOptions({
+  // Single % scale on the right — every series is rebased to 0% at window start
+  masterChart.priceScale("right").applyOptions({
     visible: true,
     borderColor: GRID,
     scaleMargins: { top: 0.1, bottom: 0.1 },
   });
 
-  // RSI panel
-  const rsiEl = document.getElementById("rsi-chart");
-  rsiEl.innerHTML = "";
-  rsiChart = LightweightCharts.createChart(rsiEl, chartOptions({
-    width: rsiEl.clientWidth,
-    height: 90,
-    rightPriceScale: { borderColor: GRID, scaleMargins: { top: 0.1, bottom: 0.1 } },
-    timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
-  }));
-  masterSeries.rsi = rsiChart.addLineSeries({
-    color: "#b478ff",
-    lineWidth: 1.4,
-    priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+  masterSeries.modelLines = {};
+  MODEL_ORDER.forEach(key => {
+    const line = masterChart.addLineSeries({
+      color: MODEL_COLORS[key],
+      lineWidth: 2,
+      lineStyle: 0,            // solid
+      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+      lastValueVisible: true,
+      priceLineVisible: false,
+      crosshairMarkerRadius: 4,
+    });
+    masterSeries.modelLines[key] = line;
   });
-  // 30/70 reference lines for RSI
-  masterSeries.rsi.createPriceLine({ price: 70, color: RED, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "70" });
-  masterSeries.rsi.createPriceLine({ price: 30, color: GREEN, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "30" });
 
-  // Sync the two charts on the time axis so the crosshair lines up
-  masterChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-    if (range && rsiChart) rsiChart.timeScale().setVisibleLogicalRange(range);
+  // SPY benchmark — dashed gray line
+  masterSeries.spy = masterChart.addLineSeries({
+    color: SPY_COLOR,
+    lineWidth: 2,
+    lineStyle: 2,              // dashed
+    priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+    lastValueVisible: true,
+    priceLineVisible: false,
+    crosshairMarkerRadius: 4,
   });
 }
 
@@ -351,16 +268,10 @@ function refreshMasterChart() {
   if (!masterChart) initMasterChart();
 
   const mode = state.timeframe === "TODAY" ? "TODAY" : "EOD";
-  const candles = buildSPYCandles(state.data, mode);
-  const sma = buildSMAOverlay(candles, 20);
-  const rsi = buildRSISeries(candles, 14);
   const modelLines = buildModelLineSeries(state.data, mode);
+  const spyLine = buildSPYLineSeries(state.data, mode);
 
-  masterSeries.spyCandle.setData(candles);
-  masterSeries.sma.setData(sma);
-  masterSeries.rsi.setData(rsi);
-
-  // Reset all model lines, then populate visible ones
+  // Reset all model series, then populate visible (non-muted) ones
   MODEL_ORDER.forEach(key => {
     masterSeries.modelLines[key].setData([]);
   });
@@ -369,23 +280,28 @@ function refreshMasterChart() {
     masterSeries.modelLines[s.key].setData(s.data);
   });
 
-  if (candles.length) masterChart.timeScale().fitContent();
-  renderLegend(modelLines);
+  if (state.mutedSeries.has("spy")) {
+    masterSeries.spy.setData([]);
+  } else {
+    masterSeries.spy.setData(spyLine);
+  }
+
+  if (modelLines.length || spyLine.length) {
+    masterChart.timeScale().fitContent();
+  }
+  renderLegend(modelLines, spyLine.length > 0);
 }
 
-function renderLegend(modelLines) {
+function renderLegend(modelLines, spyVisible) {
   const legend = document.getElementById("chart-legend");
   legend.innerHTML = "";
-  // SPY swatch
-  const spy = document.createElement("div");
-  spy.className = "legend-item dashed";
-  spy.innerHTML = `<span class="legend-swatch" style="background:${SPY_COLOR}"></span><span>SPY (candle)</span>`;
-  legend.appendChild(spy);
 
   modelLines.forEach(s => {
+    const cfg = (state.data?.models || {})[s.key] || {};
+    const label = cfg.display_name || s.key.toUpperCase();
     const item = document.createElement("div");
     item.className = "legend-item" + (state.mutedSeries.has(s.key) ? " muted" : "");
-    item.innerHTML = `<span class="legend-swatch" style="background:${s.color}"></span><span>${s.key.toUpperCase()}</span>`;
+    item.innerHTML = `<span class="legend-swatch" style="background:${s.color}"></span><span>${label}</span>`;
     item.addEventListener("click", () => {
       if (state.mutedSeries.has(s.key)) state.mutedSeries.delete(s.key);
       else state.mutedSeries.add(s.key);
@@ -394,138 +310,71 @@ function renderLegend(modelLines) {
     legend.appendChild(item);
   });
 
-  // SMA + RSI labels
-  const sma = document.createElement("div");
-  sma.className = "legend-item";
-  sma.innerHTML = `<span class="legend-swatch" style="background:${ACCENT}"></span><span>SMA(20)</span>`;
-  legend.appendChild(sma);
-  const rsi = document.createElement("div");
-  rsi.className = "legend-item";
-  rsi.innerHTML = `<span class="legend-swatch" style="background:#b478ff"></span><span>RSI(14)</span>`;
-  legend.appendChild(rsi);
+  if (spyVisible) {
+    const spy = document.createElement("div");
+    spy.className = "legend-item dashed" + (state.mutedSeries.has("spy") ? " muted" : "");
+    spy.innerHTML = `<span class="legend-swatch"></span><span>SPY (benchmark)</span>`;
+    spy.addEventListener("click", () => {
+      if (state.mutedSeries.has("spy")) state.mutedSeries.delete("spy");
+      else state.mutedSeries.add("spy");
+      refreshMasterChart();
+    });
+    legend.appendChild(spy);
+  }
 }
 
-// ===== Per-model mini charts (TradingView line series) =====
-const miniCharts = {};
-
-function renderModelMiniCharts() {
+// ===== Hero mini cards (return + sparkline per model) =====
+function renderHeroMiniCards() {
   if (!state.data) return;
-  const grid = document.getElementById("model-charts-grid");
+  const grid = document.getElementById("hero-mini-cards");
   grid.innerHTML = "";
-  // Tear down old chart instances to avoid leaks
-  Object.values(miniCharts).forEach(c => { try { c.remove(); } catch (e) {} });
-  Object.keys(miniCharts).forEach(k => delete miniCharts[k]);
 
   const mode = state.timeframe === "TODAY" ? "TODAY" : "EOD";
   const lines = buildModelLineSeries(state.data, mode);
   const linesByKey = Object.fromEntries(lines.map(s => [s.key, s]));
-
   const modelsCfg = state.data.models || {};
+
   MODEL_ORDER.forEach(key => {
     const series = linesByKey[key];
     const cfg = modelsCfg[key] || {};
     const cohort = cfg.cohort || "core";
     const displayName = cfg.display_name || key.toUpperCase();
-    const card = document.createElement("div");
-    card.className = "mini-chart-card";
-    if (cohort === "expansion") card.classList.add("cohort-expansion");
 
     const lastVal = series && series.data.length
       ? series.data[series.data.length - 1].value
       : 0;
     const color = lastVal > 0 ? GREEN : (lastVal < 0 ? RED : TEXT_DIM);
 
+    const card = document.createElement("div");
+    card.className = "hero-mini-card";
+    if (cohort === "expansion") card.classList.add("cohort-expansion");
+
     const cohortBadge = cohort === "expansion"
       ? `<span class="cohort-badge cohort-exp">EXP</span>`
       : "";
 
     card.innerHTML = `
-      <div class="mc-header">
-        <span class="mc-name">
+      <div class="hmc-name">
+        <span class="hmc-name-text">
           <span class="swatch" style="background:${MODEL_COLORS[key]}"></span>${displayName}
-          ${cohortBadge}
         </span>
-        <span class="mc-return" style="color:${color}">${fmtPct(lastVal)}</span>
+        ${cohortBadge}
       </div>
-      <div class="mc-sub">${state.timeframe} // vs SPY</div>
-      <div class="tv-mini"></div>
-      <div class="mc-spy">
-        <span>${state.timeframe} window</span>
-        <span>${series ? series.data.length + " pts" : "no data"}</span>
-      </div>
+      <div class="hmc-return" style="color:${color}">${fmtPct(lastVal)}</div>
+      <canvas class="hmc-spark"></canvas>
     `;
     grid.appendChild(card);
 
-    const mountEl = card.querySelector(".tv-mini");
-    const chart = LightweightCharts.createChart(mountEl, chartOptions({
-      width: mountEl.clientWidth,
-      height: 110,
-      rightPriceScale: {
-        borderColor: GRID,
-        scaleMargins: { top: 0.1, bottom: 0.1 },
-        visible: false,
-      },
-      timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
-      handleScroll: false,
-      handleScale: false,
-    }));
-    const lineSeries = chart.addLineSeries({
-      color: MODEL_COLORS[key],
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+    // Draw sparkline with raw equity values (drawSparkline normalizes internally)
+    const canvas = card.querySelector(".hmc-spark");
+    requestAnimationFrame(() => {
+      const sparkPoints = buildRawPointsForSpark(state.data, key, mode);
+      drawSparkline(canvas, sparkPoints);
     });
-    if (series) lineSeries.setData(series.data);
-    chart.timeScale().fitContent();
-    miniCharts[key] = chart;
   });
-
-  // SPY benchmark card
-  const spyCandles = buildSPYCandles(state.data, mode);
-  if (spyCandles.length) {
-    const first = spyCandles[0].close;
-    const last = spyCandles[spyCandles.length - 1].close;
-    const ret = first ? (last / first) - 1 : 0;
-    const color = ret > 0 ? GREEN : (ret < 0 ? RED : TEXT_DIM);
-
-    const card = document.createElement("div");
-    card.className = "mini-chart-card";
-    card.innerHTML = `
-      <div class="mc-header">
-        <span class="mc-name"><span class="swatch" style="background:${SPY_COLOR}"></span>SPY // BENCHMARK</span>
-        <span class="mc-return" style="color:${color}">${fmtPct(ret)}</span>
-      </div>
-      <div class="mc-sub">${state.timeframe} // S&P 500 ETF</div>
-      <div class="tv-mini"></div>
-      <div class="mc-spy">
-        <span>REFERENCE INDEX</span>
-        <span>${spyCandles.length} pts</span>
-      </div>
-    `;
-    grid.appendChild(card);
-
-    const mountEl = card.querySelector(".tv-mini");
-    const chart = LightweightCharts.createChart(mountEl, chartOptions({
-      width: mountEl.clientWidth,
-      height: 110,
-      rightPriceScale: { borderColor: GRID, scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false },
-      timeScale: { borderColor: GRID, timeVisible: true, secondsVisible: false, visible: false },
-      handleScroll: false,
-      handleScale: false,
-    }));
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: GREEN, downColor: RED,
-      borderUpColor: GREEN, borderDownColor: RED,
-      wickUpColor: GREEN, wickDownColor: RED,
-    });
-    candleSeries.setData(spyCandles);
-    chart.timeScale().fitContent();
-    miniCharts.spy = chart;
-  }
 }
 
-// ===== Sparklines (still hand-drawn canvas — small enough to not need TV) =====
+// ===== Sparklines (hand-drawn canvas — used by leaderboard rows + hero cards) =====
 function drawSparkline(canvas, points) {
   if (!canvas || !points || points.length < 1) return;
   const ctx = canvas.getContext("2d");
@@ -777,7 +626,7 @@ function wireControls() {
       btn.classList.add("active");
       state.timeframe = btn.getAttribute("data-tf");
       refreshMasterChart();
-      renderModelMiniCharts();
+      renderHeroMiniCards();
     });
   });
 }
@@ -788,10 +637,10 @@ async function refresh() {
   if (!d) return;
   state.data = d;
   renderStatus(d);
+  refreshMasterChart();
+  renderHeroMiniCards();
   renderLeaderboard(d);
   renderHealth(d);
-  refreshMasterChart();
-  renderModelMiniCharts();
   renderPortfolios(d);
   renderTradeFeed(d);
   renderVersionTicker(d);
@@ -804,18 +653,10 @@ setInterval(refresh, REFRESH_MS);
 window.addEventListener("resize", () => {
   if (masterChart) {
     const el = document.getElementById("master-chart");
-    masterChart.applyOptions({ width: el.clientWidth, height: 340 });
+    const newHeight = window.innerWidth <= 800 ? 360 : 460;
+    masterChart.applyOptions({ width: el.clientWidth, height: newHeight });
+    masterChart.timeScale().fitContent();
   }
-  if (rsiChart) {
-    const el = document.getElementById("rsi-chart");
-    rsiChart.applyOptions({ width: el.clientWidth, height: 90 });
-  }
-  Object.values(miniCharts).forEach((c, i) => {
-    try {
-      const el = c.chartElement?.() || c._private__chartWidget?._private__element;
-      // lightweight-charts doesn't expose a direct element accessor, so the
-      // mini grid is small and we just trigger a fit
-      c.timeScale().fitContent();
-    } catch (e) {}
-  });
+  // Hero mini-card sparklines need to redraw at the new container width
+  if (state.data) renderHeroMiniCards();
 });

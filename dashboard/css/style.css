@@ -226,15 +226,95 @@ body {
   border: 1px solid var(--border);
   position: relative;
 }
-#master-chart { height: 340px; }
-.tv-rsi {
-  height: 90px;
-  margin-top: 6px;
-  border-top: 1px solid var(--border-bright);
-}
 .tv-chart .tv-lightweight-charts {
   background: var(--bg) !important;
 }
+
+/* ===== Hero chart panel — primary visual on the page ===== */
+.hero-chart-panel {
+  /* Slightly stronger frame than other panels — this is THE visual */
+  border: 1px solid var(--border-bright);
+  border-left: 2px solid var(--accent);
+  padding: 14px 18px;
+}
+.hero-chart-panel .panel-title {
+  font-size: 12px;
+}
+.hero-chart-panel #master-chart {
+  height: 460px;
+}
+.hero-chart-panel .legend {
+  margin-top: 12px;
+  font-size: 11px;
+}
+
+/* Hero mini cards — one per model, full-width row directly under the chart */
+.hero-mini-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.hero-mini-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;       /* allow shrinking inside grid */
+}
+.hero-mini-card.cohort-expansion {
+  border-left: 2px solid var(--accent-dim);
+}
+.hero-mini-card .hmc-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-bright);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hero-mini-card .hmc-name .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  flex-shrink: 0;
+}
+.hero-mini-card .hmc-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.hero-mini-card .hmc-return {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  margin: 2px 0;
+}
+.hero-mini-card .hmc-spark {
+  width: 100%;
+  height: 36px;
+  display: block;
+}
+
+@media (max-width: 1500px) {
+  .hero-mini-cards { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 800px) {
+  .hero-mini-cards { grid-template-columns: repeat(2, 1fr); }
+  .hero-chart-panel #master-chart { height: 360px; }
+}
+
+/* Reference row (system health + version ticker) at the bottom — compact */
+.reference-row { grid-template-columns: 1fr 2fr; }
 .chart-tooltip {
   position: absolute;
   background: rgba(5, 7, 11, 0.96);

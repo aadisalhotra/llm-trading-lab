@@ -18,7 +18,7 @@
     <div class="brand">
       <span class="logo">▍</span>
       <span class="title">LLM_TRADING_LAB</span>
-      <span class="subtitle">// AUTONOMOUS // 5-MODEL HEAD-TO-HEAD // INTRADAY</span>
+      <span class="subtitle">// AUTONOMOUS // 6-MODEL HEAD-TO-HEAD // INTRADAY</span>
     </div>
     <div class="status">
       <div class="status-item"><span class="label">PHASE</span><span id="phase" class="value">—</span></div>
@@ -31,7 +31,27 @@
   </header>
 
   <main>
-    <!-- ROW 1: Leaderboard with sparklines -->
+    <!-- HERO: full-width equity chart, the primary visual on the page -->
+    <section class="panel hero-chart-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ EQUITY CURVES // 6 MODELS vs SPY</span>
+        <div class="chart-controls" id="tf-controls">
+          <button class="tf-btn" data-tf="TODAY">TODAY</button>
+          <button class="tf-btn" data-tf="1W">1W</button>
+          <button class="tf-btn" data-tf="1M">1M</button>
+          <button class="tf-btn" data-tf="3M">3M</button>
+          <button class="tf-btn" data-tf="1Y">1Y</button>
+          <button class="tf-btn active" data-tf="ALL">ALL</button>
+        </div>
+      </div>
+      <div id="master-chart" class="tv-chart"></div>
+      <div class="legend" id="chart-legend"></div>
+    </section>
+
+    <!-- HERO mini cards: one per model, return + sparkline for the active timeframe -->
+    <section class="hero-mini-cards" id="hero-mini-cards"></section>
+
+    <!-- Leaderboard -->
     <section class="panel leaderboard-panel">
       <div class="panel-header">
         <span class="panel-title">▍ LEADERBOARD</span>
@@ -57,45 +77,10 @@
       </table>
     </section>
 
-    <!-- ROW 2: Master TradingView chart + system health -->
-    <section class="row">
-      <div class="panel chart-panel">
-        <div class="panel-header">
-          <span class="panel-title">▍ EQUITY CURVES // SPY CANDLES + MODEL OVERLAYS</span>
-          <div class="chart-controls" id="tf-controls">
-            <button class="tf-btn" data-tf="TODAY">TODAY</button>
-            <button class="tf-btn" data-tf="1W">1W</button>
-            <button class="tf-btn" data-tf="1M">1M</button>
-            <button class="tf-btn" data-tf="3M">3M</button>
-            <button class="tf-btn active" data-tf="ALL">ALL</button>
-          </div>
-        </div>
-        <div id="master-chart" class="tv-chart"></div>
-        <div id="rsi-chart" class="tv-chart tv-rsi"></div>
-        <div class="legend" id="chart-legend"></div>
-      </div>
-
-      <div class="panel health-panel">
-        <div class="panel-header">
-          <span class="panel-title">▍ SYSTEM</span>
-        </div>
-        <div id="health-content"></div>
-      </div>
-    </section>
-
-    <!-- ROW 3: Per-model mini charts + SPY -->
-    <section class="panel model-charts-panel">
-      <div class="panel-header">
-        <span class="panel-title">▍ MODEL CHARTS // INDIVIDUAL CURVES</span>
-        <span class="panel-meta">REBASED PER WINDOW</span>
-      </div>
-      <div class="model-charts-grid" id="model-charts-grid"></div>
-    </section>
-
-    <!-- ROW 4: Per-model portfolio panels -->
+    <!-- Per-model portfolio panels -->
     <section class="portfolio-grid" id="portfolio-grid"></section>
 
-    <!-- ROW 5: Trade feed -->
+    <!-- Trade feed -->
     <section class="panel feed-panel">
       <div class="panel-header">
         <span class="panel-title">▍ TRADE FEED</span>
@@ -104,12 +89,20 @@
       <div id="trade-feed" class="trade-feed"></div>
     </section>
 
-    <!-- ROW 6: Model version ticker -->
-    <section class="panel version-panel">
-      <div class="panel-header">
-        <span class="panel-title">▍ MODEL VERSIONS</span>
+    <!-- System health + version ticker (compact reference info, end-of-page) -->
+    <section class="row reference-row">
+      <div class="panel health-panel">
+        <div class="panel-header">
+          <span class="panel-title">▍ SYSTEM</span>
+        </div>
+        <div id="health-content"></div>
       </div>
-      <div id="version-ticker" class="version-ticker"></div>
+      <div class="panel version-panel">
+        <div class="panel-header">
+          <span class="panel-title">▍ MODEL VERSIONS</span>
+        </div>
+        <div id="version-ticker" class="version-ticker"></div>
+      </div>
     </section>
   </main>
 
