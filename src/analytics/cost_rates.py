@@ -20,13 +20,20 @@ COST_PER_MTOK: dict[str, dict[str, float]] = {
     # Anthropic — Sonnet is roughly 5x cheaper than Opus on both ends
     "claude-sonnet-4-6": {"input": 3.00,  "output": 15.00},
     "claude-opus-4-6":   {"input": 15.00, "output": 75.00},
-    # Other providers — placeholders, not used until we add usage capture
-    # to those adapters. The expansion cohort section only needs Anthropic
-    # rates because both compared models are Anthropic.
+    # OpenAI flagship chat models
     "gpt-5.4":                {"input": 10.00, "output": 30.00},
+    # Google Gemini
     "gemini-3.1-pro-preview": {"input": 3.50,  "output": 14.00},
-    "grok-4":                 {"input": 5.00,  "output": 15.00},
-    "deepseek-chat":          {"input": 0.27,  "output": 1.10},
+    # xAI Grok — keep base "grok-4" entry so the prefix-fallback resolves
+    # legacy returned IDs like "grok-4-0709"; the production string we
+    # send is now grok-4.20-0309-reasoning.
+    "grok-4":                      {"input": 5.00,  "output": 15.00},
+    "grok-4.20-0309-reasoning":    {"input": 5.00,  "output": 25.00},
+    # DeepSeek — chat is the legacy entry, reasoner is the production
+    # string we now send. Reasoner bills more on output because the
+    # internal reasoning trace counts as output tokens.
+    "deepseek-chat":     {"input": 0.27,  "output": 1.10},
+    "deepseek-reasoner": {"input": 0.55,  "output": 2.19},
 }
 
 
