@@ -1,0 +1,32 @@
+name: Keepalive — prevent GitHub from disabling scheduled workflows
+
+on:
+  schedule:
+    # Runs every 45 days. GitHub disables cron workflows after 60 days
+    # of repo inactivity; this dummy commit keeps the repo "active."
+    - cron: "0 12 1,15 * *"   # 1st and 15th of each month at noon UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keepalive commit
+        run: |
+          git config user.name "llm-trading-lab-bot"
+          git config user.email "actions@github.com"
+          # Only commit if the last real commit is older than 30 days
+          LAST=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DIFF=$(( (NOW - LAST) / 86400 ))
+          if [ "$DIFF" -ge 30 ]; then
+            echo "Last commit was ${DIFF} days ago — refreshing"
+            git commit --allow-empty -m "chore: keepalive to prevent cron disable"
+            git push
+          else
+            echo "Last commit was ${DIFF} days ago — no keepalive needed"
+          fi
