@@ -298,7 +298,7 @@ function initMasterChart() {
       color: MODEL_COLORS[key],
       lineWidth: 2,
       lineStyle: 0,            // solid
-      priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+      priceFormat: { type: "custom", formatter: (v) => (v * 100).toFixed(2) + "%", minMove: 0.0001 },
       lastValueVisible: true,
       priceLineVisible: false,
       crosshairMarkerRadius: 4,
@@ -311,7 +311,7 @@ function initMasterChart() {
     color: SPY_COLOR,
     lineWidth: 2,
     lineStyle: 2,              // dashed
-    priceFormat: { type: "percent", precision: 2, minMove: 0.0001 },
+    priceFormat: { type: "custom", formatter: (v) => (v * 100).toFixed(2) + "%", minMove: 0.0001 },
     lastValueVisible: true,
     priceLineVisible: false,
     crosshairMarkerRadius: 4,
