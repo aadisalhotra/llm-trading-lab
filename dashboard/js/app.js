@@ -1031,8 +1031,20 @@ function updateCountdown() {
   el.className = duringMarket ? "value open" : "value";
 }
 
+// ===== Live ET clock =====
+function updateClock() {
+  const el = document.getElementById("liveclock");
+  if (!el) return;
+  el.textContent = new Date().toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", minute: "2-digit", second: "2-digit",
+    hour12: true,
+  });
+}
+
+updateClock();
 updateCountdown();
-setInterval(updateCountdown, 1000);
+setInterval(() => { updateClock(); updateCountdown(); }, 1000);
 
 wireControls();
 refresh();
