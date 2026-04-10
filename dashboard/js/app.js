@@ -10,9 +10,10 @@
 //   5. Trade feed.
 //   6. Reference row (system health + version ticker).
 //
-// Data source: ../data/dashboard.json — refreshed every 5 minutes.
+// Data source: data/dashboard.json — refreshed every 5 minutes.
+// Path is relative to the Pages site root (the dashboard/ dir becomes /).
 
-const DATA_URL = "../data/dashboard.json";
+const DATA_URL = "data/dashboard.json";
 const REFRESH_MS = 5 * 60 * 1000;
 
 const MODEL_COLORS = {
