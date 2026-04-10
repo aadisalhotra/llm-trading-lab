@@ -1097,7 +1097,7 @@ function renderHealth(d) {
     <div class="health-row"><span class="k">BENCHMARK</span><span class="v">${d.benchmark_ticker || "—"}</span></div>
     <div class="health-row"><span class="k">MODELS_ACTIVE</span><span class="v">${total - halted} / ${total}</span></div>
     <div class="health-row"><span class="k">MODELS_HALTED</span><span class="v">${halted}</span></div>
-    <div class="health-row"><span class="k">UNIVERSE_SIZE</span><span class="v">${(d.universe?.tickers || []).length}</span></div>
+    <div class="health-row"><span class="k">UNIVERSE</span><span class="v">${d.universe_coverage ? `${d.universe_coverage.total_tracked} tracked / ${d.universe_coverage.actively_held} held` : (d.universe?.tickers || []).length}</span></div>
     <div class="health-row"><span class="k">SESSION</span><span class="v">${d.intraday_session_date || "—"}</span></div>
     <div class="health-row"><span class="k">EXPERIMENT_START</span><span class="v">${d.experiment_start || "—"}</span></div>
     <div class="health-row"><span class="k">EXPERIMENT_END</span><span class="v">${d.experiment_end || "—"}</span></div>

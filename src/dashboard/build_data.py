@@ -576,6 +576,14 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "consensus_picks": consensus_picks,
         "agreement_returns": agreement_returns,
         "confidence_calibration": confidence_calibration,
+        "universe_coverage": {
+            "total_tracked": len(universe.get("tickers", [])),
+            "actively_held": len({
+                h["ticker"]
+                for p in portfolios
+                for h in p.get("holdings", [])
+            }),
+        },
     }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)

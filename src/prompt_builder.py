@@ -8,6 +8,12 @@ market data, current portfolio state, intraday session context). Output is:
   - images: optional list of PNG bytes (one composite universe chart) for
     vision-capable adapters; text-only adapters ignore the list
 
+Two-step prompting (v2 universe, 75 stocks):
+  Step 1 — Screening: lightweight call with minimal per-stock data for all 75
+           stocks. Model returns a JSON shortlist of its top 20 picks.
+  Step 2 — Trading: full data for only the 20 shortlisted stocks + current
+           holdings. Model returns buy/sell/hold decisions.
+
 Why an intraday context block?
   Without it, the model sees only "DATE: 2026-04-09" and treats every 15-min
   call as if it were the only call of the day. It would happily blow its
@@ -19,6 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 from datetime import datetime, time as dtime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -205,6 +212,159 @@ def _format_intraday_context_block(
     return "\n".join(lines)
 
 
+# ===== Two-step screening system =====
+
+SCREENING_SYSTEM_PROMPT = """You are an autonomous stock screener for the Autonomous LLM Trading Lab.
+Your job: review all 75 stocks in the universe and return a shortlist of your top 20 picks for deeper analysis.
+
+# Output format
+Return ONLY a single JSON object. No prose before or after. No markdown fences.
+
+{
+  "screening_reasoning": "<2-3 sentences on your overall market read and screening criteria this run>",
+  "shortlist": [
+    {
+      "ticker": "<symbol>",
+      "reason": "<one sentence: why this stock deserves deeper analysis right now>"
+    }
+  ]
+}
+
+# Rules
+- Return exactly 20 stocks in the shortlist.
+- Pick stocks with the strongest trading signals — momentum, news catalysts, technical setups, or risk events.
+- Include any stocks you currently hold (they need ongoing evaluation).
+- Prioritize actionable opportunities over stable-but-boring names.
+- This is a quick screening pass. Save deep analysis for the next step.
+"""
+
+
+def _format_screening_data_block(
+    market_data: dict[str, pd.DataFrame],
+    news: dict[str, Any] | None,
+    sentiment: dict[str, float] | None,
+    ticker_order: list[dict[str, Any]],
+) -> str:
+    """Compact one-line-per-stock summary for the screening call.
+
+    Each stock gets: ticker, sector, price, daily change %, volume vs avg,
+    sentiment score, one-line top headline. Cheap input tokens.
+    """
+    sentiment = sentiment or {}
+    news = news or {}
+    lines = [
+        "UNIVERSE — SCREEN THESE 75 STOCKS (sorted randomly for fairness):",
+        f"  {'TICKER':<6} {'SECTOR':<24} {'PRICE':>8} {'1D%':>7} {'VOL_VS_AVG':>11} {'SENT':>6}  HEADLINE",
+    ]
+    for t in ticker_order:
+        sym = t["symbol"]
+        sector = t["sector"][:22]
+        df = market_data.get(sym)
+        if df is None or df.empty:
+            lines.append(f"  {sym:<6} {sector:<24} {'N/A':>8}")
+            continue
+        close = float(df["Close"].iloc[-1])
+        prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else close
+        pct_1d = (close / prev - 1) * 100 if prev else 0
+        vol = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
+        avg_vol = float(df["Volume"].mean()) if "Volume" in df.columns else 1
+        vol_ratio = vol / avg_vol if avg_vol > 0 else 0
+
+        score = sentiment.get(sym, 0.0)
+        # Top headline — just the first one, trimmed
+        items = news.get(sym) or []
+        headline = items[0].get("title", "")[:80] if items else ""
+
+        lines.append(
+            f"  {sym:<6} {sector:<24} {close:>8.2f} {pct_1d:>+7.2f} {vol_ratio:>10.1f}x {score:>+6.2f}  {headline}"
+        )
+    return "\n".join(lines)
+
+
+def build_screening_prompt(
+    market_data: dict[str, pd.DataFrame],
+    portfolio_state: dict[str, Any],
+    run_date: datetime,
+    news_data: dict[str, Any] | None = None,
+    sentiment_data: dict[str, float] | None = None,
+    ticker_order: list[dict[str, Any]] | None = None,
+) -> tuple[str, str]:
+    """Build the Step 1 screening prompt.
+
+    Returns (system_prompt, user_prompt). The ticker_order list controls the
+    randomized display order — pass the same shuffled list to all models for
+    fairness within a single pipeline run.
+    """
+    universe = load_universe()
+    if ticker_order is None:
+        ticker_order = list(universe["tickers"])
+        random.shuffle(ticker_order)
+
+    # Current holdings — model must include these in its shortlist
+    held_tickers = [h["ticker"] for h in portfolio_state.get("holdings", [])]
+
+    parts = [
+        f"DATE: {run_date.strftime('%Y-%m-%d')}",
+        "",
+        _format_screening_data_block(market_data, news_data, sentiment_data, ticker_order),
+        "",
+        f"YOUR CURRENT HOLDINGS (must include in shortlist): {', '.join(held_tickers) if held_tickers else '(none — 100% cash)'}",
+        "",
+        "Return your top 20 picks as JSON now.",
+    ]
+    return SCREENING_SYSTEM_PROMPT, "\n".join(parts)
+
+
+def parse_screening_response(raw: str, held_tickers: list[str], universe_symbols: list[str]) -> list[str]:
+    """Parse the screening JSON and return a validated shortlist of ticker symbols.
+
+    Ensures held tickers are always included, and all returned symbols are in
+    the universe. Falls back to the full universe if parsing fails.
+    """
+    import re as _re
+
+    text = raw.strip()
+    fence = _re.search(r"```(?:json)?\s*(.*?)```", text, _re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    else:
+        first = text.find("{")
+        last = text.rfind("}")
+        if first != -1 and last > first:
+            text = text[first:last + 1]
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Screening response was not valid JSON — falling back to full universe")
+        return universe_symbols[:20]
+
+    shortlist_raw = data.get("shortlist", [])
+    if not isinstance(shortlist_raw, list):
+        return universe_symbols[:20]
+
+    # Extract valid tickers
+    valid = set(universe_symbols)
+    tickers = []
+    seen = set()
+    for item in shortlist_raw:
+        sym = str(item.get("ticker", "") if isinstance(item, dict) else item).upper().strip()
+        if sym in valid and sym not in seen:
+            tickers.append(sym)
+            seen.add(sym)
+
+    # Ensure held tickers are included
+    for t in held_tickers:
+        if t not in seen and t in valid:
+            tickers.append(t)
+            seen.add(t)
+
+    if not tickers:
+        return universe_symbols[:20]
+
+    return tickers[:25]  # Allow slight overshoot from held-ticker injection
+
+
 def build_prompts(
     portfolio_state: dict[str, Any],
     market_data: dict[str, pd.DataFrame],
@@ -215,6 +375,7 @@ def build_prompts(
     include_chart_image: bool = True,
     news_data: dict[str, Any] | None = None,
     sentiment_data: dict[str, float] | None = None,
+    shortlisted_symbols: list[str] | None = None,
 ) -> tuple[str, str, str, list[bytes]]:
     """Build (system_prompt, user_prompt, prompt_version, images).
 
@@ -231,6 +392,18 @@ def build_prompts(
     max_trades = int(settings["portfolio_rules"]["max_trades_per_day"])
     universe_syms = [t["symbol"] for t in universe["tickers"]]
 
+    # When a shortlist is provided (from the screening step), scope down
+    # market data and news to only those symbols. The universe block still
+    # lists ALL valid tickers (the model may only trade from the universe),
+    # but the data it sees is the shortlisted subset.
+    if shortlisted_symbols:
+        scoped_set = set(shortlisted_symbols)
+        scoped_data = {k: v for k, v in market_data.items() if k in scoped_set}
+        scoped_syms = [s for s in universe_syms if s in scoped_set]
+    else:
+        scoped_data = market_data
+        scoped_syms = universe_syms
+
     parts = [
         f"DATE: {run_date.strftime('%Y-%m-%d')}",
         f"EXECUTION MODE: {settings['mode'].upper()}",
@@ -246,11 +419,11 @@ def build_prompts(
         "",
         _format_universe_block(universe),
         "",
-        _format_market_data_block(market_data),
+        _format_market_data_block(scoped_data),
         "",
         _format_portfolio_block(portfolio_state),
         "",
-        _format_news_block(news_data, sentiment_data, universe_syms),
+        _format_news_block(news_data, sentiment_data, scoped_syms),
         "",
         _format_macro_block(news_data, sentiment_data),
         "",
@@ -270,7 +443,7 @@ def build_prompts(
     if include_chart_image:
         try:
             png = build_universe_overview_png(
-                market_data,
+                scoped_data,
                 title="UNIVERSE OVERVIEW",
                 subtitle=run_date.strftime("%Y-%m-%d %H:%M ET"),
             )

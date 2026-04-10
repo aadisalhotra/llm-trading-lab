@@ -64,7 +64,12 @@ from .portfolio import (
     validate_decisions,
 )
 from .execution import Executor
-from .prompt_builder import build_prompts, hash_inputs
+from .prompt_builder import (
+    build_prompts,
+    build_screening_prompt,
+    hash_inputs,
+    parse_screening_response,
+)
 
 
 def _prices_from_data(data: dict) -> dict[str, float]:
@@ -123,6 +128,7 @@ def run_one_model(
     news_data: dict[str, Any] | None = None,
     sentiment_data: dict[str, float] | None = None,
     news_hash: str = "",
+    ticker_order: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -145,10 +151,35 @@ def run_one_model(
                    f"Force-selling: {triggered}", {"model": model_key})
         forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP")
 
-    # Build prompts + call model. Pass intraday context so the model paces
-    # its 30-trade budget across the remaining session ticks, and news
-    # context so it can react to fundamentals not just charts.
     snapshot_before = portfolio.snapshot(prices)
+    adapter = get_adapter(cfg["provider"], cfg["model"])
+    data_hash = hash_inputs(market_data)
+    from .config_loader import universe_symbols as _universe_symbols
+
+    # ---- Step 1: Screening call (lightweight — all 75 stocks) ----
+    screening_sys, screening_user = build_screening_prompt(
+        market_data, snapshot_before, run_date,
+        news_data=news_data, sentiment_data=sentiment_data,
+        ticker_order=ticker_order,
+    )
+    screening_raw = ""
+    shortlisted: list[str] = []
+    screening_metadata: dict[str, Any] = {}
+    try:
+        screening_result = adapter.generate_decision(screening_sys, screening_user)
+        screening_raw = screening_result.raw_response
+        screening_metadata = screening_result.metadata or {}
+        held_tickers = [h["ticker"] for h in snapshot_before.get("holdings", [])]
+        shortlisted = parse_screening_response(
+            screening_raw, held_tickers, _universe_symbols(),
+        )
+        logger.info("[%s] Screening shortlist (%d): %s",
+                    model_key, len(shortlisted), ", ".join(shortlisted))
+    except Exception as e:
+        logger.warning("[%s] Screening failed: %s — falling back to full universe", model_key, e)
+        shortlisted = _universe_symbols()[:20]
+
+    # ---- Step 2: Trading decision call (full data, shortlisted stocks) ----
     system_prompt, user_prompt, prompt_version, images = build_prompts(
         snapshot_before,
         market_data,
@@ -159,10 +190,9 @@ def run_one_model(
         include_chart_image=True,
         news_data=news_data,
         sentiment_data=sentiment_data,
+        shortlisted_symbols=shortlisted,
     )
-    data_hash = hash_inputs(market_data)
 
-    adapter = get_adapter(cfg["provider"], cfg["model"])
     # Only send images to vision-capable models. Text-only adapters can
     # accept the kwarg but it's wasteful to base64-encode for nothing.
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
@@ -190,6 +220,9 @@ def run_one_model(
             news_headlines_hash=news_hash,
             news_sentiment=sentiment_data or {},
             agreement_counts=_compute_agreement_counts(model_key, forced_results, settings),
+            screening_response=screening_raw,
+            screening_shortlist=shortlisted,
+            screening_metadata=screening_metadata,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -247,6 +280,9 @@ def run_one_model(
         news_headlines_hash=news_hash,
         news_sentiment=sentiment_data or {},
         agreement_counts=_compute_agreement_counts(model_key, all_exec, settings),
+        screening_response=screening_raw,
+        screening_shortlist=shortlisted,
+        screening_metadata=screening_metadata,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])
@@ -356,6 +392,14 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
 
     executor = Executor()
 
+    # Randomize universe ticker order ONCE per pipeline run — all models see
+    # the same shuffled order for fairness, but the order differs across runs
+    # so no stock is consistently buried at the bottom of the list.
+    import random as _random
+    universe = load_universe()
+    ticker_order = list(universe["tickers"])
+    _random.shuffle(ticker_order)
+
     # Run each enabled model
     per_model_results: list[dict[str, Any]] = []
     for model_key, cfg in settings["models"].items():
@@ -369,6 +413,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
                 news_data=news_data,
                 sentiment_data=sentiment_data,
                 news_hash=news_hash,
+                ticker_order=ticker_order,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)

@@ -769,6 +769,97 @@ def _section_confidence_calibration(
     return "\n".join(parts)
 
 
+# ---- Section 9: Screening Analysis ---------------------------------------
+
+def _section_screening_analysis(
+    model_keys: list[str],
+    month: datetime,
+    settings: dict[str, Any],
+) -> str:
+    """Screening Analysis — what did each model choose to focus on?
+
+    Walks the trade logs for screening_shortlist data logged per decision run.
+    Reports: most shortlisted stocks, most ignored stocks, and whether
+    filtered-out stocks had gains the model missed.
+    """
+    start, end = _month_bounds(month)
+    parts = ["## 9. Screening Analysis", ""]
+    parts.append("_Which stocks did each model consistently shortlist? Which were ignored? "
+                 "Did models miss gains by filtering stocks out?_")
+    parts.append("")
+
+    # Walk trade logs and collect screening shortlists
+    model_shortlists: dict[str, dict[str, int]] = {}  # model -> {ticker: count}
+    model_runs: dict[str, int] = {}  # model -> total runs with screening data
+    all_tickers: set[str] = set()
+
+    for key in model_keys:
+        pattern = re.compile(rf"^{re.escape(key)}_(\d{{4}})-(\d{{2}})\.jsonl$")
+        shortlist_counts: dict[str, int] = {}
+        runs = 0
+        if not TRADES_DIR.exists():
+            continue
+        for fp in sorted(TRADES_DIR.iterdir()):
+            if not fp.is_file():
+                continue
+            m = pattern.match(fp.name)
+            if not m:
+                continue
+            year, mo = int(m.group(1)), int(m.group(2))
+            if not (year == start.year and mo == start.month):
+                continue
+            with open(fp, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    shortlist = rec.get("screening_shortlist")
+                    if not shortlist:
+                        continue
+                    runs += 1
+                    for sym in shortlist:
+                        shortlist_counts[sym] = shortlist_counts.get(sym, 0) + 1
+                        all_tickers.add(sym)
+
+        model_shortlists[key] = shortlist_counts
+        model_runs[key] = runs
+
+    if not any(model_runs.values()):
+        parts.append("_No screening data available this month (screening was not active or "
+                     "no runs were recorded with shortlist data)._")
+        return "\n".join(parts)
+
+    # Per-model: top 5 most shortlisted and top 5 most ignored
+    for key in model_keys:
+        cfg = settings["models"].get(key, {})
+        label = cfg.get("display_name", key.upper())
+        counts = model_shortlists.get(key, {})
+        runs = model_runs.get(key, 0)
+        if runs == 0:
+            continue
+
+        sorted_picks = sorted(counts.items(), key=lambda x: -x[1])
+        top5 = sorted_picks[:5]
+        # Stocks in the universe that were NEVER shortlisted
+        never = [t for t in all_tickers if t not in counts]
+
+        parts.append(f"### {label} ({runs} screening runs)")
+        parts.append("")
+        if top5:
+            parts.append("**Most shortlisted:** " +
+                         ", ".join(f"{t} ({n}/{runs})" for t, n in top5))
+        if never:
+            parts.append(f"**Never shortlisted:** {', '.join(sorted(never)[:10])}"
+                         + (f" (+{len(never)-10} more)" if len(never) > 10 else ""))
+        parts.append("")
+
+    return "\n".join(parts)
+
+
 # ---- Main entry ----------------------------------------------------------
 
 def generate_monthly_report(
@@ -824,6 +915,10 @@ def generate_monthly_report(
         "---",
         "",
         _section_confidence_calibration(model_keys, settings),
+        "",
+        "---",
+        "",
+        _section_screening_analysis(model_keys, month, settings),
         "",
         "---",
         "",

@@ -42,6 +42,9 @@ def log_decision_run(
     news_headlines_hash: str = "",
     news_sentiment: dict[str, float] | None = None,
     agreement_counts: dict[str, int] | None = None,
+    screening_response: str = "",
+    screening_shortlist: list[str] | None = None,
+    screening_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -100,6 +103,11 @@ def log_decision_run(
             for e in execution_results
         ],
         "portfolio_after": portfolio_snapshot_after,
+        # Two-step screening data — what the model chose to focus on
+        "screening_shortlist": screening_shortlist,
+        "screening_response": screening_response[:2000] if screening_response else "",
+        "screening_cost_usd": (screening_metadata or {}).get("cost_usd"),
+        "screening_tokens": (screening_metadata or {}).get("output_tokens"),
     }
 
     with open(path, "a", encoding="utf-8") as f:
