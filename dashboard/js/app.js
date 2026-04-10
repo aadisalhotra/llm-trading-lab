@@ -63,6 +63,21 @@ function fmtMoney(x) {
   if (x === null || x === undefined || isNaN(x)) return "—";
   return "$" + fmtNum(x, 2);
 }
+// Convert an ISO timestamp (or "YYYY-MM-DD HH:MM:SS") to 12-hour AM/PM.
+// showSeconds: include ":SS" (default true). Returns "YYYY-MM-DD h:MM:SS AM".
+function fmtTime(iso, showSeconds = true) {
+  if (!iso) return "—";
+  const s = iso.replace("T", " ");
+  const datepart = s.slice(0, 10);
+  const timepart = s.slice(11, 19);
+  if (!timepart) return datepart;
+  const [hh, mm, ss] = timepart.split(":");
+  let h = parseInt(hh, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  const time = showSeconds ? `${h}:${mm}:${ss} ${ampm}` : `${h}:${mm} ${ampm}`;
+  return `${datepart} ${time}`;
+}
 function colorClass(x) {
   if (x === null || x === undefined || isNaN(x)) return "neutral";
   if (x > 0) return "pos";
@@ -495,9 +510,9 @@ function renderStatus(d) {
   m.className = open ? "value open" : "value closed";
 
   document.getElementById("lastrun").textContent =
-    d.generated_at ? d.generated_at.replace("T", " ").slice(0, 19) : "—";
+    d.generated_at ? fmtTime(d.generated_at) : "—";
   document.getElementById("generated").textContent =
-    "GENERATED " + (d.generated_at || "—");
+    "GENERATED " + fmtTime(d.generated_at);
 }
 
 function renderLeaderboard(d) {
@@ -658,7 +673,7 @@ function renderTradeFeed(d) {
     const row = document.createElement("div");
     row.className = "trade-row";
     const sideClass = t.side === "BUY" ? "side-buy" : "side-sell";
-    const ts = (t.timestamp || "").replace("T", " ").slice(0, 19);
+    const ts = fmtTime(t.timestamp);
     // Prefer the new one-sentence summary; fall back to truncated reasoning
     const summary = (t.summary || t.reasoning || "").trim();
     const cfg = modelsCfg[t.model_key] || {};
@@ -701,7 +716,7 @@ function attachLeaderboardTooltip(tr, modelLabel, summaries) {
   const tip = _ensureLeaderboardTooltip();
   tr.addEventListener("mouseenter", (e) => {
     const rows = summaries.map(s => {
-      const ts = (s.timestamp || "").replace("T", " ").slice(0, 16);
+      const ts = fmtTime(s.timestamp, false);
       const sideClass = s.side === "BUY" ? "side-buy" : "side-sell";
       const conf = s.confidence != null ? `<span class="conf">[c${s.confidence}]</span>` : "";
       return `
