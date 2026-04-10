@@ -41,6 +41,7 @@ def log_decision_run(
     inception_date: str,
     news_headlines_hash: str = "",
     news_sentiment: dict[str, float] | None = None,
+    agreement_counts: dict[str, int] | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -92,6 +93,9 @@ def log_decision_run(
                 "error": e.error,
                 "timestamp": e.timestamp,
                 "decision": e.decision,
+                # How many models (including this one) hold this ticker at
+                # execution time. Drives the consensus/agreement analysis.
+                "agreement_count": (agreement_counts or {}).get(e.ticker),
             }
             for e in execution_results
         ],

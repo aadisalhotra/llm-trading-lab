@@ -902,6 +902,191 @@ function _renderRoiBar(row, maxMagnitude) {
 }
 
 
+// ===== Consensus Picks =====
+function renderConsensusPicks(d) {
+  const tbody = document.getElementById("consensus-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const picks = d.consensus_picks || [];
+  const agr = d.agreement_returns || {};
+  const meta = document.getElementById("consensus-meta");
+  if (meta) {
+    meta.textContent = picks.length
+      ? `${picks.length} STOCKS HELD BY 3+ MODELS`
+      : "NO CONSENSUS POSITIONS";
+  }
+
+  // Agreement index stat bar
+  const statEl = document.getElementById("agreement-stat");
+  if (statEl) {
+    const highAvg = agr.high_avg != null ? fmtPct(agr.high_avg) : "—";
+    const lowAvg = agr.low_avg != null ? fmtPct(agr.low_avg) : "—";
+    const hc = agr.high_count || 0;
+    const lc = agr.low_count || 0;
+    statEl.innerHTML = `
+      <div>
+        <span class="stat-label">HIGH AGREEMENT (4+ MODELS)</span>
+        <span class="stat-value">${highAvg} avg return (${hc} trades)</span>
+      </div>
+      <div>
+        <span class="stat-label">LOW AGREEMENT (1–2 MODELS)</span>
+        <span class="stat-value">${lowAvg} avg return (${lc} trades)</span>
+      </div>
+    `;
+  }
+
+  if (!picks.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-dim);font-style:italic;padding:12px 10px">// no stocks held by 3+ models</td></tr>`;
+    return;
+  }
+
+  const modelsCfg = d.models || {};
+  picks.forEach(p => {
+    const tr = document.createElement("tr");
+    const total = p.total_models || 6;
+    if (p.model_count >= total) tr.className = "agreement-6";
+    else if (p.model_count >= total - 1) tr.className = "agreement-5";
+    else if (p.model_count === 3) tr.className = "agreement-3";
+
+    const modelNames = (p.models || []).map(k => {
+      const cfg = modelsCfg[k] || {};
+      return cfg.display_name || k.toUpperCase();
+    }).join(", ");
+
+    tr.innerHTML = `
+      <td><span class="ticker-name">${escapeHtml(p.ticker)}</span>
+          <span class="models-label"> ${modelNames}</span></td>
+      <td class="num">${p.model_count}/${total}</td>
+      <td class="num">${fmtPct(p.avg_weight, false)}</td>
+      <td class="num">${p.avg_confidence != null ? p.avg_confidence.toFixed(1) + "/10" : "—"}</td>
+      <td class="num ${colorClass(p.avg_pl_pct)}">${fmtPct(p.avg_pl_pct)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ===== Confidence Calibration =====
+function renderConfidenceCalibration(d) {
+  const grid = document.getElementById("calibration-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const cal = d.confidence_calibration || {};
+  const modelsCfg = d.models || {};
+
+  MODEL_ORDER.forEach(key => {
+    const data = cal[key];
+    if (!data) return;
+    const cfg = modelsCfg[key] || {};
+    const displayName = cfg.display_name || key.toUpperCase();
+    const card = document.createElement("div");
+    card.className = "cal-card";
+
+    const score = data.calibration_score;
+    const total = data.total_trades || 0;
+    const minTrades = data.min_trades || 20;
+
+    let scoreHtml;
+    if (score != null) {
+      const cls = score > 0.05 ? "pos" : (score < -0.05 ? "neg" : "neutral");
+      scoreHtml = `<span class="cal-score ${cls}">${score >= 0 ? "+" : ""}${score.toFixed(3)}</span>`;
+    } else {
+      scoreHtml = `<span class="cal-score neutral">—</span>`;
+    }
+
+    card.innerHTML = `
+      <div class="cal-header">
+        <span class="cal-model"><span class="swatch" style="background:${MODEL_COLORS[key]};display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px"></span>${displayName}</span>
+        ${scoreHtml}
+      </div>
+      <div class="cal-trades">${total} TRADES // CALIBRATION SCORE</div>
+    `;
+
+    if (total < minTrades) {
+      const insuffEl = document.createElement("div");
+      insuffEl.className = "cal-insufficient";
+      insuffEl.textContent = `Insufficient data (${total}/${minTrades} trades)`;
+      card.appendChild(insuffEl);
+    } else {
+      const canvas = document.createElement("canvas");
+      card.appendChild(canvas);
+      grid.appendChild(card);
+      requestAnimationFrame(() => drawCalibrationChart(canvas, data.buckets));
+      return;
+    }
+    grid.appendChild(card);
+  });
+}
+
+function drawCalibrationChart(canvas, buckets) {
+  if (!canvas || !buckets) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 200;
+  const cssH = canvas.clientHeight || 100;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  // Only draw buckets that have data
+  const active = buckets.filter(b => b.count > 0 && b.avg_return != null);
+  if (!active.length) return;
+
+  const returns = active.map(b => b.avg_return);
+  let yMin = Math.min(0, ...returns);
+  let yMax = Math.max(0, ...returns);
+  if (yMin === yMax) { yMin -= 0.01; yMax += 0.01; }
+  const pad = (yMax - yMin) * 0.15;
+  yMin -= pad;
+  yMax += pad;
+
+  const barW = (cssW - 20) / 10;  // 10 confidence levels
+  const topPad = 12;
+  const botPad = 16;
+  const chartH = cssH - topPad - botPad;
+  const zeroY = topPad + chartH * (1 - (0 - yMin) / (yMax - yMin));
+
+  // Zero line
+  ctx.strokeStyle = "#1a2235";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(10, zeroY);
+  ctx.lineTo(cssW - 10, zeroY);
+  ctx.stroke();
+
+  // Bars
+  buckets.forEach(b => {
+    if (b.count === 0 || b.avg_return == null) return;
+    const x = 10 + (b.confidence - 1) * barW;
+    const valY = topPad + chartH * (1 - (b.avg_return - yMin) / (yMax - yMin));
+    const barH = Math.abs(valY - zeroY);
+    const barTop = b.avg_return >= 0 ? valY : zeroY;
+
+    ctx.fillStyle = b.avg_return >= 0
+      ? "rgba(0, 212, 136, 0.65)"
+      : "rgba(255, 51, 85, 0.65)";
+    ctx.fillRect(x + 2, barTop, barW - 4, barH);
+
+    // Count label above/below bar
+    ctx.fillStyle = "#5f6b80";
+    ctx.font = `${8 * (dpr > 1 ? 1 : 1)}px JetBrains Mono, monospace`;
+    ctx.textAlign = "center";
+    const labelY = b.avg_return >= 0 ? barTop - 2 : barTop + barH + 8;
+    ctx.fillText(`${b.count}`, x + barW / 2, labelY);
+  });
+
+  // X-axis labels (confidence 1-10)
+  ctx.fillStyle = "#5f6b80";
+  ctx.font = "9px JetBrains Mono, monospace";
+  ctx.textAlign = "center";
+  for (let i = 1; i <= 10; i++) {
+    const x = 10 + (i - 1) * barW + barW / 2;
+    ctx.fillText(String(i), x, cssH - 3);
+  }
+}
+
 function renderHealth(d) {
   const c = document.getElementById("health-content");
   const lb = d.leaderboard || [];
@@ -954,6 +1139,8 @@ async function refresh() {
   refreshMasterChart();
   renderHeroMiniCards();
   renderLeaderboard(d);
+  renderConsensusPicks(d);
+  renderConfidenceCalibration(d);
   renderCostTracker(d);
   renderHealth(d);
   renderPortfolios(d);

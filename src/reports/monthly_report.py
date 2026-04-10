@@ -42,6 +42,25 @@ from ..portfolio import load_portfolio
 logger = logging.getLogger("llmlab.reports.monthly")
 
 
+# Re-use the dashboard's trade analytics engine for monthly consensus +
+# calibration sections. It walks the same JSONL files but computes agreement
+# and confidence correlation per trade.
+def _lazy_trade_analytics(model_keys, settings):
+    """Import and run the dashboard trade analytics engine."""
+    from ..dashboard.build_data import _compute_trade_analytics
+    # Build portfolio snapshots for current pricing
+    portfolios = []
+    for key in model_keys:
+        try:
+            p = load_portfolio(key)
+            snap = p.snapshot({})  # no live prices in report context — zeros are fine
+            snap["model_key"] = key
+            portfolios.append(snap)
+        except Exception:
+            continue
+    return _compute_trade_analytics(model_keys, portfolios)
+
+
 # ---- formatters ----------------------------------------------------------
 
 def _money(x: float | None) -> str:
@@ -607,6 +626,149 @@ def _section_cost_analysis(
     return "\n".join(parts)
 
 
+# ---- Section 7: Consensus Analysis ---------------------------------------
+
+def _section_consensus_analysis(
+    model_keys: list[str],
+    settings: dict[str, Any],
+) -> str:
+    """Consensus Analysis — does model agreement predict returns?"""
+    try:
+        trades, agreement_returns, _ = _lazy_trade_analytics(model_keys, settings)
+    except Exception as e:
+        return f"## 7. Consensus Analysis\n\n_Could not compute: {e}_"
+
+    parts = ["## 7. Consensus Analysis", ""]
+    parts.append("_Does model agreement predict returns? Trades where 4+ models hold the "
+                 "same stock vs trades where only 1-2 models hold it._")
+    parts.append("")
+
+    high = agreement_returns
+    if high["high_count"] > 0 or high["low_count"] > 0:
+        headers = ["Agreement Level", "Avg Return", "Trade Count"]
+        rows = [
+            ["High (4+ models)", _pct(high["high_avg"]) if high["high_avg"] is not None else "—", str(high["high_count"])],
+            ["Low (1–2 models)", _pct(high["low_avg"]) if high["low_avg"] is not None else "—", str(high["low_count"])],
+        ]
+        parts.append(_format_table(headers, rows, aligns=["L", "R", "R"]))
+        parts.append("")
+
+        if high["high_avg"] is not None and high["low_avg"] is not None:
+            delta = high["high_avg"] - high["low_avg"]
+            if delta > 0.005:
+                parts.append(f"**Finding:** High-agreement trades outperform by "
+                           f"**{_pct(delta)}** — consensus is a positive signal.")
+            elif delta < -0.005:
+                parts.append(f"**Finding:** Low-agreement trades outperform by "
+                           f"**{_pct(abs(delta))}** — contrarian picks are winning.")
+            else:
+                parts.append("**Finding:** No meaningful difference between high and low "
+                           "agreement trades yet. More data needed.")
+    else:
+        parts.append("_Insufficient trade data to compute agreement statistics._")
+
+    # Current consensus positions
+    current_holdings: dict[str, list[str]] = {}
+    for key in model_keys:
+        try:
+            p = load_portfolio(key)
+            for ticker in p.holdings:
+                current_holdings.setdefault(ticker, []).append(key)
+        except Exception:
+            continue
+
+    consensus = {t: models for t, models in current_holdings.items() if len(models) >= 3}
+    if consensus:
+        parts.append("")
+        parts.append("### Current Consensus Positions (3+ models)")
+        parts.append("")
+        sorted_consensus = sorted(consensus.items(), key=lambda x: -len(x[1]))
+        for ticker, models in sorted_consensus:
+            model_names = ", ".join(
+                settings["models"].get(k, {}).get("display_name", k.upper())
+                for k in models
+            )
+            parts.append(f"- **{ticker}** — held by {len(models)}/{len(model_keys)} models ({model_names})")
+
+    return "\n".join(parts)
+
+
+# ---- Section 8: Confidence Calibration -----------------------------------
+
+def _section_confidence_calibration(
+    model_keys: list[str],
+    settings: dict[str, Any],
+) -> str:
+    """Confidence Calibration — do the models know what they know?"""
+    try:
+        _, _, calibration = _lazy_trade_analytics(model_keys, settings)
+    except Exception as e:
+        return f"## 8. Confidence Calibration\n\n_Could not compute: {e}_"
+
+    parts = ["## 8. Confidence Calibration", ""]
+    parts.append("_Correlation between a model's self-reported confidence (1–10) and "
+                 "actual trade return. +1.0 = perfectly calibrated, 0.0 = random noise, "
+                 "negative = overconfident on bad trades._")
+    parts.append("")
+
+    headers = ["Model", "Calibration Score", "Trades", "Assessment"]
+    rows: list[list[str]] = []
+    for key in model_keys:
+        cfg = settings["models"].get(key, {})
+        label = cfg.get("display_name", key.upper())
+        cal = calibration.get(key, {})
+        total = cal.get("total_trades", 0)
+        score = cal.get("calibration_score")
+        min_trades = cal.get("min_trades", 20)
+
+        if total < min_trades:
+            rows.append([label, "—", f"{total}/{min_trades}", "Insufficient data"])
+        elif score is not None:
+            if score > 0.2:
+                assessment = "Well calibrated"
+            elif score > 0.05:
+                assessment = "Weakly calibrated"
+            elif score > -0.05:
+                assessment = "Random noise"
+            elif score > -0.2:
+                assessment = "Weakly miscalibrated"
+            else:
+                assessment = "Miscalibrated (overconfident on bad trades)"
+            rows.append([label, f"{score:+.3f}", str(total), assessment])
+        else:
+            rows.append([label, "—", str(total), "Cannot compute"])
+
+    parts.append(_format_table(headers, rows, aligns=["L", "R", "R", "L"]))
+
+    # Per-model bucket breakdown for models with enough data
+    for key in model_keys:
+        cfg = settings["models"].get(key, {})
+        label = cfg.get("display_name", key.upper())
+        cal = calibration.get(key, {})
+        total = cal.get("total_trades", 0)
+        min_trades = cal.get("min_trades", 20)
+        if total < min_trades:
+            continue
+        buckets = cal.get("buckets", [])
+        active = [b for b in buckets if b["count"] > 0]
+        if not active:
+            continue
+        parts.append("")
+        parts.append(f"### {label} — Return by Confidence Level")
+        parts.append("")
+        bheaders = ["Confidence", "Avg Return", "Trades"]
+        brows = []
+        for b in active:
+            brows.append([
+                str(b["confidence"]),
+                _pct(b["avg_return"]) if b["avg_return"] is not None else "—",
+                str(b["count"]),
+            ])
+        parts.append(_format_table(bheaders, brows, aligns=["C", "R", "R"]))
+
+    return "\n".join(parts)
+
+
 # ---- Main entry ----------------------------------------------------------
 
 def generate_monthly_report(
@@ -654,6 +816,14 @@ def generate_monthly_report(
         "---",
         "",
         _section_cost_analysis(model_keys, month, settings),
+        "",
+        "---",
+        "",
+        _section_consensus_analysis(model_keys, settings),
+        "",
+        "---",
+        "",
+        _section_confidence_calibration(model_keys, settings),
         "",
         "---",
         "",

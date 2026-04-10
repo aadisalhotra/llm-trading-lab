@@ -230,6 +230,223 @@ def _build_cost_tracker(model_keys: list[str], starting_capital: float) -> list[
     return out
 
 
+def _consensus_picks(
+    portfolios: list[dict[str, Any]],
+    model_keys: list[str],
+    all_trades: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Stocks held by 3+ models, sorted by holder count then avg weight."""
+    ticker_holders: dict[str, list[dict[str, Any]]] = {}
+    for p in portfolios:
+        for h in p.get("holdings", []):
+            ticker_holders.setdefault(h["ticker"], []).append({
+                "model_key": p["model_key"],
+                "weight": h.get("weight", 0),
+                "unrealized_pl_pct": h.get("unrealized_pl_pct", 0),
+            })
+
+    total_models = len(model_keys)
+    picks: list[dict[str, Any]] = []
+    for ticker, holders in ticker_holders.items():
+        if len(holders) < 3:
+            continue
+        avg_weight = sum(h["weight"] for h in holders) / len(holders)
+        avg_pl = sum(h["unrealized_pl_pct"] for h in holders) / len(holders)
+        # Average confidence from most recent buys of this ticker across models
+        confs = [
+            t["confidence"] for t in all_trades
+            if t["ticker"] == ticker and t["side"] == "BUY" and t.get("confidence")
+        ]
+        avg_conf = round(sum(confs) / len(confs), 1) if confs else None
+        picks.append({
+            "ticker": ticker,
+            "model_count": len(holders),
+            "total_models": total_models,
+            "models": [h["model_key"] for h in holders],
+            "avg_weight": round(avg_weight, 4),
+            "avg_confidence": avg_conf,
+            "avg_pl_pct": round(avg_pl, 4),
+        })
+    picks.sort(key=lambda x: (-x["model_count"], -x["avg_weight"]))
+    return picks
+
+
+def _compute_trade_analytics(
+    model_keys: list[str],
+    portfolios: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """Walk all trade history and compute per-trade returns, agreement stats,
+    and confidence calibration data.
+
+    Returns (trade_list, agreement_returns, confidence_calibration).
+
+    agreement_returns = {
+        high_avg: float, high_count: int,   (4+ models agree)
+        low_avg: float, low_count: int,     (1-2 models)
+    }
+
+    confidence_calibration = {
+        model_key: {
+            buckets: [{confidence, avg_return, count}, ...],
+            calibration_score: float (-1 to +1),
+            total_trades: int,
+        }
+    }
+    """
+    # Current holdings per model for pricing open positions
+    current_holdings: dict[str, dict[str, dict[str, float]]] = {}
+    for p in portfolios:
+        ch: dict[str, dict[str, float]] = {}
+        for h in p.get("holdings", []):
+            ch[h["ticker"]] = {
+                "current_price": h.get("current_price", 0),
+                "unrealized_pl_pct": h.get("unrealized_pl_pct", 0),
+            }
+        current_holdings[p["model_key"]] = ch
+
+    # Walk all trade records chronologically across all models
+    all_records: list[tuple[str, str, dict[str, Any]]] = []
+    if TRADES_DIR.exists():
+        for key in model_keys:
+            pattern = re.compile(rf"^{re.escape(key)}_\d{{4}}-\d{{2}}\.jsonl$")
+            files = sorted(
+                fp for fp in TRADES_DIR.iterdir()
+                if fp.is_file() and pattern.match(fp.name)
+            )
+            for fp in files:
+                with open(fp, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        all_records.append((rec.get("timestamp", ""), key, rec))
+
+    all_records.sort(key=lambda x: x[0])
+
+    # Running holdings per model: {model_key: set(tickers)}
+    running: dict[str, set[str]] = {k: set() for k in model_keys}
+    # Open BUY positions for matching: {(model_key, ticker): [buy_info]}
+    open_buys: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    # Completed trades with returns
+    trades: list[dict[str, Any]] = []
+
+    for ts, model_key, rec in all_records:
+        for ex in rec.get("executions", []):
+            if not ex.get("executed") or ex.get("side") in ("HOLD", "SKIP"):
+                continue
+            ticker = ex["ticker"]
+            side = ex["side"]
+            decision = ex.get("decision") or {}
+            confidence = decision.get("confidence")
+            fill_price = ex.get("fill_price", 0)
+
+            if side == "BUY":
+                # Agreement: how many models (including buyer) hold this ticker
+                agreement = sum(1 for k in model_keys if k != model_key and ticker in running[k]) + 1
+                kt = (model_key, ticker)
+                open_buys.setdefault(kt, []).append({
+                    "fill_price": fill_price,
+                    "confidence": confidence,
+                    "agreement": agreement,
+                })
+                running[model_key].add(ticker)
+            elif side == "SELL":
+                kt = (model_key, ticker)
+                if kt in open_buys and open_buys[kt]:
+                    buy = open_buys[kt].pop(0)
+                    if not open_buys[kt]:
+                        del open_buys[kt]
+                    ret = (fill_price / buy["fill_price"] - 1) if buy["fill_price"] > 0 else 0
+                    trades.append({
+                        "model_key": model_key,
+                        "ticker": ticker,
+                        "confidence": buy["confidence"],
+                        "return_pct": ret,
+                        "agreement": buy["agreement"],
+                        "is_closed": True,
+                    })
+                running[model_key].discard(ticker)
+
+    # Still-open positions: compute return from current prices
+    for (model_key, ticker), buys in open_buys.items():
+        ch = current_holdings.get(model_key, {}).get(ticker)
+        for buy in buys:
+            if ch and buy["fill_price"] > 0:
+                ret = ch["current_price"] / buy["fill_price"] - 1
+            else:
+                ret = 0
+            trades.append({
+                "model_key": model_key,
+                "ticker": ticker,
+                "confidence": buy["confidence"],
+                "return_pct": ret,
+                "agreement": buy["agreement"],
+                "is_closed": False,
+            })
+
+    # --- Agreement returns ---
+    high = [t for t in trades if t["agreement"] >= 4]
+    low = [t for t in trades if t["agreement"] <= 2]
+    agreement_returns = {
+        "high_avg": round(sum(t["return_pct"] for t in high) / len(high), 4) if high else None,
+        "high_count": len(high),
+        "low_avg": round(sum(t["return_pct"] for t in low) / len(low), 4) if low else None,
+        "low_count": len(low),
+    }
+
+    # --- Confidence calibration per model ---
+    from collections import defaultdict
+    model_buckets: dict[str, dict[int, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for t in trades:
+        if t["confidence"] is not None:
+            model_buckets[t["model_key"]][t["confidence"]].append(t["return_pct"])
+
+    calibration: dict[str, Any] = {}
+    for key in model_keys:
+        buckets_raw = model_buckets.get(key, {})
+        total = sum(len(v) for v in buckets_raw.values())
+        buckets = []
+        for conf in range(1, 11):
+            returns = buckets_raw.get(conf, [])
+            if returns:
+                buckets.append({
+                    "confidence": conf,
+                    "avg_return": round(sum(returns) / len(returns), 4),
+                    "count": len(returns),
+                })
+            else:
+                buckets.append({"confidence": conf, "avg_return": None, "count": 0})
+
+        # Pearson correlation between confidence and return
+        cal_score = None
+        if total >= 5:
+            pairs = [(t["confidence"], t["return_pct"]) for t in trades
+                     if t["model_key"] == key and t["confidence"] is not None]
+            if len(pairs) >= 5:
+                xs = [p[0] for p in pairs]
+                ys = [p[1] for p in pairs]
+                mx = sum(xs) / len(xs)
+                my = sum(ys) / len(ys)
+                cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+                sx = sum((x - mx) ** 2 for x in xs) ** 0.5
+                sy = sum((y - my) ** 2 for y in ys) ** 0.5
+                if sx > 0 and sy > 0:
+                    cal_score = round(cov / (sx * sy), 3)
+
+        calibration[key] = {
+            "buckets": buckets,
+            "calibration_score": cal_score,
+            "total_trades": total,
+            "min_trades": 20,
+        }
+
+    return trades, agreement_returns, calibration
+
+
 def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
@@ -325,6 +542,17 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     except Exception:
         budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
 
+    # Consensus picks + trade analytics (agreement returns, confidence calibration)
+    recent_all = _recent_trades(model_keys, limit=50)
+    consensus_picks = _consensus_picks(portfolios, model_keys, recent_all)
+    try:
+        _, agreement_returns, confidence_calibration = _compute_trade_analytics(
+            model_keys, portfolios,
+        )
+    except Exception:
+        agreement_returns = {"high_avg": None, "high_count": 0, "low_avg": None, "low_count": 0}
+        confidence_calibration = {}
+
     payload = {
         "generated_at": today.isoformat(),
         "phase": settings["phase"],
@@ -335,7 +563,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "experiment_end": settings["experiment_end_date"],
         "leaderboard": leaderboard,
         "portfolios": portfolios,
-        "recent_trades": _recent_trades(model_keys, limit=50),
+        "recent_trades": recent_all,
         "equity_curves": equity_curves,
         "intraday_curves": intraday_curves,
         "intraday_session_date": session_date,
@@ -345,6 +573,9 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "prompt_version": settings["prompt_version"],
         "cost_tracker": cost_tracker,
         "budget_status": budget_status,
+        "consensus_picks": consensus_picks,
+        "agreement_returns": agreement_returns,
+        "confidence_calibration": confidence_calibration,
     }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)

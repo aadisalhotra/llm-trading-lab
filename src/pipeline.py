@@ -75,6 +75,41 @@ def _prices_from_data(data: dict) -> dict[str, float]:
     return out
 
 
+def _compute_agreement_counts(
+    model_key: str,
+    execution_results: list[Any],
+    settings: dict[str, Any],
+) -> dict[str, int]:
+    """For each executed ticker, count how many models (including this one) hold it.
+
+    Reads the current state files for all other models. This is cheap — just
+    reading JSON state files already on disk — and the result is logged per
+    execution for long-term consensus analysis.
+    """
+    # Collect holdings across all models
+    from .portfolio import load_portfolio as _lp
+    all_holdings: dict[str, set[str]] = {}  # ticker -> set of model_keys holding it
+    for key in settings["models"]:
+        try:
+            p = _lp(key)
+            for ticker in p.holdings:
+                all_holdings.setdefault(ticker, set()).add(key)
+        except Exception:
+            continue
+
+    # For BUY executions, the buying model might not hold it yet (pre-execution),
+    # so ensure the buying model is counted
+    counts: dict[str, int] = {}
+    for e in execution_results:
+        if not e.executed or e.side in ("HOLD", "SKIP"):
+            continue
+        holders = all_holdings.get(e.ticker, set())
+        if e.side == "BUY":
+            holders = holders | {model_key}
+        counts[e.ticker] = len(holders)
+    return counts
+
+
 def run_one_model(
     model_key: str,
     cfg: dict[str, Any],
@@ -154,6 +189,7 @@ def run_one_model(
             execution_mode=settings["mode"], inception_date=portfolio.inception_date,
             news_headlines_hash=news_hash,
             news_sentiment=sentiment_data or {},
+            agreement_counts=_compute_agreement_counts(model_key, forced_results, settings),
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -210,6 +246,7 @@ def run_one_model(
         execution_mode=settings["mode"], inception_date=portfolio.inception_date,
         news_headlines_hash=news_hash,
         news_sentiment=sentiment_data or {},
+        agreement_counts=_compute_agreement_counts(model_key, all_exec, settings),
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])

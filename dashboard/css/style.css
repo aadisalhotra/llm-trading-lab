@@ -571,6 +571,124 @@ body {
   color: var(--accent-bright);
 }
 
+/* ===== Consensus Picks panel ===== */
+.consensus-panel {
+  border-left: 2px solid var(--accent);
+}
+.consensus-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.consensus-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-bright);
+  font-weight: 600;
+  background: var(--bg);
+}
+.consensus-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--bg-row);
+  font-size: 12px;
+}
+.consensus-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.consensus-table tr:hover td { background: var(--bg-row-hi); }
+.consensus-table tr.agreement-6 td { background: var(--accent-glow); }
+.consensus-table tr.agreement-6 td:first-child {
+  color: var(--accent-bright);
+  font-weight: 700;
+  border-left: 2px solid var(--accent);
+}
+.consensus-table tr.agreement-5 td { background: rgba(43, 138, 255, 0.06); }
+.consensus-table tr.agreement-5 td:first-child {
+  border-left: 2px solid var(--accent-dim);
+}
+.consensus-table tr.agreement-3 td:first-child {
+  border-left: 2px solid var(--border-bright);
+}
+.consensus-table .ticker-name { color: var(--text-bright); font-weight: 700; letter-spacing: 0.5px; }
+.consensus-table .models-label { color: var(--text-dim); font-size: 10px; }
+.consensus-table .pos { color: var(--green); font-weight: 600; }
+.consensus-table .neg { color: var(--red); font-weight: 600; }
+.consensus-table .neutral { color: var(--text-dim); }
+
+.agreement-stat {
+  font-size: 11px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  letter-spacing: 0.3px;
+}
+.agreement-stat .stat-label { color: var(--text-dim); font-size: 10px; letter-spacing: 0.8px; }
+.agreement-stat .stat-value { color: var(--text-bright); font-weight: 700; margin-left: 6px; }
+
+/* ===== Confidence Calibration panel ===== */
+.calibration-panel {
+  border-left: 2px solid var(--accent);
+}
+.calibration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .calibration-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .calibration-grid { grid-template-columns: 1fr; }
+}
+.cal-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+}
+.cal-card .cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.cal-card .cal-model {
+  color: var(--text-bright);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+}
+.cal-card .cal-score {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cal-card .cal-score.pos { color: var(--green); }
+.cal-card .cal-score.neg { color: var(--red); }
+.cal-card .cal-score.neutral { color: var(--text-dim); }
+.cal-card .cal-trades {
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.cal-card .cal-insufficient {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-style: italic;
+  padding: 16px 0;
+  text-align: center;
+}
+.cal-card canvas {
+  width: 100%;
+  height: 100px;
+  display: block;
+}
+
 /* ===== API Cost Tracker panel ===== */
 .cost-tracker-panel {
   border-left: 2px solid var(--amber);
