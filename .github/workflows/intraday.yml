@@ -114,6 +114,7 @@ jobs:
           else
             MODE="${{ steps.mode.outputs.mode }}"
             git commit -m "${MODE} tick $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git pull --rebase origin main
             git push
           fi
 
