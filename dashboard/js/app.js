@@ -630,6 +630,7 @@ function renderPortfolios(d) {
     const displayName = p.display_name || p.model_key.toUpperCase();
     let holdingsTbl = "";
     if (p.holdings && p.holdings.length) {
+      p.holdings.sort((a, b) => (b.weight || 0) - (a.weight || 0));
       holdingsTbl = `
         <table class="holdings">
           <thead><tr>
