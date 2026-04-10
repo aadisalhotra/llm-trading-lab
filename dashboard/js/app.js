@@ -100,7 +100,8 @@ function chartOptions(extra = {}) {
     },
     rightPriceScale: {
       borderColor: GRID,
-      scaleMargins: { top: 0.1, bottom: 0.1 },
+      scaleMargins: { top: 0.02, bottom: 0.02 },
+      autoScale: true,
     },
     timeScale: {
       borderColor: GRID,
@@ -219,6 +220,27 @@ function buildRawPointsForSpark(data, key, mode) {
   return points.map(p => ({ raw: p.value }));
 }
 
+// Raw SPY benchmark prices for sparkline — mirrors buildRawPointsForSpark
+// but pulls from the benchmark field embedded in equity/intraday curves.
+function buildRawSPYPointsForSpark(data, mode) {
+  if (mode === "TODAY") {
+    const curves = data.intraday_curves || {};
+    const refModel = MODEL_ORDER.find(k => (curves[k] || []).some(p => p.benchmark));
+    if (!refModel) return [];
+    return (curves[refModel] || [])
+      .filter(p => p.benchmark)
+      .map(p => ({ raw: p.benchmark }));
+  }
+  const curves = data.equity_curves || {};
+  const refModel = MODEL_ORDER.find(k => (curves[k] || []).some(p => p.benchmark));
+  if (!refModel) return [];
+  let pts = curves[refModel] || [];
+  if (state.timeframe !== "ALL" && TIMEFRAME_DAYS[state.timeframe]) {
+    pts = pts.slice(-TIMEFRAME_DAYS[state.timeframe]);
+  }
+  return pts.filter(p => p.benchmark).map(p => ({ raw: p.benchmark }));
+}
+
 // ===== Master hero chart (TradingView) =====
 let masterChart = null;
 let masterSeries = {}; // { spy, modelLines: {key: lineSeries} }
@@ -231,11 +253,14 @@ function initMasterChart() {
     height: 460,
   }));
 
-  // Single % scale on the right — every series is rebased to 0% at window start
+  // Single % scale on the right — every series is rebased to 0% at window start.
+  // Tight margins (2%) so even small return differences produce visible movement
+  // instead of a flat-looking chart when all models are within fractions of a percent.
   masterChart.priceScale("right").applyOptions({
     visible: true,
     borderColor: GRID,
-    scaleMargins: { top: 0.1, bottom: 0.1 },
+    scaleMargins: { top: 0.02, bottom: 0.02 },
+    autoScale: true,
   });
 
   masterSeries.modelLines = {};
@@ -372,6 +397,29 @@ function renderHeroMiniCards() {
       const sparkPoints = buildRawPointsForSpark(state.data, key, mode);
       drawSparkline(canvas, sparkPoints);
     });
+  });
+
+  // SPY benchmark mini card — same layout as model cards
+  const spyLine = buildSPYLineSeries(state.data, mode);
+  const spyLastVal = spyLine.length ? spyLine[spyLine.length - 1].value : 0;
+  const spyColor = spyLastVal > 0 ? GREEN : (spyLastVal < 0 ? RED : TEXT_DIM);
+  const spyCard = document.createElement("div");
+  spyCard.className = "hero-mini-card cohort-benchmark";
+  spyCard.innerHTML = `
+    <div class="hmc-name">
+      <span class="hmc-name-text">
+        <span class="swatch" style="background:${SPY_COLOR}"></span>SPY
+      </span>
+      <span class="cohort-badge cohort-bench">BENCH</span>
+    </div>
+    <div class="hmc-return" style="color:${spyColor}">${fmtPct(spyLastVal)}</div>
+    <canvas class="hmc-spark"></canvas>
+  `;
+  grid.appendChild(spyCard);
+  requestAnimationFrame(() => {
+    const spyCanvas = spyCard.querySelector(".hmc-spark");
+    const spySparkPoints = buildRawSPYPointsForSpark(state.data, mode);
+    drawSparkline(spyCanvas, spySparkPoints);
   });
 }
 
@@ -882,6 +930,79 @@ async function refresh() {
   renderTradeFeed(d);
   renderVersionTicker(d);
 }
+
+// ===== Countdown timer to next pipeline run =====
+// Market hours: 9:00 AM – 4:30 PM ET, Mon–Fri.
+// During market hours: count down to next :00/:15/:30/:45.
+// Outside market hours: count down to 9:00 AM ET next trading day.
+function updateCountdown() {
+  const el = document.getElementById("nextrun");
+  if (!el) return;
+
+  const now = new Date();
+
+  // Convert to ET. America/New_York handles DST automatically.
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const et = new Date(etStr);
+  const etHour = et.getHours();
+  const etMin = et.getMinutes();
+  const etSec = et.getSeconds();
+  const etDay = et.getDay(); // 0=Sun, 6=Sat
+
+  const isWeekday = etDay >= 1 && etDay <= 5;
+  const marketOpen = 9 * 60;           // 9:00 AM in minutes
+  const marketClose = 16 * 60 + 30;    // 4:30 PM in minutes
+  const nowMin = etHour * 60 + etMin;
+  const duringMarket = isWeekday && nowMin >= marketOpen && nowMin < marketClose;
+
+  let remainSec;
+
+  if (duringMarket) {
+    // Next :00, :15, :30, or :45 mark
+    const nextQuarter = (Math.floor(etMin / 15) + 1) * 15;
+    remainSec = (nextQuarter - etMin) * 60 - etSec;
+    if (remainSec <= 0) remainSec += 15 * 60;
+  } else {
+    // Time until 9:00 AM ET next trading day
+    const target = new Date(et);
+    target.setHours(9, 0, 0, 0);
+
+    if (isWeekday && nowMin < marketOpen) {
+      // Before open today — target is today 9:00 AM
+    } else if (etDay === 5) {
+      // Friday after close — next Monday
+      target.setDate(target.getDate() + 3);
+    } else if (etDay === 6) {
+      // Saturday — next Monday
+      target.setDate(target.getDate() + 2);
+    } else if (etDay === 0) {
+      // Sunday — next Monday
+      target.setDate(target.getDate() + 1);
+    } else {
+      // Weekday after close — next day
+      target.setDate(target.getDate() + 1);
+    }
+
+    remainSec = Math.floor((target.getTime() - et.getTime()) / 1000);
+    if (remainSec < 0) remainSec = 0;
+  }
+
+  // Format the countdown
+  if (remainSec < 3600) {
+    const m = Math.floor(remainSec / 60);
+    const s = remainSec % 60;
+    el.textContent = `${m}m ${s.toString().padStart(2, "0")}s`;
+  } else {
+    const h = Math.floor(remainSec / 3600);
+    const m = Math.floor((remainSec % 3600) / 60);
+    el.textContent = `${h}h ${m.toString().padStart(2, "0")}m`;
+  }
+
+  el.className = duringMarket ? "value open" : "value";
+}
+
+updateCountdown();
+setInterval(updateCountdown, 1000);
 
 wireControls();
 refresh();

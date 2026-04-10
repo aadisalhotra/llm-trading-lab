@@ -33,7 +33,7 @@
   --m-gemini:   #ffd23f;
   --m-grok:     #b478ff;
   --m-deepseek: #ff5599;
-  --m-spy:      #6b7585;
+  --m-spy:      #9aa4b8;
 
   --amber: #ffb547;
 }
@@ -251,7 +251,7 @@ body {
 /* Hero mini cards — one per model, full-width row directly under the chart */
 .hero-mini-cards {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -266,6 +266,10 @@ body {
 }
 .hero-mini-card.cohort-expansion {
   border-left: 2px solid var(--accent-dim);
+}
+.hero-mini-card.cohort-benchmark {
+  border-left: 2px dashed var(--m-spy);
+  opacity: 0.85;
 }
 .hero-mini-card .hmc-name {
   display: flex;
@@ -306,7 +310,7 @@ body {
 }
 
 @media (max-width: 1500px) {
-  .hero-mini-cards { grid-template-columns: repeat(3, 1fr); }
+  .hero-mini-cards { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 800px) {
   .hero-mini-cards { grid-template-columns: repeat(2, 1fr); }
