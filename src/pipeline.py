@@ -157,6 +157,36 @@ def run_one_model(
     data_hash = hash_inputs(market_data)
     from .config_loader import universe_symbols as _universe_symbols
 
+    # EOD pass: no trading — only snapshot, log, and report. The EOD cron
+    # fires after market close to capture closing prices and generate the
+    # daily report. It must NOT execute any trades.
+    if is_eod:
+        snapshot_after = snapshot_before
+        portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
+        save_portfolio(portfolio)
+        log_intraday_snapshot(
+            model_key=model_key, run_timestamp=run_date,
+            snapshot=snapshot_after,
+            benchmark_value=prices.get(settings["benchmark_ticker"]),
+            trades_executed_this_run=0,
+            trades_executed_today=portfolio.intraday.trades_executed_today,
+            runs_today=portfolio.intraday.runs_today,
+            api_success=True,
+        )
+        log_daily_snapshot(model_key, run_date, snapshot_after,
+                           prices.get(settings["benchmark_ticker"]),
+                           api_success=True)
+        return {
+            "model_key": model_key,
+            "status": "OK",
+            "trades_executed": 0,
+            "trades_today": portfolio.intraday.trades_executed_today,
+            "runs_today": portfolio.intraday.runs_today,
+            "violations": 0,
+            "total_value": snapshot_after["total_value"],
+            "cumulative_return": snapshot_after["cumulative_return"],
+        }
+
     # ---- Step 1: Screening call (lightweight — all 75 stocks) ----
     screening_sys, screening_user = build_screening_prompt(
         market_data, snapshot_before, run_date,

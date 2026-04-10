@@ -128,7 +128,7 @@ def is_market_open_now(reference: datetime | None = None) -> bool:
         return False
 
     t = now.timetz().replace(tzinfo=None)
-    return NYSE_OPEN <= t <= NYSE_CLOSE
+    return NYSE_OPEN <= t < NYSE_CLOSE
 
 
 def fetch_intraday_data(

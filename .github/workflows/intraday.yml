@@ -2,16 +2,17 @@ name: Intraday Trading Pipeline
 
 on:
   schedule:
-    # Intraday ticks: every 15 minutes from 13:00 to 20:45 UTC, Mon-Fri.
-    # That window covers 09:00-16:45 ET in DST and 08:00-15:45 ET in standard
-    # time, so the cron always overlaps the NYSE 09:30-16:00 ET session
-    # regardless of DST. The pipeline itself uses is_market_open_now() to
-    # skip silently outside the actual session window.
-    - cron: "*/15 13-20 * * 1-5"
+    # Intraday ticks: every 15 minutes from 13:30 to 20:00 UTC, Mon-Fri.
+    # EDT (UTC-4): 09:30–16:00 ET. EST (UTC-5): 08:30–15:00 ET.
+    # The window is tight enough that no tick fires after 16:00 ET in
+    # either DST regime. The pipeline double-checks via is_market_open_now().
+    - cron: "*/15 13-19 * * 1-5"
+    - cron: "0 20 * * 1-5"
     # End-of-day wrap-up: writes the EOD perf row, generates the daily
-    # report, and sends the daily summary alert. Fires at 21:30 UTC =
-    # 17:30 ET in DST / 16:30 ET in standard time — both safely after close.
-    - cron: "30 21 * * 1-5"
+    # report, and sends the daily summary alert. Fires at 21:00 UTC =
+    # 17:00 ET in DST / 16:00 ET in standard time — safely after close.
+    # This run does NOT execute trades.
+    - cron: "0 21 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -61,12 +62,12 @@ jobs:
       - name: Resolve run mode
         id: mode
         run: |
-          # The 21:30 UTC cron is the EOD wrap-up; everything else is intraday.
+          # The 21:00 UTC cron is the EOD wrap-up; everything else is intraday.
           # workflow_dispatch overrides via the `mode` input.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
             echo "force=${{ github.event.inputs.force }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "30 21 * * 1-5" ]; then
+          elif [ "${{ github.event.schedule }}" = "0 21 * * 1-5" ]; then
             echo "mode=end-of-day" >> $GITHUB_OUTPUT
             echo "force=false" >> $GITHUB_OUTPUT
           else
