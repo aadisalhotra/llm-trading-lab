@@ -513,11 +513,16 @@ function renderStatus(d) {
   document.getElementById("day").textContent =
     d.experiment_day ? `${d.experiment_day} / ${d.experiment_total_days}` : "—";
 
+  // Market hours: 9:30 AM – 4:00 PM ET, Mon–Fri. Convert to ET properly
+  // so DST shifts don't break the check. Does not detect holidays —
+  // the pipeline handles that server-side via pandas_market_calendars.
   const now = new Date();
-  const dow = now.getUTCDay();
-  const hour = now.getUTCHours();
-  const isWeekday = dow >= 1 && dow <= 5;
-  const inHours = hour >= 13 && hour < 21;
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const et = new Date(etStr);
+  const etDay = et.getDay(); // 0=Sun, 6=Sat
+  const etMinutes = et.getHours() * 60 + et.getMinutes(); // minutes since midnight ET
+  const isWeekday = etDay >= 1 && etDay <= 5;
+  const inHours = etMinutes >= 570 && etMinutes < 960; // 9:30=570, 16:00=960
   const open = isWeekday && inHours;
   const m = document.getElementById("market");
   m.textContent = open ? "OPEN" : "CLOSED";
