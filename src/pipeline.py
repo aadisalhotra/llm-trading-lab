@@ -17,7 +17,7 @@ The pipeline runs in one of two modes, controlled by CLI flags:
 
 The persistent intraday trade cap lives in
 `Portfolio.intraday.trades_executed_today` and resets automatically when a
-new ET trading day begins. Models therefore see the *whole-day* 30-trade
+new ET trading day begins. Models therefore see the *whole-day* 50-trade
 budget across all 26 ticks of the day, not a fresh 30 every 15 minutes.
 """
 from __future__ import annotations

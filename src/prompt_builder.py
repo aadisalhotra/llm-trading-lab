@@ -17,7 +17,7 @@ Two-step prompting (v2 universe, 75 stocks):
 Why an intraday context block?
   Without it, the model sees only "DATE: 2026-04-09" and treats every 15-min
   call as if it were the only call of the day. It would happily blow its
-  entire 30-trade budget on the first run. The intraday block tells the model
+  entire 50-trade budget on the first run. The intraday block tells the model
   the current ET clock, how many trades/runs it's already used, and how much
   trading session remains — so it paces itself.
 """
@@ -167,7 +167,7 @@ def _format_intraday_context_block(
 ) -> str:
     """Tell the model where it is in the trading session.
 
-    The whole point of this block is to make the model pace its 30-trade
+    The whole point of this block is to make the model pace its 50-trade
     budget across the ~26 intraday calls of the day instead of dumping it
     all on the first call.
     """
@@ -203,7 +203,7 @@ def _format_intraday_context_block(
         f"  Trades remaining:    {trades_remaining}",
         "",
         "  IMPORTANT: This is one of many ~15-minute intraday calls today.",
-        "  Pace your 30-trade daily budget across the remaining runs — do",
+        "  Pace your 50-trade daily budget across the remaining runs — do",
         "  not exhaust it on a single call. HOLD is a valid action when",
         "  there is no clear edge. New information will arrive each tick.",
     ]

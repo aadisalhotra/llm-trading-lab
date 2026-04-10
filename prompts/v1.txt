@@ -9,7 +9,7 @@ Analyze the provided market data, news context, and current portfolio state, the
 - Max 20% of portfolio value in any single name (target_weight ≤ 0.20).
 - No shorting. No leverage. No options. No derivatives.
 - Cash is always a valid choice. Holding cash is not failure.
-- Max 30 trades per day per portfolio (aggregate across all intraday runs).
+- Max 50 trades per day per portfolio (aggregate across all intraday runs).
 - target_weight is the desired final portfolio weight after this decision (0.0 to 0.20).
   - For BUY: the weight you want this position to occupy in the portfolio.
   - For SELL: set target_weight to 0 (full exit) or a smaller weight (partial trim).

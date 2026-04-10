@@ -38,7 +38,7 @@ def validate_decisions(
     `trades_already_executed_today` is the persistent count of buys+sells the
     model has used so far this trading session (across prior intraday runs).
     The cap enforced is `max_trades_per_day - trades_already_executed_today`,
-    so the 30-trade ceiling applies to the *whole day*, not per call.
+    so the 50-trade ceiling applies to the *whole day*, not per call.
     """
     settings = load_settings()
     rules = settings["portfolio_rules"]
