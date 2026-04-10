@@ -106,6 +106,15 @@
       <div id="budget-warnings" class="budget-warnings"></div>
     </section>
 
+    <!-- Confidence Calibration — are confidence scores predictive? -->
+    <section class="panel calibration-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ CONFIDENCE CALIBRATION</span>
+        <span class="panel-meta">DO THE MODELS KNOW WHAT THEY KNOW?</span>
+      </div>
+      <div id="calibration-grid" class="calibration-grid"></div>
+    </section>
+
     <!-- Consensus Picks — stocks held by 3+ models -->
     <section class="panel consensus-panel">
       <div class="panel-header">
@@ -125,15 +134,6 @@
         </thead>
         <tbody id="consensus-body"></tbody>
       </table>
-    </section>
-
-    <!-- Confidence Calibration — are confidence scores predictive? -->
-    <section class="panel calibration-panel">
-      <div class="panel-header">
-        <span class="panel-title">▍ CONFIDENCE CALIBRATION</span>
-        <span class="panel-meta">DO THE MODELS KNOW WHAT THEY KNOW?</span>
-      </div>
-      <div id="calibration-grid" class="calibration-grid"></div>
     </section>
 
     <!-- Per-model portfolio panels -->
