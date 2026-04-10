@@ -103,6 +103,47 @@ body {
 .value.open { color: var(--green); }
 .value.closed { color: var(--text-dim); }
 
+/* ===== Market Brief banner ===== */
+.market-brief-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
+  border-left: 2px solid var(--accent);
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.brief-text {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.65;
+  letter-spacing: 0.2px;
+}
+.brief-text .brief-welcome {
+  color: var(--accent-bright);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.brief-text .brief-stale {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: italic;
+  margin-left: 6px;
+}
+.brief-moves {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.brief-moves .moves-label {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  margin-right: 8px;
+}
+
 /* ===== Panels ===== */
 .panel {
   background: var(--bg-panel);

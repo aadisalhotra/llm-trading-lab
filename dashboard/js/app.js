@@ -507,6 +507,51 @@ function drawSparkline(canvas, points) {
 }
 
 // ===== Renderers =====
+// ===== Market Brief banner =====
+function renderMarketBrief(d) {
+  const panel = document.getElementById("market-brief-panel");
+  const textEl = document.getElementById("brief-text");
+  const movesEl = document.getElementById("brief-moves");
+  if (!panel || !textEl) return;
+
+  const mb = d.market_brief || {};
+  const brief = mb.brief || "";
+  if (!brief) {
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "";
+
+  // Check if market is currently open — if not, show stale note
+  const now = new Date();
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const et = new Date(etStr);
+  const etDay = et.getDay();
+  const etMin = et.getHours() * 60 + et.getMinutes();
+  const isOpen = etDay >= 1 && etDay <= 5 && etMin >= 570 && etMin < 960;
+
+  const staleNote = !isOpen && mb.as_of_date
+    ? `<span class="brief-stale">(Last trading day: ${mb.as_of_date})</span>`
+    : "";
+
+  // Highlight "Welcome." prefix
+  const formatted = brief.replace(
+    /^Welcome\./,
+    '<span class="brief-welcome">Welcome.</span>',
+  );
+  textEl.innerHTML = formatted + staleNote;
+
+  if (movesEl) {
+    const moves = mb.key_moves || "";
+    if (moves) {
+      movesEl.innerHTML = `<span class="moves-label">KEY MOVES</span>${moves}`;
+      movesEl.style.display = "";
+    } else {
+      movesEl.style.display = "none";
+    }
+  }
+}
+
 function renderStatus(d) {
   document.getElementById("phase").textContent = d.phase || "—";
   document.getElementById("mode").textContent = (d.mode || "—").toUpperCase();
@@ -1141,6 +1186,7 @@ async function refresh() {
   if (!d) return;
   state.data = d;
   renderStatus(d);
+  renderMarketBrief(d);
   refreshMasterChart();
   renderHeroMiniCards();
   renderLeaderboard(d);

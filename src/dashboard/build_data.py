@@ -27,6 +27,7 @@ from ..config_loader import (
     load_settings,
     load_universe,
 )
+from ..data.market_data import fetch_universe_data, INDEX_SYMBOLS
 from ..portfolio import load_portfolio
 
 EASTERN = ZoneInfo("America/New_York")
@@ -447,6 +448,169 @@ def _compute_trade_analytics(
     return trades, agreement_returns, calibration
 
 
+def _build_market_brief(
+    leaderboard: list[dict[str, Any]],
+    portfolios: list[dict[str, Any]],
+    model_keys: list[str],
+    settings: dict[str, Any],
+    prices: dict[str, float],
+    universe: dict[str, Any],
+) -> dict[str, Any]:
+    """Generate a Bloomberg-style market brief for the dashboard banner.
+
+    Returns {brief: str, key_moves: str, as_of_date: str} ready for the frontend.
+    """
+    now_et = datetime.now(EASTERN)
+    as_of_date = now_et.strftime("%A, %B %-d" if hasattr(now_et, "day") else "%A, %B %d")
+    # Windows strftime doesn't support %-d
+    try:
+        as_of_date = now_et.strftime("%A, %B %-d")
+    except ValueError:
+        as_of_date = now_et.strftime("%A, %B %d").replace(" 0", " ")
+
+    # --- Index performance ---
+    index_parts = []
+    try:
+        index_data = fetch_universe_data(
+            symbols=list(INDEX_SYMBOLS.keys()), lookback_days=5,
+        )
+        for sym, label in INDEX_SYMBOLS.items():
+            df = index_data.get(sym)
+            if df is not None and len(df) >= 2:
+                close = float(df["Close"].iloc[-1])
+                prev = float(df["Close"].iloc[-2])
+                pct = (close / prev - 1) * 100 if prev else 0
+                short_label = label.split()[0] if "Nasdaq" not in label else "Nasdaq"
+                if "Dow" in label:
+                    short_label = "Dow"
+                index_parts.append(f"{short_label} {pct:+.2f}%")
+    except Exception:
+        pass
+    index_str = ", ".join(index_parts) if index_parts else "index data unavailable"
+
+    # --- Sector performance (from universe prices) ---
+    sector_returns: dict[str, list[float]] = {}
+    tickers_by_sym = {t["symbol"]: t for t in universe.get("tickers", [])}
+    for t in universe.get("tickers", []):
+        sym = t["symbol"]
+        cur = prices.get(sym)
+        if not cur:
+            continue
+        # We need yesterday's close — approximate from portfolio data or skip
+        # Use a simple approach: fetch_universe_data was already called for the
+        # pipeline so we pull from the same source. For the brief, we only need
+        # 1-day change. We'll compute from the leaderboard's equity curve data
+        # or just use what we can from prices.
+        sector_returns.setdefault(t["sector"], [])
+
+    # Better approach: pull 2-day data for sector calc + key moves
+    sector_data: dict[str, Any] = {}
+    try:
+        sector_data = fetch_universe_data(
+            symbols=[t["symbol"] for t in universe.get("tickers", [])],
+            lookback_days=5,
+        )
+        for t in universe.get("tickers", []):
+            sym = t["symbol"]
+            df = sector_data.get(sym)
+            if df is not None and len(df) >= 2:
+                close = float(df["Close"].iloc[-1])
+                prev = float(df["Close"].iloc[-2])
+                pct = (close / prev - 1) * 100 if prev else 0
+                sector_returns.setdefault(t["sector"], []).append(pct)
+    except Exception:
+        pass
+
+    sector_avg = {}
+    for sec, rets in sector_returns.items():
+        if rets:
+            sector_avg[sec] = sum(rets) / len(rets)
+    leading_sector = max(sector_avg, key=sector_avg.get) if sector_avg else None
+    lagging_sector = min(sector_avg, key=sector_avg.get) if sector_avg else None
+
+    # --- Model performance (daily) ---
+    competing = [r for r in leaderboard if r.get("cohort") != "benchmark"]
+    models_up = sum(1 for r in competing if (r.get("daily_pnl_pct") or 0) > 0)
+    models_down = len(competing) - models_up
+
+    best_model = max(competing, key=lambda r: r.get("daily_pnl_pct") or -999) if competing else None
+    worst_model = min(competing, key=lambda r: r.get("daily_pnl_pct") or 999) if competing else None
+    cum_leader = max(competing, key=lambda r: r.get("cumulative_return") or -999) if competing else None
+
+    # --- Red flags ---
+    flags = []
+    for r in competing:
+        if not r.get("last_api_success", True):
+            cfg = settings["models"].get(r["model_key"], {})
+            flags.append(f"{cfg.get('display_name', r['model_key'])} API failed")
+        if r.get("halted"):
+            cfg = settings["models"].get(r["model_key"], {})
+            flags.append(f"{cfg.get('display_name', r['model_key'])} HALTED")
+
+    # --- Compose brief ---
+    sentences = [f"Welcome. U.S. equities: {index_str}."]
+
+    if leading_sector and lagging_sector and leading_sector != lagging_sector:
+        sentences.append(
+            f"{leading_sector} led sectors ({sector_avg[leading_sector]:+.2f}%) "
+            f"while {lagging_sector} lagged ({sector_avg[lagging_sector]:+.2f}%)."
+        )
+
+    if best_model:
+        best_cfg = settings["models"].get(best_model["model_key"], {})
+        best_name = best_cfg.get("display_name", best_model["model_key"])
+        best_daily = best_model.get("daily_pnl_pct") or 0
+        sentences.append(
+            f"{best_name} led the day at {best_daily * 100:+.2f}%."
+        )
+
+    if flags:
+        sentences.append(" ".join(flags) + ".")
+
+    sentences.append(
+        f"{models_up} of {len(competing)} models green on the day."
+    )
+
+    if cum_leader:
+        cum_cfg = settings["models"].get(cum_leader["model_key"], {})
+        cum_name = cum_cfg.get("display_name", cum_leader["model_key"])
+        cum_ret = cum_leader.get("cumulative_return") or 0
+        sentences.append(f"Cumulative leader: {cum_name} at {cum_ret * 100:+.2f}%.")
+
+    brief = " ".join(sentences)
+
+    # --- Key moves: top 3 movers in universe ---
+    movers = []
+    held_tickers: dict[str, int] = {}
+    for p in portfolios:
+        for h in p.get("holdings", []):
+            held_tickers[h["ticker"]] = held_tickers.get(h["ticker"], 0) + 1
+
+    for t in universe.get("tickers", []):
+        sym = t["symbol"]
+        df = sector_data.get(sym)
+        if df is not None and len(df) >= 2:
+            close = float(df["Close"].iloc[-1])
+            prev = float(df["Close"].iloc[-2])
+            pct = (close / prev - 1) * 100 if prev else 0
+            movers.append((sym, pct))
+
+    movers.sort(key=lambda x: abs(x[1]), reverse=True)
+    top_movers = movers[:3]
+    key_moves_parts = []
+    total_models = len(model_keys)
+    for sym, pct in top_movers:
+        held = held_tickers.get(sym, 0)
+        key_moves_parts.append(f"{sym} {pct:+.1f}% (held by {held}/{total_models})")
+    key_moves = " | ".join(key_moves_parts) if key_moves_parts else ""
+
+    return {
+        "brief": brief,
+        "key_moves": key_moves,
+        "as_of_date": as_of_date,
+    }
+
+
 def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
@@ -542,6 +706,14 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     except Exception:
         budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
 
+    # Market brief — Bloomberg-style summary for the dashboard banner
+    try:
+        market_brief = _build_market_brief(
+            leaderboard, portfolios, model_keys, settings, prices or {}, universe,
+        )
+    except Exception:
+        market_brief = {"brief": "", "key_moves": "", "as_of_date": ""}
+
     # Consensus picks + trade analytics (agreement returns, confidence calibration)
     recent_all = _recent_trades(model_keys, limit=50)
     consensus_picks = _consensus_picks(portfolios, model_keys, recent_all)
@@ -576,6 +748,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "consensus_picks": consensus_picks,
         "agreement_returns": agreement_returns,
         "confidence_calibration": confidence_calibration,
+        "market_brief": market_brief,
         "universe_coverage": {
             "total_tracked": len(universe.get("tickers", [])),
             "actively_held": len({
