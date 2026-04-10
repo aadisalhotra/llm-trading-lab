@@ -63,20 +63,34 @@ function fmtMoney(x) {
   if (x === null || x === undefined || isNaN(x)) return "—";
   return "$" + fmtNum(x, 2);
 }
-// Convert an ISO timestamp (or "YYYY-MM-DD HH:MM:SS") to 12-hour AM/PM.
-// showSeconds: include ":SS" (default true). Returns "YYYY-MM-DD h:MM:SS AM".
+// Convert a UTC ISO timestamp to US/Eastern 12-hour AM/PM format.
+// Pipeline writes all timestamps in UTC; this converts for display.
 function fmtTime(iso, showSeconds = true) {
   if (!iso) return "—";
-  const s = iso.replace("T", " ");
-  const datepart = s.slice(0, 10);
-  const timepart = s.slice(11, 19);
-  if (!timepart) return datepart;
-  const [hh, mm, ss] = timepart.split(":");
-  let h = parseInt(hh, 10);
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  const time = showSeconds ? `${h}:${mm}:${ss} ${ampm}` : `${h}:${mm} ${ampm}`;
-  return `${datepart} ${time}`;
+  // Ensure the string parses as UTC — append "Z" if no timezone indicator
+  let utcStr = iso;
+  if (!/[Zz+\-]/.test(iso.slice(10))) utcStr = iso + "Z";
+  const d = new Date(utcStr);
+  if (isNaN(d.getTime())) return iso;
+  const opts = {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "numeric", minute: "2-digit",
+    hour12: true,
+  };
+  if (showSeconds) opts.second = "2-digit";
+  // toLocaleString gives "MM/DD/YYYY, h:MM:SS AM" — reformat to YYYY-MM-DD
+  const parts = d.toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }); // "YYYY-MM-DD"
+  const timePart = d.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", minute: "2-digit",
+    ...(showSeconds ? { second: "2-digit" } : {}),
+    hour12: true,
+  }); // "h:MM:SS AM"
+  return `${parts} ${timePart}`;
 }
 function colorClass(x) {
   if (x === null || x === undefined || isNaN(x)) return "neutral";
