@@ -649,6 +649,138 @@ def _compute_personality_profiles(
     return profiles
 
 
+def _find_mvp_trade(
+    model_keys: list[str],
+    portfolios: list[dict[str, Any]],
+    settings: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Find the single best trade today (or most recent trading day).
+
+    For SELLs (realized): P&L is computed from entry price vs exit price.
+    For BUYs (unrealized): P&L is computed from fill price vs current market price.
+    If no trades exist with computable P&L, falls back to highest-conviction trade.
+
+    Returns a single dict with all fields the frontend needs, or None.
+    """
+    if not TRADES_DIR.exists():
+        return None
+
+    # Build current price lookup from portfolios
+    current_prices: dict[str, dict[str, float]] = {}  # {model_key: {ticker: price}}
+    for p in portfolios:
+        prices_for_model: dict[str, float] = {}
+        for h in p.get("holdings", []):
+            prices_for_model[h["ticker"]] = h.get("current_price", 0)
+        current_prices[p.get("model_key", "")] = prices_for_model
+
+    # Also build a global ticker -> best current price map (any model that holds it)
+    global_prices: dict[str, float] = {}
+    for p in portfolios:
+        for h in p.get("holdings", []):
+            ticker = h["ticker"]
+            price = h.get("current_price", 0)
+            if price and (ticker not in global_prices or price > global_prices[ticker]):
+                global_prices[ticker] = price
+
+    # Collect all trades, grouped by date (newest first)
+    all_by_date: dict[str, list[dict[str, Any]]] = {}
+    for key in model_keys:
+        pattern = re.compile(rf"^{re.escape(key)}_\d{{4}}-\d{{2}}\.jsonl$")
+        files = sorted(
+            (fp for fp in TRADES_DIR.iterdir() if fp.is_file() and pattern.match(fp.name)),
+            key=lambda fp: fp.name,
+        )
+        # Track open BUY positions per (model, ticker) for SELL P&L computation
+        open_buys: dict[str, list[float]] = {}  # ticker -> [fill_prices]
+        for fp in files:
+            with open(fp, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    date = rec.get("date", "")
+                    for ex in rec.get("executions", []):
+                        if not ex.get("executed") or ex.get("side") in ("HOLD", "SKIP"):
+                            continue
+                        ticker = ex["ticker"]
+                        side = ex["side"]
+                        fill_price = ex.get("fill_price", 0)
+                        decision = ex.get("decision", {}) or {}
+                        summary = (
+                            decision.get("summary", "")
+                            or (decision.get("reasoning", "") or "")[:200]
+                        )
+
+                        entry = {
+                            "date": date,
+                            "model_key": key,
+                            "display_name": settings["models"].get(key, {}).get(
+                                "display_name", key.upper()
+                            ),
+                            "side": side,
+                            "ticker": ticker,
+                            "fill_price": fill_price,
+                            "confidence": decision.get("confidence"),
+                            "summary": summary,
+                            "pnl_pct": None,
+                            "current_price": None,
+                        }
+
+                        if side == "BUY":
+                            open_buys.setdefault(ticker, []).append(fill_price)
+                            # Unrealized P&L from current market price
+                            cur = global_prices.get(ticker)
+                            if cur and fill_price > 0:
+                                entry["pnl_pct"] = round(cur / fill_price - 1, 4)
+                                entry["current_price"] = round(cur, 2)
+                        elif side == "SELL":
+                            # Realized P&L: match against earliest open BUY
+                            if open_buys.get(ticker):
+                                buy_price = open_buys[ticker].pop(0)
+                                if buy_price > 0:
+                                    entry["pnl_pct"] = round(fill_price / buy_price - 1, 4)
+                                    entry["current_price"] = round(fill_price, 2)
+                                    entry["fill_price"] = buy_price  # entry price
+                            # If no matching buy, pnl_pct stays None
+
+                        all_by_date.setdefault(date, []).append(entry)
+
+    if not all_by_date:
+        return None
+
+    # Find trades for today, or fall back to most recent trading day
+    sorted_dates = sorted(all_by_date.keys(), reverse=True)
+    target_date = sorted_dates[0]  # most recent day with trades
+
+    candidates = all_by_date[target_date]
+
+    # Primary: pick the trade with highest P&L %
+    with_pnl = [t for t in candidates if t["pnl_pct"] is not None]
+    if with_pnl:
+        mvp = max(with_pnl, key=lambda t: t["pnl_pct"])
+        mvp["selection_reason"] = "highest_gain"
+        return mvp
+
+    # Fallback: highest confidence trade (early in the day, nothing closed yet)
+    with_conf = [t for t in candidates if t.get("confidence") is not None]
+    if with_conf:
+        mvp = max(with_conf, key=lambda t: t["confidence"])
+        mvp["selection_reason"] = "highest_conviction"
+        return mvp
+
+    # Last resort: just the first trade
+    if candidates:
+        mvp = candidates[0]
+        mvp["selection_reason"] = "only_trade"
+        return mvp
+
+    return None
+
+
 def _build_ticker_tape(
     portfolios: list[dict[str, Any]],
     universe: dict[str, Any],
@@ -975,6 +1107,12 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     except Exception:
         budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
 
+    # MVP Trade — best single trade of the day (or most recent trading day)
+    try:
+        mvp_trade = _find_mvp_trade(model_keys, portfolios, settings)
+    except Exception:
+        mvp_trade = None
+
     # Ticker tape — top 10 most-held stocks with price + daily change
     try:
         ticker_tape = _build_ticker_tape(portfolios, universe)
@@ -1032,6 +1170,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "agreement_returns": agreement_returns,
         "confidence_calibration": confidence_calibration,
         "personality_profiles": personality_profiles,
+        "mvp_trade": mvp_trade,
         "ticker_tape": ticker_tape,
         "market_brief": market_brief,
         "universe_coverage": {

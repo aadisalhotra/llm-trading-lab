@@ -552,6 +552,68 @@ function renderMarketBrief(d) {
   }
 }
 
+// ===== MVP Trade =====
+function renderMvpTrade(d) {
+  const panel = document.getElementById("mvp-panel");
+  const content = document.getElementById("mvp-content");
+  const meta = document.getElementById("mvp-meta");
+  if (!panel || !content) return;
+
+  const mvp = d.mvp_trade;
+  if (!mvp) {
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "";
+
+  const color = MODEL_COLORS[mvp.model_key] || TEXT;
+  const sideClass = mvp.side === "SELL" ? "sell" : "buy";
+  const sideLabel = mvp.side === "SELL" ? "SOLD" : "BOUGHT";
+
+  // Prices
+  const entryPrice = mvp.fill_price ? `$${mvp.fill_price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "—";
+  const exitPrice = mvp.current_price ? `$${mvp.current_price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "—";
+  const priceLabel = mvp.side === "SELL" ? "EXIT" : "NOW";
+
+  // P&L
+  let pnlHtml = "";
+  if (mvp.pnl_pct != null) {
+    const pct = mvp.pnl_pct;
+    const sign = pct > 0 ? "+" : "";
+    const cls = pct > 0 ? "pos" : pct < 0 ? "neg" : "flat";
+    pnlHtml = `<span class="mvp-pnl ${cls}">${sign}${(pct * 100).toFixed(2)}%</span>`;
+  }
+
+  // Confidence
+  const confHtml = mvp.confidence != null
+    ? `<span class="mvp-conf">CONF ${mvp.confidence}/10</span>`
+    : "";
+
+  // Summary
+  const summary = mvp.summary || "";
+  const summaryHtml = summary
+    ? `<div class="mvp-summary">"${summary}"</div>`
+    : "";
+
+  // Meta label
+  const reason = mvp.selection_reason;
+  if (reason === "highest_conviction") {
+    meta.textContent = "HIGHEST CONVICTION (no closes yet)";
+  } else {
+    meta.textContent = mvp.date || "—";
+  }
+
+  content.innerHTML = `
+    <span class="mvp-model" style="color:${color}">${mvp.display_name}</span>
+    <span class="mvp-action ${sideClass}">${sideLabel}</span>
+    <span class="mvp-ticker">${mvp.ticker}</span>
+    <span class="mvp-prices">${entryPrice} <span class="mvp-arrow">\u2192</span> ${exitPrice} <span class="mvp-arrow">(${priceLabel})</span></span>
+    ${pnlHtml}
+    ${confHtml}
+    ${summaryHtml}
+  `;
+}
+
 // ===== Ticker Tape =====
 function renderTickerTape(d) {
   const track = document.getElementById("ticker-track");
@@ -1294,6 +1356,7 @@ async function refresh() {
   renderStatus(d);
   renderTickerTape(d);
   renderMarketBrief(d);
+  renderMvpTrade(d);
   refreshMasterChart();
   renderHeroMiniCards();
   renderLeaderboard(d);

@@ -213,6 +213,75 @@ body {
   margin-right: 8px;
 }
 
+/* ===== MVP Trade panel ===== */
+.mvp-panel {
+  border: 1px solid var(--amber);
+  border-left: 3px solid var(--amber);
+  background: var(--bg-panel);
+}
+.mvp-title {
+  color: var(--amber) !important;
+  text-shadow: 0 0 10px rgba(255, 181, 71, 0.25);
+}
+.mvp-content {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.mvp-model {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.mvp-action {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+.mvp-action.buy  { color: var(--green); background: var(--green-glow); }
+.mvp-action.sell { color: var(--red); background: var(--red-glow); }
+.mvp-ticker {
+  color: var(--text-bright);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.mvp-prices {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.mvp-prices .mvp-arrow { color: var(--text-dim); margin: 0 4px; }
+.mvp-pnl {
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.mvp-pnl.pos { color: var(--green); }
+.mvp-pnl.neg { color: var(--red); }
+.mvp-pnl.flat { color: var(--text-dim); }
+.mvp-conf {
+  color: var(--amber);
+  font-weight: 600;
+  font-size: 11px;
+}
+.mvp-summary {
+  width: 100%;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 4px;
+  font-style: italic;
+}
+.mvp-fallback {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: italic;
+}
+
 /* ===== Panels ===== */
 .panel {
   background: var(--bg-panel);
