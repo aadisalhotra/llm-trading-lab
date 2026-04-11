@@ -45,6 +45,8 @@ const state = {
   timeframe: "ALL",
   mutedSeries: new Set(),
   data: null,
+  h2hA: null,   // model_key for left side of H2H comparison
+  h2hB: null,   // model_key for right side of H2H comparison
 };
 
 // ===== Formatters =====
@@ -1125,6 +1127,395 @@ function renderConsensusPicks(d) {
   });
 }
 
+// ===== Head-to-Head Comparison =====
+function initH2HSelectors(d) {
+  const selA = document.getElementById("h2h-select-a");
+  const selB = document.getElementById("h2h-select-b");
+  if (!selA || !selB) return;
+
+  const models = d.models || {};
+  const lb = (d.leaderboard || []).filter(r => (r.cohort || "core") !== "benchmark");
+
+  // Build options from leaderboard order (already sorted by rank)
+  const buildOpts = (sel) => {
+    sel.innerHTML = "";
+    lb.forEach(row => {
+      const cfg = models[row.model_key] || {};
+      const opt = document.createElement("option");
+      opt.value = row.model_key;
+      opt.textContent = cfg.display_name || row.model_key.toUpperCase();
+      sel.appendChild(opt);
+    });
+  };
+  buildOpts(selA);
+  buildOpts(selB);
+
+  // Default: two closest models by cumulative return
+  if (!state.h2hA || !state.h2hB) {
+    let minDiff = Infinity;
+    let bestI = 0, bestJ = 1;
+    for (let i = 0; i < lb.length; i++) {
+      for (let j = i + 1; j < lb.length; j++) {
+        const diff = Math.abs((lb[i].cumulative_return || 0) - (lb[j].cumulative_return || 0));
+        if (diff < minDiff) { minDiff = diff; bestI = i; bestJ = j; }
+      }
+    }
+    state.h2hA = lb[bestI] ? lb[bestI].model_key : (lb[0] ? lb[0].model_key : null);
+    state.h2hB = lb[bestJ] ? lb[bestJ].model_key : (lb[1] ? lb[1].model_key : null);
+  }
+
+  selA.value = state.h2hA;
+  selB.value = state.h2hB;
+
+  selA.onchange = () => { state.h2hA = selA.value; renderHeadToHead(state.data); };
+  selB.onchange = () => { state.h2hB = selB.value; renderHeadToHead(state.data); };
+}
+
+function renderHeadToHead(d) {
+  const content = document.getElementById("h2h-content");
+  if (!content) return;
+  content.innerHTML = "";
+
+  const keyA = state.h2hA;
+  const keyB = state.h2hB;
+  if (!keyA || !keyB) return;
+
+  const models = d.models || {};
+  const lb = d.leaderboard || [];
+  const rowA = lb.find(r => r.model_key === keyA) || {};
+  const rowB = lb.find(r => r.model_key === keyB) || {};
+  const cfgA = models[keyA] || {};
+  const cfgB = models[keyB] || {};
+  const nameA = cfgA.display_name || keyA.toUpperCase();
+  const nameB = cfgB.display_name || keyB.toUpperCase();
+  const colorA = MODEL_COLORS[keyA] || TEXT;
+  const colorB = MODEL_COLORS[keyB] || TEXT;
+
+  // Winner badge
+  const retA = rowA.cumulative_return || 0;
+  const retB = rowB.cumulative_return || 0;
+  const winnerKey = retA >= retB ? keyA : keyB;
+  const badgeA = winnerKey === keyA ? '<span class="h2h-winner-badge">LEADER</span>' : "";
+  const badgeB = winnerKey === keyB ? '<span class="h2h-winner-badge">LEADER</span>' : "";
+
+  // --- 1. Equity curve chart ---
+  const chartWrap = document.createElement("div");
+  chartWrap.className = "h2h-chart-wrap";
+  const canvas = document.createElement("canvas");
+  chartWrap.appendChild(canvas);
+  content.appendChild(chartWrap);
+
+  // Legend
+  const legend = document.createElement("div");
+  legend.className = "h2h-chart-legend";
+  legend.innerHTML = `
+    <span><span class="swatch" style="background:${colorA}"></span> ${nameA}</span>
+    <span><span class="swatch" style="background:${colorB}"></span> ${nameB}</span>
+    <span><span class="swatch dashed"></span> SPY</span>
+  `;
+  content.appendChild(legend);
+
+  // Draw chart after DOM insertion
+  requestAnimationFrame(() => drawH2HChart(canvas, d, keyA, keyB, colorA, colorB));
+
+  // --- 2. Stats table ---
+  const costTracker = d.cost_tracker || [];
+  const costA = costTracker.find(c => c.model_key === keyA) || {};
+  const costB = costTracker.find(c => c.model_key === keyB) || {};
+
+  const cal = d.confidence_calibration || {};
+  const calA = cal[keyA] || {};
+  const calB = cal[keyB] || {};
+  const avgConfA = computeAvgConf(calA);
+  const avgConfB = computeAvgConf(calB);
+
+  const tradesPerDayA = (costA.trades_executed_total || 0) / Math.max(rowA.days || 1, 1);
+  const tradesPerDayB = (costB.trades_executed_total || 0) / Math.max(rowB.days || 1, 1);
+
+  const stats = [
+    { label: "CUMULATIVE RETURN", a: fmtPct(rowA.cumulative_return), b: fmtPct(rowB.cumulative_return),
+      aWin: retA > retB, bWin: retB > retA },
+    { label: "SHARPE (30D)", a: rowA.sharpe_30d != null ? fmtNum(rowA.sharpe_30d) : "—", b: rowB.sharpe_30d != null ? fmtNum(rowB.sharpe_30d) : "—",
+      aWin: (rowA.sharpe_30d || 0) > (rowB.sharpe_30d || 0), bWin: (rowB.sharpe_30d || 0) > (rowA.sharpe_30d || 0) },
+    { label: "MAX DRAWDOWN", a: fmtPct(rowA.max_drawdown), b: fmtPct(rowB.max_drawdown),
+      aWin: (rowA.max_drawdown || 0) > (rowB.max_drawdown || 0), bWin: (rowB.max_drawdown || 0) > (rowA.max_drawdown || 0) },
+    { label: "WIN RATE", a: rowA.win_rate != null ? fmtPct(rowA.win_rate, false) : "—", b: rowB.win_rate != null ? fmtPct(rowB.win_rate, false) : "—",
+      aWin: (rowA.win_rate || 0) > (rowB.win_rate || 0), bWin: (rowB.win_rate || 0) > (rowA.win_rate || 0) },
+    { label: "TRADES / DAY", a: fmtNum(tradesPerDayA, 1), b: fmtNum(tradesPerDayB, 1), aWin: false, bWin: false },
+    { label: "AVG CONFIDENCE", a: avgConfA != null ? fmtNum(avgConfA, 1) + "/10" : "—", b: avgConfB != null ? fmtNum(avgConfB, 1) + "/10" : "—",
+      aWin: (avgConfA || 0) > (avgConfB || 0), bWin: (avgConfB || 0) > (avgConfA || 0) },
+    { label: "CASH %", a: fmtPct(rowA.current_cash_pct, false), b: fmtPct(rowB.current_cash_pct, false), aWin: false, bWin: false },
+    { label: "TOTAL API COST", a: "$" + fmtNum(costA.cost_total_usd || 0), b: "$" + fmtNum(costB.cost_total_usd || 0),
+      aWin: (costA.cost_total_usd || 0) < (costB.cost_total_usd || 0), bWin: (costB.cost_total_usd || 0) < (costA.cost_total_usd || 0) },
+  ];
+
+  const statsRows = stats.map(s => `
+    <tr>
+      <td>${s.label}</td>
+      <td class="${s.aWin ? "better" : ""}">${s.a}</td>
+      <td class="${s.bWin ? "better" : ""}">${s.b}</td>
+    </tr>
+  `).join("");
+
+  const statsTable = document.createElement("table");
+  statsTable.className = "h2h-stats";
+  statsTable.innerHTML = `
+    <thead><tr>
+      <th>METRIC</th>
+      <th><span style="color:${colorA}">${nameA}</span>${badgeA}</th>
+      <th><span style="color:${colorB}">${nameB}</span>${badgeB}</th>
+    </tr></thead>
+    <tbody>${statsRows}</tbody>
+  `;
+  content.appendChild(statsTable);
+
+  // --- 3. Bottom row: trade overlap + sector bars ---
+  const bottom = document.createElement("div");
+  bottom.className = "h2h-bottom";
+
+  // Trade overlap
+  const overlap = computeTradeOverlap(d, keyA, keyB);
+  const overlapDiv = document.createElement("div");
+  overlapDiv.className = "h2h-overlap";
+  overlapDiv.innerHTML = `
+    <div class="h2h-overlap-title">TRADE OVERLAP</div>
+    <div class="h2h-overlap-value">${overlap.pct}%</div>
+    <div class="h2h-overlap-detail">${overlap.matched} of ${overlap.total} trades same ticker + direction + day</div>
+  `;
+  bottom.appendChild(overlapDiv);
+
+  // Sector allocation bars
+  const universe = d.universe || {};
+  const sectorMap = {};
+  (universe.tickers || []).forEach(t => { sectorMap[t.symbol] = t.sector; });
+
+  // Index portfolios by MODEL_ORDER position (model_key in snapshot may
+  // differ — e.g. claude_opus reports model_key="claude" in its snapshot).
+  const portfolios = d.portfolios || [];
+  const portA = portfolios[MODEL_ORDER.indexOf(keyA)] || {};
+  const portB = portfolios[MODEL_ORDER.indexOf(keyB)] || {};
+
+  const sectorsA = computeSectorWeights(portA, sectorMap);
+  const sectorsB = computeSectorWeights(portB, sectorMap);
+
+  // Merge all sectors
+  const allSectors = [...new Set([...Object.keys(sectorsA), ...Object.keys(sectorsB)])].sort();
+
+  bottom.appendChild(buildSectorCol(nameA, colorA, sectorsA, allSectors));
+  bottom.appendChild(buildSectorCol(nameB, colorB, sectorsB, allSectors));
+
+  content.appendChild(bottom);
+}
+
+function computeAvgConf(calData) {
+  const buckets = calData.buckets || [];
+  let totalConf = 0, totalCount = 0;
+  buckets.forEach(b => {
+    if (b.count > 0) {
+      totalConf += b.confidence * b.count;
+      totalCount += b.count;
+    }
+  });
+  return totalCount > 0 ? totalConf / totalCount : null;
+}
+
+function computeTradeOverlap(d, keyA, keyB) {
+  const trades = d.recent_trades || [];
+  // Group trades by (date, ticker, side) per model
+  const setA = new Set();
+  const setB = new Set();
+  const allA = [];
+  const allB = [];
+  trades.forEach(t => {
+    const sig = `${t.date}|${t.ticker}|${t.side}`;
+    if (t.model_key === keyA) { setA.add(sig); allA.push(sig); }
+    if (t.model_key === keyB) { setB.add(sig); allB.push(sig); }
+  });
+  let matched = 0;
+  setA.forEach(sig => { if (setB.has(sig)) matched++; });
+  const total = new Set([...setA, ...setB]).size;
+  const pct = total > 0 ? Math.round((matched / total) * 100) : 0;
+  return { matched, total, pct };
+}
+
+function computeSectorWeights(portfolio, sectorMap) {
+  const weights = {};
+  (portfolio.holdings || []).forEach(h => {
+    const sec = sectorMap[h.ticker] || "Other";
+    // Shorten sector names
+    const short = {
+      "Technology": "Tech",
+      "Communication Services": "Comms",
+      "Consumer Discretionary": "Cons Disc",
+      "Consumer Staples": "Staples",
+      "Healthcare": "Health",
+      "Financials": "Finance",
+      "Industrials": "Indust",
+      "Energy": "Energy",
+      "Materials": "Material",
+      "Real Estate": "REIT",
+      "Utilities": "Utility",
+    }[sec] || sec;
+    weights[short] = (weights[short] || 0) + (h.weight || 0);
+  });
+  return weights;
+}
+
+function buildSectorCol(name, color, weights, allSectors) {
+  const col = document.createElement("div");
+  col.className = "h2h-sector-col";
+  col.innerHTML = `<div class="h2h-sector-title" style="color:${color}">${name} SECTORS</div>`;
+
+  // Remap allSectors through the same shortening
+  const shortMap = {
+    "Technology": "Tech", "Communication Services": "Comms",
+    "Consumer Discretionary": "Cons Disc", "Consumer Staples": "Staples",
+    "Healthcare": "Health", "Financials": "Finance", "Industrials": "Indust",
+    "Energy": "Energy", "Materials": "Material", "Real Estate": "REIT", "Utilities": "Utility",
+  };
+  const shortSectors = [...new Set(allSectors.map(s => shortMap[s] || s))];
+
+  shortSectors.forEach(sec => {
+    const w = weights[sec] || 0;
+    const pct = (w * 100).toFixed(0);
+    const row = document.createElement("div");
+    row.className = "h2h-sector-row";
+    row.innerHTML = `
+      <span class="h2h-sector-label">${sec}</span>
+      <div class="h2h-sector-bar-wrap">
+        <div class="h2h-sector-bar" style="width:${Math.min(w * 100, 100)}%;background:${color}"></div>
+      </div>
+      <span class="h2h-sector-pct">${pct}%</span>
+    `;
+    col.appendChild(row);
+  });
+  return col;
+}
+
+function drawH2HChart(canvas, d, keyA, keyB, colorA, colorB) {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = rect.width;
+  const cssH = rect.height;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.width = cssW + "px";
+  canvas.style.height = cssH + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const curves = d.equity_curves || {};
+  const curveA = curves[keyA] || [];
+  const curveB = curves[keyB] || [];
+  const curveSpy = curves["spy_benchmark"] || [];
+
+  if (!curveA.length && !curveB.length) {
+    ctx.fillStyle = TEXT_DIM;
+    ctx.font = "11px 'JetBrains Mono', monospace";
+    ctx.fillText("No equity data available", 20, cssH / 2);
+    return;
+  }
+
+  // Unify date range — use all dates from both curves
+  const allDates = new Set();
+  curveA.forEach(p => allDates.add(p.date));
+  curveB.forEach(p => allDates.add(p.date));
+  curveSpy.forEach(p => allDates.add(p.date));
+  const dates = [...allDates].sort();
+
+  // Build value maps
+  const mapA = {}; curveA.forEach(p => { mapA[p.date] = p.value; });
+  const mapB = {}; curveB.forEach(p => { mapB[p.date] = p.value; });
+  const mapSpy = {}; curveSpy.forEach(p => { mapSpy[p.date] = p.value; });
+
+  // Convert to % return from first available value
+  const toReturns = (map) => {
+    let base = null;
+    return dates.map(d => {
+      const v = map[d];
+      if (v == null) return null;
+      if (base == null) base = v;
+      return base > 0 ? (v / base - 1) * 100 : 0;
+    });
+  };
+
+  const retA = toReturns(mapA);
+  const retB = toReturns(mapB);
+  const retSpy = toReturns(mapSpy);
+
+  // Find Y range
+  const allVals = [...retA, ...retB, ...retSpy].filter(v => v != null);
+  if (!allVals.length) return;
+  let yMin = Math.min(...allVals);
+  let yMax = Math.max(...allVals);
+  const yPad = (yMax - yMin) * 0.15 || 1;
+  yMin -= yPad;
+  yMax += yPad;
+
+  const padL = 50, padR = 10, padT = 10, padB = 24;
+  const plotW = cssW - padL - padR;
+  const plotH = cssH - padT - padB;
+  const xStep = dates.length > 1 ? plotW / (dates.length - 1) : plotW;
+
+  // Grid
+  ctx.strokeStyle = GRID;
+  ctx.lineWidth = 0.5;
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + (plotH / yTicks) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(cssW - padR, y); ctx.stroke();
+    const label = (yMax - (yMax - yMin) * (i / yTicks)).toFixed(1) + "%";
+    ctx.fillStyle = TEXT_DIM;
+    ctx.font = "9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(label, padL - 4, y + 3);
+  }
+
+  // Zero line
+  if (yMin < 0 && yMax > 0) {
+    const zeroY = padT + plotH * (yMax / (yMax - yMin));
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(padL, zeroY); ctx.lineTo(cssW - padR, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  const drawLine = (returns, color, dashed) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = dashed ? 1 : 1.8;
+    if (dashed) ctx.setLineDash([5, 4]);
+    else ctx.setLineDash([]);
+    ctx.beginPath();
+    let started = false;
+    returns.forEach((v, i) => {
+      if (v == null) return;
+      const x = padL + i * xStep;
+      const y = padT + plotH * ((yMax - v) / (yMax - yMin));
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+
+  drawLine(retSpy, SPY_COLOR, true);
+  drawLine(retA, colorA, false);
+  drawLine(retB, colorB, false);
+
+  // Date labels on x-axis
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = "9px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center";
+  const labelStep = Math.max(1, Math.floor(dates.length / 6));
+  dates.forEach((dt, i) => {
+    if (i % labelStep === 0 || i === dates.length - 1) {
+      const x = padL + i * xStep;
+      ctx.fillText(dt.slice(5), x, cssH - 4);  // MM-DD
+    }
+  });
+}
+
 // ===== Confidence Calibration =====
 function renderConfidenceCalibration(d) {
   const grid = document.getElementById("calibration-grid");
@@ -1361,6 +1752,8 @@ async function refresh() {
   renderHeroMiniCards();
   renderLeaderboard(d);
   renderConsensusPicks(d);
+  initH2HSelectors(d);
+  renderHeadToHead(d);
   renderConfidenceCalibration(d);
   renderPersonalityProfiles(d);
   renderCostTracker(d);
