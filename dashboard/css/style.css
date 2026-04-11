@@ -103,64 +103,6 @@ body {
 .value.open { color: var(--green); }
 .value.closed { color: var(--text-dim); }
 
-/* ===== Fullscreen button ===== */
-.fs-btn {
-  background: var(--bg);
-  border: 1px solid var(--border-bright);
-  color: var(--text-dim);
-  font-size: 14px;
-  padding: 2px 8px;
-  cursor: pointer;
-  line-height: 1;
-  transition: all 100ms ease;
-  font-family: inherit;
-}
-.fs-btn:hover {
-  color: var(--text-bright);
-  border-color: var(--accent-dim);
-}
-
-/* Fullscreen ESC hint overlay */
-.fs-hint {
-  display: none;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(10, 14, 21, 0.92);
-  border: 1px solid var(--border-bright);
-  color: var(--text-bright);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  padding: 14px 28px;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.8s ease;
-}
-.fs-hint.visible { display: block; }
-.fs-hint.fade { opacity: 0; }
-
-/* Footer keyboard hint */
-.footer-hints kbd {
-  background: var(--bg-row);
-  border: 1px solid var(--border-bright);
-  padding: 1px 5px;
-  font-family: inherit;
-  font-size: 9px;
-  color: var(--text);
-}
-
-/* Fullscreen-specific overrides */
-:fullscreen {
-  background: var(--bg);
-}
-:fullscreen .hero-chart-panel #master-chart {
-  height: calc(100vh - 320px);
-  min-height: 500px;
-}
-
 /* ===== Ticker Tape ===== */
 .ticker-tape {
   overflow: hidden;
