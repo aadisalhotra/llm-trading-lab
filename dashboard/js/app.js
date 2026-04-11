@@ -632,12 +632,20 @@ function renderLeaderboard(d) {
       : (row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) : "—");
     const rankCell = cohort === "benchmark" ? "—" : row.rank;
 
+    // Streak badge
+    let streakLabel = "–";
+    if (cohort !== "benchmark" && row.streak_count > 0 && row.streak_type) {
+      if (row.streak_type === "W") streakLabel = `<span class="streak-win">\u{1F525} ${row.streak_count}W</span>`;
+      else streakLabel = `<span class="streak-loss">\u274C ${row.streak_count}L</span>`;
+    }
+
     tr.innerHTML = `
       <td>${rankCell}</td>
       <td>
         <span class="model-name">${displayName}</span>
         ${badge}
       </td>
+      <td class="streak-cell">${streakLabel}</td>
       <td>${versionLabel}</td>
       <td class="${numClass(ret)}">${fmtPct(ret)}</td>
       <td class="${numClass(dailyPnl)}">${dailyPnl != null ? fmtPct(dailyPnl) : "—"}</td>

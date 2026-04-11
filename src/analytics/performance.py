@@ -54,6 +54,8 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
             "sharpe_90d": None,
             "max_drawdown": 0.0,
             "alpha_vs_spy": None,
+            "streak_count": 0,
+            "streak_type": None,
             "current_value": float(df["total_value"].iloc[-1]) if not df.empty else 0.0,
             "current_cash_pct": float(df["cash_pct"].iloc[-1]) if not df.empty else 1.0,
             "num_positions": int(df["num_positions"].iloc[-1]) if not df.empty else 0,
@@ -96,6 +98,24 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
         if v is not None and not pd.isna(v):
             last_api_success = bool(v)
 
+    # Win/loss streak: count consecutive days of same sign from most recent
+    streak_count = 0
+    streak_type = None  # "W" or "L"
+    if len(daily_returns) > 0:
+        for ret in reversed(daily_returns):
+            if ret > 0:
+                direction = "W"
+            elif ret < 0:
+                direction = "L"
+            else:
+                break  # flat day breaks the streak
+            if streak_type is None:
+                streak_type = direction
+            if direction == streak_type:
+                streak_count += 1
+            else:
+                break
+
     return {
         "model_key": model_key,
         "days": int(len(df)),
@@ -106,6 +126,8 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
         "sharpe_90d": sharpe_90,
         "max_drawdown": max_drawdown,
         "alpha_vs_spy": alpha,
+        "streak_count": streak_count,
+        "streak_type": streak_type,
         "current_value": float(values[-1]),
         "current_cash_pct": float(df["cash_pct"].iloc[-1]),
         "num_positions": int(df["num_positions"].iloc[-1]),
@@ -179,6 +201,8 @@ def compute_spy_benchmark_metrics(starting_capital: float = 100_000.0) -> dict[s
         "sharpe_90d": sharpe_90,
         "max_drawdown": max_drawdown,
         "alpha_vs_spy": 0.0,            # benchmark vs itself
+        "streak_count": 0,
+        "streak_type": None,
         "current_value": float(values[-1]),
         "current_cash_pct": 0.0,
         "num_positions": 1,
