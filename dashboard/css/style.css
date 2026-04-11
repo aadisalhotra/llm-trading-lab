@@ -103,6 +103,75 @@ body {
 .value.open { color: var(--green); }
 .value.closed { color: var(--text-dim); }
 
+/* ===== Ticker Tape ===== */
+.ticker-tape {
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  margin-bottom: 12px;
+  white-space: nowrap;
+  position: relative;
+}
+.ticker-tape::before,
+.ticker-tape::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 2;
+  pointer-events: none;
+}
+.ticker-tape::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-panel), transparent);
+}
+.ticker-tape::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-panel), transparent);
+}
+.ticker-track {
+  display: inline-flex;
+  gap: 0;
+  animation: ticker-scroll 40s linear infinite;
+  will-change: transform;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 18px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+.ticker-item .tk-symbol {
+  color: var(--text-bright);
+  font-weight: 700;
+}
+.ticker-item .tk-price {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ticker-item .tk-change {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ticker-item .tk-change.pos { color: var(--green); }
+.ticker-item .tk-change.neg { color: var(--red); }
+.ticker-item .tk-change.flat { color: var(--text-dim); }
+.ticker-item .tk-sep {
+  color: var(--border-bright);
+  margin-left: 12px;
+}
+
 /* ===== Market Brief banner ===== */
 .market-brief-panel {
   background: var(--bg-panel);

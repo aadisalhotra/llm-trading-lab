@@ -649,6 +649,74 @@ def _compute_personality_profiles(
     return profiles
 
 
+def _build_ticker_tape(
+    portfolios: list[dict[str, Any]],
+    universe: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build ticker tape data: top 10 most-held stocks with price + daily change.
+
+    Returns [{symbol, name, price, change_pct}, ...] sorted by hold count desc,
+    then alphabetically. Fetches 2-day price history for daily % change.
+    """
+    # Count how many models hold each ticker
+    hold_count: dict[str, int] = {}
+    for p in portfolios:
+        for h in p.get("holdings", []):
+            sym = h["ticker"]
+            hold_count[sym] = hold_count.get(sym, 0) + 1
+
+    # Sort by hold count desc, then alphabetically, take top 10
+    ranked = sorted(hold_count.keys(), key=lambda s: (-hold_count[s], s))
+    top_symbols = ranked[:10]
+    if not top_symbols:
+        return []
+
+    # Ticker name lookup from universe
+    name_map: dict[str, str] = {}
+    for t in universe.get("tickers", []):
+        name_map[t["symbol"]] = t["name"]
+
+    # Fetch 2-day price data for daily change calculation
+    price_data = fetch_universe_data(symbols=top_symbols, lookback_days=5)
+
+    tape: list[dict[str, Any]] = []
+    for sym in top_symbols:
+        df = price_data.get(sym)
+        if df is not None and len(df) >= 2:
+            close = float(df["Close"].iloc[-1])
+            prev = float(df["Close"].iloc[-2])
+            change_pct = (close / prev - 1) if prev else 0
+        elif df is not None and len(df) == 1:
+            close = float(df["Close"].iloc[-1])
+            change_pct = 0
+        else:
+            # Fall back to portfolio price if yfinance fails
+            close = 0
+            for p in portfolios:
+                for h in p.get("holdings", []):
+                    if h["ticker"] == sym and h.get("current_price"):
+                        close = h["current_price"]
+                        break
+                if close:
+                    break
+            change_pct = 0
+
+        # Avoid -0.0 display artifacts from floating point
+        rounded_change = round(change_pct, 4)
+        if rounded_change == 0:
+            rounded_change = 0.0
+
+        tape.append({
+            "symbol": sym,
+            "name": name_map.get(sym, sym),
+            "price": round(close, 2),
+            "change_pct": rounded_change,
+            "holders": hold_count[sym],
+        })
+
+    return tape
+
+
 def _build_market_brief(
     leaderboard: list[dict[str, Any]],
     portfolios: list[dict[str, Any]],
@@ -907,6 +975,12 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     except Exception:
         budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
 
+    # Ticker tape — top 10 most-held stocks with price + daily change
+    try:
+        ticker_tape = _build_ticker_tape(portfolios, universe)
+    except Exception:
+        ticker_tape = []
+
     # Market brief — Bloomberg-style summary for the dashboard banner
     try:
         market_brief = _build_market_brief(
@@ -958,6 +1032,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "agreement_returns": agreement_returns,
         "confidence_calibration": confidence_calibration,
         "personality_profiles": personality_profiles,
+        "ticker_tape": ticker_tape,
         "market_brief": market_brief,
         "universe_coverage": {
             "total_tracked": len(universe.get("tickers", [])),

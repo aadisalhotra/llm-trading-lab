@@ -552,6 +552,45 @@ function renderMarketBrief(d) {
   }
 }
 
+// ===== Ticker Tape =====
+function renderTickerTape(d) {
+  const track = document.getElementById("ticker-track");
+  if (!track) return;
+
+  const tape = d.ticker_tape || [];
+  if (!tape.length) {
+    document.getElementById("ticker-tape").style.display = "none";
+    return;
+  }
+  document.getElementById("ticker-tape").style.display = "";
+
+  // Build one set of items
+  const buildItems = () => tape.map(t => {
+    const pct = t.change_pct || 0;
+    const sign = pct > 0 ? "+" : "";
+    const cls = pct > 0 ? "pos" : pct < 0 ? "neg" : "flat";
+    const arrow = pct > 0 ? "\u25B2" : pct < 0 ? "\u25BC" : "";
+    return `<span class="ticker-item">`
+      + `<span class="tk-symbol">${t.symbol}</span>`
+      + `<span class="tk-price">$${t.price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`
+      + `<span class="tk-change ${cls}">${arrow} ${sign}${(pct * 100).toFixed(2)}%</span>`
+      + `<span class="tk-sep">|</span>`
+      + `</span>`;
+  }).join("");
+
+  // Duplicate content so the scroll loops seamlessly
+  const items = buildItems();
+  track.innerHTML = items + items;
+
+  // Adjust speed based on content width: ~60px/sec for smooth reading
+  requestAnimationFrame(() => {
+    const halfWidth = track.scrollWidth / 2;
+    const speed = 60; // px per second
+    const duration = halfWidth / speed;
+    track.style.animationDuration = `${duration}s`;
+  });
+}
+
 function renderStatus(d) {
   document.getElementById("phase").textContent = d.phase || "—";
   document.getElementById("mode").textContent = (d.mode || "—").toUpperCase();
@@ -1253,6 +1292,7 @@ async function refresh() {
   if (!d) return;
   state.data = d;
   renderStatus(d);
+  renderTickerTape(d);
   renderMarketBrief(d);
   refreshMasterChart();
   renderHeroMiniCards();
