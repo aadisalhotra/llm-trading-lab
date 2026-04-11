@@ -44,15 +44,6 @@
       <div class="brief-moves" id="brief-moves"></div>
     </section>
 
-    <!-- TODAY'S MVP TRADE — best single trade of the day -->
-    <section class="panel mvp-panel" id="mvp-panel" style="display:none">
-      <div class="panel-header">
-        <span class="panel-title mvp-title">&#9733; TODAY'S MVP TRADE</span>
-        <span class="panel-meta" id="mvp-meta">—</span>
-      </div>
-      <div id="mvp-content" class="mvp-content"></div>
-    </section>
-
     <!-- HERO: full-width equity chart, the primary visual on the page -->
     <section class="panel hero-chart-panel">
       <div class="panel-header">
@@ -127,22 +118,22 @@
       <div id="budget-warnings" class="budget-warnings"></div>
     </section>
 
-    <!-- Confidence Calibration — are confidence scores predictive? -->
-    <section class="panel calibration-panel">
+    <!-- TODAY'S MVP TRADE — best single trade of the day -->
+    <section class="panel mvp-panel" id="mvp-panel" style="display:none">
       <div class="panel-header">
-        <span class="panel-title">▍ CONFIDENCE CALIBRATION</span>
-        <span class="panel-meta">DO THE MODELS KNOW WHAT THEY KNOW?</span>
+        <span class="panel-title mvp-title">&#9733; TODAY'S MVP TRADE</span>
+        <span class="panel-meta" id="mvp-meta">—</span>
       </div>
-      <div id="calibration-grid" class="calibration-grid"></div>
+      <div id="mvp-content" class="mvp-content"></div>
     </section>
 
-    <!-- Model Correlation Matrix — pairwise daily return correlation -->
-    <section class="panel corr-panel">
+    <!-- Trade feed -->
+    <section class="panel feed-panel">
       <div class="panel-header">
-        <span class="panel-title">&#9646; MODEL CORRELATION</span>
-        <span class="panel-meta">PAIRWISE DAILY RETURN CORRELATION</span>
+        <span class="panel-title">▍ TRADE FEED</span>
+        <span class="panel-meta">LAST 50</span>
       </div>
-      <div id="corr-content" class="corr-content"></div>
+      <div id="trade-feed" class="trade-feed"></div>
     </section>
 
     <!-- Consensus Picks — stocks held by 3+ models -->
@@ -179,17 +170,26 @@
       <div id="h2h-content" class="h2h-content"></div>
     </section>
 
+    <!-- Model Correlation Matrix — pairwise daily return correlation -->
+    <section class="panel corr-panel">
+      <div class="panel-header">
+        <span class="panel-title">&#9646; MODEL CORRELATION</span>
+        <span class="panel-meta">PAIRWISE DAILY RETURN CORRELATION</span>
+      </div>
+      <div id="corr-content" class="corr-content"></div>
+    </section>
+
+    <!-- Confidence Calibration — are confidence scores predictive? -->
+    <section class="panel calibration-panel">
+      <div class="panel-header">
+        <span class="panel-title">▍ CONFIDENCE CALIBRATION</span>
+        <span class="panel-meta">DO THE MODELS KNOW WHAT THEY KNOW?</span>
+      </div>
+      <div id="calibration-grid" class="calibration-grid"></div>
+    </section>
+
     <!-- Per-model portfolio panels -->
     <section class="portfolio-grid" id="portfolio-grid"></section>
-
-    <!-- Trade feed -->
-    <section class="panel feed-panel">
-      <div class="panel-header">
-        <span class="panel-title">▍ TRADE FEED</span>
-        <span class="panel-meta">LAST 50</span>
-      </div>
-      <div id="trade-feed" class="trade-feed"></div>
-    </section>
 
     <!-- System health + version ticker (compact reference info, end-of-page) -->
     <section class="row reference-row">
