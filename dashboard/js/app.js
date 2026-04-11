@@ -1965,10 +1965,47 @@ setInterval(refresh, REFRESH_MS);
 window.addEventListener("resize", () => {
   if (masterChart) {
     const el = document.getElementById("master-chart");
-    const newHeight = window.innerWidth <= 800 ? 360 : 460;
+    const isFS = !!document.fullscreenElement;
+    const newHeight = isFS
+      ? Math.max(500, window.innerHeight - 320)
+      : (window.innerWidth <= 800 ? 360 : 460);
     masterChart.applyOptions({ width: el.clientWidth, height: newHeight });
     masterChart.timeScale().fitContent();
   }
   // Hero mini-card sparklines need to redraw at the new container width
   if (state.data) renderHeroMiniCards();
+});
+
+// ===== Fullscreen toggle =====
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen().then(() => {
+      // Show ESC hint, then fade it after 3 seconds
+      const hint = document.getElementById("fs-hint");
+      if (hint) {
+        hint.classList.add("visible");
+        hint.classList.remove("fade");
+        setTimeout(() => hint.classList.add("fade"), 2200);
+        setTimeout(() => hint.classList.remove("visible", "fade"), 3000);
+      }
+    }).catch(() => {});
+  }
+}
+
+document.getElementById("fs-btn").addEventListener("click", toggleFullscreen);
+
+document.addEventListener("keydown", (e) => {
+  // Ignore if typing in an input/select
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+  if (e.key === "f" || e.key === "F") {
+    e.preventDefault();
+    toggleFullscreen();
+  }
+});
+
+// Re-layout chart when fullscreen changes (covers ESC exit too)
+document.addEventListener("fullscreenchange", () => {
+  window.dispatchEvent(new Event("resize"));
 });
