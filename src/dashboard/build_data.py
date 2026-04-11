@@ -448,6 +448,107 @@ def _compute_trade_analytics(
     return trades, agreement_returns, calibration
 
 
+def _compute_correlation_matrix(
+    model_keys: list[str],
+) -> dict[str, Any] | None:
+    """Compute pairwise Pearson correlation of daily returns across all models.
+
+    Returns {model_keys: [...], matrix: [[float]], insufficient: bool,
+             highest: {pair, value}, lowest: {pair, value}} or None on failure.
+    Requires all models to have at least 5 overlapping trading days.
+    """
+    import numpy as np
+
+    # Load daily returns per model, keyed by date.
+    # Performance logs may have multiple rows per date (intraday ticks),
+    # so we deduplicate by keeping the last row per date (EOD snapshot)
+    # before computing day-over-day returns.
+    returns_by_model: dict[str, dict[str, float]] = {}
+    for key in model_keys:
+        df = load_performance_history(key)
+        if df.empty or len(df) < 2:
+            returns_by_model[key] = {}
+            continue
+        # Keep last row per date (EOD value)
+        df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
+        eod = df.groupby("date_str", sort=True).last().reset_index()
+        if len(eod) < 2:
+            returns_by_model[key] = {}
+            continue
+        values = eod["total_value"].astype(float).values
+        daily_returns = np.diff(values) / values[:-1]
+        dates = eod["date_str"].iloc[1:].tolist()
+        returns_by_model[key] = dict(zip(dates, daily_returns.tolist()))
+
+    # Find dates common to ALL models
+    all_date_sets = [set(r.keys()) for r in returns_by_model.values()]
+    if not all_date_sets:
+        return None
+    common_dates = sorted(set.intersection(*all_date_sets))
+
+    if len(common_dates) < 5:
+        return {
+            "model_keys": model_keys,
+            "matrix": [],
+            "insufficient": True,
+            "min_days": 5,
+            "common_days": len(common_dates),
+        }
+
+    # Build aligned return arrays
+    n = len(model_keys)
+    arrays: list[list[float]] = []
+    for key in model_keys:
+        rm = returns_by_model[key]
+        arrays.append([rm[d] for d in common_dates])
+
+    # Compute pairwise Pearson correlation
+    matrix: list[list[float | None]] = []
+    for i in range(n):
+        row: list[float | None] = []
+        for j in range(n):
+            if i == j:
+                row.append(1.0)
+            else:
+                xi = np.array(arrays[i])
+                xj = np.array(arrays[j])
+                mx, mj = xi.mean(), xj.mean()
+                cov = np.sum((xi - mx) * (xj - mj))
+                si = np.sqrt(np.sum((xi - mx) ** 2))
+                sj = np.sqrt(np.sum((xj - mj) ** 2))
+                if si > 0 and sj > 0:
+                    row.append(round(float(cov / (si * sj)), 2))
+                else:
+                    row.append(None)
+        matrix.append(row)
+
+    # Find highest and lowest off-diagonal pairs
+    highest_val = -2.0
+    lowest_val = 2.0
+    highest_pair: list[str] = []
+    lowest_pair: list[str] = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            v = matrix[i][j]
+            if v is None:
+                continue
+            if v > highest_val:
+                highest_val = v
+                highest_pair = [model_keys[i], model_keys[j]]
+            if v < lowest_val:
+                lowest_val = v
+                lowest_pair = [model_keys[i], model_keys[j]]
+
+    return {
+        "model_keys": model_keys,
+        "matrix": matrix,
+        "insufficient": False,
+        "common_days": len(common_dates),
+        "highest": {"pair": highest_pair, "value": highest_val} if highest_pair else None,
+        "lowest": {"pair": lowest_pair, "value": lowest_val} if lowest_pair else None,
+    }
+
+
 def _compute_personality_profiles(
     model_keys: list[str],
     portfolios: list[dict[str, Any]],
@@ -1138,6 +1239,12 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         agreement_returns = {"high_avg": None, "high_count": 0, "low_avg": None, "low_count": 0}
         confidence_calibration = {}
 
+    # Model correlation matrix — pairwise Pearson correlation of daily returns
+    try:
+        correlation_matrix = _compute_correlation_matrix(model_keys)
+    except Exception:
+        correlation_matrix = None
+
     # Model personality profiles — auto-generated from trading behavior
     try:
         personality_profiles = _compute_personality_profiles(
@@ -1170,6 +1277,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         "agreement_returns": agreement_returns,
         "confidence_calibration": confidence_calibration,
         "personality_profiles": personality_profiles,
+        "correlation_matrix": correlation_matrix,
         "mvp_trade": mvp_trade,
         "ticker_tape": ticker_tape,
         "market_brief": market_brief,

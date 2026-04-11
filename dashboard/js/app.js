@@ -1696,6 +1696,115 @@ function renderPersonalityProfiles(d) {
   });
 }
 
+// ===== Model Correlation Matrix =====
+function renderCorrelationMatrix(d) {
+  const container = document.getElementById("corr-content");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const corr = d.correlation_matrix;
+  if (!corr) return;
+
+  if (corr.insufficient) {
+    container.innerHTML = `<div class="corr-insufficient">Insufficient data — need 5+ overlapping trading days across all models (currently ${corr.common_days || 0})</div>`;
+    return;
+  }
+
+  const keys = corr.model_keys || [];
+  const matrix = corr.matrix || [];
+  const models = d.models || {};
+  const n = keys.length;
+  if (!n || !matrix.length) return;
+
+  // Short display names for headers
+  const shortNames = keys.map(k => {
+    const full = (models[k] || {}).display_name || k.toUpperCase();
+    // Take first word only if too long, e.g. "Claude Sonnet 4.6" -> "Sonnet"
+    const parts = full.split(" ");
+    if (parts.length >= 2 && parts[0] === "Claude") return parts[1];
+    return parts[0];
+  });
+
+  // Build grid: (n+1) columns (header col + n data cols), (n+1) rows
+  const grid = document.createElement("div");
+  grid.className = "corr-grid";
+  grid.style.gridTemplateColumns = `64px repeat(${n}, 56px)`;
+
+  // Top-left empty corner
+  grid.appendChild(createDiv("corr-cell corr-header", ""));
+
+  // Column headers
+  for (let j = 0; j < n; j++) {
+    const cell = createDiv("corr-cell corr-header corr-header-row", shortNames[j]);
+    cell.style.color = MODEL_COLORS[keys[j]] || TEXT;
+    grid.appendChild(cell);
+  }
+
+  // Data rows
+  for (let i = 0; i < n; i++) {
+    // Row header
+    const rh = createDiv("corr-cell corr-header corr-header-col", shortNames[i]);
+    rh.style.color = MODEL_COLORS[keys[i]] || TEXT;
+    grid.appendChild(rh);
+
+    for (let j = 0; j < n; j++) {
+      const v = matrix[i][j];
+      const cell = createDiv("corr-cell", v != null ? v.toFixed(2) : "—");
+
+      if (i === j) {
+        // Diagonal
+        cell.style.background = "var(--bg-row)";
+        cell.style.color = "var(--text-dim)";
+      } else if (v != null) {
+        cell.style.background = corrColor(v);
+        cell.style.color = v >= 0.5 ? "#f0f4fb" : v < 0 ? "#f0f4fb" : "#c8d4e6";
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  container.appendChild(grid);
+
+  // Insight line
+  const highest = corr.highest;
+  const lowest = corr.lowest;
+  if (highest && lowest) {
+    const hNames = highest.pair.map(k => {
+      const full = (models[k] || {}).display_name || k;
+      const parts = full.split(" ");
+      return parts.length >= 2 && parts[0] === "Claude" ? parts[1] : parts[0];
+    });
+    const lNames = lowest.pair.map(k => {
+      const full = (models[k] || {}).display_name || k;
+      const parts = full.split(" ");
+      return parts.length >= 2 && parts[0] === "Claude" ? parts[1] : parts[0];
+    });
+    const insight = document.createElement("div");
+    insight.className = "corr-insight";
+    insight.innerHTML = `Highest: <strong>${hNames[0]} \u2194 ${hNames[1]} (${highest.value.toFixed(2)})</strong> | Lowest: <strong>${lNames[0]} \u2194 ${lNames[1]} (${lowest.value.toFixed(2)})</strong> | ${corr.common_days} overlapping days`;
+    container.appendChild(insight);
+  }
+}
+
+function createDiv(className, text) {
+  const div = document.createElement("div");
+  div.className = className;
+  div.textContent = text;
+  return div;
+}
+
+function corrColor(v) {
+  // +0.8 to +1.0: dark blue, +0.5 to +0.8: medium blue,
+  // 0 to +0.5: gray, negative: red
+  if (v >= 0.8)  return "rgba(43, 138, 255, 0.55)";
+  if (v >= 0.65) return "rgba(43, 138, 255, 0.38)";
+  if (v >= 0.5)  return "rgba(43, 138, 255, 0.22)";
+  if (v >= 0.3)  return "rgba(95, 107, 128, 0.25)";
+  if (v >= 0)    return "rgba(95, 107, 128, 0.12)";
+  if (v >= -0.3) return "rgba(255, 51, 85, 0.15)";
+  return "rgba(255, 51, 85, 0.35)";
+}
+
 function renderHealth(d) {
   const c = document.getElementById("health-content");
   const lb = d.leaderboard || [];
@@ -1756,6 +1865,7 @@ async function refresh() {
   renderHeadToHead(d);
   renderConfidenceCalibration(d);
   renderPersonalityProfiles(d);
+  renderCorrelationMatrix(d);
   renderCostTracker(d);
   renderHealth(d);
   renderPortfolios(d);
