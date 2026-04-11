@@ -1145,6 +1145,65 @@ function drawCalibrationChart(canvas, buckets) {
   }
 }
 
+// ===== Model Personality Profiles =====
+function renderPersonalityProfiles(d) {
+  const grid = document.getElementById("profiles-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const profiles = d.personality_profiles || {};
+  const models = d.models || {};
+
+  MODEL_ORDER.forEach(key => {
+    const profile = profiles[key];
+    if (!profile) return;
+
+    const cfg = models[key] || {};
+    const displayName = cfg.display_name || key.toUpperCase();
+    const color = MODEL_COLORS[key] || TEXT;
+
+    const card = document.createElement("div");
+    card.className = "profile-card";
+    card.style.borderTopColor = color;
+
+    if (profile.insufficient) {
+      card.innerHTML = `
+        <div class="profile-header">
+          <div class="profile-model" style="color:${color}">${displayName}</div>
+        </div>
+        <div class="profile-insufficient">Insufficient data — needs 5+ trading days</div>
+      `;
+      grid.appendChild(card);
+      return;
+    }
+
+    const traits = profile.traits || {};
+    const traitRows = [
+      ["AGGRESSION", traits.aggression],
+      ["SECTOR BIAS", traits.sector_bias],
+      ["CONVICTION", traits.conviction],
+      ["FREQUENCY", traits.frequency],
+      ["CONCENTRATION", traits.concentration],
+    ].map(([name, t]) => {
+      if (!t) return "";
+      return `
+        <div class="profile-trait">
+          <span class="trait-name">${name}</span>
+          <span><span class="trait-value">${t.value}</span><span class="trait-detail">${t.detail}</span></span>
+        </div>`;
+    }).join("");
+
+    card.innerHTML = `
+      <div class="profile-header">
+        <div class="profile-model" style="color:${color}">${displayName}</div>
+        <div class="profile-label">${profile.label}</div>
+      </div>
+      <div class="profile-traits">${traitRows}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
 function renderHealth(d) {
   const c = document.getElementById("health-content");
   const lb = d.leaderboard || [];
@@ -1200,6 +1259,7 @@ async function refresh() {
   renderLeaderboard(d);
   renderConsensusPicks(d);
   renderConfidenceCalibration(d);
+  renderPersonalityProfiles(d);
   renderCostTracker(d);
   renderHealth(d);
   renderPortfolios(d);
