@@ -762,12 +762,8 @@ def _build_market_brief(
     Returns {brief: str, key_moves: str, as_of_date: str} ready for the frontend.
     """
     now_et = datetime.now(EASTERN)
-    as_of_date = now_et.strftime("%A, %B %-d" if hasattr(now_et, "day") else "%A, %B %d")
-    # Windows strftime doesn't support %-d
-    try:
-        as_of_date = now_et.strftime("%A, %B %-d")
-    except ValueError:
-        as_of_date = now_et.strftime("%A, %B %d").replace(" 0", " ")
+    # Windows strftime doesn't support %-d, so format then strip leading zero
+    as_of_date = now_et.strftime("%A, %B %d").replace(" 0", " ")
 
     # --- Index performance ---
     index_parts = []
