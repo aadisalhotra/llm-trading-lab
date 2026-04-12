@@ -134,6 +134,11 @@ class Portfolio:
             self.holdings[ticker] = Holding(ticker=ticker, shares=shares, avg_cost=price)
         self.cash -= cost
 
+    # Ghost-position threshold: any residual smaller than this gets swept
+    # off the books after a sell. Catches dust like 0.0001 shares left
+    # behind by float rounding in fractional executions.
+    GHOST_SHARES_EPSILON = 0.01
+
     def sell(self, ticker: str, shares: float, price: float) -> float:
         if ticker not in self.holdings:
             raise ValueError(f"Cannot sell {ticker}: not held")
@@ -143,9 +148,22 @@ class Portfolio:
         proceeds = shares * price
         h.shares -= shares
         self.cash += proceeds
-        if h.shares <= 1e-6:
+        if h.shares < self.GHOST_SHARES_EPSILON:
             del self.holdings[ticker]
         return proceeds
+
+    def sweep_ghost_positions(self) -> list[str]:
+        """Drop any holding with fewer than GHOST_SHARES_EPSILON shares.
+
+        These are dust positions left behind by fractional rounding — they
+        clutter the dashboard and confuse the model. Returns the list of
+        ticker symbols that were swept (for logging).
+        """
+        ghosts = [t for t, h in self.holdings.items()
+                  if h.shares < self.GHOST_SHARES_EPSILON]
+        for t in ghosts:
+            del self.holdings[t]
+        return ghosts
 
     def liquidate_all(self, prices: dict[str, float]) -> None:
         for ticker in list(self.holdings.keys()):

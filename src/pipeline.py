@@ -13,7 +13,15 @@ The pipeline runs in one of two modes, controlled by CLI flags:
                 generates the daily research report, and sends the daily
                 summary alert. Should fire once per trading day after 16:00 ET.
 
-  --force       bypass the market-open-now check (for manual smoke tests).
+  --force       run the pipeline even if invoked off-schedule. Does NOT
+                bypass the market-hours check — if NYSE is closed (weekend,
+                holiday, after-hours), the tick still skips. Use this to
+                force a manual run during market hours when the cron didn't
+                fire.
+
+  --force-trade implies --force AND bypasses the market-hours check. Use
+                this only for testing trade execution outside market hours;
+                it will execute live decisions on stale prices.
 
 The persistent intraday trade cap lives in
 `Portfolio.intraday.trades_executed_today` and resets automatically when a
@@ -352,13 +360,19 @@ def run_one_model(
     }
 
 
-def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
+def run_pipeline(mode: str = "intraday", force: bool = False,
+                 force_trade: bool = False) -> int:
     """Run one pipeline tick.
 
     `mode` is one of:
       "intraday"   — normal in-session tick (default)
       "end-of-day" — post-close wrap-up that also writes the EOD perf row,
                      generates the daily report, and sends the summary alert
+
+    `force` allows the pipeline to run when invoked off-schedule, but does
+    NOT bypass the market-hours check — trades only happen when the market
+    is genuinely open. `force_trade` additionally bypasses market hours
+    (use only for testing).
     """
     load_env()
     ensure_dirs()
@@ -367,23 +381,30 @@ def run_pipeline(mode: str = "intraday", force: bool = False) -> int:
     run_date = datetime.now(EASTERN)
     is_eod = (mode == "end-of-day")
 
-    logger.info("==== Pipeline start: %s | mode=%s | session=%s | exec_mode=%s | phase=%s ====",
+    # force_trade implies force
+    if force_trade:
+        force = True
+
+    logger.info("==== Pipeline start: %s | mode=%s | session=%s | exec_mode=%s | phase=%s | force=%s | force_trade=%s ====",
                 run_date.strftime("%Y-%m-%d %H:%M ET"),
                 mode,
                 run_date.strftime("%Y-%m-%d"),
                 settings["mode"],
-                settings["phase"])
+                settings["phase"],
+                force, force_trade)
 
-    # Skip silently outside market hours unless forced or this is the EOD pass.
+    # Market-hours guard. Only --force-trade bypasses this — bare --force
+    # used to bypass it but that let weekend/holiday "force" runs execute
+    # trades on stale prices.
     # is_market_open_today() catches NYSE holidays via pandas-market-calendars;
     # is_market_open_now() additionally enforces the 9:30-16:00 ET window.
     if is_eod:
-        if not is_market_open_today(run_date) and not force:
-            logger.info("Not a trading day — skipping EOD pass")
+        if not is_market_open_today(run_date) and not force_trade:
+            logger.info("Not a trading day — skipping EOD pass (use --force-trade to override)")
             return 0
     else:
-        if not is_market_open_now(run_date) and not force:
-            logger.info("Market closed (or outside 09:30-16:00 ET) — skipping intraday tick")
+        if not is_market_open_now(run_date) and not force_trade:
+            logger.info("Market closed (or outside 09:30-16:00 ET) — skipping intraday tick (use --force-trade to override)")
             return 0
 
     # Pull market data — intraday 15m bars by default, daily fallback at EOD
@@ -531,14 +552,17 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--intraday", action="store_true", help="Run a normal intraday tick (default)")
     group.add_argument("--end-of-day", action="store_true", help="Run the post-close EOD wrap-up")
-    parser.add_argument("--force", action="store_true", help="Bypass the market-open check")
+    parser.add_argument("--force", action="store_true",
+                        help="Run off-schedule (still respects market hours)")
+    parser.add_argument("--force-trade", action="store_true",
+                        help="Bypass market-hours check too — trades on stale prices, testing only")
     args = parser.parse_args()
 
     if args.end_of_day:
         mode = "end-of-day"
     else:
         mode = "intraday"
-    return run_pipeline(mode=mode, force=args.force)
+    return run_pipeline(mode=mode, force=args.force, force_trade=args.force_trade)
 
 
 if __name__ == "__main__":

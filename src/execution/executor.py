@@ -201,6 +201,11 @@ class Executor:
         else:
             order_id = f"PAPER_SELL_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         portfolio.sell(ticker, shares, price)
+        # Sweep any dust left over from this or earlier fractional sells
+        # so positions never linger as 0.0001-share ghosts on the dashboard.
+        swept = portfolio.sweep_ghost_positions()
+        if swept:
+            logger.info("Swept ghost positions after %s sell: %s", ticker, swept)
         return ExecutionResult(decision=decision, executed=True, side="SELL",
                                ticker=ticker, shares=shares, fill_price=price,
                                notional=shares * price, order_id=order_id)

@@ -742,11 +742,16 @@ function renderLeaderboard(d) {
       else streakLabel = `<span class="streak-loss">\u274C ${row.streak_count}L</span>`;
     }
 
+    const daysBadge = (cohort !== "benchmark" && row.days != null)
+      ? `<span class="days-badge" title="Days of EOD data">${row.days}d</span>`
+      : "";
+
     tr.innerHTML = `
       <td>${rankCell}</td>
       <td>
         <span class="model-name">${displayName}</span>
         ${badge}
+        ${daysBadge}
       </td>
       <td class="streak-cell">${streakLabel}</td>
       <td>${versionLabel}</td>
@@ -774,65 +779,6 @@ function renderLeaderboard(d) {
       const points = (curves[key] || []).map(p => ({ date: p.date, raw: p.value }));
       drawSparkline(canvas, points);
     });
-  });
-}
-
-function renderPortfolios(d) {
-  const grid = document.getElementById("portfolio-grid");
-  grid.innerHTML = "";
-  (d.portfolios || []).forEach(p => {
-    const card = document.createElement("div");
-    card.className = "portfolio-card";
-    if ((p.cohort || "core") === "expansion") card.classList.add("cohort-expansion");
-    const halted = p.halted ? `<span class="halted-badge">HALTED</span>` : "";
-    const cohortBadge = (p.cohort || "core") === "expansion"
-      ? `<span class="cohort-badge cohort-exp">EXP</span>`
-      : "";
-    const displayName = p.display_name || p.model_key.toUpperCase();
-    let holdingsTbl = "";
-    if (p.holdings && p.holdings.length) {
-      p.holdings.sort((a, b) => (b.weight || 0) - (a.weight || 0));
-      holdingsTbl = `
-        <table class="holdings">
-          <thead><tr>
-            <th>TICKER</th><th class="num">SHRS</th><th class="num">COST</th>
-            <th class="num">PRICE</th><th class="num">WT</th><th class="num">P/L</th>
-          </tr></thead>
-          <tbody>
-            ${p.holdings.map(h => `
-              <tr>
-                <td>${h.ticker}</td>
-                <td class="num">${fmtNum(h.shares, 2)}</td>
-                <td class="num">${fmtNum(h.avg_cost)}</td>
-                <td class="num">${fmtNum(h.current_price)}</td>
-                <td class="num">${fmtPct(h.weight, false)}</td>
-                <td class="num ${colorClass(h.unrealized_pl_pct)}">${fmtPct(h.unrealized_pl_pct)}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      `;
-    } else {
-      holdingsTbl = `<div class="empty">// no open positions — 100% cash</div>`;
-    }
-    card.innerHTML = `
-      <div class="card-header">
-        <div>
-          <span class="name">${displayName}</span>
-          ${cohortBadge}
-          <span class="provider"> // ${p.provider || ""} ${p.model_id || ""}</span>
-        </div>
-        ${halted}
-      </div>
-      <div class="summary">
-        <span class="k">VALUE</span><span class="v">${fmtMoney(p.total_value)}</span>
-        <span class="k">RETURN</span><span class="v ${colorClass(p.cumulative_return)}">${fmtPct(p.cumulative_return)}</span>
-        <span class="k">CASH</span><span class="v">${fmtMoney(p.cash)} (${fmtPct(p.cash_pct, false)})</span>
-        <span class="k">POSITIONS</span><span class="v">${(p.holdings || []).length} / ${d.max_positions || 10}</span>
-      </div>
-      ${holdingsTbl}
-    `;
-    grid.appendChild(card);
   });
 }
 
@@ -1808,7 +1754,6 @@ async function refresh() {
   renderCorrelationMatrix(d);
   renderCostTracker(d);
   renderHealth(d);
-  renderPortfolios(d);
   renderTradeFeed(d);
   renderVersionTicker(d);
 }
