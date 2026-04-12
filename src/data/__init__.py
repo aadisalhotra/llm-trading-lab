@@ -8,7 +8,7 @@ from .market_data import (
     is_market_open_now,
     INDEX_SYMBOLS,
 )
-from .news import fetch_news, hash_news_payload
+from .news import fetch_news, fetch_top_macro_headlines, hash_news_payload
 from .sentiment import (
     score_headline,
     aggregate_sentiment,

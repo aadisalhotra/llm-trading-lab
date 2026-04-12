@@ -47,6 +47,7 @@ from ..config_loader import NEWS_CACHE_DIR, load_settings, universe_symbols
 logger = logging.getLogger("llmlab.news")
 
 CACHE_FILE = NEWS_CACHE_DIR / "cache.json"
+MACRO_TOP_CACHE_FILE = NEWS_CACHE_DIR / "macro_top.json"
 HTTP_TIMEOUT = 10  # seconds — keep tight; news is best-effort
 
 # ---- Public API ----------------------------------------------------------
@@ -95,6 +96,135 @@ def fetch_news(
         logger.warning("All news providers returned empty / failed — pipeline will run without headlines")
 
     return _flatten_cache(fresh, headlines_per_stock, macro_count)
+
+
+def fetch_top_macro_headlines(
+    settings: dict[str, Any] | None = None,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """Return macro headlines for the Market Brief banner.
+
+    NewsAPI is the primary source — its `top-headlines?category=business`
+    endpoint pulls from CNN, Reuters, CNBC, Bloomberg, etc., which gives
+    much better macro coverage than Finnhub's general feed for the
+    Welcome banner specifically.
+
+    Cached separately from `fetch_news()` at /data/news_cache/macro_top.json
+    on the same hourly TTL so we stay well under NewsAPI's 100/day free
+    tier (24 calls/day per the default 60-minute TTL).
+
+    Falls back to whatever Finnhub macro is sitting in the main news cache
+    if NewsAPI is unavailable, unkeyed, or returns empty.
+    """
+    if settings is None:
+        settings = load_settings()
+    news_cfg = settings.get("news", {}) or {}
+    ttl_minutes = int(news_cfg.get("cache_ttl_minutes", 60))
+    macro_count = int(news_cfg.get("macro_headlines", 5))
+
+    if not force_refresh:
+        cached = _load_macro_top_cache(ttl_minutes)
+        if cached is not None:
+            logger.info("Using cached macro headlines (age: %ds, provider: %s, n=%d)",
+                        cached["_age_seconds"], cached.get("provider", "?"),
+                        len(cached.get("macro", [])))
+            return list(cached.get("macro", []))[:macro_count]
+
+    # --- Primary: NewsAPI ---
+    api_key = os.getenv("NEWS_API_KEY", "").strip()
+    if api_key:
+        try:
+            macro = _fetch_newsapi_top_business(api_key, macro_count)
+            if macro:
+                _write_macro_top_cache(macro, ttl_minutes, "newsapi")
+                logger.info("Fetched %d top macro headlines from NewsAPI", len(macro))
+                return macro
+            logger.info("NewsAPI returned no macro headlines — falling back to Finnhub cache")
+        except requests.RequestException as e:
+            logger.warning("NewsAPI macro fetch failed: %s — falling back to Finnhub cache", e)
+
+    # --- Fallback: Finnhub macro from the main news cache ---
+    if CACHE_FILE.exists():
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                main = json.load(f)
+            macro = list(main.get("macro", []) or [])[:macro_count]
+            if macro:
+                _write_macro_top_cache(macro, ttl_minutes, "finnhub_fallback")
+                logger.info("Using %d Finnhub macro headlines as NewsAPI fallback", len(macro))
+                return macro
+        except (OSError, json.JSONDecodeError):
+            logger.exception("Failed to read main news cache for macro fallback")
+
+    return []
+
+
+def _fetch_newsapi_top_business(api_key: str, count: int) -> list[dict[str, Any]]:
+    """Pull top US business headlines from NewsAPI's top-headlines endpoint."""
+    r = requests.get(
+        "https://newsapi.org/v2/top-headlines",
+        params={"category": "business", "country": "us", "pageSize": max(count, 5)},
+        headers={"X-Api-Key": api_key},
+        timeout=HTTP_TIMEOUT,
+    )
+    if not r.ok:
+        logger.warning("NewsAPI top-headlines HTTP %d: %s", r.status_code, r.text[:200])
+        return []
+    articles = (r.json() or {}).get("articles", []) or []
+    out: list[dict[str, Any]] = []
+    for a in articles:
+        title = (a.get("title") or "").strip()
+        if not title:
+            continue
+        out.append({
+            "title": title,
+            "source": (a.get("source") or {}).get("name", "NewsAPI"),
+            "datetime": a.get("publishedAt", ""),
+            "url": a.get("url", ""),
+            "summary": (a.get("description") or "")[:300],
+        })
+        if len(out) >= count:
+            break
+    return out
+
+
+def _load_macro_top_cache(ttl_minutes: int) -> dict[str, Any] | None:
+    """Read the dedicated macro-headline cache if it's still inside its TTL."""
+    if not MACRO_TOP_CACHE_FILE.exists():
+        return None
+    try:
+        with open(MACRO_TOP_CACHE_FILE, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Failed to read macro_top cache — treating as miss")
+        return None
+    fetched_at = payload.get("fetched_at", "")
+    try:
+        ts = datetime.fromisoformat(fetched_at)
+    except (TypeError, ValueError):
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - ts).total_seconds()
+    if age > ttl_minutes * 60:
+        return None
+    payload["_age_seconds"] = int(age)
+    return payload
+
+
+def _write_macro_top_cache(macro: list[dict[str, Any]], ttl_minutes: int,
+                           provider: str) -> None:
+    NEWS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "ttl_minutes": ttl_minutes,
+        "provider": provider,
+        "macro": macro,
+    }
+    tmp = MACRO_TOP_CACHE_FILE.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    tmp.replace(MACRO_TOP_CACHE_FILE)
 
 
 # ---- Cache layer ---------------------------------------------------------

@@ -849,26 +849,20 @@ def _format_macro_sentence(picked: dict[str, Any]) -> str:
     return f"Key headline: {title} — {phrase}."
 
 
-def _load_macro_headlines_from_cache() -> list[dict[str, Any]]:
-    """Read macro headlines from the news cache without triggering a fetch.
+def _load_macro_headlines_for_brief() -> list[dict[str, Any]]:
+    """Pull macro headlines for the Market Brief banner.
 
-    The pipeline already populates this cache earlier in the tick, so by
-    the time the dashboard is built we just read what's on disk. Returns
-    [] if the cache file doesn't exist or can't be parsed.
+    Delegates to `fetch_top_macro_headlines` which prefers NewsAPI's
+    business top-headlines (CNN/Reuters/CNBC/Bloomberg coverage) and
+    falls back to the Finnhub macro feed already cached by the standard
+    pipeline news pass. Both layers are cached on the configured hourly
+    TTL so this is essentially free on subsequent ticks.
     """
     try:
-        from ..config_loader import NEWS_CACHE_DIR
-    except ImportError:
-        return []
-    cache_file = NEWS_CACHE_DIR / "cache.json"
-    if not cache_file.exists():
-        return []
-    try:
-        with open(cache_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return list(data.get("macro", []) or [])
-    except (OSError, json.JSONDecodeError):
-        logger.exception("market brief: failed to read news cache")
+        from ..data import fetch_top_macro_headlines
+        return fetch_top_macro_headlines()
+    except Exception:
+        logger.exception("market brief: failed to load macro headlines")
         return []
 
 
@@ -1000,7 +994,7 @@ def _build_market_brief(
     # --- Top macro headline ---
     # Pulled from the news cache the pipeline already populated this tick.
     # Skipped silently if no headlines are available.
-    macro = _load_macro_headlines_from_cache()
+    macro = _load_macro_headlines_for_brief()
     picked = _pick_top_macro_headline(macro)
     if picked:
         sentences.append(_format_macro_sentence(picked))
