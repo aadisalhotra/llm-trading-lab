@@ -163,10 +163,9 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
     """Create a fresh portfolio for a model. Used on first run only.
 
     Inception date is the experiment start (from settings), not the wall-clock
-    date the state file happens to be created. This matters because the
-    pipeline can run in build/test phases before Phase A officially begins —
-    we don't want a state file created on 2026-04-08 to claim an April
-    inception when Phase A actually starts 2026-07-01.
+    date the state file happens to be created. This keeps the inception
+    pinned to the configured Phase A start even if the pipeline runs earlier
+    for build/test purposes.
     """
     settings = load_settings()
     mode = mode or settings["mode"]

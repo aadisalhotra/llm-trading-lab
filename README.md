@@ -118,14 +118,12 @@ An end-of-day pass at 5:30 PM ET writes daily performance snapshots, generates r
 ## Project Timeline
 
 ```
-Apr 2026    Pipeline build + dashboard launch
-May 2026    Dry runs, risk tuning, universe expansion to 75 stocks
-Jun 2026    Two-step screening, confidence calibration, consensus tracking
-Jul 2026    Paper trading begins — $100K per model
-            Monthly reports begin publishing
-Dec 2026    Paper phase ends — 6 months of data
-Jan 2027    Live trading begins — $1K real per model
-Jan 2028    Experiment concludes — capstone research report
+Apr 9, 2026   Phase A — Paper trading begins ($100K per model)
+Oct 9, 2026   Phase A ends — 6 months of paper data
+Mid-Oct 2026  Month 6 Paper Trading Final Report
+Nov 1, 2026   Phase B — Live trading begins ($1K real per model)
+Nov 1, 2027   Phase B ends — 12 months of live data
+Nov 2027      Month 18 Final Capstone Report
 ```
 
 ## Running Locally
