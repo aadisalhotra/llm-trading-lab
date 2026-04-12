@@ -754,28 +754,65 @@ def _build_ticker_tape(
 
 # Keyword tiers for picking the most market-moving macro headline. Higher
 # tier wins. Within a tier, more keyword hits wins. Order inside a tier
-# doesn't matter.
+# doesn't matter. A headline that matches NO tier is filtered out entirely
+# rather than shown — NewsAPI's business feed is noisy with tech gossip
+# and lifestyle stories that aren't market-relevant.
 _MACRO_TIERS: list[tuple[int, tuple[str, ...]]] = [
-    # Tier 1 — geopolitical / trade conflict
-    (3, (
-        "war", "conflict", "ceasefire", "sanction", "tariff", "trade war",
-        "trade dispute", "embargo", "missile", "strike", "airstrike",
-        "invasion", "military", "troops", "nato", "russia", "ukraine",
-        "china", "iran", "israel", "gaza", "hamas", "hezbollah", "houthi",
-        "taiwan", "north korea", "south china sea", "diplomat", "summit",
-        "treaty", "geopolitic",
-    )),
-    # Tier 2 — Fed / central banks
-    (2, (
+    # Tier 4 — central banks & monetary policy (highest signal)
+    (4, (
         "fed", "federal reserve", "fomc", "powell", "rate cut", "rate hike",
-        "interest rate", "monetary policy", "ecb", "boj", "central bank",
-        "dovish", "hawkish", "minutes",
+        "interest rate", "monetary policy", "quantitative", "tightening",
+        "easing", "dovish", "hawkish", "basis points", "ecb", "boj",
+        "central bank",
     )),
-    # Tier 3 — major economic data
+    # Tier 3 — geopolitical / trade conflict
+    (3, (
+        "war", "conflict", "ceasefire", "sanctions", "sanction", "tariff",
+        "trade war", "embargo", "nato", "missile", "nuclear", "invasion",
+        "troops", "military", "iran", "china", "russia", "taiwan",
+        "north korea", "opec", "strait of hormuz", "ukraine", "israel",
+        "gaza", "hamas", "hezbollah", "houthi",
+    )),
+    # Tier 2 — economic data & markets/finance
+    (2, (
+        "inflation", "cpi", "ppi", "gdp", "jobs", "unemployment", "nonfarm",
+        "payroll", "retail sales", "consumer confidence", "housing starts",
+        "pmi", "manufacturing", "recession", "stagflation", "economic growth",
+        "labor market", "jobless claims", "pce", "ism",
+        "s&p", "nasdaq", "dow", "treasury", "yield", "bond", "crash",
+        "rally", "correction", "bear market", "bull market", "selloff",
+        "sell-off", "capitulation", "volatility", "vix", "margin call",
+        "liquidity", "default", "bankruptcy", "bailout", "stimulus",
+        "debt ceiling",
+    )),
+    # Tier 1 — commodities, FX, policy, sectors, credit, corp actions, etc.
     (1, (
-        "cpi", "inflation", "ppi", "gdp", "jobs report", "nonfarm",
-        "payroll", "unemployment", "jobless claims", "retail sales",
-        "consumer confidence", "ism", "pce",
+        # Commodities & currencies
+        "oil", "crude", "natural gas", "gold", "silver", "copper", "dollar",
+        "euro", "yen", "dxy", "commodity", "energy prices",
+        # Sectors & corporate
+        "earnings", "revenue", "guidance", "layoffs", "merger", "acquisition",
+        "antitrust", "ipo", "sec", "regulation", "fda approval", "recall",
+        "data breach", "supply chain", "chip shortage", "ai spending",
+        "semiconductor",
+        # Policy & government
+        "biden", "trump", "congress", "executive order", "legislation",
+        "budget", "deficit", "spending bill", "shutdown", "infrastructure",
+        "tax",
+        # Crypto
+        "bitcoin", "crypto", "ethereum", "digital currency", "stablecoin",
+        # Real estate & housing
+        "mortgage", "housing market", "foreclosure", "home sales", "rent",
+        # Labor & social
+        "strike", "union", "minimum wage", "walkout",
+        # Health & disruption
+        "pandemic", "outbreak", "bird flu", "drug approval", "vaccine",
+        # Credit & ratings
+        "downgrade", "credit rating", "moody's", "fitch", "s&p global",
+        "sovereign debt",
+        # Corporate actions
+        "buyback", "dividend cut", "stock split", "insider selling",
+        "activist investor", "short squeeze",
     )),
 ]
 
@@ -816,9 +853,10 @@ def _pick_top_macro_headline(macro: list[dict[str, Any]]) -> dict[str, Any] | No
             break  # only count the highest matching tier per headline
 
     if best is None:
-        # Fallback: take the first headline so we always say something if
-        # macro data exists at all. Sentiment will be neutral.
-        return {"item": macro[0], "sentiment": "neutral"}
+        # No headline matched any market-relevant keyword — skip the macro
+        # sentence entirely rather than surfacing tech gossip or lifestyle
+        # filler from NewsAPI's business feed.
+        return None
 
     item = best[2]
     title = (item.get("title") or "").lower()
