@@ -33,7 +33,7 @@ def validate_decisions(
 
     Returns (accepted_decisions, violations). Violations are logged but other
     decisions still execute. Order matters: BUYs that would push the portfolio
-    over the 10-position cap or 20% allocation cap are dropped.
+    over the 50-position cap or 20% allocation cap are dropped.
 
     `trades_already_executed_today` is the persistent count of buys+sells the
     model has used so far this trading session (across prior intraday runs).

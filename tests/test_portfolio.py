@@ -65,7 +65,7 @@ def test_risk_clamps_oversize_weight():
 
 
 def test_risk_blocks_eleventh_position():
-    holdings = {f"T{i}": Holding(ticker=f"T{i}", shares=1, avg_cost=100) for i in range(10)}
+    holdings = {f"T{i}": Holding(ticker=f"T{i}", shares=1, avg_cost=100) for i in range(50)}
     p = Portfolio(model_key="t", cash=10_000, holdings=holdings, halted=False,
                   inception_value=20_000, inception_date="2026-04-08")
     # Use a real universe ticker that's not already held

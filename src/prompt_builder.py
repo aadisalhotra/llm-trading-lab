@@ -85,11 +85,11 @@ def _format_market_data_block(market_data: dict[str, pd.DataFrame]) -> str:
     return "\n".join(lines)
 
 
-def _format_portfolio_block(portfolio_state: dict[str, Any]) -> str:
+def _format_portfolio_block(portfolio_state: dict[str, Any], max_positions: int) -> str:
     lines = ["YOUR CURRENT PORTFOLIO STATE:"]
     lines.append(f"  Total value:   ${portfolio_state['total_value']:,.2f}")
     lines.append(f"  Cash:          ${portfolio_state['cash']:,.2f} ({portfolio_state['cash_pct']*100:.1f}%)")
-    lines.append(f"  Open positions: {len(portfolio_state['holdings'])} / 10 max")
+    lines.append(f"  Open positions: {len(portfolio_state['holdings'])} / {max_positions} max")
     if portfolio_state["holdings"]:
         lines.append("")
         lines.append("  HOLDINGS:")
@@ -421,7 +421,7 @@ def build_prompts(
         "",
         _format_market_data_block(scoped_data),
         "",
-        _format_portfolio_block(portfolio_state),
+        _format_portfolio_block(portfolio_state, int(settings["portfolio_rules"]["max_positions"])),
         "",
         _format_news_block(news_data, sentiment_data, scoped_syms),
         "",
