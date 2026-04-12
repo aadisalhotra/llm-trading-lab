@@ -752,6 +752,126 @@ def _build_ticker_tape(
     return tape
 
 
+# Keyword tiers for picking the most market-moving macro headline. Higher
+# tier wins. Within a tier, more keyword hits wins. Order inside a tier
+# doesn't matter.
+_MACRO_TIERS: list[tuple[int, tuple[str, ...]]] = [
+    # Tier 1 — geopolitical / trade conflict
+    (3, (
+        "war", "conflict", "ceasefire", "sanction", "tariff", "trade war",
+        "trade dispute", "embargo", "missile", "strike", "airstrike",
+        "invasion", "military", "troops", "nato", "russia", "ukraine",
+        "china", "iran", "israel", "gaza", "hamas", "hezbollah", "houthi",
+        "taiwan", "north korea", "south china sea", "diplomat", "summit",
+        "treaty", "geopolitic",
+    )),
+    # Tier 2 — Fed / central banks
+    (2, (
+        "fed", "federal reserve", "fomc", "powell", "rate cut", "rate hike",
+        "interest rate", "monetary policy", "ecb", "boj", "central bank",
+        "dovish", "hawkish", "minutes",
+    )),
+    # Tier 3 — major economic data
+    (1, (
+        "cpi", "inflation", "ppi", "gdp", "jobs report", "nonfarm",
+        "payroll", "unemployment", "jobless claims", "retail sales",
+        "consumer confidence", "ism", "pce",
+    )),
+]
+
+_POS_KEYWORDS = (
+    "rally", "surge", "jump", "gains", "ease", "eases", "ceasefire",
+    "agreement", "deal", "beat", "beats", "exceeds", "breakthrough",
+    "rebound", "rate cut", "cuts rates", "dovish", "optimism", "recover",
+    "resolved", "lifts", "lift", "boost",
+)
+_NEG_KEYWORDS = (
+    "plunge", "crash", "slump", "tumble", "sanction", "escalate",
+    "escalation", "attack", "invasion", "war", "tariff", "miss", "missed",
+    "shortfall", "hawkish", "rate hike", "raises rates", "fears", "warns",
+    "threat", "threatens", "risk", "concern", "selloff", "sell-off",
+    "downgrade", "recession", "strike", "halt", "ban",
+)
+
+
+def _pick_top_macro_headline(macro: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Score macro headlines by tier + keyword hits and return the top one
+    with an inferred sentiment label. Returns None if nothing scored.
+    """
+    if not macro:
+        return None
+
+    best: tuple[int, int, dict[str, Any]] | None = None  # (tier, hits, item)
+    for item in macro:
+        title = (item.get("title") or "").lower()
+        if not title:
+            continue
+        for weight, keywords in _MACRO_TIERS:
+            hits = sum(1 for kw in keywords if kw in title)
+            if hits == 0:
+                continue
+            score = (weight, hits)
+            if best is None or score > (best[0], best[1]):
+                best = (weight, hits, item)
+            break  # only count the highest matching tier per headline
+
+    if best is None:
+        # Fallback: take the first headline so we always say something if
+        # macro data exists at all. Sentiment will be neutral.
+        return {"item": macro[0], "sentiment": "neutral"}
+
+    item = best[2]
+    title = (item.get("title") or "").lower()
+    pos_hits = sum(1 for kw in _POS_KEYWORDS if kw in title)
+    neg_hits = sum(1 for kw in _NEG_KEYWORDS if kw in title)
+    if neg_hits > pos_hits:
+        sentiment = "negative"
+    elif pos_hits > neg_hits:
+        sentiment = "positive"
+    else:
+        sentiment = "neutral"
+    return {"item": item, "sentiment": sentiment}
+
+
+def _format_macro_sentence(picked: dict[str, Any]) -> str:
+    """Render the picked headline into the one-sentence brief line."""
+    item = picked["item"]
+    sentiment = picked["sentiment"]
+    title = (item.get("title") or "").strip().rstrip(".")
+    # Trim absurdly long titles so the brief stays readable
+    if len(title) > 140:
+        title = title[:137].rstrip() + "..."
+    phrase = {
+        "positive": "broadly positive for equities",
+        "negative": "headwind for risk assets",
+        "neutral": "market reaction muted",
+    }[sentiment]
+    return f"Key headline: {title} — {phrase}."
+
+
+def _load_macro_headlines_from_cache() -> list[dict[str, Any]]:
+    """Read macro headlines from the news cache without triggering a fetch.
+
+    The pipeline already populates this cache earlier in the tick, so by
+    the time the dashboard is built we just read what's on disk. Returns
+    [] if the cache file doesn't exist or can't be parsed.
+    """
+    try:
+        from ..config_loader import NEWS_CACHE_DIR
+    except ImportError:
+        return []
+    cache_file = NEWS_CACHE_DIR / "cache.json"
+    if not cache_file.exists():
+        return []
+    try:
+        with open(cache_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return list(data.get("macro", []) or [])
+    except (OSError, json.JSONDecodeError):
+        logger.exception("market brief: failed to read news cache")
+        return []
+
+
 def _build_market_brief(
     leaderboard: list[dict[str, Any]],
     portfolios: list[dict[str, Any]],
@@ -876,6 +996,14 @@ def _build_market_brief(
         cum_name = cum_cfg.get("display_name", cum_leader["model_key"])
         cum_ret = cum_leader.get("cumulative_return") or 0
         sentences.append(f"Cumulative leader: {cum_name} at {cum_ret * 100:+.2f}%.")
+
+    # --- Top macro headline ---
+    # Pulled from the news cache the pipeline already populated this tick.
+    # Skipped silently if no headlines are available.
+    macro = _load_macro_headlines_from_cache()
+    picked = _pick_top_macro_headline(macro)
+    if picked:
+        sentences.append(_format_macro_sentence(picked))
 
     brief = " ".join(sentences)
 
