@@ -828,7 +828,7 @@ function renderPortfolios(d) {
         <span class="k">VALUE</span><span class="v">${fmtMoney(p.total_value)}</span>
         <span class="k">RETURN</span><span class="v ${colorClass(p.cumulative_return)}">${fmtPct(p.cumulative_return)}</span>
         <span class="k">CASH</span><span class="v">${fmtMoney(p.cash)} (${fmtPct(p.cash_pct, false)})</span>
-        <span class="k">POSITIONS</span><span class="v">${(p.holdings || []).length} / 10</span>
+        <span class="k">POSITIONS</span><span class="v">${(p.holdings || []).length} / ${d.max_positions || 10}</span>
       </div>
       ${holdingsTbl}
     `;
