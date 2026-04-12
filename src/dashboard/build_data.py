@@ -6,6 +6,7 @@ The frontend is purely static; everything dynamic flows through this JSON.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -31,6 +32,8 @@ from ..data.market_data import fetch_universe_data, INDEX_SYMBOLS
 from ..portfolio import load_portfolio
 
 EASTERN = ZoneInfo("America/New_York")
+
+logger = logging.getLogger(__name__)
 
 
 def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any]]:
@@ -782,7 +785,7 @@ def _build_market_brief(
                     short_label = "Dow"
                 index_parts.append(f"{short_label} {pct:+.2f}%")
     except Exception:
-        pass
+        logger.exception("market brief: failed to fetch index data")
     index_str = ", ".join(index_parts) if index_parts else "index data unavailable"
 
     # --- Sector performance (from universe prices) ---
@@ -816,7 +819,7 @@ def _build_market_brief(
                 pct = (close / prev - 1) * 100 if prev else 0
                 sector_returns.setdefault(t["sector"], []).append(pct)
     except Exception:
-        pass
+        logger.exception("market brief: failed to fetch sector data")
 
     sector_avg = {}
     for sec, rets in sector_returns.items():
@@ -1001,18 +1004,21 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     try:
         budget_status = compute_budget_status(settings)
     except Exception:
+        logger.exception("compute_budget_status failed; using empty fallback")
         budget_status = {"providers": {}, "any_warn": False, "any_critical": False}
 
     # MVP Trade — best single trade of the day (or most recent trading day)
     try:
         mvp_trade = _find_mvp_trade(model_keys, portfolios, settings)
     except Exception:
+        logger.exception("_find_mvp_trade failed; mvp_trade=None")
         mvp_trade = None
 
     # Ticker tape — top 10 most-held stocks with price + daily change
     try:
         ticker_tape = _build_ticker_tape(portfolios, universe)
     except Exception:
+        logger.exception("_build_ticker_tape failed; ticker_tape=[]")
         ticker_tape = []
 
     # Market brief — Bloomberg-style summary for the dashboard banner
@@ -1021,6 +1027,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
             leaderboard, portfolios, model_keys, settings, prices or {}, universe,
         )
     except Exception:
+        logger.exception("_build_market_brief failed; market_brief banner will be hidden")
         market_brief = {"brief": "", "key_moves": "", "as_of_date": ""}
 
     # Consensus picks + trade analytics (agreement returns, confidence calibration)
@@ -1031,6 +1038,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
             model_keys, portfolios,
         )
     except Exception:
+        logger.exception("_compute_trade_analytics failed; using empty fallbacks")
         agreement_returns = {"high_avg": None, "high_count": 0, "low_avg": None, "low_count": 0}
         confidence_calibration = {}
 
@@ -1038,6 +1046,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     try:
         correlation_matrix = _compute_correlation_matrix(model_keys)
     except Exception:
+        logger.exception("_compute_correlation_matrix failed; correlation_matrix=None")
         correlation_matrix = None
 
     payload = {
