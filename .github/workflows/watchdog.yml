@@ -1,0 +1,33 @@
+name: Watchdog — kick off intraday pipeline at market open
+
+# Safety net: GitHub sometimes throttles or delays high-frequency cron.
+# This workflow uses a different cron cadence (once daily at 13:00 UTC
+# Mon–Fri) that GitHub is far less likely to skip. Its only job is to
+# dispatch the intraday pipeline at US market open (09:00 ET EDT /
+# 08:00 ET EST). From there, intraday.yml's self-chain job keeps the
+# ticks flowing every 15 minutes until market close.
+
+on:
+  schedule:
+    - cron: "0 13 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  kick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch intraday pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}'
+          echo "Dispatched intraday.yml"

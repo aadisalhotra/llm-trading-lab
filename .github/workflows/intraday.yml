@@ -32,6 +32,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: write
 
 # Stop overlapping ticks from racing to commit data — if a previous run is
 # still going, the new one waits its turn.
@@ -118,6 +119,64 @@ jobs:
             git pull --rebase origin main
             git push
           fi
+
+  # Self-perpetuating chain: after each successful intraday tick, if we're
+  # still inside market hours, sleep until the next 15-minute boundary and
+  # dispatch intraday.yml again. This decouples us from GitHub's cron
+  # scheduler entirely — even if */15 is throttled, the chain keeps ticking
+  # once the watchdog kicks it off at 13:00 UTC.
+  chain:
+    needs: run
+    runs-on: ubuntu-latest
+    if: success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
+    steps:
+      - name: Sleep to next 15-minute boundary, then dispatch next tick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          NOW_MIN=$(date -u +%M)
+          NOW_SEC=$(date -u +%S)
+          NOW_HOUR=$(date -u +%H)
+          NOW_DOW=$(date -u +%u)  # 1=Mon..7=Sun
+
+          # Stop chain on weekends (shouldn't happen, but be safe)
+          if [ "$NOW_DOW" -gt 5 ]; then
+            echo "Weekend — stopping chain"
+            exit 0
+          fi
+
+          # Stop chain after 19:45 UTC: the 20:00 cron + 21:00 EOD cover the rest.
+          # (Those fire on their own reliably because they aren't */15.)
+          if [ "$NOW_HOUR" -ge 20 ]; then
+            echo "Past 20:00 UTC — stopping chain (EOD crons take over)"
+            exit 0
+          fi
+
+          # Seconds until next 15-min boundary + 30s buffer so the dispatch
+          # lands after the wall-clock minute rolls over.
+          MIN_MOD=$(( 10#$NOW_MIN % 15 ))
+          WAIT=$(( (15 - MIN_MOD) * 60 - 10#$NOW_SEC + 30 ))
+          if [ "$WAIT" -lt 60 ]; then
+            WAIT=$(( WAIT + 900 ))
+          fi
+          echo "Sleeping ${WAIT}s until next tick..."
+          sleep "$WAIT"
+
+          # Re-check hour after sleep in case we crossed 20:00 UTC
+          POST_HOUR=$(date -u +%H)
+          if [ "$POST_HOUR" -ge 20 ]; then
+            echo "Crossed 20:00 UTC during sleep — stopping chain"
+            exit 0
+          fi
+
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}'
+          echo "Dispatched next intraday tick"
 
   pages:
     needs: run
