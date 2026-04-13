@@ -1034,8 +1034,12 @@ def _build_market_brief(
     # Skipped silently if no headlines are available.
     macro = _load_macro_headlines_for_brief()
     picked = _pick_top_macro_headline(macro)
+    macro_sentence = ""
+    macro_sentiment = "neutral"
     if picked:
-        sentences.append(_format_macro_sentence(picked))
+        macro_sentence = _format_macro_sentence(picked)
+        macro_sentiment = picked["sentiment"]
+        sentences.append(macro_sentence)
 
     brief = " ".join(sentences)
 
@@ -1068,6 +1072,8 @@ def _build_market_brief(
         "brief": brief,
         "key_moves": key_moves,
         "as_of_date": as_of_date,
+        "macro_sentence": macro_sentence,
+        "macro_sentiment": macro_sentiment,
     }
 
 
@@ -1188,7 +1194,10 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         )
     except Exception:
         logger.exception("_build_market_brief failed; market_brief banner will be hidden")
-        market_brief = {"brief": "", "key_moves": "", "as_of_date": ""}
+        market_brief = {
+            "brief": "", "key_moves": "", "as_of_date": "",
+            "macro_sentence": "", "macro_sentiment": "neutral",
+        }
 
     # Consensus picks + trade analytics (agreement returns, confidence calibration)
     recent_all = _recent_trades(model_keys, limit=50)

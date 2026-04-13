@@ -537,10 +537,24 @@ function renderMarketBrief(d) {
     : "";
 
   // Highlight "Welcome." prefix
-  const formatted = brief.replace(
+  let formatted = brief.replace(
     /^Welcome\./,
     '<span class="brief-welcome">Welcome.</span>',
   );
+
+  // Color-code the macro headline sentence by inferred sentiment.
+  // Backend hands us the exact sentence string + sentiment tag so we
+  // don't have to parse the brief ourselves.
+  const macroSentence = mb.macro_sentence || "";
+  const macroSentiment = mb.macro_sentiment || "neutral";
+  if (macroSentence && macroSentiment !== "neutral") {
+    const escaped = macroSentence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    formatted = formatted.replace(
+      new RegExp(escaped),
+      `<span class="brief-macro brief-macro-${macroSentiment}">${macroSentence}</span>`,
+    );
+  }
+
   textEl.innerHTML = formatted + staleNote;
 
   if (movesEl) {
