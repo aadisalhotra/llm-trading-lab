@@ -194,6 +194,12 @@ jobs:
         run: |
           mkdir -p dashboard/data
           cp data/dashboard.json dashboard/data/dashboard.json
+          # Stamp asset version into index.html so browsers can't serve a
+          # cached shell that references stale JS/CSS. The JSON itself is
+          # already cache-busted at fetch time inside app.js.
+          VERSION="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          sed -i "s/__ASSET_VERSION__/${VERSION}/g" dashboard/index.html
+          echo "Asset version: ${VERSION}"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload dashboard artifact
