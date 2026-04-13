@@ -726,6 +726,70 @@ body {
   color: var(--text-dim);
   border: 1px solid var(--text-dim);
 }
+/* ===== Per-model portfolio panels ===== */
+.portfolios-panel { margin-bottom: 12px; }
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 4px;
+}
+@media (max-width: 900px) {
+  .portfolio-grid { grid-template-columns: 1fr; }
+}
+.portfolio-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+}
+.portfolio-card.cohort-expansion {
+  border-left: 2px solid var(--accent-dim);
+}
+.portfolio-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.portfolio-card .name { color: var(--text-bright); font-weight: 700; letter-spacing: 1px; font-size: 12px; }
+.portfolio-card .provider { color: var(--text-dim); font-size: 10px; }
+.portfolio-card .summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.portfolio-card .summary .k { color: var(--text-dim); font-size: 10px; }
+.portfolio-card .summary .v { color: var(--text-bright); text-align: right; font-weight: 600; }
+.portfolio-card .summary .v.pos { color: var(--green); }
+.portfolio-card .summary .v.neg { color: var(--red); }
+.portfolio-card table.holdings {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+.portfolio-card table.holdings th {
+  color: var(--text-dim);
+  text-align: left;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-bright);
+}
+.portfolio-card table.holdings td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--bg-row);
+}
+.portfolio-card table.holdings tr:hover td { background: var(--bg-row); }
+.portfolio-card table.holdings .num { text-align: right; font-variant-numeric: tabular-nums; }
+.portfolio-card table.holdings .pos { color: var(--green); }
+.portfolio-card table.holdings .neg { color: var(--red); }
+.portfolio-card .empty { color: var(--text-dim); font-size: 11px; padding: 8px 0; font-style: italic; }
+
 .days-badge {
   display: inline-block;
   padding: 1px 5px;

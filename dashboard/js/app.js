@@ -796,6 +796,67 @@ function renderLeaderboard(d) {
   });
 }
 
+function renderPortfolios(d) {
+  const grid = document.getElementById("portfolio-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const maxPositions = d.max_positions || 50;
+  (d.portfolios || []).forEach(p => {
+    const card = document.createElement("div");
+    card.className = "portfolio-card";
+    if ((p.cohort || "core") === "expansion") card.classList.add("cohort-expansion");
+    const halted = p.halted ? `<span class="halted-badge">HALTED</span>` : "";
+    const cohortBadge = (p.cohort || "core") === "expansion"
+      ? `<span class="cohort-badge cohort-exp">EXP</span>`
+      : "";
+    const displayName = p.display_name || p.model_key.toUpperCase();
+    let holdingsTbl = "";
+    if (p.holdings && p.holdings.length) {
+      const sorted = p.holdings.slice().sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      holdingsTbl = `
+        <table class="holdings">
+          <thead><tr>
+            <th>TICKER</th><th class="num">SHRS</th><th class="num">COST</th>
+            <th class="num">PRICE</th><th class="num">WT</th><th class="num">P/L</th>
+          </tr></thead>
+          <tbody>
+            ${sorted.map(h => `
+              <tr>
+                <td>${h.ticker}</td>
+                <td class="num">${fmtNum(h.shares, 2)}</td>
+                <td class="num">${fmtNum(h.avg_cost)}</td>
+                <td class="num">${fmtNum(h.current_price)}</td>
+                <td class="num">${fmtPct(h.weight, false)}</td>
+                <td class="num ${colorClass(h.unrealized_pl_pct)}">${fmtPct(h.unrealized_pl_pct)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    } else {
+      holdingsTbl = `<div class="empty">// no open positions — 100% cash</div>`;
+    }
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <span class="name">${displayName}</span>
+          ${cohortBadge}
+          <span class="provider"> // ${p.provider || ""} ${p.model_id || ""}</span>
+        </div>
+        ${halted}
+      </div>
+      <div class="summary">
+        <span class="k">VALUE</span><span class="v">${fmtMoney(p.total_value)}</span>
+        <span class="k">RETURN</span><span class="v ${colorClass(p.cumulative_return)}">${fmtPct(p.cumulative_return)}</span>
+        <span class="k">CASH</span><span class="v">${fmtMoney(p.cash)} (${fmtPct(p.cash_pct, false)})</span>
+        <span class="k">POSITIONS</span><span class="v">${(p.holdings || []).length} / ${maxPositions}</span>
+      </div>
+      ${holdingsTbl}
+    `;
+    grid.appendChild(card);
+  });
+}
+
 function renderTradeFeed(d) {
   const feed = document.getElementById("trade-feed");
   feed.innerHTML = "";
@@ -1769,6 +1830,7 @@ async function refresh() {
   renderCostTracker(d);
   renderHealth(d);
   renderTradeFeed(d);
+  renderPortfolios(d);
   renderVersionTicker(d);
 }
 
