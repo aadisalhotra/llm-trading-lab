@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-13T21:32:45.134600",
+  "generated_at": "2026-04-13T23:30:41.700468",
   "phase": "Phase A - Paper Trading",
   "mode": "paper",
   "experiment_day": 5,
@@ -9,16 +9,16 @@
   "leaderboard": [
     {
       "model_key": "deepseek",
-      "days": 10,
+      "days": 11,
       "cumulative_return": 0.0975517739009133,
-      "daily_pnl_pct": 0.010095634368492014,
-      "win_rate": 0.4444444444444444,
-      "sharpe_30d": 6.865428517768923,
-      "sharpe_90d": 6.865428517768923,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.4,
+      "sharpe_30d": 6.485815856564128,
+      "sharpe_90d": 6.485815856564128,
       "max_drawdown": -0.003579200797986092,
       "alpha_vs_spy": 0.08262600997056757,
-      "streak_count": 2,
-      "streak_type": "W",
+      "streak_count": 0,
+      "streak_type": null,
       "current_value": 109755.17739009134,
       "current_cash_pct": 0.028761627494334203,
       "num_positions": 10,
@@ -52,67 +52,23 @@
       ]
     },
     {
-      "model_key": "claude",
-      "days": 5,
-      "cumulative_return": 0.04818665054974636,
-      "daily_pnl_pct": 0.0036070323352806067,
-      "win_rate": 1.0,
-      "sharpe_30d": null,
-      "sharpe_90d": null,
-      "max_drawdown": 0.0,
-      "alpha_vs_spy": 0.03980929757010232,
-      "streak_count": 4,
-      "streak_type": "W",
-      "current_value": 104855.5995319809,
-      "current_cash_pct": 0.041319561003097235,
-      "num_positions": 14,
-      "halted": false,
-      "last_api_success": true,
-      "rank": 2,
-      "cohort": "core",
-      "display_name": "Claude Sonnet 4.6",
-      "recent_summaries": [
-        {
-          "timestamp": "2026-04-13T19:40:46.179691",
-          "side": "BUY",
-          "ticker": "TMUS",
-          "confidence": 6,
-          "summary": "Initiating small TMUS position on KeyBanc upgrade to Overweight citing network advantage and compressed valuation as a near-term catalyst."
-        },
-        {
-          "timestamp": "2026-04-13T19:40:46.179681",
-          "side": "BUY",
-          "ticker": "INTC",
-          "confidence": 7,
-          "summary": "Adding INTC on the landmark Google partnership announcement and AI momentum, with the stock extending a 5% rally today."
-        },
-        {
-          "timestamp": "2026-04-13T19:40:46.179667",
-          "side": "SELL",
-          "ticker": "COST",
-          "confidence": 6,
-          "summary": "Exiting COST position as it is down -4.76% unrealized and is the largest underperformer in the portfolio with no near-term recovery catalyst."
-        }
-      ]
-    },
-    {
       "model_key": "claude_opus",
-      "days": 10,
+      "days": 11,
       "cumulative_return": 0.04809765857672099,
-      "daily_pnl_pct": 0.0031849256135319513,
-      "win_rate": 0.5555555555555556,
-      "sharpe_30d": 8.174249701616287,
-      "sharpe_90d": 8.174249701616287,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.5,
+      "sharpe_30d": 7.689249984966867,
+      "sharpe_90d": 7.689249984966867,
       "max_drawdown": -1.455191522836685e-16,
       "alpha_vs_spy": 0.033171894646375266,
-      "streak_count": 1,
-      "streak_type": "W",
+      "streak_count": 0,
+      "streak_type": null,
       "current_value": 104809.7658576721,
       "current_cash_pct": 0.16183701361388744,
       "num_positions": 11,
       "halted": false,
       "last_api_success": true,
-      "rank": 3,
+      "rank": 2,
       "cohort": "expansion",
       "display_name": "Claude Opus 4.6",
       "recent_summaries": [
@@ -140,17 +96,61 @@
       ]
     },
     {
+      "model_key": "claude",
+      "days": 6,
+      "cumulative_return": 0.047728475251807456,
+      "daily_pnl_pct": -0.0004371123193551624,
+      "win_rate": 0.8,
+      "sharpe_30d": 7.796776789825994,
+      "sharpe_90d": 7.796776789825994,
+      "max_drawdown": -0.0004371123193551624,
+      "alpha_vs_spy": 0.03935112227216342,
+      "streak_count": 1,
+      "streak_type": "L",
+      "current_value": 104809.7658576721,
+      "current_cash_pct": 0.16183701361388744,
+      "num_positions": 11,
+      "halted": false,
+      "last_api_success": true,
+      "rank": 3,
+      "cohort": "core",
+      "display_name": "Claude Sonnet 4.6",
+      "recent_summaries": [
+        {
+          "timestamp": "2026-04-13T19:40:46.179691",
+          "side": "BUY",
+          "ticker": "TMUS",
+          "confidence": 6,
+          "summary": "Initiating small TMUS position on KeyBanc upgrade to Overweight citing network advantage and compressed valuation as a near-term catalyst."
+        },
+        {
+          "timestamp": "2026-04-13T19:40:46.179681",
+          "side": "BUY",
+          "ticker": "INTC",
+          "confidence": 7,
+          "summary": "Adding INTC on the landmark Google partnership announcement and AI momentum, with the stock extending a 5% rally today."
+        },
+        {
+          "timestamp": "2026-04-13T19:40:46.179667",
+          "side": "SELL",
+          "ticker": "COST",
+          "confidence": 6,
+          "summary": "Exiting COST position as it is down -4.76% unrealized and is the largest underperformer in the portfolio with no near-term recovery catalyst."
+        }
+      ]
+    },
+    {
       "model_key": "grok",
-      "days": 10,
+      "days": 11,
       "cumulative_return": 0.03867099094846704,
-      "daily_pnl_pct": 0.023673795957409878,
-      "win_rate": 0.4444444444444444,
-      "sharpe_30d": 7.17754957250999,
-      "sharpe_90d": 7.17754957250999,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.4,
+      "sharpe_30d": 6.774190697447784,
+      "sharpe_90d": 6.774190697447784,
       "max_drawdown": -0.002901740053934548,
       "alpha_vs_spy": 0.023745227018121318,
-      "streak_count": 2,
-      "streak_type": "W",
+      "streak_count": 0,
+      "streak_type": null,
       "current_value": 103867.0990948467,
       "current_cash_pct": 0.011017311378542198,
       "num_positions": 11,
@@ -185,16 +185,16 @@
     },
     {
       "model_key": "gpt",
-      "days": 10,
+      "days": 11,
       "cumulative_return": 0.03263570454641762,
-      "daily_pnl_pct": 0.014711293486868657,
-      "win_rate": 0.4444444444444444,
-      "sharpe_30d": 6.079930522862056,
-      "sharpe_90d": 6.079930522862056,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.4,
+      "sharpe_30d": 5.756561726619196,
+      "sharpe_90d": 5.756561726619196,
       "max_drawdown": -0.011645866984703133,
       "alpha_vs_spy": 0.017709940616071895,
-      "streak_count": 1,
-      "streak_type": "W",
+      "streak_count": 0,
+      "streak_type": null,
       "current_value": 103263.57045464178,
       "current_cash_pct": 0.039624055533264695,
       "num_positions": 8,
@@ -229,16 +229,16 @@
     },
     {
       "model_key": "gemini",
-      "days": 10,
+      "days": 11,
       "cumulative_return": -0.016948677803672596,
-      "daily_pnl_pct": 0.018558771194649697,
-      "win_rate": 0.3333333333333333,
-      "sharpe_30d": -1.2799031127599643,
-      "sharpe_90d": -1.2799031127599643,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.3,
+      "sharpe_30d": -1.221341517093559,
+      "sharpe_90d": -1.221341517093559,
       "max_drawdown": -0.05392262454006987,
       "alpha_vs_spy": -0.03187444173401832,
-      "streak_count": 1,
-      "streak_type": "W",
+      "streak_count": 0,
+      "streak_type": null,
       "current_value": 98305.13221963272,
       "current_cash_pct": 0.019124706504775404,
       "num_positions": 8,
@@ -273,12 +273,12 @@
     },
     {
       "model_key": "spy_benchmark",
-      "days": 10,
+      "days": 11,
       "cumulative_return": 0.014925763930345726,
-      "daily_pnl_pct": 0.009772397784351844,
-      "win_rate": 0.2222222222222222,
-      "sharpe_30d": 6.954364333005274,
-      "sharpe_90d": 6.954364333005274,
+      "daily_pnl_pct": 0.0,
+      "win_rate": 0.2,
+      "sharpe_30d": 6.568069552818508,
+      "sharpe_90d": 6.568069552818508,
       "max_drawdown": -0.001381543809049342,
       "alpha_vs_spy": 0.0,
       "streak_count": 0,
@@ -1666,6 +1666,11 @@
         "date": "2026-04-13",
         "value": 104855.5995319809,
         "benchmark": 686.0999755859375
+      },
+      {
+        "date": "2026-04-13",
+        "value": 104809.7658576721,
+        "benchmark": 686.0999755859375
       }
     ],
     "gpt": [
@@ -1713,6 +1718,11 @@
         "date": "2026-04-10",
         "value": 101766.45427863084,
         "benchmark": 679.4600219726562
+      },
+      {
+        "date": "2026-04-13",
+        "value": 103263.57045464178,
+        "benchmark": 686.0999755859375
       },
       {
         "date": "2026-04-13",
@@ -1770,6 +1780,11 @@
         "date": "2026-04-13",
         "value": 98305.13221963272,
         "benchmark": 686.0999755859375
+      },
+      {
+        "date": "2026-04-13",
+        "value": 98305.13221963272,
+        "benchmark": 686.0999755859375
       }
     ],
     "grok": [
@@ -1817,6 +1832,11 @@
         "date": "2026-04-10",
         "value": 101465.03652338103,
         "benchmark": 679.4600219726562
+      },
+      {
+        "date": "2026-04-13",
+        "value": 103867.0990948467,
+        "benchmark": 686.0999755859375
       },
       {
         "date": "2026-04-13",
@@ -1874,6 +1894,11 @@
         "date": "2026-04-13",
         "value": 109755.17739009134,
         "benchmark": 686.0999755859375
+      },
+      {
+        "date": "2026-04-13",
+        "value": 109755.17739009134,
+        "benchmark": 686.0999755859375
       }
     ],
     "claude_opus": [
@@ -1921,6 +1946,11 @@
         "date": "2026-04-10",
         "value": 104477.0143386795,
         "benchmark": 679.4600219726562
+      },
+      {
+        "date": "2026-04-13",
+        "value": 104809.7658576721,
+        "benchmark": 686.0999755859375
       },
       {
         "date": "2026-04-13",
@@ -1978,6 +2008,11 @@
         "date": "2026-04-13",
         "value": 101492.57639303457,
         "benchmark": 686.0999755859375
+      },
+      {
+        "date": "2026-04-13",
+        "value": 101492.57639303457,
+        "benchmark": 686.0999755859375
       }
     ]
   },
@@ -2024,6 +2059,13 @@
         "benchmark": 686.0999755859375,
         "trades_today": 5,
         "runs_today": 2
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
+        "value": 104809.7658576721,
+        "benchmark": 686.0999755859375,
+        "trades_today": 0,
+        "runs_today": 2
       }
     ],
     "gpt": [
@@ -2068,6 +2110,13 @@
         "benchmark": 686.0999755859375,
         "trades_today": 17,
         "runs_today": 6
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
+        "value": 103263.57045464178,
+        "benchmark": 686.0999755859375,
+        "trades_today": 17,
+        "runs_today": 7
       }
     ],
     "gemini": [
@@ -2112,6 +2161,13 @@
         "benchmark": 686.0999755859375,
         "trades_today": 8,
         "runs_today": 6
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
+        "value": 98305.13221963272,
+        "benchmark": 686.0999755859375,
+        "trades_today": 8,
+        "runs_today": 7
       }
     ],
     "grok": [
@@ -2156,6 +2212,13 @@
         "benchmark": 686.0999755859375,
         "trades_today": 14,
         "runs_today": 6
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
+        "value": 103867.0990948467,
+        "benchmark": 686.0999755859375,
+        "trades_today": 14,
+        "runs_today": 7
       }
     ],
     "deepseek": [
@@ -2200,6 +2263,13 @@
         "benchmark": 686.0999755859375,
         "trades_today": 7,
         "runs_today": 6
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
+        "value": 109755.17739009134,
+        "benchmark": 686.0999755859375,
+        "trades_today": 7,
+        "runs_today": 7
       }
     ],
     "claude_opus": [
@@ -2240,6 +2310,13 @@
       },
       {
         "timestamp": "2026-04-13T17:32:13.206270-04:00",
+        "value": 104809.7658576721,
+        "benchmark": 686.0999755859375,
+        "trades_today": 0,
+        "runs_today": 1
+      },
+      {
+        "timestamp": "2026-04-13T19:30:20.070962-04:00",
         "value": 104809.7658576721,
         "benchmark": 686.0999755859375,
         "trades_today": 0,
@@ -2694,8 +2771,8 @@
       "trades_executed_total": 73,
       "trades_executed_month": 73,
       "trades_executed_today": 18,
-      "gross_pnl_usd": 4820.36,
-      "net_pnl_usd": 4818.95,
+      "gross_pnl_usd": 4774.53,
+      "net_pnl_usd": 4773.11,
       "is_profitable": true
     },
     {
@@ -3430,11 +3507,11 @@
     }
   ],
   "market_brief": {
-    "brief": "Welcome. U.S. equities: S&P +1.02%, Nasdaq +1.23%, Dow +0.63%. Technology led sectors (+3.42%) while Utilities lagged (-1.54%). Grok 4.20 (Reasoning) led the day at +2.37%. 6 of 6 models green on the day. Cumulative leader: DeepSeek Reasoner at +9.76%. Key headline: Here's what smart people are saying about what the failed US-Iran peace talks and Trump's blockade mean for markets - markets.businessins... \u2014 market reaction muted.",
+    "brief": "Welcome. U.S. equities: S&P +1.02%, Nasdaq +1.23%, Dow +0.63%. Technology led sectors (+3.42%) while Utilities lagged (-1.54%). Claude Sonnet 4.6 led the day at -0.04%. 0 of 6 models green on the day. Cumulative leader: DeepSeek Reasoner at +9.76%. Key headline: Fidelity, AARP warn Americans on 401(k)s - thestreet.com \u2014 headwind for risk assets.",
     "key_moves": "ORCL +12.7% (held by 4/6) | ADBE +6.5% (held by 1/6) | CRM +4.8% (held by 1/6)",
     "as_of_date": "Monday, April 13",
-    "macro_sentence": "Key headline: Here's what smart people are saying about what the failed US-Iran peace talks and Trump's blockade mean for markets - markets.businessins... \u2014 market reaction muted.",
-    "macro_sentiment": "neutral"
+    "macro_sentence": "Key headline: Fidelity, AARP warn Americans on 401(k)s - thestreet.com \u2014 headwind for risk assets.",
+    "macro_sentiment": "negative"
   },
   "universe_coverage": {
     "total_tracked": 75,
