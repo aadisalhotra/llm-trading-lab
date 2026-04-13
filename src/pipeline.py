@@ -33,6 +33,8 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -385,6 +387,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     if force_trade:
         force = True
 
+    pipeline_start = time.monotonic()
     logger.info("==== Pipeline start: %s | mode=%s | session=%s | exec_mode=%s | phase=%s | force=%s | force_trade=%s ====",
                 run_date.strftime("%Y-%m-%d %H:%M ET"),
                 mode,
@@ -452,12 +455,21 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     ticker_order = list(universe["tickers"])
     _random.shuffle(ticker_order)
 
-    # Run each enabled model
-    per_model_results: list[dict[str, Any]] = []
-    for model_key, cfg in settings["models"].items():
+    # Run each enabled model in parallel. Every model reads/writes its own
+    # portfolio state file and its own log files, so the only shared mutation
+    # is the alerts.jsonl append path — Python's file append + the stdlib
+    # logging module are already thread-safe, so no extra lock is needed.
+    # The dashboard build below runs only after all threads have joined.
+    enabled_models = [
+        (mk, cfg) for mk, cfg in settings["models"].items()
+        if cfg.get("enabled", True)
+    ]
+    for mk, cfg in settings["models"].items():
         if not cfg.get("enabled", True):
-            logger.info("[%s] disabled — skipping", model_key)
-            continue
+            logger.info("[%s] disabled — skipping", mk)
+
+    def _run_model_threadsafe(model_key: str, cfg: dict) -> dict:
+        t0 = time.monotonic()
         try:
             r = run_one_model(
                 model_key, cfg, market_data, prices, executor, run_date, settings, logger,
@@ -471,7 +483,30 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             logger.exception("[%s] unhandled error: %s", model_key, e)
             send_alert("CRITICAL", f"Unhandled error in {model_key}", str(e), {"model": model_key})
             r = {"model_key": model_key, "status": "ERROR", "error": str(e)}
-        per_model_results.append(r)
+        r["_duration_sec"] = round(time.monotonic() - t0, 2)
+        return r
+
+    per_model_results: list[dict[str, Any]] = []
+    models_start = time.monotonic()
+    logger.info("Launching %d models in parallel (ThreadPoolExecutor)", len(enabled_models))
+    with ThreadPoolExecutor(max_workers=max(1, len(enabled_models)), thread_name_prefix="model") as pool:
+        futures = {
+            pool.submit(_run_model_threadsafe, mk, cfg): mk
+            for mk, cfg in enabled_models
+        }
+        for fut in as_completed(futures):
+            mk = futures[fut]
+            try:
+                r = fut.result()
+            except Exception as e:
+                logger.exception("[%s] future raised unexpectedly: %s", mk, e)
+                r = {"model_key": mk, "status": "ERROR", "error": str(e)}
+            logger.info("[%s] finished in %.2fs (status=%s)",
+                        mk, r.get("_duration_sec", -1), r.get("status", "?"))
+            per_model_results.append(r)
+    models_elapsed = time.monotonic() - models_start
+    logger.info("All %d models completed in %.2fs (parallel wall-clock)",
+                len(enabled_models), models_elapsed)
 
     # Build dashboard payload (intraday + EOD both refresh this — the dashboard
     # is always live)
@@ -543,7 +578,9 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         except Exception as e:
             logger.exception("Budget check failed: %s", e)
 
-    logger.info("==== Pipeline tick complete ====")
+    total_elapsed = time.monotonic() - pipeline_start
+    logger.info("==== Pipeline tick complete in %.2fs (%.2fs in parallel model phase) ====",
+                total_elapsed, models_elapsed)
     return 0
 
 
