@@ -258,6 +258,14 @@ def run_one_model(
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
     decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
 
+    # Surface retry activity in the pipeline log so we can see at a glance
+    # whether a model recovered on a second attempt vs. succeeded on first.
+    # Only the DeepSeek adapter currently sets the attempt field.
+    _attempt = int((decision_result.metadata or {}).get("attempt") or 1)
+    if _attempt > 1:
+        status_word = "recovered via retry" if decision_result.success else "failed after retry"
+        logger.warning("[%s] %s on attempt %d", model_key, status_word, _attempt)
+
     # Memory-hit detection: does the model's reasoning text reference a
     # prior decision? Best-effort — failures are logged but never fatal.
     try:

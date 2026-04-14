@@ -12,6 +12,81 @@ from typing import Any
 logger = logging.getLogger("llmlab.adapter")
 
 
+def repair_json(text: str) -> str:
+    """Best-effort fix for common JSON defects in LLM output.
+
+    Not a general JSON fixer — just enough to recover from the failure
+    modes we've actually seen in real model responses:
+      * Python literals (``True`` / ``False`` / ``None``)
+      * Trailing commas before ``}`` or ``]``
+      * Missing commas between adjacent ``}{`` / ``][`` / ``}[`` / ``]{``
+      * Unclosed brackets at the end (model got cut off mid-output)
+
+    Returns the repaired text. Unchanged if no repair heuristics fired.
+    The caller should re-attempt ``json.loads`` on the result — if the
+    repair missed, fall through to the usual error path.
+    """
+    if not text:
+        return text
+
+    # Python literal coercion (word-bounded so we don't clobber keys like
+    # "isTrueStrength" or substrings inside words).
+    text = re.sub(r"\bTrue\b", "true", text)
+    text = re.sub(r"\bFalse\b", "false", text)
+    text = re.sub(r"\bNone\b", "null", text)
+
+    # Balance brackets FIRST by walking the text once, counting opens vs
+    # closes outside of string literals. If the model was cut off
+    # mid-output the closer counts will be short; append whatever's
+    # missing before we run the regex passes. Doing this first lets the
+    # trailing-comma pass also clean up the dangling comma that typically
+    # sits right before where the model stopped.
+    open_curly = 0
+    open_square = 0
+    in_string = False
+    escape = False
+    for ch in text:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            open_curly += 1
+        elif ch == "}":
+            open_curly -= 1
+        elif ch == "[":
+            open_square += 1
+        elif ch == "]":
+            open_square -= 1
+
+    if open_square > 0:
+        text += "]" * open_square
+    if open_curly > 0:
+        text += "}" * open_curly
+
+    # Trailing commas before a closer: ``{"a": 1,}`` → ``{"a": 1}``
+    # Also cleans up the ``,}`` / ``,]`` pairs that the bracket
+    # balancer just produced on cut-off responses.
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+
+    # Missing commas between adjacent objects/arrays. LLMs sometimes
+    # produce ``[{"x":1} {"y":2}]`` or ``{"a":1}{"b":2}`` — insert the
+    # comma so json.loads can proceed.
+    text = re.sub(r"(\})(\s*)(\{)", r"\1,\2\3", text)
+    text = re.sub(r"(\])(\s*)(\[)", r"\1,\2\3", text)
+    text = re.sub(r"(\})(\s*)(\[)", r"\1,\2\3", text)
+    text = re.sub(r"(\])(\s*)(\{)", r"\1,\2\3", text)
+
+    return text
+
+
 @dataclass
 class DecisionResult:
     """Parsed decision returned by a model.
@@ -134,7 +209,22 @@ class BaseAdapter(ABC):
         try:
             data = json.loads(text)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Model response was not valid JSON: {e}") from e
+            # Last-ditch repair for common LLM defects (trailing commas,
+            # Python literals, missing commas between adjacent objects,
+            # unclosed brackets). If the repair changes the text AND the
+            # repaired version parses, we recover silently. Otherwise we
+            # raise the original error so the adapter records a failure.
+            repaired = repair_json(text)
+            if repaired != text:
+                try:
+                    data = json.loads(repaired)
+                    logger.info("parse: JSON repair succeeded (original: %s)", e)
+                except json.JSONDecodeError as e2:
+                    raise ValueError(
+                        f"Model response was not valid JSON even after repair: {e2}"
+                    ) from e2
+            else:
+                raise ValueError(f"Model response was not valid JSON: {e}") from e
 
         if "decisions" not in data or not isinstance(data["decisions"], list):
             raise ValueError("Model response missing required 'decisions' list")
