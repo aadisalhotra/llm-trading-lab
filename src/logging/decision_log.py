@@ -130,14 +130,39 @@ def log_daily_snapshot(
 ) -> None:
     """Append EOD portfolio value to /data/performance/{model}.jsonl.
 
-    Called once per trading day from the EOD pipeline pass — never from
-    intraday runs (which would create duplicate same-date rows and break
-    every analytics calc that assumes one row per day).
+    Idempotent on date: if today's row already exists, this call is a
+    silent no-op. The EOD pipeline now has two trigger paths — the
+    intraday chain's post-close handoff (primary) and the 21:00 UTC cron
+    (backup) — and both can fire on the same day. A duplicate row would
+    break every downstream analytic that assumes one row per trading
+    day, so we defensively dedupe here.
     """
     PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
     path = PERFORMANCE_DIR / f"{model_key}.jsonl"
+    today_str = run_date.strftime("%Y-%m-%d")
+
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if rec.get("date") == today_str:
+                        # Already logged for today — EOD must have fired
+                        # via the other trigger path already.
+                        return
+        except OSError:
+            # Read failure — fall through and attempt the write. A
+            # duplicate row is less bad than silently dropping the EOD.
+            pass
+
     record = {
-        "date": run_date.strftime("%Y-%m-%d"),
+        "date": today_str,
         "model_key": model_key,
         "total_value": snapshot["total_value"],
         "cash": snapshot["cash"],

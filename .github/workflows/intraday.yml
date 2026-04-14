@@ -120,21 +120,61 @@ jobs:
             git push
           fi
 
-  # Self-perpetuating chain: after each successful intraday tick, if we're
-  # still inside market hours, sleep until the next 15-minute boundary and
-  # dispatch intraday.yml again. This decouples us from GitHub's cron
-  # scheduler entirely — even if */15 is throttled, the chain keeps ticking
-  # once the watchdog kicks it off at 13:00 UTC.
+  # Self-perpetuating chain. After each successful intraday tick:
+  #   * If still inside market hours (< 20:00 UTC), sleep to the next
+  #     15-minute boundary and dispatch intraday.yml again.
+  #   * If market has closed (>= 20:00 UTC EDT), sleep until ~21:05 UTC
+  #     (giving close prices time to settle) and dispatch the EOD
+  #     wrap-up run with mode=end-of-day.
+  # The chain is now the PRIMARY trigger for both intraday ticks AND the
+  # EOD wrap-up. The `0 21 * * 1-5` cron on the workflow is retained as a
+  # belt-and-suspenders backup for the rare case where this chain job
+  # itself fails — log_daily_snapshot is idempotent on date so a
+  # double-fire writes exactly one row per day.
   chain:
     needs: run
     runs-on: ubuntu-latest
     if: success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
     steps:
-      - name: Sleep to next 15-minute boundary, then dispatch next tick
+      - name: Chain next tick (intraday or EOD)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+
+          dispatch_intraday() {
+            curl -sS -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
+              -d '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}'
+            echo "Dispatched next intraday tick"
+          }
+
+          dispatch_eod() {
+            # Wait until 21:05 UTC (1h 5m after EDT market close) so
+            # prices settle, then dispatch mode=end-of-day. If we are
+            # already past 21:05, dispatch after a 30s safety buffer.
+            local h m s now target wait
+            h=$(date -u +%H); m=$(date -u +%M); s=$(date -u +%S)
+            now=$(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
+            target=$(( 21 * 3600 + 5 * 60 ))
+            wait=$(( target - now ))
+            if [ "$wait" -lt 30 ]; then
+              wait=30
+            fi
+            echo "Market closed — waiting ${wait}s before EOD dispatch..."
+            sleep "$wait"
+            curl -sS -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
+              -d '{"ref":"main","inputs":{"mode":"end-of-day","force":"false"}}'
+            echo "Dispatched end-of-day run"
+          }
+
           NOW_MIN=$(date -u +%M)
           NOW_SEC=$(date -u +%S)
           NOW_HOUR=$(date -u +%H)
@@ -146,15 +186,16 @@ jobs:
             exit 0
           fi
 
-          # Stop chain after 19:45 UTC: the 20:00 cron + 21:00 EOD cover the rest.
-          # (Those fire on their own reliably because they aren't */15.)
+          # Post-close: chain to the EOD wrap-up instead of another tick.
+          # The EOD run itself won't re-trigger this chain job because the
+          # top-level `if:` excludes mode=end-of-day.
           if [ "$NOW_HOUR" -ge 20 ]; then
-            echo "Past 20:00 UTC — stopping chain (EOD crons take over)"
+            dispatch_eod
             exit 0
           fi
 
-          # Seconds until next 15-min boundary + 30s buffer so the dispatch
-          # lands after the wall-clock minute rolls over.
+          # Intraday path: sleep to the next 15-minute boundary + 30s
+          # buffer so the dispatch lands after the wall-clock minute rolls.
           MIN_MOD=$(( 10#$NOW_MIN % 15 ))
           WAIT=$(( (15 - MIN_MOD) * 60 - 10#$NOW_SEC + 30 ))
           if [ "$WAIT" -lt 60 ]; then
@@ -163,20 +204,16 @@ jobs:
           echo "Sleeping ${WAIT}s until next tick..."
           sleep "$WAIT"
 
-          # Re-check hour after sleep in case we crossed 20:00 UTC
+          # If we crossed 20:00 UTC during the sleep, chain to EOD
+          # instead of dispatching another intraday.
           POST_HOUR=$(date -u +%H)
           if [ "$POST_HOUR" -ge 20 ]; then
-            echo "Crossed 20:00 UTC during sleep — stopping chain"
+            echo "Crossed 20:00 UTC during sleep — chaining to EOD"
+            dispatch_eod
             exit 0
           fi
 
-          curl -sS -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
-            -d '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}'
-          echo "Dispatched next intraday tick"
+          dispatch_intraday
 
   pages:
     needs: run
