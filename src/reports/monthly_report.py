@@ -193,6 +193,55 @@ def _walk_trades_for_month(
     return out
 
 
+def _walk_records_for_month(
+    model_key: str,
+    start: datetime,
+    end: datetime,
+) -> list[dict[str, Any]]:
+    """Yield every decision log *record* (not just its executions) for a
+    model whose timestamp falls in [start, end).
+
+    Sibling of `_walk_trades_for_month` — that one flattens executions,
+    this one keeps whole records so callers can read top-level fields
+    like `api_success` and `memory_hit`.
+    """
+    pattern = re.compile(rf"^{re.escape(model_key)}_(\d{{4}})-(\d{{2}})\.jsonl$")
+    out: list[dict[str, Any]] = []
+    if not TRADES_DIR.exists():
+        return out
+    for fp in sorted(TRADES_DIR.iterdir()):
+        if not fp.is_file():
+            continue
+        m = pattern.match(fp.name)
+        if not m:
+            continue
+        year, month = int(m.group(1)), int(m.group(2))
+        month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        if month_end <= start or month_start >= end:
+            continue
+        with open(fp, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts_str = rec.get("timestamp", "")
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if not (start <= ts < end):
+                    continue
+                out.append(rec)
+    return out
+
+
 # ---- Section 1: Header + at a glance -------------------------------------
 
 def _section_header(month: datetime, settings: dict[str, Any]) -> str:
@@ -860,6 +909,71 @@ def _section_screening_analysis(
     return "\n".join(parts)
 
 
+# ---- Section 10: Memory context impact -----------------------------------
+
+def _section_memory_impact(
+    model_keys: list[str],
+    month: datetime,
+    settings: dict[str, Any],
+) -> str:
+    """How often each model's reasoning explicitly cites a prior decision.
+
+    The trading prompt now includes a rolling view of each model's last 10
+    executed BUY/SELL actions. `memory_hit` is set on every decision log
+    record where the model's reasoning contains phrases like "already
+    positioned", "previously exited", "recent buy", etc. High hit rates
+    mean the memory context is actually influencing decisions; near-zero
+    rates mean models are ignoring it and the context may need stronger
+    framing or placement.
+    """
+    start, end = _month_bounds(month)
+    headers = ["Model", "Runs", "Memory Hits", "Hit Rate"]
+    rows: list[list[str]] = []
+    total_runs = 0
+    total_hits = 0
+    for key in model_keys:
+        cfg = settings["models"].get(key, {})
+        runs = 0
+        hits = 0
+        for rec in _walk_records_for_month(key, start, end):
+            # Only count successful calls — a failed API call never saw the
+            # memory context, so including it would dilute the signal.
+            if not rec.get("api_success"):
+                continue
+            runs += 1
+            if rec.get("memory_hit"):
+                hits += 1
+        total_runs += runs
+        total_hits += hits
+        if runs == 0:
+            rows.append([cfg.get("display_name", key.upper()), "0", "0", "—"])
+            continue
+        rate = hits / runs
+        rows.append([
+            cfg.get("display_name", key.upper()),
+            str(runs),
+            str(hits),
+            f"{rate * 100:.1f}%",
+        ])
+    if total_runs > 0:
+        overall_rate = total_hits / total_runs
+        rows.append([
+            "**ALL MODELS**",
+            f"**{total_runs}**",
+            f"**{total_hits}**",
+            f"**{overall_rate * 100:.1f}%**",
+        ])
+    table = _format_table(headers, rows, aligns=["L", "R", "R", "R"])
+    notes = (
+        "Hit rate = fraction of successful decision runs this month whose "
+        "reasoning explicitly references a prior decision. Useful as a "
+        "proxy for whether the rolling memory context shaped behavior. "
+        "New field introduced alongside the memory feature — historical "
+        "runs show 0 hits since they predate the field.\n\n"
+    )
+    return "## 10. Memory Context Impact\n\n" + notes + table
+
+
 # ---- Main entry ----------------------------------------------------------
 
 def generate_monthly_report(
@@ -919,6 +1033,10 @@ def generate_monthly_report(
         "---",
         "",
         _section_screening_analysis(model_keys, month, settings),
+        "",
+        "---",
+        "",
+        _section_memory_impact(model_keys, month, settings),
         "",
         "---",
         "",

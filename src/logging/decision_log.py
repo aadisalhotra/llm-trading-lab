@@ -45,6 +45,7 @@ def log_decision_run(
     screening_response: str = "",
     screening_shortlist: list[str] | None = None,
     screening_metadata: dict[str, Any] | None = None,
+    memory_hit: bool = False,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -108,6 +109,12 @@ def log_decision_run(
         "screening_response": screening_response[:2000] if screening_response else "",
         "screening_cost_usd": (screening_metadata or {}).get("cost_usd"),
         "screening_tokens": (screening_metadata or {}).get("output_tokens"),
+        # Rolling memory impact — True when the model's reasoning on this
+        # tick explicitly cites a prior decision ("already positioned",
+        # "previously exited", etc.). Drives the monthly report's memory
+        # impact section so we can see whether the recent-decisions context
+        # is actually shaping behavior.
+        "memory_hit": bool(memory_hit),
     }
 
     with open(path, "a", encoding="utf-8") as f:

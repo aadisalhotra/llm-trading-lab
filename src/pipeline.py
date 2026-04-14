@@ -64,7 +64,13 @@ from .data import (
     is_market_open_today,
 )
 from .data.sentiment import compute_sentiment_dict
-from .logging import log_decision_run, log_daily_snapshot, log_intraday_snapshot
+from .logging import (
+    log_decision_run,
+    log_daily_snapshot,
+    log_intraday_snapshot,
+    read_recent_decisions,
+    detect_memory_hit,
+)
 from .reports import generate_daily_report
 from .model_versions import detect_monthly_transition, record_observation
 from .portfolio import (
@@ -220,6 +226,18 @@ def run_one_model(
         logger.warning("[%s] Screening failed: %s — falling back to full universe", model_key, e)
         shortlisted = _universe_symbols()[:20]
 
+    # ---- Rolling memory: last 10 executed BUY/SELL for THIS model only ----
+    # Each model only ever sees its own history (read from its own JSONL file),
+    # so there is no cross-model contamination and no shared state with the
+    # other parallel model threads.
+    try:
+        recent_decisions = read_recent_decisions(model_key, limit=10, now=run_date)
+        logger.info("[%s] memory: loaded %d recent decisions",
+                    model_key, len(recent_decisions))
+    except Exception as e:
+        logger.warning("[%s] memory: recent-decisions read failed: %s — continuing without memory", model_key, e)
+        recent_decisions = []
+
     # ---- Step 2: Trading decision call (full data, shortlisted stocks) ----
     system_prompt, user_prompt, prompt_version, images = build_prompts(
         snapshot_before,
@@ -232,12 +250,23 @@ def run_one_model(
         news_data=news_data,
         sentiment_data=sentiment_data,
         shortlisted_symbols=shortlisted,
+        recent_decisions=recent_decisions,
     )
 
     # Only send images to vision-capable models. Text-only adapters can
     # accept the kwarg but it's wasteful to base64-encode for nothing.
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
     decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
+
+    # Memory-hit detection: does the model's reasoning text reference a
+    # prior decision? Best-effort — failures are logged but never fatal.
+    try:
+        memory_hit = detect_memory_hit(decision_result)
+        if memory_hit:
+            logger.info("[%s] memory: reasoning references prior decision (hit)", model_key)
+    except Exception as e:
+        logger.warning("[%s] memory: hit-detection failed: %s", model_key, e)
+        memory_hit = False
 
     # Record version observation regardless of success
     record_observation(model_key, decision_result.model_id_returned, run_date)
@@ -264,6 +293,7 @@ def run_one_model(
             screening_response=screening_raw,
             screening_shortlist=shortlisted,
             screening_metadata=screening_metadata,
+            memory_hit=memory_hit,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -324,6 +354,7 @@ def run_one_model(
         screening_response=screening_raw,
         screening_shortlist=shortlisted,
         screening_metadata=screening_metadata,
+        memory_hit=memory_hit,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])

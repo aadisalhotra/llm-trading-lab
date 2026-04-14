@@ -365,6 +365,58 @@ def parse_screening_response(raw: str, held_tickers: list[str], universe_symbols
     return tickers[:25]  # Allow slight overshoot from held-ticker injection
 
 
+_RECENT_DECISIONS_INSTRUCTION = (
+    "Review your recent decisions before acting. Do not repeat a buy or sell "
+    "on the same ticker unless the data has meaningfully changed since your "
+    "last action. If you already sold a stock in a recent decision, do not "
+    "sell it again unless you still hold shares. If you already bought a "
+    "stock recently, only add more if there is a new catalyst — not the "
+    "same headline."
+)
+
+
+def _format_recent_decisions_block(recent: list[dict[str, Any]] | None) -> str:
+    """Render the model's own last N executed BUY/SELL decisions.
+
+    Renders as a fixed-width table (timestamp, ticker, action, shares,
+    confidence, summary) followed by the anti-redundancy instruction. Each
+    model only ever sees its own history — the caller reads from
+    /data/trades/{this_model}_*.jsonl before building the prompt.
+    """
+    header = "YOUR RECENT DECISIONS (avoid redundant trades):"
+    if not recent:
+        return (
+            header + "\n"
+            "  (no prior BUY/SELL decisions logged yet — this is early in the experiment)\n"
+            "\n"
+            + _RECENT_DECISIONS_INSTRUCTION
+        )
+    lines = [header]
+    lines.append(
+        f"  {'WHEN':<19} {'TICKER':<6} {'ACTION':<6} {'SHARES':>10} {'CONF':>5}  SUMMARY"
+    )
+    for r in recent:
+        ts = str(r.get("timestamp") or "")[:19]  # yyyy-mm-ddTHH:MM:SS
+        ticker = str(r.get("ticker") or "")[:6]
+        action = str(r.get("action") or "")[:6]
+        shares = r.get("shares")
+        try:
+            shares_s = f"{float(shares):.2f}" if shares is not None else "—"
+        except (TypeError, ValueError):
+            shares_s = "—"
+        conf = r.get("confidence")
+        conf_s = f"{conf}" if conf is not None else "—"
+        summary = str(r.get("summary") or "").strip()
+        if len(summary) > 120:
+            summary = summary[:117] + "..."
+        lines.append(
+            f"  {ts:<19} {ticker:<6} {action:<6} {shares_s:>10} {conf_s:>5}  {summary}"
+        )
+    lines.append("")
+    lines.append(_RECENT_DECISIONS_INSTRUCTION)
+    return "\n".join(lines)
+
+
 def build_prompts(
     portfolio_state: dict[str, Any],
     market_data: dict[str, pd.DataFrame],
@@ -376,6 +428,7 @@ def build_prompts(
     news_data: dict[str, Any] | None = None,
     sentiment_data: dict[str, float] | None = None,
     shortlisted_symbols: list[str] | None = None,
+    recent_decisions: list[dict[str, Any]] | None = None,
 ) -> tuple[str, str, str, list[bytes]]:
     """Build (system_prompt, user_prompt, prompt_version, images).
 
@@ -422,6 +475,8 @@ def build_prompts(
         _format_market_data_block(scoped_data),
         "",
         _format_portfolio_block(portfolio_state, int(settings["portfolio_rules"]["max_positions"])),
+        "",
+        _format_recent_decisions_block(recent_decisions),
         "",
         _format_news_block(news_data, sentiment_data, scoped_syms),
         "",
