@@ -13,7 +13,7 @@
 
 ---
 
-A 1.5-year research experiment that puts the world's leading frontier AI models head-to-head in fully autonomous stock trading. Each model manages its own $100K portfolio, makes its own buy/sell decisions every 15 minutes during market hours, and is evaluated on the same metrics — returns, risk-adjusted performance, cost efficiency, and whether it can beat a passive SPY benchmark. No human touches the trades. The models sink or swim on their own judgment.
+A 1.5-year research experiment that puts the world's leading frontier AI models head-to-head in fully autonomous stock trading. Each model manages its own $100K portfolio, makes its own buy/sell decisions every 30 minutes during market hours, and is evaluated on the same metrics — returns, risk-adjusted performance, cost efficiency, and whether it can beat a passive SPY benchmark. No human touches the trades. The models sink or swim on their own judgment.
 
 ## The Research Question
 
@@ -63,7 +63,7 @@ Full GICS sector coverage across U.S. large and mega-cap equities:
 
 ## Two-Step Screening Process
 
-With 75 stocks, sending full data for every ticker on every 15-minute tick would be expensive and dilute model attention. The pipeline uses a two-step approach:
+With 75 stocks, sending full data for every ticker on every 30-minute tick would be expensive and dilute model attention. The pipeline uses a two-step approach:
 
 1. **Screening call** — All 75 stocks with minimal data per stock (price, daily change, volume ratio, sentiment score, one-line headline). The model returns a JSON shortlist of its top 20 picks with a one-sentence reason for each. Fast, cheap, and captures what each model chooses to focus on.
 
@@ -73,9 +73,9 @@ Stock order is randomized on every run so no ticker is consistently buried at th
 
 ## Intraday Trading
 
-The pipeline runs every 15 minutes during NYSE market hours (9:30 AM – 4:00 PM ET) via GitHub Actions cron. Each tick:
+The pipeline runs every 30 minutes during NYSE market hours (9:30 AM – 4:00 PM ET) via GitHub Actions cron. Each tick:
 
-- Fetches live 15-minute bars for all 75 stocks
+- Fetches live 30-minute bars for all 75 stocks
 - Runs the two-step screening → trading process for each model
 - Executes trades via Alpaca (paper or live)
 - Logs decisions, reasoning, confidence scores, and screening shortlists
@@ -112,7 +112,7 @@ An end-of-day pass at 5:30 PM ET writes daily performance snapshots, generates r
 | Execution | Alpaca (paper + live) |
 | LLM providers | Anthropic SDK, OpenAI SDK, Google GenAI SDK, REST for xAI + DeepSeek |
 | Dashboard | Static HTML/CSS/JS, TradingView lightweight-charts, GitHub Pages |
-| Scheduling | GitHub Actions cron (every 15 min during market hours) |
+| Scheduling | GitHub Actions cron (every 30 min during market hours) |
 | Data format | JSONL trade logs, JSON state files, Markdown reports |
 
 ## Project Timeline

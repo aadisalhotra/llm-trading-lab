@@ -1836,7 +1836,7 @@ async function refresh() {
 
 // ===== Countdown timer to next pipeline run =====
 // Market hours: 9:00 AM – 4:30 PM ET, Mon–Fri.
-// During market hours: count down to next :00/:15/:30/:45.
+// During market hours: count down to next :00/:30.
 // Outside market hours: count down to 9:00 AM ET next trading day.
 function updateCountdown() {
   const el = document.getElementById("nextrun");
@@ -1861,10 +1861,10 @@ function updateCountdown() {
   let remainSec;
 
   if (duringMarket) {
-    // Next :00, :15, :30, or :45 mark
-    const nextQuarter = (Math.floor(etMin / 15) + 1) * 15;
-    remainSec = (nextQuarter - etMin) * 60 - etSec;
-    if (remainSec <= 0) remainSec += 15 * 60;
+    // Next :00 or :30 mark
+    const nextHalf = (Math.floor(etMin / 30) + 1) * 30;
+    remainSec = (nextHalf - etMin) * 60 - etSec;
+    if (remainSec <= 0) remainSec += 30 * 60;
   } else {
     // Time until 9:00 AM ET next trading day
     const target = new Date(et);

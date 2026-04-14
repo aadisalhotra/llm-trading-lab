@@ -5,7 +5,7 @@ name: Watchdog — kick off intraday pipeline at market open
 # Mon–Fri) that GitHub is far less likely to skip. Its only job is to
 # dispatch the intraday pipeline at US market open (09:00 ET EDT /
 # 08:00 ET EST). From there, intraday.yml's self-chain job keeps the
-# ticks flowing every 15 minutes until market close.
+# ticks flowing every 30 minutes until market close.
 
 on:
   schedule:

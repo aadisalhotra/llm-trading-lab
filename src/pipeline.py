@@ -2,7 +2,7 @@
 
 The pipeline runs in one of two modes, controlled by CLI flags:
 
-  --intraday    (default): one 15-minute pipeline tick during market hours.
+  --intraday    (default): one 30-minute pipeline tick during market hours.
                 Fetches intraday bars, runs each model, executes any trades
                 (subject to the persistent daily trade cap), logs an
                 intraday valuation snapshot, and rebuilds dashboard.json.
@@ -26,7 +26,7 @@ The pipeline runs in one of two modes, controlled by CLI flags:
 The persistent intraday trade cap lives in
 `Portfolio.intraday.trades_executed_today` and resets automatically when a
 new ET trading day begins. Models therefore see the *whole-day* 50-trade
-budget across all 26 ticks of the day, not a fresh 30 every 15 minutes.
+budget across all 13 ticks of the day, not a fresh 30 every 30 minutes.
 """
 from __future__ import annotations
 
@@ -449,15 +449,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             logger.info("Market closed (or outside 09:30-16:00 ET) — skipping intraday tick (use --force-trade to override)")
             return 0
 
-    # Pull market data — intraday 15m bars by default, daily fallback at EOD
+    # Pull market data — intraday 30m bars by default, daily fallback at EOD
     # so the closing prices match what the daily analytics expect.
     symbols = universe_symbols() + [settings["benchmark_ticker"]]
     if is_eod:
         logger.info("Fetching daily close data for %d symbols", len(symbols))
         market_data = fetch_universe_data(symbols=symbols)
     else:
-        logger.info("Fetching intraday 15m bars for %d symbols", len(symbols))
-        market_data = fetch_intraday_data(symbols=symbols, interval="15m")
+        logger.info("Fetching intraday 30m bars for %d symbols", len(symbols))
+        market_data = fetch_intraday_data(symbols=symbols, interval="30m")
     prices = _prices_from_data(market_data)
     if not prices:
         logger.error("No prices fetched — aborting tick")

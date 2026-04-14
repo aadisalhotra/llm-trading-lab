@@ -633,7 +633,7 @@ def _format_trade_summaries_for_model(model_key: str, run_date: datetime) -> str
 
 
 # ===========================================================================
-# INTRADAY SESSION SUMMARY — aggregates all 15-min ticks of the day
+# INTRADAY SESSION SUMMARY — aggregates all 30-min ticks of the day
 # ===========================================================================
 
 def _build_intraday_session_table(

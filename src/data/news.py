@@ -23,8 +23,8 @@ Provider chain (first one with a key + a non-empty response wins):
   3. NewsAPI        — fallback, 100 calls/day on free tier
 
 Caching is on by default with a 60-minute TTL because:
-  - News doesn't change every 15 minutes
-  - Free-tier rate limits would otherwise be a real concern at 26 ticks/day
+  - News doesn't change every 30 minutes
+  - Free-tier rate limits would otherwise be a real concern at 13 ticks/day
   - The cache file is JSON in /data/news_cache/cache.json — single file, no
     per-ticker fragmentation, atomic write on refresh
 

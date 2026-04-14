@@ -1,7 +1,7 @@
 """Market data via yfinance.
 
 Pulls daily OHLCV for the universe + benchmark with a configurable lookback,
-plus intraday 15-minute bars for the live trading session.
+plus intraday 30-minute bars for the live trading session.
 Handles holidays + early closes by checking if today appears in the index.
 """
 from __future__ import annotations
@@ -116,7 +116,7 @@ def is_market_open_now(reference: datetime | None = None) -> bool:
 
     Combines a holiday-aware day check with an ET time-of-day window of
     9:30–16:00. Used by the intraday cron to skip silently outside hours
-    even when the cron itself is firing every 15 minutes UTC.
+    even when the cron itself is firing every 30 minutes UTC.
     """
     now = reference or datetime.now(EASTERN)
     if now.tzinfo is None:
@@ -133,7 +133,7 @@ def is_market_open_now(reference: datetime | None = None) -> bool:
 
 def fetch_intraday_data(
     symbols: Iterable[str] | None = None,
-    interval: str = "15m",
+    interval: str = "30m",
 ) -> dict[str, pd.DataFrame]:
     """Fetch intraday OHLCV bars for the universe.
 
@@ -142,7 +142,7 @@ def fetch_intraday_data(
     to branch on intraday vs daily — they always read the latest Close
     from the last row.
 
-    Default interval is 15m to match the cron cadence. yfinance allows
+    Default interval is 30m to match the cron cadence. yfinance allows
     1m/2m/5m/15m/30m/60m/1h on a 7-day window for intraday data.
     """
     if symbols is None:

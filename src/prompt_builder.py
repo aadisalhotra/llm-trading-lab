@@ -15,7 +15,7 @@ Two-step prompting (v2 universe, 75 stocks):
            holdings. Model returns buy/sell/hold decisions.
 
 Why an intraday context block?
-  Without it, the model sees only "DATE: 2026-04-09" and treats every 15-min
+  Without it, the model sees only "DATE: 2026-04-09" and treats every 30-min
   call as if it were the only call of the day. It would happily blow its
   entire 50-trade budget on the first run. The intraday block tells the model
   the current ET clock, how many trades/runs it's already used, and how much
@@ -168,14 +168,14 @@ def _format_intraday_context_block(
     """Tell the model where it is in the trading session.
 
     The whole point of this block is to make the model pace its 50-trade
-    budget across the ~26 intraday calls of the day instead of dumping it
+    budget across the ~13 intraday calls of the day instead of dumping it
     all on the first call.
     """
     et = run_timestamp.astimezone(EASTERN) if run_timestamp.tzinfo else run_timestamp.replace(tzinfo=EASTERN)
     et_str = et.strftime("%H:%M ET")
     close_str = "16:00 ET"
 
-    # Estimate runs remaining: number of 15-min slots between now and 16:00 ET
+    # Estimate runs remaining: number of 30-min slots between now and 16:00 ET
     if is_eod:
         runs_remaining = 0
         session_label = "END-OF-DAY WRAP-UP RUN"
@@ -184,11 +184,11 @@ def _format_intraday_context_block(
         if now_t >= NYSE_CLOSE:
             runs_remaining = 0
         elif now_t < NYSE_OPEN:
-            # 6.5 hours of session = 26 fifteen-min slots
-            runs_remaining = 26
+            # 6.5 hours of session = 13 thirty-min slots
+            runs_remaining = 13
         else:
             minutes_left = (NYSE_CLOSE.hour * 60 + NYSE_CLOSE.minute) - (now_t.hour * 60 + now_t.minute)
-            runs_remaining = max(0, minutes_left // 15)
+            runs_remaining = max(0, minutes_left // 30)
         session_label = "INTRADAY RUN"
 
     trades_remaining = max(0, max_trades_per_day - trades_executed_today)
@@ -202,7 +202,7 @@ def _format_intraday_context_block(
         f"  Trades used today:   {trades_executed_today} / {max_trades_per_day}",
         f"  Trades remaining:    {trades_remaining}",
         "",
-        "  IMPORTANT: This is one of many ~15-minute intraday calls today.",
+        "  IMPORTANT: This is one of many ~30-minute intraday calls today.",
         "  Pace your 50-trade daily budget across the remaining runs — do",
         "  not exhaust it on a single call. HOLD is a valid action when",
         "  there is no clear edge. New information will arrive each tick.",

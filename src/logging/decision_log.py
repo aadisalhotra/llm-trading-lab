@@ -194,7 +194,7 @@ def log_intraday_snapshot(
 ) -> None:
     """Append a per-run intraday valuation row to /data/intraday/{model}_{date}.jsonl.
 
-    One file per (model, trading day). Each row is one 15-minute pipeline tick:
+    One file per (model, trading day). Each row is one 30-minute pipeline tick:
     timestamp, mark-to-market value, benchmark price, and the running trade
     counter so the dashboard can chart intraday equity vs SPY without having
     to rejoin against the trade log.
