@@ -29,6 +29,15 @@ on:
         description: "Bypass market-open check"
         required: false
         default: "false"
+  # External kick from cron-job.org (or any other cron-as-a-service).
+  # POST to /repos/{owner}/{repo}/dispatches with
+  #   {"event_type": "market-open-kick"}
+  # at 13:00 UTC Mon-Fri to start the daily chain. GitHub's own cron
+  # often delays the first tick of the day by 10-20 minutes; an
+  # external trigger lands on time, then our self-chain job handles
+  # every subsequent tick until close.
+  repository_dispatch:
+    types: [market-open-kick]
 
 permissions:
   contents: write
