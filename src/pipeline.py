@@ -203,7 +203,7 @@ def run_one_model(
             "cumulative_return": snapshot_after["cumulative_return"],
         }
 
-    # ---- Step 1: Screening call (lightweight — all 75 stocks) ----
+    # ---- Step 1: Screening call (lightweight — all 79 assets) ----
     screening_sys, screening_user = build_screening_prompt(
         market_data, snapshot_before, run_date,
         news_data=news_data, sentiment_data=sentiment_data,

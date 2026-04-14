@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://aadisalhotra.github.io/llm-trading-lab"><img src="https://img.shields.io/badge/LIVE_DASHBOARD-000000?style=for-the-badge&logo=github&logoColor=white" alt="Live Dashboard"></a>
   <img src="https://img.shields.io/badge/models-6-2b8aff?style=for-the-badge" alt="6 Models">
-  <img src="https://img.shields.io/badge/universe-75_stocks-00d488?style=for-the-badge" alt="75 Stocks">
+  <img src="https://img.shields.io/badge/universe-79_assets-00d488?style=for-the-badge" alt="79 Assets">
   <img src="https://img.shields.io/badge/phase-paper_trading-ffd23f?style=for-the-badge" alt="Paper Trading">
   <img src="https://img.shields.io/github/actions/workflow/status/aadisalhotra/llm-trading-lab/intraday.yml?style=for-the-badge&label=pipeline" alt="Pipeline Status">
 </p>
@@ -19,7 +19,7 @@ A 1.5-year research experiment that puts the world's leading frontier AI models 
 
 > When given identical market data, identical constraints, and identical execution infrastructure, which frontier LLM makes the best investment decisions — and can any of them consistently beat a passive index?
 
-This isn't a backtest or a simulation of past decisions. Every trade executes in real time against live market data. The models see the same 75 stocks, the same news headlines, the same technical indicators — and make independent choices. The experiment captures something no academic paper can: how these models actually behave as autonomous agents managing capital over months and years.
+This isn't a backtest or a simulation of past decisions. Every trade executes in real time against live market data. The models see the same 79 assets, the same news headlines, the same technical indicators — and make independent choices. The experiment captures something no academic paper can: how these models actually behave as autonomous agents managing capital over months and years.
 
 ## The Lineup
 
@@ -43,9 +43,9 @@ Model lineup is reviewed on the first trading day of each month. Each provider's
 | **Live** | Jan 2027 – Jan 2028 | $1K real per model | Real execution with real slippage, fees, and consequences |
 | **Scale** | 2028+ (optional) | TBD | Increase capital if results warrant it |
 
-## The 75-Stock Universe
+## The 79-Asset Universe
 
-Full GICS sector coverage across U.S. large and mega-cap equities:
+Full GICS sector coverage across U.S. large and mega-cap equities, plus 4 commodity ETFs:
 
 | Sector | Stocks | Names |
 |--------|--------|-------|
@@ -60,12 +60,13 @@ Full GICS sector coverage across U.S. large and mega-cap equities:
 | Materials | 5 | LIN, APD, SHW, FCX, NEM |
 | Real Estate | 4 | AMT, PLD, CCI, EQIX |
 | Utilities | 4 | NEE, DUK, SO, D |
+| Commodities | 4 | GLD (gold), SLV (silver), USO (oil), CPER (copper) |
 
 ## Two-Step Screening Process
 
-With 75 stocks, sending full data for every ticker on every 30-minute tick would be expensive and dilute model attention. The pipeline uses a two-step approach:
+With 79 assets, sending full data for every ticker on every 30-minute tick would be expensive and dilute model attention. The pipeline uses a two-step approach:
 
-1. **Screening call** — All 75 stocks with minimal data per stock (price, daily change, volume ratio, sentiment score, one-line headline). The model returns a JSON shortlist of its top 20 picks with a one-sentence reason for each. Fast, cheap, and captures what each model chooses to focus on.
+1. **Screening call** — All 79 assets with minimal data per stock (price, daily change, volume ratio, sentiment score, one-line headline). The model returns a JSON shortlist of its top 20 picks with a one-sentence reason for each. Fast, cheap, and captures what each model chooses to focus on.
 
 2. **Trading call** — Full data (OHLCV, RSI, moving averages, MACD, volume, complete news headlines, sentiment, portfolio state) for only the 20 shortlisted stocks. The model outputs buy/sell/hold decisions with confidence scores and reasoning.
 
@@ -75,7 +76,7 @@ Stock order is randomized on every run so no ticker is consistently buried at th
 
 The pipeline runs every 30 minutes during NYSE market hours (9:30 AM – 4:00 PM ET) via GitHub Actions cron. Each tick:
 
-- Fetches live 30-minute bars for all 75 stocks
+- Fetches live 30-minute bars for all 79 assets
 - Runs the two-step screening → trading process for each model
 - Executes trades via Alpaca (paper or live)
 - Logs decisions, reasoning, confidence scores, and screening shortlists

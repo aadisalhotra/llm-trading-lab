@@ -8,9 +8,9 @@ market data, current portfolio state, intraday session context). Output is:
   - images: optional list of PNG bytes (one composite universe chart) for
     vision-capable adapters; text-only adapters ignore the list
 
-Two-step prompting (v2 universe, 75 stocks):
-  Step 1 — Screening: lightweight call with minimal per-stock data for all 75
-           stocks. Model returns a JSON shortlist of its top 20 picks.
+Two-step prompting (v2 universe, 79 assets):
+  Step 1 — Screening: lightweight call with minimal per-stock data for all 79
+           assets. Model returns a JSON shortlist of its top 20 picks.
   Step 2 — Trading: full data for only the 20 shortlisted stocks + current
            holdings. Model returns buy/sell/hold decisions.
 
@@ -215,7 +215,7 @@ def _format_intraday_context_block(
 # ===== Two-step screening system =====
 
 SCREENING_SYSTEM_PROMPT = """You are an autonomous stock screener for the Autonomous LLM Trading Lab.
-Your job: review all 75 stocks in the universe and return a shortlist of your top 20 picks for deeper analysis.
+Your job: review all 79 assets in the universe and return a shortlist of your top 20 picks for deeper analysis.
 
 # Output format
 Return ONLY a single JSON object. No prose before or after. No markdown fences.
@@ -253,7 +253,7 @@ def _format_screening_data_block(
     sentiment = sentiment or {}
     news = news or {}
     lines = [
-        "UNIVERSE — SCREEN THESE 75 STOCKS (sorted randomly for fairness):",
+        "UNIVERSE — SCREEN THESE 79 ASSETS (sorted randomly for fairness):",
         f"  {'TICKER':<6} {'SECTOR':<24} {'PRICE':>8} {'1D%':>7} {'VOL_VS_AVG':>11} {'SENT':>6}  HEADLINE",
     ]
     for t in ticker_order:
