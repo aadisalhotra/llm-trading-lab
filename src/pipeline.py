@@ -213,9 +213,9 @@ def run_one_model(
     shortlisted: list[str] = []
     screening_metadata: dict[str, Any] = {}
     try:
-        screening_result = adapter.generate_decision(screening_sys, screening_user)
-        screening_raw = screening_result.raw_response
-        screening_metadata = screening_result.metadata or {}
+        screening_raw, _scr_latency, screening_metadata = adapter.generate_raw(
+            screening_sys, screening_user,
+        )
         held_tickers = [h["ticker"] for h in snapshot_before.get("holdings", [])]
         shortlisted = parse_screening_response(
             screening_raw, held_tickers, _universe_symbols(),

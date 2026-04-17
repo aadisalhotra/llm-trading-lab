@@ -141,6 +141,21 @@ class BaseAdapter(ABC):
         Must raise on failure.
         """
 
+    def generate_raw(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> tuple[str, float, dict[str, Any]]:
+        """Call the model and return (raw_text, latency_seconds, metadata).
+
+        No JSON parsing — use this for prompts (like screening) whose
+        response schema differs from the trading-decision format.
+        """
+        start = time.perf_counter()
+        raw, _returned_id, metadata = self._call_api(system_prompt, user_prompt)
+        latency = time.perf_counter() - start
+        return raw, latency, metadata or {}
+
     def generate_decision(
         self,
         system_prompt: str,
