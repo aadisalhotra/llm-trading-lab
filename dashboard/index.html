@@ -6,7 +6,25 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>LLM TRADING LAB // LIVE TERMINAL</title>
+  <title>LLM Trading Lab &mdash; Autonomous AI Trading Experiment</title>
+  <meta name="description" content="6 frontier AI models trade autonomously. Live dashboard tracking performance vs S&amp;P 500." />
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg?v=__ASSET_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=__ASSET_VERSION__" sizes="any" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=__ASSET_VERSION__" />
+
+  <!-- Open Graph / social sharing -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="LLM Trading Lab &mdash; Autonomous AI Trading Experiment" />
+  <meta property="og:description" content="6 frontier AI models trade autonomously. Live dashboard tracking performance vs S&amp;P 500." />
+  <meta property="og:image" content="apple-touch-icon.png?v=__ASSET_VERSION__" />
+  <meta property="og:url" content="https://llmtradinglab.ai/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="LLM Trading Lab &mdash; Autonomous AI Trading Experiment" />
+  <meta name="twitter:description" content="6 frontier AI models trade autonomously. Live dashboard tracking performance vs S&amp;P 500." />
+  <meta name="twitter:image" content="apple-touch-icon.png?v=__ASSET_VERSION__" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,8 +37,23 @@
 
   <header class="topbar">
     <div class="brand">
-      <span class="logo">▍</span>
-      <span class="title">LLM_TRADING_LAB</span>
+      <svg class="brand-mark" width="36" height="33" viewBox="0 0 52 48" fill="none" aria-hidden="true" focusable="false">
+        <rect x="5" y="6" width="1.2" height="34" rx="0.6" fill="#ef4444" opacity="0.35"/>
+        <rect x="1.5" y="12" width="8" height="14" rx="1.5" fill="#ef4444" opacity="0.85"/>
+        <rect x="16" y="4" width="1.2" height="32" rx="0.6" fill="#22c55e" opacity="0.4"/>
+        <rect x="12.5" y="8" width="8" height="16" rx="1.5" fill="#22c55e" opacity="0.9"/>
+        <rect x="27" y="10" width="1.2" height="28" rx="0.6" fill="#ef4444" opacity="0.35"/>
+        <rect x="23.5" y="16" width="8" height="10" rx="1.5" fill="#ef4444" opacity="0.8"/>
+        <rect x="38" y="2" width="1.2" height="36" rx="0.6" fill="#22c55e" opacity="0.45"/>
+        <rect x="34.5" y="4" width="8" height="22" rx="1.5" fill="#22c55e"/>
+        <rect x="0" y="43" width="44" height="0.8" rx="0.4" fill="#4a7aed" opacity="0.15"/>
+        <circle cx="48" cy="12" r="1.4" fill="#4a7aed" opacity="0.6"/>
+        <circle cx="48" cy="23" r="1.4" fill="#4a7aed" opacity="0.4"/>
+        <circle cx="48" cy="34" r="1.4" fill="#4a7aed" opacity="0.2"/>
+        <line x1="48" y1="13.4" x2="48" y2="21.6" stroke="#4a7aed" stroke-width="0.5" opacity="0.25"/>
+        <line x1="48" y1="24.4" x2="48" y2="32.6" stroke="#4a7aed" stroke-width="0.5" opacity="0.15"/>
+      </svg>
+      <span class="title">LLM TRADING LAB</span>
       <span class="subtitle">// AUTONOMOUS // 6-MODEL HEAD-TO-HEAD // INTRADAY</span>
     </div>
     <div class="status">
@@ -34,6 +67,8 @@
       <div class="status-item"><span class="label">NEXT_RUN</span><span id="nextrun" class="value">—</span></div>
     </div>
   </header>
+
+  <p class="explainer">6 frontier AI models run fully autonomous trading portfolios with zero human intervention. Real-time performance vs S&amp;P 500.</p>
 
   <!-- TICKER TAPE — scrolling stock prices -->
   <div class="ticker-tape" id="ticker-tape">
@@ -218,7 +253,11 @@
   </main>
 
   <footer>
-    <span>LLM_TRADING_LAB // PERSONAL RESEARCH EXPERIMENT // NOT FINANCIAL ADVICE</span>
+    <span class="footer-left">
+      LLM_TRADING_LAB // PERSONAL RESEARCH EXPERIMENT // NOT FINANCIAL ADVICE
+      <span class="footer-sep">//</span>
+      <a class="footer-link" href="https://github.com/aadisalhotra/llm-trading-lab" target="_blank" rel="noopener noreferrer">View source code and methodology on GitHub &rarr;</a>
+    </span>
     <span id="generated">—</span>
   </footer>
 
