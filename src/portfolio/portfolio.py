@@ -204,13 +204,28 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
 
 
 def load_portfolio(model_key: str) -> Portfolio:
-    """Load from disk, creating a fresh state file if it doesn't exist."""
+    """Load from disk, creating a fresh state file if it doesn't exist.
+
+    The filename is the authoritative identity of the portfolio — we always
+    use the `model_key` argument on the returned Portfolio, never the
+    `model_key` field stored inside the JSON. A mismatch means the file was
+    mis-seeded (e.g. copied from another model's state without updating the
+    field), which previously caused `save_portfolio` to route writes to the
+    wrong path and silently clobber the other model's state.
+    """
     path = _state_path(model_key)
     if not path.exists():
         logger.info("No state for %s — initializing fresh portfolio", model_key)
         return init_portfolio(model_key)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    stored_key = data.get("model_key")
+    if stored_key and stored_key != model_key:
+        logger.warning(
+            "State file %s has model_key='%s' but expected '%s' — "
+            "overriding from filename (file will be rewritten on next save)",
+            path.name, stored_key, model_key,
+        )
     holdings = {
         t: Holding(ticker=t, shares=h["shares"], avg_cost=h["avg_cost"])
         for t, h in data.get("holdings", {}).items()
@@ -224,7 +239,7 @@ def load_portfolio(model_key: str) -> Portfolio:
         last_run_at=str(raw_intraday.get("last_run_at", "")),
     )
     return Portfolio(
-        model_key=data["model_key"],
+        model_key=model_key,
         cash=float(data["cash"]),
         holdings=holdings,
         halted=bool(data.get("halted", False)),
