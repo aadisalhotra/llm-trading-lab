@@ -11,6 +11,15 @@ from typing import Any
 
 logger = logging.getLogger("llmlab.adapter")
 
+# All adapters inherit a single targeted retry on parse-level failure.
+# Empirically the "model returned invalid JSON / empty response" failure
+# mode clears on a short cooldown across every provider we've seen it on
+# (DeepSeek, Gemini). HTTP/network/auth errors are NOT retried — those
+# usually indicate rate limits or bad keys that a quick retry can't fix,
+# and retrying risks a second billing event for the same failure.
+_RETRY_DELAY_SECONDS = 15
+_MAX_ATTEMPTS = 2
+
 
 def repair_json(text: str) -> str:
     """Best-effort fix for common JSON defects in LLM output.
@@ -166,12 +175,85 @@ class BaseAdapter(ABC):
 
         Never raises — failures are returned as `success=False` so one bad
         provider can't kill the daily run for the others.
+
+        Retry policy: HTTP / network / auth errors from ``_call_api`` fail
+        fast (no retry) — those usually need human intervention, and a
+        second call risks a duplicate billing event. ``ValueError`` from
+        ``_parse_response`` (empty response, invalid JSON even after
+        ``repair_json``, or a response missing the ``decisions`` list)
+        triggers ONE retry after ``_RETRY_DELAY_SECONDS``. Every returned
+        ``DecisionResult.metadata`` includes an ``attempt`` key (1 or 2)
+        so the pipeline log can surface retry activity.
         """
         start = time.perf_counter()
-        try:
-            raw, returned_id, metadata = self._call_api(system_prompt, user_prompt, images)
+        last_error: str | None = None
+        last_raw: str = ""
+        last_metadata: dict[str, Any] = {}
+
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            try:
+                raw, returned_id, call_meta = self._call_api(
+                    system_prompt, user_prompt, images,
+                )
+            except Exception as e:
+                # HTTP / network / auth failure — not the retry target.
+                latency = time.perf_counter() - start
+                logger.exception(
+                    "%s call failed (attempt %d): %s",
+                    self.provider_name, attempt, e,
+                )
+                return DecisionResult(
+                    provider=self.provider_name,
+                    model_id_configured=self.model,
+                    model_id_returned=self.model,
+                    decisions=[],
+                    overall_reasoning="",
+                    raw_response="",
+                    latency_seconds=latency,
+                    success=False,
+                    error=str(e),
+                    metadata={"attempt": attempt},
+                )
+
+            last_raw = raw
+            last_metadata = call_meta or {}
+
+            try:
+                parsed = self._parse_response(raw)
+            except ValueError as e:
+                last_error = str(e)
+                if attempt < _MAX_ATTEMPTS:
+                    logger.warning(
+                        "%s parse failure on attempt %d/%d: %s — retrying in %ds",
+                        self.provider_name, attempt, _MAX_ATTEMPTS, e,
+                        _RETRY_DELAY_SECONDS,
+                    )
+                    time.sleep(_RETRY_DELAY_SECONDS)
+                    continue
+                latency = time.perf_counter() - start
+                logger.error(
+                    "%s parse failure on final attempt %d/%d: %s",
+                    self.provider_name, attempt, _MAX_ATTEMPTS, e,
+                )
+                return DecisionResult(
+                    provider=self.provider_name,
+                    model_id_configured=self.model,
+                    model_id_returned=self.model,
+                    decisions=[],
+                    overall_reasoning="",
+                    raw_response=raw,
+                    latency_seconds=latency,
+                    success=False,
+                    error=last_error,
+                    metadata={**last_metadata, "attempt": attempt},
+                )
+
             latency = time.perf_counter() - start
-            parsed = self._parse_response(raw)
+            if attempt > 1:
+                logger.info(
+                    "%s recovered on retry (attempt %d/%d)",
+                    self.provider_name, attempt, _MAX_ATTEMPTS,
+                )
             return DecisionResult(
                 provider=self.provider_name,
                 model_id_configured=self.model,
@@ -181,22 +263,23 @@ class BaseAdapter(ABC):
                 raw_response=raw,
                 latency_seconds=latency,
                 success=True,
-                metadata=metadata or {},
+                metadata={**last_metadata, "attempt": attempt},
             )
-        except Exception as e:
-            latency = time.perf_counter() - start
-            logger.exception("Adapter %s failed: %s", self.provider_name, e)
-            return DecisionResult(
-                provider=self.provider_name,
-                model_id_configured=self.model,
-                model_id_returned=self.model,
-                decisions=[],
-                overall_reasoning="",
-                raw_response="",
-                latency_seconds=latency,
-                success=False,
-                error=str(e),
-            )
+
+        # Defensive fallthrough — the loop always returns above.
+        latency = time.perf_counter() - start
+        return DecisionResult(
+            provider=self.provider_name,
+            model_id_configured=self.model,
+            model_id_returned=self.model,
+            decisions=[],
+            overall_reasoning="",
+            raw_response=last_raw,
+            latency_seconds=latency,
+            success=False,
+            error=last_error or "retries exhausted",
+            metadata={**last_metadata, "attempt": _MAX_ATTEMPTS},
+        )
 
     @staticmethod
     def _parse_response(raw: str) -> dict[str, Any]:

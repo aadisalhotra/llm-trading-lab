@@ -67,10 +67,10 @@ def log_decision_run(
         "api_success": decision_result.success,
         "api_error": decision_result.error,
         "api_latency_seconds": decision_result.latency_seconds,
-        # Which call attempt produced the parsed decision. Currently only
-        # the DeepSeek adapter sets this (1 on first-try success, 2 on
-        # retry recovery, 2 with api_success=false on retry exhaustion);
-        # every other adapter runs once and defaults to 1.
+        # Which call attempt produced the parsed decision. Every adapter
+        # inherits the BaseAdapter retry loop: 1 on first-try success,
+        # 2 on retry recovery, 2 with api_success=false on retry
+        # exhaustion. Defaults to 1 if metadata is missing for any reason.
         "api_attempt": int(md.get("attempt") or 1),
         # Token usage + USD cost — drives the cost-performance comparison
         # in the daily report's expansion cohort section. None for failed
