@@ -128,8 +128,14 @@ class BaseAdapter(ABC):
     provider_name: str = "base"
     supports_vision: bool = False
 
-    def __init__(self, model: str):
+    def __init__(self, model: str, temperature: float | None = None):
         self.model = model
+        # Optional sampling temperature. ``None`` (the default for the live
+        # pipeline) leaves the provider default untouched — adapters omit the
+        # parameter entirely. The determinism probe (RQ6) sets this to 0.0 to
+        # request greedy decoding for its reruns. Only the probe ever sets it,
+        # so the production decision path is unchanged.
+        self.temperature = temperature
 
     @abstractmethod
     def _call_api(

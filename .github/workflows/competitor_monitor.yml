@@ -1,0 +1,62 @@
+name: Competitor Monitor — weekly arXiv/SSRN scan
+
+on:
+  schedule:
+    # Every Monday at 14:00 UTC. Scans the prior week for new LLM-trading
+    # research and commits a dated digest to reports/.
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Look-back window in days (use 365 for a first-run backfill)"
+        required: false
+        default: "7"
+
+permissions:
+  contents: write
+
+# Don't let a manual run race the scheduled one for the commit.
+concurrency:
+  group: competitor-monitor
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run competitor scan
+        run: |
+          DAYS="${{ github.event.inputs.days }}"
+          DAYS="${DAYS:-7}"
+          echo "Scanning last ${DAYS} days"
+          python -m scripts.competitor_monitor --days "${DAYS}"
+
+      - name: Commit + push digest
+        run: |
+          git config user.name "llm-trading-lab-bot"
+          git config user.email "actions@github.com"
+          git pull --rebase origin main || true
+          git add reports/competitor_digest_*.md || true
+          if git diff --cached --quiet; then
+            echo "No digest changes to commit"
+          else
+            git commit -m "competitor digest $(date -u +%Y-%m-%d)"
+            git pull --rebase origin main
+            git push
+          fi

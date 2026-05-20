@@ -5,6 +5,7 @@
 
 <p align="center">
   <a href="https://aadisalhotra.github.io/llm-trading-lab"><img src="https://img.shields.io/badge/LIVE_DASHBOARD-000000?style=for-the-badge&logo=github&logoColor=white" alt="Live Dashboard"></a>
+  <a href="docs/PRE_REGISTRATION.md"><img src="https://img.shields.io/badge/study-pre--registered-7b2ff7?style=for-the-badge" alt="Pre-registered"></a>
   <img src="https://img.shields.io/badge/models-6-2b8aff?style=for-the-badge" alt="6 Models">
   <img src="https://img.shields.io/badge/universe-79_assets-00d488?style=for-the-badge" alt="79 Assets">
   <img src="https://img.shields.io/badge/phase-paper_trading-ffd23f?style=for-the-badge" alt="Paper Trading">
@@ -20,6 +21,25 @@ A 1.5-year research experiment that puts the world's leading frontier AI models 
 > When given identical market data, identical constraints, and identical execution infrastructure, which frontier LLM makes the best investment decisions — and can any of them consistently beat a passive index?
 
 This isn't a backtest or a simulation of past decisions. Every trade executes in real time against live market data. The models see the same 79 assets, the same news headlines, the same technical indicators — and make independent choices. The experiment captures something no academic paper can: how these models actually behave as autonomous agents managing capital over months and years.
+
+## Research Paper Track
+
+**This experiment is pre-registered.** The full research design — six research questions, their hypotheses, the exact metric each is operationalized as, the numeric predictions, and the decision rules that will resolve them — was locked on **2026-05-19**, *before* the live (confirmatory) phase generates any inferential data. A pre-registration written after seeing results is worthless; it lets you fit the hypothesis to the noise. Locking it first is what makes the eventual findings credible.
+
+📋 **[Pre-Registration](docs/PRE_REGISTRATION.md)** (locked) · machine-readable [`v1.json`](data/pre_registration/v1.json) · living [Research Questions tracker](docs/RESEARCH_QUESTIONS.md) · [Backtest Harness Scope](docs/BACKTEST_HARNESS_SCOPE.md)
+
+The six pre-registered questions:
+
+| | Research question | Type |
+|---|-------------------|------|
+| **RQ1** | Do frontier LLMs **converge on identical decisions** under identical information sets? | Primary |
+| **RQ2** | Do they exhibit a **disposition effect** (realize gains faster than losses)? | Behavioral |
+| **RQ3** | Are self-reported **confidence scores calibrated** to trade outcomes? | Behavioral |
+| **RQ4** | Do portfolios carry systematic **style-factor tilts** (Fama-French 5 + momentum)? | Factor |
+| **RQ5** | How does behavior shift in response to **portfolio drawdowns**? | Behavioral |
+| **RQ6** | How **non-deterministic** are decisions at temperature = 0? | Methodological |
+
+Methodology is locked across the whole family: every estimate is **regime-stratified** (bull-trending / range-bound / vol-spike / drawdown), multiple comparisons are controlled by **Benjamini-Hochberg FDR at q = 0.10**, risk-adjusted performance is reported as **Deflated Sharpe** alongside raw Sharpe, and all confidence intervals use a **block bootstrap (length 5, 10,000 resamples, BCa)**. **Inference uses live-phase data only** — the paper-trading phase is an explicit pilot. The analysis code lives in [`src/analytics/`](src/analytics/) (`research_metrics.py`, `regime_classifier.py`, `statistical_corrections.py`); regenerate every number with `python -m src.analytics.research_metrics`. A weekly [competitor monitor](scripts/competitor_monitor.py) scans arXiv and SSRN so we know the landscape before publishing. The methodology is locked and will be deposited to OSF before the live phase begins.
 
 ## The Lineup
 

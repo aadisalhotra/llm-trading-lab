@@ -974,6 +974,168 @@ def _section_memory_impact(
     return "## 10. Memory Context Impact\n\n" + notes + table
 
 
+# ---- Section 11: Research Questions Update -------------------------------
+
+def _fmt_num(x: float | None, places: int = 3) -> str:
+    if x is None or (isinstance(x, float) and (x != x)):
+        return "—"
+    return f"{x:.{places}f}"
+
+
+def _fmt_ci(low: float | None, high: float | None, places: int = 3) -> str:
+    if low is None or high is None:
+        return "—"
+    return f"[{low:.{places}f}, {high:.{places}f}]"
+
+
+def _section_research_questions(
+    model_keys: list[str],
+    settings: dict[str, Any],
+) -> str:
+    """Research Questions Update — the paper track's monthly scorecard.
+
+    Pulls every pre-registered RQ metric from the analytics layer (regime
+    stratified, with block-bootstrap CIs and BH-FDR control) and renders the
+    current reading + hypothesis status. Pilot data in the paper phase;
+    confirmatory on live data per docs/PRE_REGISTRATION.md.
+    """
+    try:
+        from ..analytics import compute_all_research_metrics
+        # Lighter resample/permutation counts than the standalone CLI so the
+        # monthly report stays quick; the locked defaults (10k resamples) are
+        # used for the published numbers via `python -m src.analytics.research_metrics`.
+        m = compute_all_research_metrics(
+            settings=settings, n_permutations=300, n_resamples=4000,
+        )
+    except Exception as e:  # never let the research section break the report
+        logger.exception("research questions section failed")
+        return f"## 11. Research Questions Update\n\n_Could not compute research metrics: {e}_"
+
+    parts: list[str] = ["## 11. Research Questions Update", ""]
+    parts.append("_Pre-registered paper-track metrics (see "
+                 "[PRE_REGISTRATION.md](../../docs/PRE_REGISTRATION.md)). "
+                 "**Pilot data in the paper phase — confirmatory analysis runs on "
+                 "live-phase data only.** All CIs are block-bootstrap BCa 90%._")
+    parts.append("")
+    dw = m.get("data_window", {})
+    fdr = m.get("fdr_correction", {})
+    sig = fdr.get("significant", [])
+    parts.append(f"**Window:** {dw.get('first_date','—')} → {dw.get('last_date','—')} "
+                 f"({dw.get('n_trading_dates',0)} trading days)  ·  "
+                 f"**BH-FDR (q={fdr.get('q',0.10)}) significant:** "
+                 f"{', '.join(sig) if sig else 'none yet'}")
+    parts.append("")
+
+    rq1 = m.get("RQ1", {})
+    rq2 = m.get("RQ2", {})
+    rq3 = m.get("RQ3", {})
+    rq4 = m.get("RQ4", {})
+    rq5 = m.get("RQ5", {})
+    rq6 = m.get("RQ6", {})
+
+    # Headline status table
+    headers = ["RQ", "Question", "Status", "Headline metric", "Value", "90% CI / note"]
+    rows: list[list[str]] = []
+
+    rows.append([
+        "RQ1", "Convergence (identical inputs)", rq1.get("status", "—"),
+        "concordance vs null",
+        f"{_fmt_num(rq1.get('observed_action_concordance'))} vs "
+        f"{_fmt_num(rq1.get('null_action_concordance_mean'))} "
+        f"(p={_fmt_num(rq1.get('permutation_p_value'))})",
+        _fmt_ci((rq1.get('ci_action_concordance') or {}).get('low'),
+                (rq1.get('ci_action_concordance') or {}).get('high')),
+    ])
+    p2 = rq2.get("pooled", {})
+    rows.append([
+        "RQ2", "Disposition effect", rq2.get("status", "—"),
+        "PGR − PLR",
+        f"{_fmt_num(p2.get('disposition_difference'))} "
+        f"(PGR {_fmt_num(p2.get('PGR'))}, PLR {_fmt_num(p2.get('PLR'))})",
+        _fmt_ci((p2.get('ci_difference') or {}).get('low'),
+                (p2.get('ci_difference') or {}).get('high')),
+    ])
+    p3 = rq3.get("pooled", {})
+    rows.append([
+        "RQ3", "Confidence calibration", rq3.get("status", "—"),
+        "conf↔outcome r / ECE",
+        f"r={_fmt_num(p3.get('confidence_outcome_corr'))}, "
+        f"ECE={_fmt_num(p3.get('expected_calibration_error'))}",
+        f"{p3.get('n_closed_trades', 0)} closed trades",
+    ])
+    rq4_models = rq4.get("per_model", {})
+    rq4_alpha = None
+    for v in rq4_models.values():
+        if v.get("alpha_annualized") is not None:
+            rq4_alpha = v["alpha_annualized"]
+            break
+    rows.append([
+        "RQ4", "Style-factor tilts", rq4.get("status", "—"),
+        "FF5+MOM alpha (ann.)",
+        _fmt_num(rq4_alpha) if rq4_alpha is not None else "—",
+        "factor data not yet aligned" if rq4.get("status") == "Open" else "see per-model betas",
+    ])
+    rows.append([
+        "RQ5", "Drawdown response", rq5.get("status", "—"),
+        "drawdown days",
+        str(rq5.get("total_drawdown_days_across_models", 0)),
+        f"trigger {int(rq5.get('drawdown_threshold', -0.10)*100)}% off 60-day peak",
+    ])
+    rows.append([
+        "RQ6", "Non-determinism @ temp=0", rq6.get("status", "—"),
+        "decision flip rate",
+        _fmt_num(rq6.get("overall_decision_flip_rate")) if rq6.get("overall_decision_flip_rate") is not None else "—",
+        "manual probe (scripts/determinism_probe.py)",
+    ])
+    parts.append(_format_table(headers, rows, aligns=["L", "L", "C", "L", "L", "L"]))
+
+    # RQ1 regime stratification (where data exist)
+    by_regime = rq1.get("by_regime", {})
+    if by_regime:
+        parts.append("")
+        parts.append("### RQ1 — Convergence by market regime")
+        parts.append("")
+        rheaders = ["Regime", "Pairwise obs", "Action concordance", "90% CI"]
+        rrows = []
+        for regime, v in by_regime.items():
+            rrows.append([
+                regime, str(v.get("n_observations", 0)),
+                _fmt_num(v.get("observed_concordance")),
+                _fmt_ci(v.get("ci_low"), v.get("ci_high")),
+            ])
+        parts.append(_format_table(rheaders, rrows, aligns=["L", "R", "R", "R"]))
+        rsum = m.get("regime_summary", {})
+        if rsum.get("counts"):
+            covered = sorted(by_regime.keys())
+            parts.append("")
+            parts.append(f"_Decision dates this experiment span the {', '.join(covered)} "
+                         f"regime(s) only — the single-regime limitation the backtest "
+                         f"harness addresses (see "
+                         f"[BACKTEST_HARNESS_SCOPE.md](../../docs/BACKTEST_HARNESS_SCOPE.md))._")
+
+    # Per-model disposition (RQ2) — short exploratory table
+    rq2_models = rq2.get("per_model", {})
+    disp_rows = [
+        [settings["models"].get(k, {}).get("display_name", k.upper()),
+         _fmt_num(v.get("disposition_difference")),
+         _fmt_num(v.get("disposition_ratio")),
+         str(v.get("n_sale_records", 0))]
+        for k, v in rq2_models.items() if v.get("disposition_difference") is not None
+    ]
+    if disp_rows:
+        parts.append("")
+        parts.append("### RQ2 — Disposition by model (exploratory)")
+        parts.append("")
+        parts.append(_format_table(
+            ["Model", "PGR − PLR", "PGR / PLR", "Sale records"],
+            disp_rows, aligns=["L", "R", "R", "R"]))
+        parts.append("")
+        parts.append("_Negative PGR − PLR = the model realizes losses faster than gains "
+                     "(reverse of the classic human disposition effect)._")
+
+    return "\n".join(parts)
+
+
 # ---- Main entry ----------------------------------------------------------
 
 def generate_monthly_report(
@@ -1037,6 +1199,10 @@ def generate_monthly_report(
         "---",
         "",
         _section_memory_impact(model_keys, month, settings),
+        "",
+        "---",
+        "",
+        _section_research_questions(model_keys, settings),
         "",
         "---",
         "",

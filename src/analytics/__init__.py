@@ -9,3 +9,5 @@ from .performance import (
     compute_budget_status,
 )
 from .cost_rates import COST_PER_MTOK, compute_call_cost_usd
+from .research_metrics import compute_all_research_metrics
+from .regime_classifier import classify_regimes, summarize_regimes, ALL_REGIMES

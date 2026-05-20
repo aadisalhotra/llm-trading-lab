@@ -43,11 +43,15 @@ class AnthropicAdapter(BaseAdapter):
                 })
         content.append({"type": "text", "text": user_prompt})
 
+        extra: dict[str, Any] = {}
+        if self.temperature is not None:
+            extra["temperature"] = self.temperature
         response = client.messages.create(
             model=self.model,
             max_tokens=4096,
             system=system_prompt,
             messages=[{"role": "user", "content": content}],
+            **extra,
         )
         # Concatenate text blocks
         parts: list[str] = []

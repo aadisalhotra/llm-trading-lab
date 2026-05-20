@@ -49,6 +49,8 @@ class XAIAdapter(BaseAdapter):
             "max_tokens": 4096,
             "response_format": {"type": "json_object"},
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",

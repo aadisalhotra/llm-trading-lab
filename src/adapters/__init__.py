@@ -22,12 +22,17 @@ _REGISTRY: dict[str, type[BaseAdapter]] = {
 }
 
 
-def get_adapter(provider: str, model: str) -> BaseAdapter:
-    """Resolve an adapter for the given provider name."""
+def get_adapter(provider: str, model: str,
+                temperature: float | None = None) -> BaseAdapter:
+    """Resolve an adapter for the given provider name.
+
+    ``temperature`` defaults to None (provider default — the live pipeline
+    path). Only the RQ6 determinism probe passes an explicit value.
+    """
     key = provider.lower()
     if key not in _REGISTRY:
         raise ValueError(f"Unknown provider: {provider}. Known: {list(_REGISTRY)}")
-    return _REGISTRY[key](model=model)
+    return _REGISTRY[key](model=model, temperature=temperature)
 
 
 __all__ = [

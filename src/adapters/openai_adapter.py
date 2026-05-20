@@ -44,6 +44,9 @@ class OpenAIAdapter(BaseAdapter):
 
         # Newer GPT models reject `max_tokens` and require `max_completion_tokens`.
         # The OpenAI SDK accepts the new param across all current chat models.
+        extra: dict[str, Any] = {}
+        if self.temperature is not None:
+            extra["temperature"] = self.temperature
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -52,6 +55,7 @@ class OpenAIAdapter(BaseAdapter):
             ],
             response_format={"type": "json_object"},
             max_completion_tokens=4096,
+            **extra,
         )
         text = response.choices[0].message.content or ""
         returned_id = getattr(response, "model", self.model)

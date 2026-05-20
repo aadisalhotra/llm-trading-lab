@@ -1,0 +1,213 @@
+{
+  "schema_version": "1.0",
+  "pre_registration_version": "v1",
+  "title": "Autonomous LLM Trading Lab — Pre-Registration",
+  "author": "Aadi Salhotra",
+  "registration_date": "2026-05-19",
+  "status": "locked",
+  "planned_osf_deposit": "before 2026-11-01",
+  "human_readable_document": "docs/PRE_REGISTRATION.md",
+  "analysis_software": {
+    "metrics": "src/analytics/research_metrics.py",
+    "regime_classifier": "src/analytics/regime_classifier.py",
+    "statistical_corrections": "src/analytics/statistical_corrections.py",
+    "regenerate_command": "python -m src.analytics.research_metrics"
+  },
+  "principles": [
+    "Append-only after the OSF deposit date; all later changes recorded in amendments[].",
+    "PRE_REGISTRATION.md / this file are authoritative; research_metrics.py is its executable form. On disagreement, the registration wins.",
+    "Inference uses live-phase data only. Paper-trading is pilot data (pipeline validation, definition-locking, power estimation)."
+  ],
+  "experiment": {
+    "models": [
+      {"key": "claude", "display_name": "Claude Sonnet 4.6", "provider": "anthropic", "cohort": "core"},
+      {"key": "gpt", "display_name": "GPT-5.4", "provider": "openai", "cohort": "core"},
+      {"key": "gemini", "display_name": "Gemini 3.1 Pro", "provider": "google", "cohort": "core"},
+      {"key": "grok", "display_name": "Grok 4.20 (Reasoning)", "provider": "xai", "cohort": "core"},
+      {"key": "deepseek", "display_name": "DeepSeek Reasoner", "provider": "deepseek", "cohort": "core"},
+      {"key": "claude_opus", "display_name": "Claude Opus 4.6", "provider": "anthropic", "cohort": "expansion"}
+    ],
+    "benchmark": "SPY buy-and-hold",
+    "universe_size": 79,
+    "decision_cadence": "every 30 minutes, 09:30-16:00 ET",
+    "identical_input_guarantee": "all models share one data_inputs_hash per tick (verified)"
+  },
+  "phases": {
+    "paper": {
+      "window": "2026-04-09 to 2026-10-09",
+      "capital_usd": 100000,
+      "role": "pilot",
+      "confirmatory": false
+    },
+    "live": {
+      "window": "approx 2026-11 to 2027-10-09",
+      "capital_usd": 1000,
+      "role": "confirmatory",
+      "confirmatory": true
+    }
+  },
+  "research_questions": [
+    {
+      "id": "RQ1",
+      "title": "Decision convergence under identical information sets",
+      "primary": true,
+      "methodological": false,
+      "status": "Testing",
+      "hypothesis": {
+        "null": "Given identical inputs, pairwise decision agreement equals the chance level implied by each model's own action base rates.",
+        "alternative": "Pairwise decision agreement exceeds chance — models converge."
+      },
+      "operationalization": "Join records on data_inputs_hash (identical across models within a tick). Use each model's raw_decisions (pre-risk-filter). For every model pair on every tick, over tickers both ruled on (>=3 shared): action concordance (3-way BUY/SELL/HOLD exact-match rate) and weight correlation (Pearson r of target_weight vectors).",
+      "metric_definition": "Headline = mean pairwise action concordance across all (pair, tick) observations. Chance = shuffled-permutation null: independently permute each model's action vector within a tick (preserving its BUY/SELL/HOLD marginals), recompute grand-mean concordance, repeat to build the null. Excess = observed minus null mean.",
+      "prediction": "Observed concordance exceeds the shuffled-null mean by >=0.10, one-sided permutation p<0.05 surviving FDR. Strongest in trending regimes, weakest in vol-spike.",
+      "decision_rule": "Resolved-converge if live-window permutation p<0.05 after Benjamini-Hochberg AND BCa 90% CI for excess concordance excludes 0. Resolved-null if CI includes 0. Interpreted against the RQ6 non-determinism floor (convergence ceiling = 1 - within-model flip rate).",
+      "data_window_required": ">=200 pairwise (pair,tick) observations with >=3 shared tickers, live data; >=50 per regime for stratified estimates.",
+      "in_fdr_family": true
+    },
+    {
+      "id": "RQ2",
+      "title": "Disposition effect in sequential trading",
+      "primary": false,
+      "methodological": false,
+      "status": "Testing",
+      "hypothesis": {
+        "null": "Proportion of gains realized equals proportion of losses realized (PGR - PLR = 0).",
+        "alternative": "PGR - PLR != 0 (disposition if >0; reverse/loss-cutting if <0)."
+      },
+      "operationalization": "Odean (1998). Replay executed trades with average-cost accounting. On each record with >=1 executed SELL: each sell is a realized gain (fill>avg cost) or loss (fill<avg cost); paper gains/losses are still-held positions classified by unrealized_pl_pct from that record's portfolio_after. Transaction-level (partial trims count).",
+      "metric_definition": "PGR = realized gains / (realized gains + paper gains). PLR = realized losses / (realized losses + paper losses). Disposition difference = PGR - PLR (headline). Disposition ratio = PGR / PLR.",
+      "prediction": "Weaker disposition than retail humans (whose PGR-PLR ~ +0.05 to +0.10). Two-sided; pilot suggests a possible reverse disposition (cutting losers faster).",
+      "decision_rule": "Per model and pooled: Resolved when BCa 90% CI for PGR-PLR excludes 0 (live data); sign gives direction. Pooled test enters the FDR family.",
+      "data_window_required": ">=30 sale records per model (>=100 pooled), live data.",
+      "in_fdr_family": true
+    },
+    {
+      "id": "RQ3",
+      "title": "Confidence calibration on closed trades",
+      "primary": false,
+      "methodological": false,
+      "status": "Testing",
+      "hypothesis": {
+        "null": "P(profitable | confidence=k) is flat in k; ECE no better than a non-informative baseline.",
+        "alternative": "P(profitable | confidence=k) increases in k (confidence is informative)."
+      },
+      "operationalization": "Closed trades only. A position is closed ONLY on full exit (residual shares < 0.01); partial trims never close it; re-entry after exit is an independent trade. Outcome = realized P&L > 0 over the full life. Entry confidence = share-weighted average of buy-leg confidences, rounded to nearest integer 1-10.",
+      "metric_definition": "Calibration curve P(profitable | confidence=k) for k=1..10. Brier = mean((p_hat - outcome)^2), p_hat = confidence/10. ECE = sum_k (n_k/N)*|acc_k - k/10|, bins = integer confidence. Headline statistic = point-biserial correlation between entry confidence and profitable outcome.",
+      "prediction": "Directionally informative but overconfident: confidence/outcome correlation in ~[+0.05, +0.20], ECE materially above 0.",
+      "decision_rule": "Per model with >=20 closed trades (locked minimum): Resolved-calibrated if BCa 90% CI for confidence/outcome correlation excludes 0 and is positive (live data). <20 closed trades stays Open. Pooled correlation enters the FDR family.",
+      "data_window_required": ">=20 closed (full-exit) trades per model, live data.",
+      "in_fdr_family": true
+    },
+    {
+      "id": "RQ4",
+      "title": "Systematic style-factor tilts",
+      "primary": false,
+      "methodological": false,
+      "status": "Open",
+      "hypothesis": {
+        "null": "Daily excess returns load zero on each style factor (pure-alpha / factor-neutral).",
+        "alternative": "One or more factor loadings are non-zero (persistent size/value/quality/investment/momentum tilt)."
+      },
+      "operationalization": "OLS of each model's daily excess return (portfolio return - RF) on Fama-French 5 factors (Mkt-RF, SMB, HML, RMW, CMA) plus Momentum (MOM), with an intercept (alpha). Daily factors from the Ken French Data Library. EOD values deduplicated to one per trading day.",
+      "metric_definition": "Per model: annualized alpha and t-stat; six factor betas with t-stats; R-squared. p-values via normal approximation (no scipy), flagged approximate at small n.",
+      "prediction": "Tilt toward large-cap growth/quality (negative SMB, negative HML, positive RMW) with positive momentum loading; alphas indistinguishable from zero net of factors.",
+      "decision_rule": "Per factor per model: Resolved-tilt if BCa 90% CI for the beta excludes 0 over the live window. Alpha != 0 (smallest p across models) enters the FDR family. Cross-regime loadings require the backtest harness.",
+      "data_window_required": ">=60 aligned trading days per model, live data; cross-regime requires the backtest harness (BACKTEST_HARNESS_SCOPE.md).",
+      "in_fdr_family": true
+    },
+    {
+      "id": "RQ5",
+      "title": "Behavioral response to portfolio drawdowns",
+      "primary": false,
+      "methodological": false,
+      "status": "Open",
+      "hypothesis": {
+        "null": "Concentration, turnover, position size, and cash are unchanged between drawdown and normal days.",
+        "alternative": "Behavior shifts measurably when a model is in drawdown."
+      },
+      "operationalization": "A model is in drawdown on an EOD when portfolio value is >=10% below its trailing 60-day peak (EOD value). Distinct from the SPY drawdown regime (5% off a 60-day peak) used for stratification. For each EOD compute four behavioral metrics from that day's last portfolio_after snapshot and trade activity; compare drawdown vs normal days.",
+      "metric_definition": "Drawdown-minus-normal difference in: (1) HHI concentration = sum w_i^2; (2) turnover = sum |executed notional| that day / EOD value; (3) average position size = mean holding weight; (4) cash allocation = cash / total value.",
+      "prediction": "In drawdown, models become more conservative: cash up, HHI down, average position size down; turnover rises transiently as positions are cut.",
+      "decision_rule": "Per model with >=1 drawdown episode and a normal-day contrast: Resolved per metric whose BCa 90% CI on the drawdown-minus-normal difference excludes 0 (live data). Pooled HHI-change test enters the FDR family. If no model draws down in the live window, RQ5 is reported Open / not testable on this tape and deferred to the backtest harness.",
+      "data_window_required": ">=1 episode of >=10% drawdown plus >=20 contrasting normal days per model, live data.",
+      "in_fdr_family": true
+    },
+    {
+      "id": "RQ6",
+      "title": "Non-determinism at temperature = 0",
+      "primary": false,
+      "methodological": true,
+      "status": "Open",
+      "hypothesis": {
+        "null": "At temperature=0, identical inputs yield identical decisions (flip rate = 0).",
+        "alternative": "Decisions vary across reruns at temperature=0 (flip rate > 0); irreducible API non-determinism."
+      },
+      "operationalization": "Manual-trigger only. On a seeded random 5% subsample of decision ticks, each model is re-run K=10 times at temperature=0 on the same inputs (scripts/determinism_probe.py -> data/determinism/). For each (model, tick, ticker) compare the action across the K reruns.",
+      "metric_definition": "Per model: decision flip rate = fraction of (tick,ticker) decisions where the K reruns do NOT all agree on the action (headline); mean normalized action entropy; mean target-weight standard deviation across reruns.",
+      "prediction": "Flip rate small but non-zero (~1-10%), larger for reasoning models. Sets the empirical ceiling on RQ1 convergence (two models cannot agree more reliably than one model agrees with itself).",
+      "decision_rule": "Descriptive, NOT part of the FDR family. Resolved once K=10 reruns exist for >=5% of a representative live-week's ticks; report per-model flip rate with a binomial 90% interval and use it to bound RQ1.",
+      "data_window_required": ">=1 representative trading week of ticks, 5% sampled, K=10 reruns each, per model.",
+      "in_fdr_family": false
+    }
+  ],
+  "methodological_commitments": {
+    "regime_stratification": {
+      "description": "Every inferential estimate is reported overall and stratified by SPY market regime. Regimes assigned post hoc from SPY daily prices. Volatility annualized as daily-std * sqrt(252).",
+      "criteria": {
+        "bull_trending": "SPY 20-day return > +3% AND 20-day annualized vol < 15%",
+        "range_bound": "SPY 20-day return in [-2%, +2%] AND 20-day annualized vol in [10%, 20%]",
+        "vol_spike": "SPY 5-day realized annualized vol > 25%",
+        "drawdown": "SPY > 5% below trailing 60-day peak (EOD close)"
+      },
+      "precedence": ["vol_spike", "drawdown", "bull_trending", "range_bound", "neutral"],
+      "note": "A day may match multiple rules; precedence yields mutually-exclusive strata. Raw per-rule booleans retained for re-stratification."
+    },
+    "multiple_comparison_control": {
+      "method": "Benjamini-Hochberg false discovery rate",
+      "q": 0.10,
+      "family": ["RQ1", "RQ2", "RQ3", "RQ4", "RQ5"],
+      "excluded": ["RQ6 (descriptive)"],
+      "note": "One headline frequentist test per RQ forms the family. Per-model sub-tests are exploratory and not folded into the primary family."
+    },
+    "sharpe_reporting": {
+      "method": "Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014) reported alongside raw Sharpe; probabilistic Sharpe available.",
+      "n_trials": 7,
+      "n_trials_note": "6 models + SPY = 7 strategies selected from; deflation discounts for skew, kurtosis, sample length, and trials."
+    },
+    "bootstrap": {
+      "method": "circular moving-block bootstrap with BCa interval",
+      "block_length": 5,
+      "n_resamples": 10000,
+      "default_alpha": 0.10,
+      "acceleration_estimator": "delete-one-block jackknife",
+      "rationale": "Blocks preserve short-horizon autocorrelation; BCa corrects skew/median bias an IID percentile interval ignores."
+    },
+    "inference_window": {
+      "rule": "Inferential (confirmatory) analysis uses live-phase data only.",
+      "paper_phase_role": "pilot: pipeline validation, definition-locking, power estimation",
+      "note": "No paper-phase result is reported as confirmatory."
+    },
+    "api_nondeterminism": {
+      "rule": "Frontier model APIs are not bitwise deterministic even at temperature=0 (RQ6). Measured RQ1 convergence has a ceiling below 1.0.",
+      "interpretation": "RQ1 convergence is read relative to (1 - within-model flip rate), never against a naive 100%."
+    },
+    "locked_definitions": {
+      "closed_trade": "Closed only on full exit (residual shares < 0.01). Partial trims never close a position; re-entry after exit is an independent trade.",
+      "portfolio_drawdown": "EOD portfolio value >= 10% below trailing 60-day peak. Distinct from the SPY drawdown regime (5% off a 60-day peak).",
+      "confidence_to_probability": "Predicted win probability p_hat = stated confidence / 10.",
+      "decision_unit": "A model's raw_decisions entry per (tick, ticker): {action in BUY/SELL/HOLD, target_weight in [0,1], confidence in 1-10}.",
+      "identical_information_set": "Decision records sharing one data_inputs_hash (verified identical across all models within a tick)."
+    },
+    "data_provenance": {
+      "logs": ["data/trades/{model}_{YYYY-MM}.jsonl", "data/performance/{model}.jsonl", "data/determinism/*.jsonl"],
+      "immutability": "Append-only JSONL committed to git on every tick; full record + inputs hash timestamped; raw model responses retained.",
+      "freeze": "OSF deposit freezes the v1 design hash."
+    }
+  },
+  "status_legend": {
+    "Open": "Not enough data yet to test.",
+    "Testing": "Accumulating data; no decision reached.",
+    "Resolved": "Decision rule has been met."
+  },
+  "amendments": []
+}

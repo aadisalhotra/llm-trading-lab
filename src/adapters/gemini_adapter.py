@@ -25,13 +25,16 @@ class GeminiAdapter(BaseAdapter):
             raise RuntimeError("GOOGLE_API_KEY not set")
 
         genai.configure(api_key=api_key)
+        generation_config: dict[str, Any] = {
+            "response_mime_type": "application/json",
+            "max_output_tokens": 4096,
+        }
+        if self.temperature is not None:
+            generation_config["temperature"] = self.temperature
         model = genai.GenerativeModel(
             model_name=self.model,
             system_instruction=system_prompt,
-            generation_config={
-                "response_mime_type": "application/json",
-                "max_output_tokens": 4096,
-            },
+            generation_config=generation_config,
         )
 
         # Gemini takes a list of parts where each part is a dict with either
