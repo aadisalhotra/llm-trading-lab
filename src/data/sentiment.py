@@ -21,6 +21,47 @@ from typing import Any
 logger = logging.getLogger("llmlab.sentiment")
 
 _analyzer = None
+_macro_analyzer = None
+
+# Crisis/finance lexicon augmentation used ONLY by score_macro_headline()
+# (the trigger #11 market-event gate). VADER's stock lexicon is tuned for
+# social media and is domain-blind: it scores "market crash", "sovereign
+# default", and "recession" at or near zero, so a plain |compound| > 0.6 gate
+# would almost never fire on the very headlines a market-event alert exists to
+# catch. We therefore score those candidates with a SEPARATE analyzer whose
+# lexicon is augmented with the terms below. This is deliberately kept off the
+# shared score_headline() path so the sentiment the trading models see in
+# their prompts is completely unchanged. Values follow VADER's own scale
+# (roughly -4..+4); they only ever apply to headlines that have already
+# matched a high-severity keyword category, so a strongly-negative valence
+# here can't create false positives on unrelated news.
+_MACRO_CRISIS_LEXICON: dict[str, float] = {
+    # market action
+    "crash": -3.4, "crashes": -3.4, "crashed": -3.4, "crashing": -3.4,
+    "plunge": -2.8, "plunges": -2.8, "plunged": -2.8, "plunging": -2.8,
+    "plummet": -3.0, "plummets": -3.0, "plummeted": -3.0,
+    "collapse": -3.0, "collapses": -3.0, "collapsed": -3.0,
+    "meltdown": -3.0, "rout": -2.6, "selloff": -2.4, "sell-off": -2.4,
+    "tumble": -2.2, "tumbles": -2.2, "tumbled": -2.2,
+    "nosedive": -2.8, "freefall": -2.8,
+    "halts": -1.4, "halted": -1.4, "circuit": -1.6, "breaker": -1.6,
+    # macro / credit
+    "recession": -3.8, "depression": -3.4, "stagflation": -3.4,
+    "contraction": -2.2, "contracts": -2.0,
+    "default": -3.2, "defaults": -3.2, "defaulted": -3.2, "sovereign": -1.6,
+    "downgrade": -2.8, "downgrades": -2.8, "downgraded": -2.8,
+    "crisis": -3.1, "emergency": -2.6, "devaluation": -2.6, "embargo": -2.2,
+    "inflation": -1.0, "surge": -1.6, "surges": -1.6, "surging": -1.6,
+    "spike": -1.8, "spikes": -1.8, "soar": -1.5, "soars": -1.5, "soaring": -1.5,
+    "shock": -2.0, "shocks": -2.0,
+    # systemic / health
+    "pandemic": -3.4, "epidemic": -3.2, "outbreak": -2.2,
+    # geopolitical
+    "invasion": -3.4, "invade": -3.2, "invades": -3.2, "invaded": -3.2,
+    "war": -3.0, "warfare": -3.0, "missile": -2.8, "missiles": -2.8,
+    "airstrike": -2.8, "airstrikes": -2.8, "terrorist": -3.4,
+    "terrorism": -3.4, "terror": -3.0, "coup": -3.0,
+}
 
 
 def _get_analyzer():
@@ -63,6 +104,49 @@ def score_headline(text: str) -> float:
         return float(analyzer.polarity_scores(text).get("compound", 0.0))
     except Exception as e:
         logger.warning("Failed to score headline: %s", e)
+        return 0.0
+
+
+def _get_macro_analyzer():
+    """Lazy-init a SECOND VADER analyzer augmented with the crisis lexicon.
+
+    Built from a fresh SentimentIntensityAnalyzer and then `lexicon.update`-d,
+    so the shared analyzer used by score_headline() (and therefore the trading
+    prompts) is never mutated.
+    """
+    global _macro_analyzer
+    if _macro_analyzer is not None:
+        return _macro_analyzer
+    try:
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+    except ImportError as e:
+        raise RuntimeError(
+            "nltk is not installed. Add it to requirements.txt and pip install."
+        ) from e
+    try:
+        analyzer = SentimentIntensityAnalyzer()
+    except LookupError:
+        logger.info("VADER lexicon missing — downloading (one-time, ~127KB)")
+        import nltk
+        nltk.download("vader_lexicon", quiet=True)
+        analyzer = SentimentIntensityAnalyzer()
+    analyzer.lexicon.update(_MACRO_CRISIS_LEXICON)
+    _macro_analyzer = analyzer
+    return _macro_analyzer
+
+
+def score_macro_headline(text: str) -> float:
+    """VADER compound score for a macro headline, using the crisis-augmented
+    lexicon. Used only by the trigger #11 market-event gate — see
+    _MACRO_CRISIS_LEXICON for why. Strictly within [-1.0, +1.0]; returns 0.0
+    for empty / unscoreable input and degrades to the plain score on error."""
+    if not text or not text.strip():
+        return 0.0
+    try:
+        analyzer = _get_macro_analyzer()
+        return float(analyzer.polarity_scores(text).get("compound", 0.0))
+    except Exception as e:
+        logger.warning("Failed to score macro headline: %s", e)
         return 0.0
 
 

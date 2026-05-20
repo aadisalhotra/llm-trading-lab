@@ -43,7 +43,7 @@ from zoneinfo import ZoneInfo
 EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
-from .alerts import send_alert, send_daily_summary
+from .alerts import scan_macro_events, send_alert, send_daily_summary
 from .analytics import build_leaderboard, compute_budget_status
 from .config_loader import (
     configure_logging,
@@ -488,6 +488,16 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             logger.info("News context: empty (no provider key, cache miss, or all providers failed) — pipeline runs without headlines")
     except Exception as e:
         logger.exception("News fetch failed unexpectedly: %s — pipeline continues without headlines", e)
+
+    # Trigger #11 — market-wide event scan. Runs every tick off the freshly
+    # fetched macro feed (plus the on-disk caches) so a war, an emergency rate
+    # decision, a crash/circuit-breaker, etc. fires an immediate CRITICAL
+    # alert as it surfaces — not deferred to the EOD sweep. De-duplicated once
+    # per event category per ET day, so it can't re-fire across the day's ticks.
+    try:
+        scan_macro_events(news_data=news_data, settings=settings)
+    except Exception as e:
+        logger.exception("Macro market-event scan failed: %s — pipeline continues", e)
 
     executor = Executor()
 

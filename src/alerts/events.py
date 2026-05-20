@@ -60,6 +60,7 @@ KIND_LABELS: dict[str, str] = {
     "ath": "New all-time high",
     "oversized_trade": "Oversized single trade",
     "news_impact": "High-impact news on held stock",
+    "macro_event": "Major market event",
     "state_anomaly": "State integrity anomaly",
     "missed_run": "Missed scheduled run",
     "pipeline_error": "Pipeline error",
@@ -69,6 +70,81 @@ KIND_LABELS: dict[str, str] = {
     "budget": "API budget threshold",
     "model_transition": "Model version transition",
 }
+
+
+# ---------------------------------------------------------------------------
+# Trigger #11 — market-wide event taxonomy.
+#
+# Five categories of genuinely market-wide shocks, each a list of regex
+# patterns matched (case-insensitively) against a macro headline's title +
+# summary. Everything uses word boundaries so we don't false-positive on
+# substrings ("war" must not match "warm/forward/Warner", "coup" must not
+# match "couple/coupon"). This is the keyword half of the gate; the sentiment
+# half (|VADER| > threshold) is applied in detect_macro_market_events so only
+# high-conviction headlines fire. Categories are checked in this order and a
+# headline is assigned to the FIRST category it matches.
+# ---------------------------------------------------------------------------
+MACRO_EVENT_PATTERNS: dict[str, list[str]] = {
+    "Geopolitical shock": [
+        r"\bwar\b", r"\bwarfare\b", r"\binvasion\b", r"\binvade[sd]?\b",
+        r"\bmissile(s)?\b", r"\bairstrike(s)?\b", r"\bair strike(s)?\b",
+        r"\bceasefire\b", r"\btruce\b",
+        r"\bmilitary (conflict|strike|action|offensive|escalation)\b",
+        r"\bterror(ism|ist)?\b", r"\bcoup\b",
+        r"\b(nuclear|chemical) (attack|strike|test|threat|war)\b",
+    ],
+    "Monetary policy surprise": [
+        r"\bemergency\b.{0,30}\b(rate|fed|fomc|cut|hike|meeting|decision)\b",
+        r"\b(surprise|unexpected|shock|unscheduled|inter-?meeting)\b.{0,30}\b(rate|hike|cut|fed|fomc)\b",
+        r"\b(rate|fed|fomc)\b.{0,30}\b(emergency|surprise|unscheduled|unexpected|inter-?meeting)\b",
+        r"\bemergency (rate|fed|fomc)\b",
+    ],
+    "Macro crisis": [
+        r"\bmarket crash\b", r"\bstock market crash\b",
+        r"\bcircuit breaker(s)?\b",
+        r"\b(stocks?|markets?|dow|nasdaq|s ?& ?p ?500|wall street|equities)\b.{0,25}\b(crash|plunge|collapse|tumble|plummet|nosedive|rout|meltdown)\b",
+        r"\b(crash|plunge|collapse|sell-?off|rout|meltdown)\b.{0,25}\b(stocks?|markets?|dow|nasdaq|s ?& ?p|wall street|equities)\b",
+        r"\bbank(ing)? (failure|collapse|run|crisis|bailout)\b",
+        r"\b(bank|lender) (fail|fails|failed|collapse|collapses|collapsed)\b",
+        r"\bsovereign default\b", r"\bdebt default\b",
+        r"\bdefault(s|ed|ing)?\b.{0,25}\b(debt|bond|sovereign|nation|country|loan)\b",
+        r"\bdebt ceiling\b", r"\bdebt limit\b",
+        r"\b(credit (downgrade|rating)|rating (cut|downgrade)|downgrade(s|d)?)\b.{0,25}\b(u\.?s\.?|treasury|sovereign|credit|debt|rating|nation)\b",
+        r"\b(u\.?s\.?|treasury|sovereign)\b.{0,25}\b(credit )?(downgrade(s|d)?|rating cut)\b",
+    ],
+    "Systemic event": [
+        r"\bpandemic\b", r"\bepidemic\b", r"\b(public )?health emergency\b",
+        r"\b(earthquake|hurricane|tsunami|wildfire(s)?|typhoon|cyclone)\b",
+        r"\bnatural disaster\b",
+        r"\boil\b.{0,25}\b(shock|embargo|supply|spike(s)?|surge(s)?|soar(s|ed)?|crisis)\b",
+        r"\bopec\b.{0,25}\b(cut|production|supply|output|quota)\b",
+        r"\b(currency|fx) (crisis|crash|collapse|war)\b",
+        r"\b(yen|euro|dollar|pound|peso|lira|ruble|rouble|yuan|won|rupee)\b.{0,20}\b(crash|collapse|plunge(s)?|crisis|tumble(s)?|devalu)\b",
+        r"\bdevaluation\b",
+    ],
+    "Severe economic data": [
+        r"\brecession\b", r"\bstagflation\b", r"\beconomic depression\b",
+        r"\b(cpi|inflation|jobs report|nonfarm|payrolls?|unemployment|pce)\b.{0,30}\b(surprise|shock|surge(s|d)?|spike(s|d)?|soar(s|ed)?|jump(s|ed)?|plunge(s|d)?|miss(es|ed)?|beat|hotter|cooler|hot)\b",
+        r"\b(hot(ter)?|surprise|shock|surging|soaring)\b.{0,20}\b(cpi|inflation|payrolls?|jobs report)\b",
+    ],
+}
+
+_COMPILED_MACRO_PATTERNS: dict[str, list[re.Pattern]] = {
+    cat: [re.compile(p, re.IGNORECASE) for p in pats]
+    for cat, pats in MACRO_EVENT_PATTERNS.items()
+}
+
+
+def _match_macro_category(text: str) -> str | None:
+    """Return the first market-wide event category whose keywords appear in
+    `text`, or None. `text` is normally the headline title + summary."""
+    if not text:
+        return None
+    for category, patterns in _COMPILED_MACRO_PATTERNS.items():
+        for pat in patterns:
+            if pat.search(text):
+                return category
+    return None
 
 
 def session_date() -> str:
@@ -348,6 +424,95 @@ def _read_news_cache() -> dict[str, Any]:
         return {}
 
 
+def _read_macro_top_cache() -> list[dict[str, Any]]:
+    """Macro headlines from the dedicated NewsAPI macro feed cache
+    (data/news_cache/macro_top.json), written by news.fetch_top_macro_headlines."""
+    path = NEWS_CACHE_DIR / "macro_top.json"
+    if not path.exists():
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return list(json.load(f).get("macro", []) or [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _collect_macro_headlines(news_data: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Union of macro headlines from the freshest tick plus both on-disk
+    caches, de-duplicated by case-folded title (first occurrence wins).
+
+    Pulling from all three sources means the detector behaves identically
+    whether it's called inline on a pipeline tick (news_data supplied) or
+    later from the EOD sweep (reads disk only).
+    """
+    items: list[dict[str, Any]] = []
+    if news_data:
+        items.extend(news_data.get("macro", []) or [])
+    items.extend(_read_macro_top_cache())                      # NewsAPI macro feed
+    items.extend(_read_news_cache().get("macro", []) or [])    # provider-chain macro
+
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for it in items:
+        title = (it.get("title") or "").strip()
+        if not title:
+            continue
+        key = title.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
+
+
+def _models_positioning(settings: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate current positioning across the enabled models, for the
+    macro-event alert body so the reader sees how exposed the portfolios are.
+
+    Reads the freshly-built dashboard.json (which carries mark-to-market cash
+    and total_value per model). Falls back to the live portfolio state files
+    for holder counts if the dashboard payload isn't available — in that
+    fallback cash % is left unknown rather than guessed without prices.
+
+    Returns: n_models, total_cash_pct (float|None, dollar-weighted across all
+    models), and most_held (list of (ticker, holder_count), top 5).
+    """
+    enabled = set(_enabled_model_keys(settings))
+    snaps = [s for s in _read_dashboard_portfolios() if s.get("model_key") in enabled]
+
+    total_cash = 0.0
+    total_value = 0.0
+    holders: dict[str, int] = {}
+    n_models = 0
+
+    if snaps:
+        for snap in snaps:
+            n_models += 1
+            total_cash += float(snap.get("cash") or 0.0)
+            total_value += float(snap.get("total_value") or 0.0)
+            for h in snap.get("holdings", []) or []:
+                t = h.get("ticker")
+                if t:
+                    holders[t] = holders.get(t, 0) + 1
+        cash_pct = (total_cash / total_value) if total_value > 0 else None
+    else:
+        # Dashboard payload missing — count holders from live state, leave
+        # cash % unknown (no prices on hand to value the holdings).
+        from ..portfolio import load_portfolio
+        for key in enabled:
+            try:
+                p = load_portfolio(key)
+            except Exception:
+                continue
+            n_models += 1
+            for t in p.holdings:
+                holders[t] = holders.get(t, 0) + 1
+        cash_pct = None
+
+    most_held = sorted(holders.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    return {"n_models": n_models, "total_cash_pct": cash_pct, "most_held": most_held}
+
+
 def _fmt_pct(x: float | None) -> str:
     return "—" if x is None else f"{x * 100:+.2f}%"
 
@@ -591,6 +756,145 @@ def detect_news_impact(settings: dict[str, Any]) -> list[dict[str, Any]]:
     return specs
 
 
+def detect_macro_market_events(
+    settings: dict[str, Any],
+    news_data: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Trigger #11 — genuinely market-wide events (war, an emergency rate
+    decision, a crash/circuit-breaker, a pandemic, a recession call, …).
+
+    Distinct from trigger #9 (detect_news_impact), which keys off a single
+    stock held by 4+ models. This one ignores who holds what: a market-wide
+    shock matters regardless of the current book.
+
+    Gate: a macro headline must (a) match a high-severity keyword in one of
+    the five MACRO_EVENT_PATTERNS categories AND (b) carry a sentiment
+    magnitude above `alerts.macro_event_sentiment_threshold` (default 0.6),
+    so routine business news ("S&P slips on light volume") never fires.
+
+    De-dup is per category per ET day (the dispatch dedup_key), so the same
+    event reported by a dozen outlets — or re-seen across the day's 13 ticks —
+    fires exactly once. The single highest-magnitude headline in each matched
+    category becomes that category's alert.
+    """
+    from ..data.sentiment import score_macro_headline, sentiment_label
+
+    alerts_cfg = settings.get("alerts", {}) or {}
+    threshold = float(alerts_cfg.get("macro_event_sentiment_threshold", 0.6))
+
+    headlines = _collect_macro_headlines(news_data)
+    if not headlines:
+        return []
+
+    # category -> (signed_score, item, title) for the strongest match so far.
+    best_by_cat: dict[str, tuple[float, dict[str, Any], str]] = {}
+    for it in headlines:
+        title = (it.get("title") or "").strip()
+        if not title:
+            continue
+        category = _match_macro_category(f"{title} {it.get('summary') or ''}")
+        if not category:
+            continue
+        # Crisis-augmented VADER (see score_macro_headline) — the plain lexicon
+        # scores "crash"/"recession"/"default" near zero, so the gate would be
+        # dead. Scored on title + summary for a stabler magnitude on terse heads.
+        score = score_macro_headline(f"{title}. {it.get('summary') or ''}")
+        if abs(score) <= threshold:
+            continue
+        prev = best_by_cat.get(category)
+        if prev is None or abs(score) > abs(prev[0]):
+            best_by_cat[category] = (score, it, title)
+
+    if not best_by_cat:
+        return []
+
+    pos = _models_positioning(settings)
+    n_models = pos["n_models"]
+    cash_pct = pos["total_cash_pct"]
+    cash_str = f"{cash_pct * 100:.1f}%" if cash_pct is not None else "—"
+    most_held = pos["most_held"]
+    most_held_str = (
+        ", ".join(f"{t} ({c}/{n_models})" for t, c in most_held) if most_held else "none"
+    )
+
+    specs: list[dict[str, Any]] = []
+    for category, (score, it, title) in best_by_cat.items():
+        src = it.get("source", "?")
+        ts = it.get("datetime") or "—"
+        label = sentiment_label(score)
+        specs.append({
+            "kind": "macro_event",
+            "severity": "CRITICAL",
+            # Title is fixed so the subject is exactly the spec'd string
+            # ("[ALERT] Major Market Event Detected"); the matched category
+            # is carried in the body + the numbers table below.
+            "title": "Major Market Event Detected",
+            "body": (
+                f"<b>{category}.</b> A macro headline matched a high-severity "
+                f"market-wide signal (sentiment <b>{score:+.2f}</b>, {label}):<br>"
+                f"<i>&ldquo;{title}&rdquo;</i><br>"
+                f"&mdash; {src}, {ts}.<br><br>"
+                f"This is a market-wide event and may affect <b>all model portfolios</b>, "
+                f"not just a single stock.<br><br>"
+                f"Positioning right now across {n_models} models: <b>{cash_str}</b> total cash; "
+                f"most-held — <b>{most_held_str}</b>."
+            ),
+            "context": {
+                "models": ["All models"],
+                "numbers": {
+                    "Category": category,
+                    "Sentiment": f"{score:+.2f} ({label})",
+                    "Source": src,
+                    "Headline time": ts,
+                    "Total cash across models": cash_str,
+                    "Most-held": most_held_str,
+                },
+            },
+            "dedup_key": f"macro_event:{category}",
+        })
+    return specs
+
+
+def scan_macro_events(
+    news_data: dict[str, Any] | None = None,
+    settings: dict[str, Any] | None = None,
+) -> dict[str, int]:
+    """Run the market-wide event detector and dispatch immediately.
+
+    This is the "fire as it happens" path the pipeline calls every tick, right
+    after the news fetch — so a war or a crash alerts within the tick it
+    surfaces rather than waiting for the EOD sweep. Dedup (once per category
+    per ET day) makes it safe to call on all 13 daily ticks. Returns a small
+    disposition tally for logging. Never raises.
+    """
+    if settings is None:
+        settings = load_settings()
+    tally: dict[str, int] = {}
+    try:
+        specs = detect_macro_market_events(settings, news_data=news_data)
+    except Exception:
+        logger.exception("Macro market-event detection failed")
+        return tally
+    for spec in specs:
+        try:
+            disp = dispatch_event(
+                kind=spec["kind"],
+                severity=spec["severity"],
+                title=spec["title"],
+                body=spec["body"],
+                context=spec.get("context"),
+                dedup_key=spec.get("dedup_key"),
+                settings=settings,
+            )
+        except Exception:
+            logger.exception("Macro market-event dispatch failed")
+            continue
+        tally[disp] = tally.get(disp, 0) + 1
+    if tally:
+        logger.info("Macro market-event scan dispositions: %s", tally)
+    return tally
+
+
 def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None) -> list[dict[str, Any]]:
     """Data-integrity sweep: ghost positions, position-cap violations,
     duplicate state across models, negative cash, and duplicate perf rows."""
@@ -797,8 +1101,12 @@ def run_eod_alert_sweep(summary: dict[str, Any], settings: dict[str, Any] | None
     date_str = summary.get("date") or session_date()
 
     # Critical → informational, so the per-day cap is spent on the events that
-    # matter most; lower-priority detections overflow into the digest.
+    # matter most; lower-priority detections overflow into the digest. The
+    # macro-event detector runs first (and again here as an EOD backstop —
+    # the intraday scan_macro_events path is the primary trigger; dedup means
+    # this re-run is a no-op if it already fired today).
     detectors: list[tuple[str, Any]] = [
+        ("macro_market_events", lambda: detect_macro_market_events(settings)),
         ("state_anomalies", lambda: detect_state_anomalies(settings, date_str)),
         ("missed_runs", lambda: detect_missed_runs(settings, date_str)),
         ("oversized_trades", lambda: detect_oversized_trades(settings, date_str)),

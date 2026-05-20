@@ -143,6 +143,115 @@ def test_detect_oversized_trades(iso):
     assert "NVDA" in specs[0]["title"]
 
 
+# ---- Trigger #11: market-wide events --------------------------------------
+
+def test_match_macro_category_and_false_positive_guards():
+    m = events._match_macro_category
+    assert m("Russia launches invasion, missiles strike Kyiv") == "Geopolitical shock"
+    assert m("Fed announces emergency rate cut in unscheduled meeting") == "Monetary policy surprise"
+    assert m("Wall Street crashes, circuit breaker halts trading") == "Macro crisis"
+    assert m("Moody downgrades US sovereign credit rating") == "Macro crisis"
+    assert m("WHO declares a global pandemic") == "Systemic event"
+    assert m("US economy enters recession as GDP contracts") == "Severe economic data"
+    # Substring false positives must NOT match.
+    assert m("Coupon startup raises a funding round") is None      # 'coup' in 'coupon'
+    assert m("Warner Bros forward guidance warms investors") is None  # 'war' in warner/forward/warms
+    assert m("Apple unveils a new iPhone with a faster chip") is None
+
+
+def _macro_news(title, summary="", source="Test", dt="2026-05-20T14:00:00Z"):
+    return {"macro": [{"title": title, "summary": summary, "source": source, "datetime": dt}]}
+
+
+def _stub_macro(monkeypatch, tmp_path, portfolios, score):
+    """Isolate the detector: empty on-disk macro caches, fixed positioning,
+    and a deterministic sentiment score (no VADER/network in the unit path)."""
+    monkeypatch.setattr(events, "NEWS_CACHE_DIR", tmp_path / "news_cache")
+    monkeypatch.setattr(events, "_read_dashboard_portfolios", lambda: portfolios)
+    monkeypatch.setattr("src.data.sentiment.score_macro_headline", lambda text: score)
+
+
+def test_detect_macro_event_fires_with_positioning(iso, monkeypatch, tmp_path):
+    _stub_macro(monkeypatch, tmp_path, [
+        {"model_key": "claude", "cash": 50000.0, "total_value": 100000.0,
+         "holdings": [{"ticker": "NVDA"}, {"ticker": "AAPL"}]},
+        {"model_key": "gpt", "cash": 30000.0, "total_value": 100000.0,
+         "holdings": [{"ticker": "NVDA"}]},
+    ], score=-0.92)
+
+    specs = events.detect_macro_market_events(
+        SETTINGS, news_data=_macro_news("Russia launches full-scale invasion", "missiles strike"))
+    assert len(specs) == 1
+    s = specs[0]
+    assert s["kind"] == "macro_event"
+    assert s["severity"] == "CRITICAL"
+    assert s["title"] == "Major Market Event Detected"          # exact subject after [ALERT]
+    assert s["dedup_key"] == "macro_event:Geopolitical shock"
+    assert s["context"]["numbers"]["Category"] == "Geopolitical shock"
+    # Positioning: total cash (50k+30k)/(200k) = 40%; NVDA held by 2/2, AAPL 1/2.
+    assert "40.0%" in s["body"]
+    assert "NVDA (2/2)" in s["body"]
+    assert "all model portfolios" in s["body"]
+
+
+def test_macro_event_requires_keyword_and_sentiment(iso, monkeypatch, tmp_path):
+    # Keyword matches but sentiment is too weak → no fire.
+    _stub_macro(monkeypatch, tmp_path, [], score=-0.4)
+    assert events.detect_macro_market_events(
+        SETTINGS, news_data=_macro_news("Market crash feared by a few analysts")) == []
+
+    # Strong sentiment but no high-severity keyword → no fire.
+    _stub_macro(monkeypatch, tmp_path, [], score=-0.95)
+    assert events.detect_macro_market_events(
+        SETTINGS, news_data=_macro_news("Beloved CEO retires after a stellar decade")) == []
+
+
+def test_scan_macro_events_dedup_once_per_category_per_day(iso, monkeypatch, tmp_path):
+    _stub_macro(monkeypatch, tmp_path, [
+        {"model_key": "claude", "cash": 0.0, "total_value": 100000.0, "holdings": [{"ticker": "NVDA"}]},
+    ], score=-0.9)
+    news = _macro_news("Stocks crash as circuit breaker halts Wall Street trading", source="CNBC")
+
+    d1 = events.scan_macro_events(news_data=news, settings=SETTINGS)
+    d2 = events.scan_macro_events(news_data=news, settings=SETTINGS)
+    assert d1.get("sent") == 1
+    assert d2.get("deduped") == 1            # same category — fires once per day
+    assert len(iso) == 1
+    assert iso[0]["subject"] == "[ALERT] Major Market Event Detected"
+
+
+def test_macro_event_distinct_categories_both_fire(iso, monkeypatch, tmp_path):
+    _stub_macro(monkeypatch, tmp_path, [
+        {"model_key": "claude", "cash": 0.0, "total_value": 100000.0, "holdings": []},
+    ], score=-0.9)
+    news = {"macro": [
+        {"title": "Russia launches invasion with missile strikes", "summary": "", "source": "AP", "datetime": "t"},
+        {"title": "Fed makes emergency rate cut in unscheduled meeting", "summary": "", "source": "WSJ", "datetime": "t"},
+    ]}
+    specs = events.detect_macro_market_events(SETTINGS, news_data=news)
+    cats = {s["dedup_key"] for s in specs}
+    assert cats == {"macro_event:Geopolitical shock", "macro_event:Monetary policy surprise"}
+
+
+def test_macro_event_real_vader_gate(iso, monkeypatch, tmp_path):
+    # Exercises the real crisis-augmented VADER scorer (no stub) to guard the
+    # lexicon + threshold against regressions. Skipped if the VADER lexicon
+    # isn't available offline, so CI stays network-free.
+    try:
+        import nltk
+        nltk.data.find("sentiment/vader_lexicon.zip")
+    except Exception:
+        pytest.skip("VADER lexicon not available offline")
+    monkeypatch.setattr(events, "NEWS_CACHE_DIR", tmp_path / "news_cache")
+    monkeypatch.setattr(events, "_read_dashboard_portfolios",
+                        lambda: [{"model_key": "claude", "cash": 0.0,
+                                  "total_value": 100000.0, "holdings": []}])
+    fire = _macro_news("Wall Street crashes as circuit breaker halts trading", "Stocks plunge 8%")
+    routine = _macro_news("S&P 500 edges higher on light volume", "Quiet pre-holiday session")
+    assert len(events.detect_macro_market_events(SETTINGS, news_data=fire)) == 1
+    assert events.detect_macro_market_events(SETTINGS, news_data=routine) == []
+
+
 def test_digest_builds_offline(iso, monkeypatch):
     # Avoid the yfinance index fetch.
     import src.data.market_data as md
