@@ -35,6 +35,10 @@ LEADERBOARD_DIR = DATA_DIR / "leaderboard"
 MODEL_VERSIONS_DIR = DATA_DIR / "model_versions"
 STATE_DIR = DATA_DIR / "state"
 NEWS_CACHE_DIR = DATA_DIR / "news_cache"
+# Email-alert state + send log. Committed with the rest of data/ so the
+# "fire once per threshold ever" milestone ledger survives across the
+# ephemeral GitHub Actions runners.
+ALERTS_DIR = DATA_DIR / "alerts"
 
 _LOG_CONFIGURED = False
 
@@ -50,6 +54,7 @@ def ensure_dirs() -> None:
         MODEL_VERSIONS_DIR,
         STATE_DIR,
         NEWS_CACHE_DIR,
+        ALERTS_DIR,
         LOGS_DIR,
         REPORTS_DIR,
         MONTHLY_REPORTS_DIR,

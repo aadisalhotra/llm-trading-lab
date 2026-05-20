@@ -165,7 +165,8 @@ def run_one_model(
     forced_results = []
     if triggered:
         send_alert("WARN", f"Position stop on {model_key}",
-                   f"Force-selling: {triggered}", {"model": model_key})
+                   f"Force-selling: {triggered}", {"model": model_key},
+                   kind="position_stop", dedup_key=f"position_stop:{model_key}")
         forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP")
 
     snapshot_before = portfolio.snapshot(prices)
@@ -281,12 +282,14 @@ def run_one_model(
     transition = detect_monthly_transition(model_key, run_date)
     if transition:
         send_alert("INFO", f"Model transition: {model_key}",
-                   f"{transition['old_version']} -> {transition['new_version']}", transition)
+                   f"{transition['old_version']} -> {transition['new_version']}", transition,
+                   kind="model_transition")
 
     if not decision_result.success:
         logger.error("[%s] Adapter failure: %s", model_key, decision_result.error)
         send_alert("WARN", f"Model {model_key} failed", decision_result.error or "unknown",
-                   {"model": model_key})
+                   {"model": model_key},
+                   kind="api_failure", dedup_key=f"api_failure:{model_key}")
         # Still log the failure + intraday snapshot
         log_decision_run(
             model_key=model_key, run_date=run_date,
@@ -338,7 +341,8 @@ def run_one_model(
     # Portfolio stop check AFTER execution
     if check_portfolio_stop(portfolio, prices):
         send_alert("CRITICAL", f"Portfolio stop hit: {model_key}",
-                   "Liquidating to cash and halting model", {"model": model_key})
+                   "Liquidating to cash and halting model", {"model": model_key},
+                   kind="portfolio_halt", dedup_key=f"portfolio_halt:{model_key}")
         portfolio.liquidate_all(prices)
         portfolio.halted = True
 
@@ -461,7 +465,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     prices = _prices_from_data(market_data)
     if not prices:
         logger.error("No prices fetched — aborting tick")
-        send_alert("CRITICAL", "Market data failure", "No prices for any symbol")
+        send_alert("CRITICAL", "Market data failure", "No prices for any symbol",
+                   kind="market_data_failure", dedup_key="market_data_failure")
         return 1
 
     # Fetch news intelligence ONCE per pipeline tick — not per model — so all
@@ -520,7 +525,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
-            send_alert("CRITICAL", f"Unhandled error in {model_key}", str(e), {"model": model_key})
+            send_alert("CRITICAL", f"Unhandled error in {model_key}", str(e), {"model": model_key},
+                       kind="pipeline_error", dedup_key=f"pipeline_error:{model_key}")
             r = {"model_key": model_key, "status": "ERROR", "error": str(e)}
         r["_duration_sec"] = round(time.monotonic() - t0, 2)
         return r
@@ -554,7 +560,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         build_dashboard_payload(prices=prices)
     except Exception as e:
         logger.exception("Dashboard build failed: %s", e)
-        send_alert("WARN", "Dashboard build failed", str(e))
+        send_alert("WARN", "Dashboard build failed", str(e),
+                   kind="dashboard_failure", dedup_key="dashboard_failure")
 
     # EOD-only: report + summary alert
     if is_eod:
@@ -574,7 +581,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             logger.info("Daily report at %s", report_path)
         except Exception as e:
             logger.exception("Daily report generation failed: %s", e)
-            send_alert("WARN", "Daily report generation failed", str(e))
+            send_alert("WARN", "Daily report generation failed", str(e),
+                       kind="report_failure", dedup_key="report_failure")
 
         leaderboard = build_leaderboard(list(settings["models"].keys()))
         summary = {
@@ -605,12 +613,14 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                     logger.error("BUDGET CRITICAL — %s", detail)
                     send_alert("CRITICAL", "Monthly API budget exceeded",
                                f"One or more providers over their monthly cap (trading continues): {detail}",
-                               {"budget": budget})
+                               {"budget": budget},
+                               kind="budget", dedup_key="budget:critical")
                 else:
                     logger.warning("BUDGET WARN — %s", detail)
                     send_alert("WARN", "Monthly API budget approaching cap",
                                f"One or more providers ≥80% of monthly cap: {detail}",
-                               {"budget": budget})
+                               {"budget": budget},
+                               kind="budget", dedup_key="budget:warn")
             else:
                 logger.info("Budget check: all providers below %.0f%% of monthly cap",
                             budget["warn_threshold_pct"] * 100)

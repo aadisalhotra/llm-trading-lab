@@ -1,15 +1,25 @@
-"""Alert dispatch.
+"""Alert dispatch — the stable interface the pipeline calls.
 
-Right now alerts are logged + written to /logs/alerts.jsonl. Email/SMS hooks
-are stubbed at the boundary so plugging in SMTP later is a single function
-swap. The pipeline calls send_alert() and send_daily_summary() — those are
-the stable interfaces.
+Two entry points, unchanged in signature so existing call sites keep working:
+
+  - `send_alert(severity, title, body, context)` — any non-routine event.
+    Logs to /logs/alerts.jsonl + the pipeline log (as before), then routes
+    to the email layer via `events.dispatch_event`, which applies de-dup, the
+    per-day cap, and overflow-into-digest. WARN/CRITICAL email by default;
+    INFO is log-only unless `email=True` is passed.
+
+  - `send_daily_summary(summary)` — the EOD digest trigger. Logs the summary,
+    runs the end-of-day detection sweep (milestones, ATH, negative crossings,
+    oversized trades, news impact, state anomalies, missed runs), then sends
+    the once-per-day HTML digest (which bundles any capped overflow alerts).
+
+Email failures never propagate: the whole email path is wrapped so a flaky
+SMTP connection can't crash a trading tick.
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
@@ -26,7 +36,42 @@ def _persist(record: dict[str, Any]) -> None:
         f.write(json.dumps(record) + "\n")
 
 
-def send_alert(severity: str, title: str, body: str, context: dict[str, Any] | None = None) -> None:
+# Fallback classifier for the machine `kind` tag when a caller doesn't pass
+# one explicitly. Keeps the email layer's grouping/labels sensible even for
+# ad-hoc alerts.
+def _infer_kind(title: str) -> str:
+    t = (title or "").lower()
+    if "position stop" in t:
+        return "position_stop"
+    if "portfolio stop" in t or "halt" in t:
+        return "portfolio_halt"
+    if "market data" in t:
+        return "market_data_failure"
+    if "unhandled error" in t:
+        return "pipeline_error"
+    if "dashboard" in t:
+        return "dashboard_failure"
+    if "report" in t:
+        return "report_failure"
+    if "budget" in t:
+        return "budget"
+    if "transition" in t:
+        return "model_transition"
+    if "fail" in t or "api" in t:
+        return "api_failure"
+    return "event"
+
+
+def send_alert(
+    severity: str,
+    title: str,
+    body: str,
+    context: dict[str, Any] | None = None,
+    *,
+    kind: str | None = None,
+    dedup_key: str | None = None,
+    email: bool | None = None,
+) -> None:
     """Single point of dispatch for any non-routine event.
 
     severity: INFO | WARN | CRITICAL
@@ -43,11 +88,27 @@ def send_alert(severity: str, title: str, body: str, context: dict[str, Any] | N
         {"INFO": logging.INFO, "WARN": logging.WARNING, "CRITICAL": logging.ERROR}.get(severity, logging.INFO),
         "ALERT [%s] %s — %s", severity, title, body,
     )
-    _maybe_email(record)
+    try:
+        from .events import dispatch_event
+        dispatch_event(
+            kind=kind or _infer_kind(title),
+            severity=severity,
+            title=title,
+            body=body,
+            context=context or {},
+            dedup_key=dedup_key,
+            email=email,
+        )
+    except Exception:
+        logger.exception("Alert email dispatch failed for: %s", title)
 
 
 def send_daily_summary(summary: dict[str, Any]) -> None:
-    """End-of-run digest with per-model results + leaderboard."""
+    """End-of-run digest with per-model results + leaderboard.
+
+    Records the summary, runs the EOD event-detection sweep, then sends the
+    once-per-day HTML digest email.
+    """
     record = {
         "timestamp": datetime.utcnow().isoformat(),
         "type": "DAILY_SUMMARY",
@@ -55,18 +116,17 @@ def send_daily_summary(summary: dict[str, Any]) -> None:
     }
     _persist(record)
     logger.info("DAILY SUMMARY recorded for %s", summary.get("date"))
-    _maybe_email(record)
 
+    # Detection sweep first so any capped events are queued before the digest
+    # renders (the digest bundles the overflow).
+    try:
+        from .events import run_eod_alert_sweep
+        run_eod_alert_sweep(summary)
+    except Exception:
+        logger.exception("EOD alert sweep failed")
 
-def _maybe_email(record: dict[str, Any]) -> None:
-    """Email hook — only fires if SMTP config is present.
-
-    This is the boundary to swap in real email later. For now it's a no-op
-    when SMTP_HOST is unset, which is the default.
-    """
-    smtp_host = os.getenv("SMTP_HOST")
-    if not smtp_host:
-        return
-    # Stub: real implementation goes here when alerts are turned on.
-    # Intentionally left as a logged no-op so the call surface is real but inert.
-    logger.debug("Email hook fired (no-op until SMTP wiring is enabled): %s", record.get("title", record.get("type")))
+    try:
+        from .digest import send_daily_digest
+        send_daily_digest(summary)
+    except Exception:
+        logger.exception("Daily digest send failed")
