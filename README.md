@@ -59,8 +59,8 @@ Model lineup is reviewed on the first trading day of each month. Each provider's
 
 | Phase | Period | Capital | Purpose |
 |-------|--------|---------|---------|
-| **Paper** | Jul 2026 – Dec 2026 | $100K simulated per model | Validate pipeline, collect baseline data, tune risk controls |
-| **Live** | Jan 2027 – Jan 2028 | $1K real per model | Real execution with real slippage, fees, and consequences |
+| **Paper** | Apr 9 – Oct 31, 2026 | $100K simulated per model | Validate pipeline, collect baseline data, tune risk controls |
+| **Live** | Nov 1, 2026 – Nov 1, 2027 | $1K real per model | Real execution with real slippage, fees, and consequences |
 | **Scale** | 2028+ (optional) | TBD | Increase capital if results warrant it |
 
 ## The 79-Asset Universe
@@ -140,11 +140,11 @@ An end-of-day pass at 5:30 PM ET writes daily performance snapshots, generates r
 
 ```
 Apr 9, 2026   Phase A — Paper trading begins ($100K per model)
-Oct 9, 2026   Phase A ends — 6 months of paper data
-Mid-Oct 2026  Month 6 Paper Trading Final Report
+Oct 31, 2026  Phase A ends — ~7 months of paper data
+Late Oct 2026 Paper Trading Final Report — go/no-go for live
 Nov 1, 2026   Phase B — Live trading begins ($1K real per model)
 Nov 1, 2027   Phase B ends — 12 months of live data
-Nov 2027      Month 18 Final Capstone Report
+Nov 2027      Final Capstone Report
 ```
 
 ## Running Locally

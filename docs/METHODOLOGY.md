@@ -21,13 +21,13 @@ Given identical information, identical constraints, and identical execution infr
 
 | Phase | Dates | Capital | Purpose |
 |---|---|---|---|
-| 1: Build | Apr–May 2026 | $0 | Pipeline + dashboard |
-| 2: Test | May–Jun 2026 | $0 | Dry runs, validate guardrails |
-| A: Paper | Jul–Dec 2026 | $100k each | Validate viability |
-| Month 6 Report | Jan 2027 | — | Go/no-go for live |
-| B: Live | Jan 2027–Jan 2028 | $1k each | Real capital |
-| Capstone | Jan 2028 | — | Final report |
-| C: Scale | TBD | TBD | Optional |
+| 1: Build | Pre-launch (completed) | $0 | Pipeline + dashboard |
+| 2: Test | Pre-launch (completed) | $0 | Dry runs, validate guardrails |
+| A: Paper | Apr 9 – Oct 31, 2026 | $100k each | Validate viability (pilot) |
+| Paper Final Report | Late Oct 2026 | — | Go/no-go for live |
+| B: Live | Nov 1, 2026 – Nov 1, 2027 | $1k each | Real capital |
+| Capstone | Nov 2027 | — | Final report |
+| C: Scale | 2028+ | TBD | Optional |
 
 ## Model Evolution Policy
 
@@ -40,8 +40,8 @@ Given identical information, identical constraints, and identical execution infr
 - **Daily**: dashboard auto-update
 - **Weekly**: snapshot commit
 - **Monthly**: full research report in `/reports`
-- **Month 6**: Paper Trading Final Report
-- **Month 18**: Capstone
+- **Late Oct 2026**: Paper Trading Final Report (go/no-go for live)
+- **Nov 2027**: Capstone
 
 ## Compliance
 Personal investment experiment. Not financial advice. All risk is the operator's own.

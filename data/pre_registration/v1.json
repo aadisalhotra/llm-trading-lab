@@ -34,13 +34,13 @@
   },
   "phases": {
     "paper": {
-      "window": "2026-04-09 to 2026-10-09",
+      "window": "2026-04-09 to 2026-10-31",
       "capital_usd": 100000,
       "role": "pilot",
       "confirmatory": false
     },
     "live": {
-      "window": "approx 2026-11 to 2027-10-09",
+      "window": "2026-11-01 to 2027-11-01",
       "capital_usd": 1000,
       "role": "confirmatory",
       "confirmatory": true
@@ -209,5 +209,11 @@
     "Testing": "Accumulating data; no decision reached.",
     "Resolved": "Decision rule has been met."
   },
-  "amendments": []
+  "amendments": [
+    {
+      "date": "2026-05-20",
+      "change": "Reconciled phase dates to one canonical timeline: paper 2026-04-09 to 2026-10-31; live 2026-11-01 to 2027-11-01 (12-month live window).",
+      "rationale": "Aligned settings.json, README.md, PRE_REGISTRATION.md, and this file. Prior draft ended paper 2026-10-09 with an approximate live window. No change to research questions, metrics, or decision rules."
+    }
+  ]
 }

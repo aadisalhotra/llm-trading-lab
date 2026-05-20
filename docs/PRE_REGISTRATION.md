@@ -4,7 +4,7 @@
 **Pre-registration version:** v1
 **Status:** 🔒 LOCKED
 **Author:** Aadi Salhotra
-**Planned public deposit:** OSF, before 2026-11-01 (i.e. before the live phase generates any inferential data)
+**Planned public deposit:** OSF, before the live phase begins on **2026-11-01** (so the deposit predates any inferential data)
 **Machine-readable copy:** [`data/pre_registration/v1.json`](../data/pre_registration/v1.json)
 
 ---
@@ -37,8 +37,8 @@ Six frontier LLMs each manage an independent portfolio under identical condition
 
 | Phase | Window | Capital | Role in this study |
 |-------|--------|---------|--------------------|
-| **A — Paper** | 2026-04-09 → 2026-10-09 | $100K simulated | **Pilot.** Pipeline validation, definition-locking, power analysis. *Not* confirmatory. |
-| **B — Live** | ≈2026-11 → 2027-10-09 | $1K real | **Confirmatory.** All inferential tests below run on this window. |
+| **A — Paper** | 2026-04-09 → 2026-10-31 | $100K simulated | **Pilot.** Pipeline validation, definition-locking, power analysis. *Not* confirmatory. |
+| **B — Live** | 2026-11-01 → 2027-11-01 | $1K real | **Confirmatory.** All inferential tests below run on this window. |
 
 The single biggest threat to this study is that the live window covers only **one** market regime. That limitation, and the planned backtest harness that addresses it for RQ1/RQ4/RQ5, is documented in [`BACKTEST_HARNESS_SCOPE.md`](BACKTEST_HARNESS_SCOPE.md).
 
@@ -237,6 +237,7 @@ Append-only. Each entry: date · what changed · why. No edits above this line a
 | Date | Change | Rationale |
 |------|--------|-----------|
 | 2026-05-19 | Initial registration (v1). | Locks design before the live (confirmatory) phase. |
+| 2026-05-20 | Reconciled phase dates to one canonical timeline: Phase A (paper) 2026-04-09 → 2026-10-31; Phase B (live) 2026-11-01 → 2027-11-01 (12-month live window). | Aligned `settings.json`, `README.md`, and `v1.json`; the prior draft ended paper on 2026-10-09 with an approximate live window. No change to research questions, metrics, or decision rules. |
 
 ---
 
