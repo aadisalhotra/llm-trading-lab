@@ -21,11 +21,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.config_loader import load_env  # noqa: E402
+from src.config_loader import force_utf8_console, load_env  # noqa: E402
 from src.alerts.email_alerts import send_email  # noqa: E402
 
 
 def main() -> int:
+    force_utf8_console()
     load_env()
 
     workflow = os.getenv("GITHUB_WORKFLOW", "pipeline")

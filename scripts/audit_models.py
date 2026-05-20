@@ -24,7 +24,7 @@ import requests
 
 # Allow running as a script from project root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.config_loader import load_env, load_settings  # noqa: E402
+from src.config_loader import force_utf8_console, load_env, load_settings  # noqa: E402
 
 HTTP_TIMEOUT = 30
 
@@ -120,6 +120,7 @@ def fetch_google_models() -> list[dict[str, Any]]:
 
 
 def main() -> int:
+    force_utf8_console()
     load_env()
     settings = load_settings()
 

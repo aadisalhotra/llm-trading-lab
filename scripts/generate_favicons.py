@@ -11,11 +11,16 @@ Run:
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.config_loader import force_utf8_console  # noqa: E402
+
 log = logging.getLogger("favicons")
+force_utf8_console()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 # Dashboard dark surface. Favicons bake this in so the mark reads on any tab.

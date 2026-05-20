@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -90,10 +91,34 @@ def get_env(name: str, default: str | None = None, required: bool = False) -> st
     return val
 
 
+def force_utf8_console() -> None:
+    """Force stdout/stderr to UTF-8 so console logs render Unicode glyphs.
+
+    On Windows, when stdout/stderr aren't an interactive console — piped,
+    captured by CI, or redirected to a file — Python falls back to the locale
+    code page (typically cp1252), which can't encode the em-dashes, arrows, and
+    middots we log; they get mangled to '?' or '\\uXXXX'. We reconfigure the
+    existing stream objects in place, so any logging handler already holding a
+    reference to sys.stderr keeps working with the new encoding. Idempotent, and
+    a no-op on streams that don't support reconfigure (None under pythonw, a
+    captured StringIO in tests, an already-detached stream).
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            # Stream closed or otherwise unreconfigurable — leave it as-is.
+            pass
+
+
 def configure_logging(level: int = logging.INFO) -> logging.Logger:
     """Configure root logger once. Returns the project logger."""
     global _LOG_CONFIGURED
     if not _LOG_CONFIGURED:
+        force_utf8_console()  # before the StreamHandler grabs sys.stderr
         ensure_dirs()
         log_file = LOGS_DIR / "pipeline.log"
         handlers = [

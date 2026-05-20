@@ -30,7 +30,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate
 from typing import Any
 
-from ..config_loader import ALERTS_DIR, load_settings
+from ..config_loader import ALERTS_DIR, force_utf8_console, load_settings
 
 logger = logging.getLogger("llmlab.alerts.email")
 
@@ -208,5 +208,6 @@ def _send_test_email() -> bool:
 
 if __name__ == "__main__":
     import logging as _logging
+    force_utf8_console()
     _logging.basicConfig(level=_logging.INFO, format="%(levelname)s %(name)s %(message)s")
     raise SystemExit(0 if _send_test_email() else 1)
