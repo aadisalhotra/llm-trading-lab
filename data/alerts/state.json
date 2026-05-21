@@ -1,19 +1,118 @@
 {
-  "milestones_fired": {},
+  "milestones_fired": {
+    "claude": [
+      5,
+      10
+    ],
+    "gpt": [
+      5,
+      10,
+      15
+    ],
+    "gemini": [
+      5
+    ],
+    "grok": [
+      5,
+      10
+    ],
+    "deepseek": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "claude_opus": [
+      5,
+      10
+    ]
+  },
   "daily": {
     "date": "2026-05-21",
-    "sent_count": 1,
+    "sent_count": 10,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "milestone:claude:10",
+      "milestone:gpt:15",
+      "milestone:gemini:5",
+      "milestone:grok:10",
+      "milestone:deepseek:20",
+      "milestone:claude_opus:10",
+      "news:TJX:c8bc4c61dd",
+      "news:GE:aacda4ee33",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-05-21T13:33:16.552773+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 crossed +10%",
+        "timestamp": "2026-05-21T21:06:59.837015+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "GPT-5.4 crossed +15%",
+        "timestamp": "2026-05-21T21:07:00.631890+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro crossed +5%",
+        "timestamp": "2026-05-21T21:07:01.232892+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) crossed +10%",
+        "timestamp": "2026-05-21T21:07:01.852795+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "DeepSeek Reasoner crossed +20%",
+        "timestamp": "2026-05-21T21:07:02.487587+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 crossed +10%",
+        "timestamp": "2026-05-21T21:07:02.994449+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TJX (held by 6)",
+        "timestamp": "2026-05-21T21:07:03.525070+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on GE (held by 6)",
+        "timestamp": "2026-05-21T21:07:04.020525+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-05-21T21:07:06.077511+00:00",
         "disposition": "sent"
       }
     ]
