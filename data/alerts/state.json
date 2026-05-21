@@ -40,9 +40,58 @@
       "milestone:claude_opus:10",
       "news:TJX:c8bc4c61dd",
       "news:GE:aacda4ee33",
-      "budget:warn"
+      "budget:warn",
+      "news:NVDA:6117f3a9d5",
+      "news:COST:6117f3a9d5"
     ],
-    "overflow": [],
+    "overflow": [
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on NVDA (held by 6)",
+        "body": "A <b>very positive</b> headline (sentiment +0.74) is affecting <b>NVDA</b>, held by 6 models (Claude Opus 4.6, Claude Sonnet 4.6, DeepSeek Reasoner, GPT-5.4, Gemini 3.1 Pro, Grok 4.20 (Reasoning)):<br><i>&ldquo;Stock Market Today, May 21: Markets Edge Upwards Again on Iran Peace Hopes&rdquo;</i> \u2014 Yahoo.",
+        "context": {
+          "models": [
+            "Claude Opus 4.6",
+            "Claude Sonnet 4.6",
+            "DeepSeek Reasoner",
+            "GPT-5.4",
+            "Gemini 3.1 Pro",
+            "Grok 4.20 (Reasoning)"
+          ],
+          "numbers": {
+            "Ticker": "NVDA",
+            "Sentiment": "+0.74 (very positive)",
+            "Models holding": "6",
+            "Source": "Yahoo"
+          }
+        },
+        "fired_at_et": "2026-05-21 18:20 ET",
+        "timestamp": "2026-05-21T22:20:05.337041+00:00"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on COST (held by 4)",
+        "body": "A <b>very positive</b> headline (sentiment +0.74) is affecting <b>COST</b>, held by 4 models (Claude Sonnet 4.6, DeepSeek Reasoner, GPT-5.4, Grok 4.20 (Reasoning)):<br><i>&ldquo;Stock Market Today, May 21: Markets Edge Upwards Again on Iran Peace Hopes&rdquo;</i> \u2014 Yahoo.",
+        "context": {
+          "models": [
+            "Claude Sonnet 4.6",
+            "DeepSeek Reasoner",
+            "GPT-5.4",
+            "Grok 4.20 (Reasoning)"
+          ],
+          "numbers": {
+            "Ticker": "COST",
+            "Sentiment": "+0.74 (very positive)",
+            "Models holding": "4",
+            "Source": "Yahoo"
+          }
+        },
+        "fired_at_et": "2026-05-21 18:20 ET",
+        "timestamp": "2026-05-21T22:20:05.337815+00:00"
+      }
+    ],
     "digest_sent": true,
     "fired_log": [
       {
@@ -114,6 +163,20 @@
         "title": "Monthly API budget approaching cap",
         "timestamp": "2026-05-21T21:07:06.077511+00:00",
         "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on NVDA (held by 6)",
+        "timestamp": "2026-05-21T22:20:05.337041+00:00",
+        "disposition": "overflow"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on COST (held by 4)",
+        "timestamp": "2026-05-21T22:20:05.337815+00:00",
+        "disposition": "overflow"
       }
     ]
   }
