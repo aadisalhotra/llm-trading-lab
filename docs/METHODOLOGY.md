@@ -7,7 +7,7 @@ Given identical information, identical constraints, and identical execution infr
 
 **Identical inputs.** Every model receives the same market data, the same prompt content, the same portfolio constraints, and the same per-model portfolio state. The only differences across providers are API-format adjustments (message structure, system prompt handling).
 
-**Identical rules.** Max 10 positions, max 20% per name, no leverage, no shorting, no options. $100k paper / $1k live starting capital. 30-trade daily cap. Universe is 20 large-cap U.S. equities.
+**Identical rules.** Max 50 positions, max 20% per name, no leverage, no shorting, no options. $100k paper / $1k live starting capital. 50-trade daily cap. Universe is 79 assets across 12 sectors (75 large-cap U.S. equities plus 4 commodity ETFs: GLD, SLV, USO, CPER).
 
 **Identical execution.** All trades route through the same `executor.py`. Paper mode prices off real market quotes; live mode submits real orders to Alpaca.
 
