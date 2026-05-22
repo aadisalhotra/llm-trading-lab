@@ -16,13 +16,13 @@ RQ1  Decision convergence under identical information sets (PRIMARY)
 RQ2  Disposition effect in sequential trading
 RQ3  Confidence calibration on closed trades
 RQ4  Systematic style-factor tilts (Fama-French 5 + momentum)
-RQ5  Behavioral response to portfolio drawdowns
-RQ6  Non-determinism at temperature = 0 (METHODOLOGICAL, manual probe)
+RQ5  Path-dependent risk behavior under drawdown (headline: drawdown-conditioned concentration response)
+RQ6  Operational reproducibility of deployed agents (CHARACTERIZATION, frozen-context probe)
 
 Data source of truth:
   * /data/trades/{model}_{YYYY-MM}.jsonl  — per-tick decisions + executions
   * /data/performance/{model}.jsonl        — one EOD portfolio snapshot per day
-  * /data/determinism/*.jsonl              — temperature=0 rerun probe output (RQ6)
+  * /data/determinism/*.jsonl              — frozen-context reproducibility probe output (RQ6)
 """
 from __future__ import annotations
 
@@ -57,6 +57,7 @@ from .statistical_corrections import (
     bca_bootstrap_ci,
     benjamini_hochberg,
     norm_cdf,
+    norm_ppf,
 )
 
 logger = logging.getLogger("llmlab.research")
@@ -70,6 +71,12 @@ MIN_CLOSED_TRADES_RQ3 = 20
 # SPY drawdown *regime*): 10% below the trailing 60-day EOD peak.
 RQ5_DRAWDOWN_THRESHOLD = -0.10
 RQ5_PEAK_WINDOW = 60
+# Uniform Phase A pilot-analysis start across all six models — pinned in
+# data/pre_registration/v1.json (RQ5.phase_a_pilot_window.resolved_start): the
+# later of the designated shakedown-period end (2026-04-22) and the launch-window
+# state-file commingling corruption-end (~2026-04-23). All RQ5 Phase A pilot
+# analyses begin here, excluding the shakedown/commingling window for all models.
+RQ5_PHASE_A_PILOT_START = "2026-04-23"
 # Full-exit epsilon — a position is "closed" only when residual shares fall
 # below this (mirrors Portfolio.GHOST_SHARES_EPSILON).
 SHARES_EPSILON = 0.01
@@ -971,7 +978,6 @@ def _daily_portfolio_features(records: list[dict[str, Any]]) -> dict[str, dict[s
             "total_value": total_value,
             "hhi": hhi,
             "cash_pct": float(pa.get("cash_pct") or 0.0),
-            "num_positions": float(len(holdings)),
             "avg_position_size": avg_w,
             "turnover": turnover,
         }
@@ -989,18 +995,251 @@ def _drawdown_flags(dates: list[str], values: list[float]) -> list[bool]:
     return flags
 
 
+def _hhi_normalized(values: list[float]) -> float:
+    """HHI = sum w_i^2 over positive values normalized to sum to 1. 0 if empty."""
+    pos = [float(v) for v in values if v and float(v) > 0]
+    tot = sum(pos)
+    if tot <= 0:
+        return 0.0
+    return float(sum((v / tot) ** 2 for v in pos))
+
+
+def _rq5_trade_panel(records: list[dict[str, Any]], window_start: str) -> list[dict[str, Any]]:
+    """Per-decision-period observations for one model within the pilot window.
+
+    For each period t (with an in-window prior period t-1) returns
+    {date, tick_pos, dHHI_trade, DD}:
+      * dHHI_trade = HHI(post-trade risky weights) - HHI(pre-trade price-drifted
+        risky weights). HHI is on risky-position weights normalized to sum to 1
+        (cash excluded). Pre-trade weights are reconstructed: the prior period's
+        post-trade holdings (quantities) re-priced at this period's prices (from
+        portfolio_after current_price for held names, executions fill_price for
+        names traded this period). This is the registered reconstruction; RQ5's
+        dependent variable is a derived quantity.
+      * DD = decline of total_value (incl. cash) from its running peak within the
+        window; DD>=0, 0 at a new peak.
+      * tick_pos = 1-indexed order within the trading day (for tick-position FE).
+    The first in-window period per model is dropped (no in-window prior, so its
+    pre-trade weights would re-price across the excluded shakedown boundary).
+    """
+    win = [r for r in records
+           if r.get("date", "") >= window_start
+           and (r.get("portfolio_after") or {}).get("total_value") is not None]
+    win.sort(key=lambda r: (r.get("date", ""), r.get("timestamp", "")))
+    if len(win) < 2:
+        return []
+    by_day: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in win:
+        by_day[r.get("date", "")].append(r)
+    tickpos: dict[int, int] = {}
+    for _d, rs in by_day.items():
+        for i, r in enumerate(sorted(rs, key=lambda x: x.get("timestamp", "")), 1):
+            tickpos[id(r)] = i
+
+    peak = float("-inf")
+    prev_holdings: dict[str, float] | None = None
+    obs: list[dict[str, Any]] = []
+    for r in win:
+        pa = r.get("portfolio_after") or {}
+        tv = float(pa.get("total_value") or 0.0)
+        if tv > peak:
+            peak = tv
+        dd = (1.0 - tv / peak) if peak > 0 else 0.0
+        holdings = pa.get("holdings") or []
+        hhi_post = _hhi_normalized([float(h.get("market_value") or 0.0) for h in holdings])
+        # period-t price map for re-pricing prior holdings
+        price_now: dict[str, float] = {}
+        for h in holdings:
+            cp = h.get("current_price")
+            if cp is not None:
+                price_now[str(h.get("ticker"))] = float(cp)
+        for ex in (r.get("executions") or []):
+            if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
+                fp = ex.get("fill_price")
+                if fp is not None:
+                    price_now.setdefault(str(ex.get("ticker")), float(fp))
+        if prev_holdings is not None:
+            pre_mv = [sh * price_now[t] for t, sh in prev_holdings.items()
+                      if sh > 0 and t in price_now]
+            obs.append({
+                "date": r.get("date", ""),
+                "tick_pos": tickpos[id(r)],
+                "dHHI_trade": hhi_post - _hhi_normalized(pre_mv),
+                "DD": dd,
+            })
+        prev_holdings = {str(h.get("ticker")): float(h.get("shares") or 0.0)
+                         for h in holdings if float(h.get("shares") or 0.0) > 0}
+    return obs
+
+
+def _rq5_headline_test(
+    panels: dict[str, list[dict[str, Any]]],
+    model_keys: list[str],
+    n_resamples: int,
+    seed: int = 20260523,
+) -> dict[str, Any]:
+    """Pooled dHHI_trade ~ DD with model + tick-position fixed effects.
+
+    dHHI_trade[m,t] = alpha_m + delta_p + beta*DD[m,t] + epsilon. Headline = the
+    two-sided percentile moving-block-bootstrap p-value on beta (blocks resampled
+    within model, L = round(n^(1/3))). Sensitivity re-runs at floor(L/2) and 2L
+    (NOT in the FDR family). One headline p-value.
+    """
+    from .statistical_corrections import _moving_block_indices
+
+    rows = [(key, o["tick_pos"], o["dHHI_trade"], o["DD"])
+            for key in model_keys for o in panels.get(key, [])]
+    n = len(rows)
+    present = [m for m in model_keys if any(r[0] == m for r in rows)]
+    if n < 10 or len(present) < 2:
+        return {"status": "insufficient", "n_periods": n, "n_models": len(present),
+                "headline_p_value": None,
+                "note": "Need >=10 pooled decision periods across >=2 models for the headline test."}
+
+    models = [r[0] for r in rows]
+    tickpos = [r[1] for r in rows]
+    y = np.array([r[2] for r in rows], dtype=float)
+    DD = np.array([r[3] for r in rows], dtype=float)
+    # Two-way FE design: intercept + model dummies (drop first present) +
+    # tick-position dummies (drop first) + DD. beta is the DD coefficient.
+    cols = [np.ones(n)]
+    for m in present[1:]:
+        cols.append(np.array([1.0 if mm == m else 0.0 for mm in models]))
+    for p in sorted(set(tickpos))[1:]:
+        cols.append(np.array([1.0 if tp == p else 0.0 for tp in tickpos]))
+    cols.append(DD)
+    X = np.column_stack(cols)
+    dd_col = X.shape[1] - 1
+
+    def _beta(idx: np.ndarray) -> float:
+        return float(_ols(y[idx], X[idx])["beta"][dd_col])
+
+    beta_hat = _beta(np.arange(n))
+    model_rows: dict[str, np.ndarray] = {}
+    for i, m in enumerate(models):
+        model_rows.setdefault(m, []).append(i)
+    model_rows = {m: np.array(v) for m, v in model_rows.items()}
+    L = max(1, int(round(n ** (1.0 / 3.0))))
+
+    def _boot(block_len: int, sd: int) -> np.ndarray:
+        rng = np.random.default_rng(sd)
+        reps: list[float] = []
+        for _ in range(n_resamples):
+            idx = np.concatenate([ridx[_moving_block_indices(len(ridx), block_len, rng)]
+                                  for ridx in model_rows.values()])
+            try:
+                b = _beta(idx)
+            except Exception:
+                continue
+            if math.isfinite(b):
+                reps.append(b)
+        return np.asarray(reps, dtype=float)
+
+    def _two_sided_p(reps: np.ndarray) -> float | None:
+        if len(reps) < 2:
+            return None
+        return min(1.0, 2.0 * min(float(np.mean(reps <= 0.0)), float(np.mean(reps >= 0.0))))
+
+    reps = _boot(L, seed)
+    p_val = _two_sided_p(reps)
+
+    # BCa CI for beta (z0 from reps; acceleration via delete-one-block jackknife).
+    ci_low = ci_high = None
+    method = "insufficient"
+    if len(reps) >= 2:
+        ci_low = float(np.percentile(reps, 5.0))
+        ci_high = float(np.percentile(reps, 95.0))
+        method = "percentile"
+        jack: list[float] = []
+        for m, ridx in model_rows.items():
+            nm = len(ridx)
+            base = ([model_rows[mm] for mm in model_rows if mm != m])
+            base_idx = np.concatenate(base) if base else np.array([], dtype=int)
+            for b in range(int(math.ceil(nm / L))):
+                lo, hi = b * L, min(b * L + L, nm)
+                keep = np.concatenate([ridx[:lo], ridx[hi:]])
+                idx = np.concatenate([base_idx, keep]) if len(keep) else base_idx
+                if len(idx) > X.shape[1]:
+                    try:
+                        bb = _beta(idx)
+                    except Exception:
+                        continue
+                    if math.isfinite(bb):
+                        jack.append(bb)
+        prop_less = float(np.mean(reps < beta_hat))
+        prop_less = min(max(prop_less, 1.0 / (len(reps) + 1)), 1.0 - 1.0 / (len(reps) + 1))
+        z0 = norm_ppf(prop_less)
+        accel = 0.0
+        jarr = np.asarray(jack, dtype=float)
+        if len(jarr) >= 2:
+            diffs = jarr.mean() - jarr
+            denom = 6.0 * (float(np.sum(diffs ** 2)) ** 1.5)
+            if denom != 0:
+                accel = float(np.sum(diffs ** 3) / denom)
+        if math.isfinite(z0) and math.isfinite(accel):
+            def _adj(zq: float) -> float:
+                num = z0 + zq
+                den = 1.0 - accel * num
+                return norm_cdf(z0 + num / (den if den != 0 else 1e-12))
+            a1, a2 = _adj(norm_ppf(0.05)), _adj(norm_ppf(0.95))
+            if math.isfinite(a1) and math.isfinite(a2) and 0.0 < a1 < a2 < 1.0:
+                ci_low = float(np.percentile(reps, 100.0 * a1))
+                ci_high = float(np.percentile(reps, 100.0 * a2))
+                method = "BCa"
+
+    # Registered block-length sensitivity (NOT in the FDR family).
+    sensitivity: dict[str, Any] = {}
+    for lab, bl in (("floor_L_over_2", max(1, L // 2)), ("2L", max(1, 2 * L))):
+        rr = _boot(bl, seed + (1 if lab == "floor_L_over_2" else 2))
+        sensitivity[lab] = {"block_length": bl, "p_value": _two_sided_p(rr)}
+    ps = [p for p in ([p_val] + [s["p_value"] for s in sensitivity.values()]) if p is not None]
+    robust = (all(p < DEFAULT_FDR_Q for p in ps) or all(p >= DEFAULT_FDR_Q for p in ps)) if len(ps) == 3 else None
+
+    return {
+        "status": "Testing",
+        "name": "drawdown_conditioned_concentration_response",
+        "model": "dHHI_trade = alpha_m + delta_p + beta*DD + epsilon",
+        "n_periods": n,
+        "n_models": len(present),
+        "block_length": L,
+        "block_length_rule": "round(n^(1/3))",
+        "beta": beta_hat,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "ci_method": method,
+        "headline_p_value": p_val,
+        "sensitivity": sensitivity,
+        "block_length_robust_proxy": robust,
+        "note": ("Headline p (at L) enters the BH family; the floor(L/2)/2L sensitivity "
+                 "runs do NOT. block_length_robust_proxy checks whether all three p-values "
+                 "land on the same side of q; BH-adjusted significance is evaluated at the "
+                 "family level."),
+    }
+
+
 def compute_rq5(
     all_records: dict[str, list[dict[str, Any]]],
     regime_map: dict[str, str],
     model_keys: list[str],
     n_resamples: int = DEFAULT_N_RESAMPLES,
 ) -> dict[str, Any]:
-    """How does behavior change when a model is >=10% off its own 60-day peak?"""
-    metrics = ["hhi", "turnover", "avg_position_size", "cash_pct", "num_positions"]
+    """RQ5 — path-dependent risk behavior under drawdown.
+
+    Two layers, both on the uniform Phase A pilot window (RQ5_PHASE_A_PILOT_START):
+      * Descriptive (not in the FDR family): the four registered behavioral
+        metrics (HHI, turnover, avg position size, cash) compared drawdown-vs-
+        normal day, per model, with bootstrap CIs. num_positions is NOT a
+        registered RQ5 metric and is excluded.
+      * Headline (one p-value, in the FDR family): pooled dHHI_trade ~ DD with
+        model + tick-position fixed effects (see _rq5_headline_test).
+    """
+    metrics = ["hhi", "turnover", "avg_position_size", "cash_pct"]
+    windowed = {k: [r for r in all_records.get(k, [])
+                    if r.get("date", "") >= RQ5_PHASE_A_PILOT_START] for k in model_keys}
     per_model: dict[str, Any] = {}
     total_dd_days = 0
     for key in model_keys:
-        feats = _daily_portfolio_features(all_records.get(key, []))
+        feats = _daily_portfolio_features(windowed.get(key, []))
         dates = sorted(feats.keys())
         if len(dates) < 5:
             per_model[key] = {"n_days": len(dates), "status": "insufficient"}
@@ -1012,7 +1251,7 @@ def compute_rq5(
         entry: dict[str, Any] = {"n_days": len(dates), "n_drawdown_days": n_dd}
         if n_dd == 0 or n_dd == len(dates):
             entry["status"] = "no_drawdown_contrast"
-            entry["note"] = "No 10% portfolio drawdown observed yet (or always in one)."
+            entry["note"] = "No 10% portfolio drawdown observed in the pilot window (or always in one)."
             per_model[key] = entry
             continue
         entry["status"] = "Testing"
@@ -1021,7 +1260,6 @@ def compute_rq5(
             in_vals = np.array([feats[d][m] for d, f in zip(dates, dd) if f])
             out_vals = np.array([feats[d][m] for d, f in zip(dates, dd) if not f])
             delta = float(in_vals.mean() - out_vals.mean())
-            # bootstrap the difference of means across the day index
             allv = np.array([feats[d][m] for d in dates])
             ddmask = np.array(dd)
 
@@ -1042,19 +1280,30 @@ def compute_rq5(
         entry["metrics"] = comp
         per_model[key] = entry
 
+    panels = {k: _rq5_trade_panel(all_records.get(k, []), RQ5_PHASE_A_PILOT_START)
+              for k in model_keys}
+    headline = _rq5_headline_test(panels, model_keys, n_resamples)
+
     return {
-        "status": "Testing" if total_dd_days > 0 else "Open",
+        "status": "Testing" if (headline.get("headline_p_value") is not None or total_dd_days > 0) else "Open",
+        "pilot_window_start": RQ5_PHASE_A_PILOT_START,
         "drawdown_threshold": RQ5_DRAWDOWN_THRESHOLD,
         "peak_window_days": RQ5_PEAK_WINDOW,
         "total_drawdown_days_across_models": total_dd_days,
+        "behavioral_metrics": metrics,
         "per_model": per_model,
-        "interpretation": ("Compares concentration (HHI), turnover, position size, "
-                           "and cash between drawdown and normal days."),
+        "headline_test": headline,
+        "headline_p_value": headline.get("headline_p_value"),
+        "interpretation": ("Descriptive layer: four behavioral metrics (HHI, turnover, "
+                           "avg position size, cash) drawdown-vs-normal, per model. "
+                           "Headline: pooled dHHI_trade ~ drawdown_depth with model + "
+                           "tick-position fixed effects; one moving-block-bootstrap "
+                           "p-value on beta enters the BH family."),
     }
 
 
 # ==========================================================================
-# RQ6 — Non-determinism at temperature = 0 (manual probe analyzer)
+# RQ6 — Operational reproducibility of deployed agents (frozen-context analyzer)
 # ==========================================================================
 
 def _load_determinism_records() -> list[dict[str, Any]]:
@@ -1075,101 +1324,94 @@ def _load_determinism_records() -> list[dict[str, Any]]:
 
 
 def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
-    """Quantify decision non-determinism across K temperature=0 reruns.
+    """RQ6 — operational reproducibility of deployed agents (characterization).
 
-    Reads probe output from /data/determinism/*.jsonl. Each line is one rerun:
-      {model_key, tick_id, run_index, temperature, decisions:[{ticker,action,
-       target_weight,confidence}], api_success}
+    Reframed from "non-determinism at temperature 0" (temperature is a no-op
+    across the reasoning cohort) to run-to-run divergence at each model's
+    DEPLOYED configuration. Reads frozen-context probe output from
+    /data/determinism/*.jsonl: K independent calls per held-out decision context
+    at the deployed configuration (the probe is tick-position-stratified with
+    identical composition across models and run off-peak — a probe-side property;
+    this analyzer computes the metric on whatever calls succeeded).
 
-    Per (model, tick, ticker) we measure whether all K runs agree on the
-    action; the decision-flip rate is the fraction that do NOT. Also reports
-    mean normalized action entropy and target-weight dispersion.
+    Per context c: decision set D = {(ticker, action)} with action in {BUY, SELL}.
+    Context divergence delta_c = 1 - mean pairwise Jaccard over the C(K',2) call
+    pairs (J=1 if both sets empty), K' = successful calls for that context.
+    Per-model divergence Delta_m = mean(delta_c) over contexts, with a BCa CI
+    resampling contexts. NOT in the FDR family; no hypothesis is tested.
     """
     records = _load_determinism_records()
     if not records:
-        return {"status": "Open",
-                "note": ("No determinism-probe data yet. RQ6 is manual-trigger: "
-                         "run scripts/determinism_probe.py to generate K reruns "
-                         "at temperature=0 over a 5% subsample."),
+        return {"status": "Open", "in_fdr_family": False,
+                "estimand": "Per-model run-to-run decision divergence Delta_m at the deployed configuration.",
+                "note": ("No frozen-context reproducibility data yet. RQ6 is manual-trigger: "
+                         "run the off-peak, tick-position-stratified frozen-context probe "
+                         "(K independent calls per context at each model's deployed "
+                         "configuration) into data/determinism/."),
                 "per_model": {}}
 
-    # group: (model, tick) -> list of run decision dicts {ticker: (action, weight)}
-    groups: dict[tuple[str, str], list[dict[str, tuple[str, float]]]] = defaultdict(list)
-    temps: set[float] = set()
+    # group: (model, context) -> list of decision sets, one per successful call
+    groups: dict[tuple[str, str], list[set]] = defaultdict(list)
     for r in records:
         if not r.get("api_success", True):
             continue
         mk = r.get("model_key")
-        tick = str(r.get("tick_id") or r.get("data_inputs_hash") or "")
-        if not mk or not tick:
+        ctx = str(r.get("context_id") or r.get("tick_id") or r.get("data_inputs_hash") or "")
+        if not mk or not ctx:
             continue
-        if r.get("temperature") is not None:
-            temps.add(float(r["temperature"]))
-        dec = {}
+        dset: set = set()
         for d in r.get("decisions", []):
             t = str(d.get("ticker", "")).upper().strip()
             a = str(d.get("action", "")).upper()
-            if t and a:
-                try:
-                    w = float(d.get("target_weight", 0.0))
-                except (TypeError, ValueError):
-                    w = 0.0
-                dec[t] = (a, w)
-        groups[(mk, tick)].append(dec)
+            if t and a in ("BUY", "SELL"):
+                dset.add((t, a))
+        groups[(mk, ctx)].append(dset)
+
+    def _jaccard(a: set, b: set) -> float:
+        if not a and not b:
+            return 1.0
+        union = a | b
+        return (len(a & b) / len(union)) if union else 1.0
 
     per_model: dict[str, Any] = {}
     for key in model_keys:
-        flips = 0
-        total = 0
-        entropies: list[float] = []
-        weight_stds: list[float] = []
-        k_runs: list[int] = []
-        for (mk, tick), runs in groups.items():
-            if mk != key or len(runs) < 2:
+        ctx_deltas: list[float] = []
+        kprimes: list[int] = []
+        for (mk, _ctx), calls in groups.items():
+            if mk != key or len(calls) < 2:
                 continue
-            k_runs.append(len(runs))
-            tickers = set().union(*[set(r.keys()) for r in runs])
-            for t in tickers:
-                actions = [r[t][0] for r in runs if t in r]
-                if len(actions) < 2:
-                    continue
-                total += 1
-                counts = defaultdict(int)
-                for a in actions:
-                    counts[a] += 1
-                if len(counts) > 1:
-                    flips += 1
-                # normalized entropy
-                n = len(actions)
-                ent = -sum((c / n) * math.log(c / n) for c in counts.values())
-                max_ent = math.log(min(3, n)) if n > 1 else 1.0
-                entropies.append(ent / max_ent if max_ent > 0 else 0.0)
-                weights = [r[t][1] for r in runs if t in r]
-                if len(weights) >= 2:
-                    weight_stds.append(float(np.std(weights)))
-        if total == 0:
-            per_model[key] = {"n_decisions": 0, "status": "no_data"}
+            kprimes.append(len(calls))
+            pairs = [_jaccard(calls[i], calls[j])
+                     for i in range(len(calls)) for j in range(i + 1, len(calls))]
+            if pairs:
+                ctx_deltas.append(1.0 - float(np.mean(pairs)))
+        if not ctx_deltas:
+            per_model[key] = {"n_contexts": 0, "status": "no_data"}
             continue
+        arr = np.asarray(ctx_deltas, dtype=float)
+        boot = bca_bootstrap_ci(arr, np.mean, alpha=0.10, n_resamples=DEFAULT_N_RESAMPLES)
         per_model[key] = {
-            "n_tick_ticker_decisions": total,
-            "mean_runs_per_tick": round(float(np.mean(k_runs)), 2) if k_runs else None,
-            "decision_flip_rate": round(flips / total, 4),
-            "mean_normalized_entropy": round(float(np.mean(entropies)), 4) if entropies else 0.0,
-            "mean_target_weight_std": round(float(np.mean(weight_stds)), 5) if weight_stds else 0.0,
+            "n_contexts": len(ctx_deltas),
+            "mean_runs_per_context": round(float(np.mean(kprimes)), 2) if kprimes else None,
+            "Delta_m": round(float(arr.mean()), 4),
+            "ci_low": boot.ci_low,
+            "ci_high": boot.ci_high,
+            "ci_method": boot.method,
         }
 
-    overall_flip = None
-    flips_all = [m["decision_flip_rate"] for m in per_model.values() if "decision_flip_rate" in m]
-    if flips_all:
-        overall_flip = round(float(np.mean(flips_all)), 4)
+    deltas = [m["Delta_m"] for m in per_model.values() if "Delta_m" in m]
+    overall = round(float(np.mean(deltas)), 4) if deltas else None
     return {
         "status": "Testing",
-        "temperatures_observed": sorted(temps),
-        "overall_decision_flip_rate": overall_flip,
+        "in_fdr_family": False,
+        "estimand": "Per-model run-to-run decision divergence Delta_m at the deployed configuration.",
+        "overall_mean_divergence": overall,
         "per_model": per_model,
-        "interpretation": ("A non-zero flip rate at temperature=0 means identical "
-                           "inputs yield different decisions — irreducible API "
-                           "non-determinism that bounds RQ1's measurable convergence."),
+        "interpretation": ("Delta_m = mean over frozen contexts of (1 - mean pairwise "
+                           "Jaccard of (ticker,action) decision sets across the K calls). "
+                           "Higher Delta_m = lower run-to-run reproducibility; it qualifies "
+                           "the RQ1-RQ5 interpretation. Characterization, not an NHST; "
+                           "excluded from the BH family."),
     }
 
 

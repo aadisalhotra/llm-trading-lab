@@ -63,7 +63,7 @@ Each RQ is stated with a null/alternative hypothesis, the operational definition
   - *Continuous signal:* **weight correlation** = Pearson r of the two models' `target_weight` vectors over the shared tickers.
 - **Metric definition.** Headline metric = mean pairwise action concordance across all (pair, tick) observations. Chance level = the **shuffled-permutation null**: within each tick, each model's action vector is independently permuted across its tickers (preserving that model's BUY/SELL/HOLD marginal rates, destroying cross-model alignment); the grand-mean concordance is recomputed; repeated to build the null distribution. Excess = observed − null mean.
 - **Pre-registered prediction.** Observed action concordance exceeds the shuffled-null mean by **≥ 0.10** (e.g. ~0.60 observed vs ~0.50 chance), with a one-sided permutation *p* < 0.05 surviving FDR control. Convergence is **strongest in trending regimes** and weakest in vol-spike regimes.
-- **Decision rule.** **Resolved-converge** if, on the live window, the permutation *p*-value < 0.05 after Benjamini-Hochberg correction **and** the BCa 90% CI for excess concordance excludes 0. **Resolved-null** if the CI includes 0. The convergence ceiling is interpreted against the RQ6 non-determinism floor: convergence cannot exceed (1 − within-model flip rate).
+- **Decision rule.** **Resolved-converge** if, on the live window, the permutation *p*-value < 0.05 after Benjamini-Hochberg correction **and** the BCa 90% CI for excess concordance excludes 0. **Resolved-null** if the CI includes 0. The convergence ceiling is interpreted against the RQ6 run-to-run reproducibility floor: convergence cannot exceed (1 − within-model run-to-run divergence).
 - **Data window required.** ≥ 200 pairwise (pair, tick) observations with ≥ 3 shared tickers, on live data. Stratified estimates require ≥ 50 observations per regime.
 
 ---
@@ -126,42 +126,54 @@ Each RQ is stated with a null/alternative hypothesis, the operational definition
 
 ---
 
-### RQ5 — Behavioral response to portfolio drawdowns
+### RQ5 — Path-dependent risk behavior under drawdown
 
-> **How do LLMs respond to portfolio drawdowns?**
+> **How do LLMs' trading decisions respond to their own portfolio drawdowns?**
 
-- **Status:** Open (no model has hit the drawdown trigger yet)
-- **Hypothesis.**
-  - H₀: Portfolio behavior (concentration, turnover, position size, cash) is unchanged between drawdown and normal days.
-  - H₁: Behavior shifts measurably when a model is in drawdown.
-- **Operationalization.** A model is **in drawdown** on an EOD when its portfolio value is **≥ 10% below its trailing 60-day peak** (measured on end-of-day portfolio value). *This is the model's own-equity drawdown and is deliberately distinct from the SPY drawdown **regime** (5% off a 60-day peak) used for stratification.* For each EOD we compute four behavioral metrics from that day's last `portfolio_after` snapshot and trade activity, then compare drawdown days vs normal days.
-- **Metric definition.** Drawdown-minus-normal difference in:
-  1. **HHI concentration** = Σ wᵢ² over holdings
-  2. **Turnover rate** = Σ |executed notional| that day / EOD portfolio value
-  3. **Average position size** = mean holding weight
-  4. **Cash allocation** = cash / total value
-- **Pre-registered prediction.** In drawdown, models become **more conservative**: cash allocation rises, HHI falls (de-concentration), average position size falls. Turnover **rises** transiently as positions are cut.
-- **Decision rule.** Per model with ≥ 1 drawdown episode and a normal-day contrast: **Resolved** for each metric whose BCa 90% CI on the drawdown-minus-normal difference excludes 0 (live data). The HHI-change test (pooled) enters the FDR family.
-- **Data window required.** At least one ≥10% drawdown episode plus ≥ 20 contrasting normal days, per model, on live data. If no model draws down in the live window, RQ5 is reported **Open / not testable on this tape** and deferred to the backtest harness.
+- **Status:** Testing (pilot data accumulating; confirmatory on the live window)
+- **Two layers.** A **descriptive** layer (four behavioral metrics, *not* in the FDR family) and one **inferential headline test** (the single RQ5 p-value in the FDR family).
+- **Hypothesis (headline).**
+  - H₀: β = 0 — trade-driven change in within-equity concentration does not respond to drawdown depth, pooled across the cohort.
+  - H₁: β ≠ 0 (two-sided) — models actively concentrate (β > 0) or diversify (β < 0) more when deeper in drawdown.
+- **Descriptive layer (not in the FDR family).** Per model, the four registered behavioral metrics — (1) **HHI concentration** = Σ wᵢ²; (2) **turnover** = Σ |executed notional| / EOD value; (3) **average position size** = mean holding weight; (4) **cash allocation** = cash / total value — compared drawdown-vs-normal day, with BCa 90% CIs. `num_positions` is **not** a registered RQ5 metric.
+- **Headline test — drawdown-conditioned concentration response.**
+  - *Dependent variable — trade-driven change in concentration.* A test on the realized HHI *level* would conflate behavior with mechanics (a market decline simultaneously deepens drawdown and passively reshapes weights). The dependent variable is the **trade-driven** change: dHHI_trade[m,t] = HHI(w_post) − HHI(w_pre), where HHI(w) = Σ wᵢ² on **risky-position weights normalized to sum to 1** (cash excluded); w_post = post-trade weights; w_pre = the prior period's post-trade holdings re-priced at period-t prices (mark-to-market drift, before period-t trades). **Pre-trade weights are not directly logged; they are reconstructed** — RQ5's dependent variable is a derived quantity (see §3.9).
+  - *Independent variable.* DD[m,t] = drawdown depth = fractional decline of total portfolio value (incl. cash) from its running peak; DD ≥ 0, 0 at a new peak.
+  - *Model.* Pooled panel OLS with **model fixed effects and within-session tick-position fixed effects**: dHHI_trade = αₘ + δₚ + β·DD + ε. (The δₚ tick-position fixed effects absorb the open-bell time-of-day structure — see §3.9 Gemini handling.)
+  - *Inference.* Moving-block bootstrap over decision periods within model, **block length L = round(n^(1/3))** (n = decision periods in the analysis window; resolved integer logged in `v1.json`), B = 10,000. Headline p = the two-sided percentile-bootstrap p on β: 2·min(share β\* ≤ 0, share β\* ≥ 0). A BCa CI for β is reported alongside.
+  - *Sensitivity (registered, not in the FDR family).* Re-run at block lengths **floor(L/2)** and **2L**; β is block-length-robust if its sign and BH-adjusted significance are stable across {floor(L/2), L, 2L}.
+- **Pre-registered prediction.** Descriptive: in drawdown, models become more conservative (cash up, HHI down, average position size down; turnover rises as positions are cut). Headline: two-sided on β.
+- **Decision rule.** The single headline p-value enters the BH family; RQ5's null is rejected if its BH-adjusted p < q (live data). The four descriptive metrics are reported per model with BCa 90% CIs and do not enter the family.
+- **Phase A pilot window.** All RQ5 Phase A pilot analyses use a **uniform series start across all six models** = the later of the designated shakedown-period end and the launch-window commingling corruption-end, resolved to **2026-04-23** (see §3.9). Phase A is exploratory.
+- **Data window required.** Confirmatory: the full Phase B live window.
 
 ---
 
-### RQ6 — Non-determinism at temperature = 0 · **METHODOLOGICAL**
+### RQ6 — Operational reproducibility of deployed agents · **CHARACTERIZATION**
 
-> **How non-deterministic are frontier LLM trading decisions at temperature = 0?**
+> **Holding model snapshot, prompt version, and input fixed, how much do a model's trading decisions vary across independent API calls at the model's deployed configuration?**
 
-- **Status:** Open (manual probe not yet run)
-- **Hypothesis.**
-  - H₀: At temperature = 0, identical inputs yield identical decisions (flip rate = 0).
-  - H₁: Decisions vary across reruns even at temperature = 0 (flip rate > 0) — irreducible API non-determinism.
-- **Operationalization.** **Manual-trigger only.** On a seeded random **5% subsample** of decision ticks, each model is re-run **K = 10** times at **temperature = 0** on the *same* inputs (`scripts/determinism_probe.py`, output to `data/determinism/`). For each (model, tick, ticker) we compare the action across the K reruns.
-- **Metric definition.** Per model:
-  - **Decision flip rate** = fraction of (tick, ticker) decisions where the K reruns do **not** all agree on the action (headline).
-  - **Mean normalized action entropy** across reruns.
-  - **Mean target-weight standard deviation** across reruns.
-- **Pre-registered prediction.** Flip rate is **small but non-zero** (≈ 1–10%), and **larger for reasoning models** (Grok, DeepSeek, o-style) than for low-temperature deterministic decoders. The flip rate sets the empirical **ceiling on RQ1 convergence**: two models cannot agree more reliably than one model agrees with itself.
-- **Decision rule.** Descriptive — **not** part of the FDR family. **Resolved** once K = 10 reruns exist for ≥ 5% of a representative live-week's ticks; report per-model flip rate with a binomial 90% interval and use it to bound the RQ1 interpretation.
-- **Data window required.** ≥ 1 representative trading week of ticks, 5% sampled, K = 10 reruns each, per model.
+- **Status:** Open (frozen-context probe not yet run)
+- **Type.** Characterization research question — **not** a null-hypothesis test, and **not** a member of the BH FDR family; it produces no headline p-value. (This reframe replaces the original "non-determinism at temperature 0": temperature 0 is a no-op across the reasoning cohort — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".)
+- **Estimand.** Per-model run-to-run decision divergence Delta_m at the deployed configuration.
+- **Operationalization.** A pre-registered, regime-stratified sample of **M** frozen decision-period input bundles. For each context, **K** independent API calls in one **time-clustered batch** at the model's deployed configuration (Per-Model API Configuration table below). The frozen-context sample is **tick-position-stratified with identical composition across all six models**, and the measurement batch is **run off-peak** (not the 09:31 ET open). If calls fail off-peak, Delta_m for that context uses the **K′ ≤ K** successful calls and K′ is reported.
+- **Metric.** Per context c: decision set D = {(ticker, action)} (action ∈ {BUY, SELL}). delta_c = 1 − mean pairwise Jaccard over the C(K′,2) call-pairs (J = 1 if both sets empty). **Delta_m = mean(delta_c)** over the M contexts. Secondary (descriptive): SD of confidence and of size among decisions common to all K calls.
+- **Inference.** Per-model Delta_m with a **BCa bootstrap CI resampling contexts, B = 10,000**. No hypothesis is tested.
+- **Parameters.** K and M pinned in `v1.json` before the OSF deposit; recommended K ≥ 10, M ≥ 30.
+- **Decision / interpretation rule.** Report Delta_m and its CI per model alongside the model's deployed configuration; interpret as a comparison of **deployed agents**, not intrinsic model stochasticity; use Delta_m to qualify the RQ1–RQ5 interpretation (a high-Delta_m model carries substantial run-to-run measurement noise).
+
+**Per-Model API Configuration** (reproduced inline so this entry is self-contained):
+
+| Model | Provider | Pinned snapshot ID | Thinking/reasoning mode | reasoning_effort (provider-standard) | Temperature behavior | Temperature value used |
+|---|---|---|---|---|---|---|
+| Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| GPT-5.4 | OpenAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Gemini 3.1 Pro | Google | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Grok 4.20 Reasoning | xAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| DeepSeek v4-pro | DeepSeek | `[PIN]` | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
+
+`[PIN]` = dated immutable snapshot ID resolved before the deposit (Claude rows use the dateless 4.6-generation canonical snapshot, no `[PIN]` needed). `[VERIFY]` = filled by the per-model API-configuration verification (a hard pre-deposit dependency of RQ6); DeepSeek's row is verified.
 
 ---
 
@@ -198,9 +210,9 @@ All confidence intervals use the **circular moving-block bootstrap** with **bloc
 
 The paper-trading phase (Apr–Oct 2026) is **pilot data**: it exists to validate the pipeline, lock these definitions, and estimate statistical power. **No paper-phase result is reported as confirmatory.** All decision rules above resolve on **live-phase** data only.
 
-### 3.6 API non-determinism characterization
+### 3.6 API non-determinism characterization (RQ6, deployed configuration)
 
-Because frontier model APIs are not bitwise deterministic even at temperature = 0 (RQ6), the **measured** convergence in RQ1 has a ceiling below 1.0. We characterize this floor explicitly (RQ6) and interpret RQ1 against it: reported convergence is always read relative to (1 − within-model flip rate), never against a naïve 100%.
+Frontier model APIs are not run-to-run deterministic at the **deployed configuration**; RQ6 measures this as per-model decision divergence Delta_m. (Temperature 0 is a no-op across the reasoning cohort, so the original temperature-0 framing is withdrawn — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".) The **measured** convergence in RQ1 therefore has a ceiling below 1.0; RQ1 is read relative to (1 − within-model run-to-run divergence), never against a naïve 100%.
 
 ### 3.7 Locked operational definitions
 
@@ -215,6 +227,28 @@ Because frontier model APIs are not bitwise deterministic even at temperature = 
 ### 3.8 Data provenance & immutability
 
 Decisions, executions, and EOD snapshots are written to append-only JSONL logs (`data/trades/`, `data/performance/`) and committed to git on every tick, timestamping the full record and the inputs hash. The analysis reads only these logs. Raw model responses are retained. This pre-registration and the dataset are version-controlled; the OSF deposit freezes the v1 design hash.
+
+### 3.9 Phase A data integrity (pilot-window scope)
+
+Discloses the Phase A (pilot) data-quality issues and the registered handling. Pilot/exploratory scope only; does not touch Phase B confirmatory data.
+
+**Phase A shakedown period — designated.** The Phase A shakedown period is **April 9 – April 22, 2026 inclusive**; the uniform Phase A pilot-analysis window opens with the first decision period of **April 23, 2026**. Basis, verified against the repository: the last shakedown-class stabilization commit is `cacd8058` (April 21, 2026 — the state-file routing fix below); April 22 – May 12 contains only intraday tick commits and no stabilization activity. Independently, the RQ5 data-availability diagnostic found the state-file commingling corruption cleared the day after `cacd8058`, with both Anthropic models' data cleanly reconstructable from ~April 23, 2026. (This supersedes a prior May 1 designation whose "engineering sprint" basis did not survive commit-history verification.)
+
+**Launch-window state-file commingling (Claude Sonnet / Claude Opus).** During ~April 9–22, 2026 a state-file commingling defect caused Claude Opus to write to Claude Sonnet's state file, so the recorded holdings, cash, and total portfolio value for **both** Anthropic models in that window do not reflect each model's own independent trading. The defect was resolved (`cacd8058`); both reconstruct cleanly from ~April 23 onward. The corruption is **forward-unfixable** — no logging change recovers the affected window. It affects all per-model behavioral data for the two Anthropic models in the window (not RQ5 alone), falls entirely within the pilot phase, and does not touch Phase B.
+
+**Uniform pilot-window rule.** All RQ Phase A pilot analyses use a **uniform series start across all six models** = the later of the designated shakedown-period end and the launch-window corruption-end (~April 23, 2026). A per-model ragged start would make a cross-model pooled estimate (e.g. RQ5's β) confound shakedown-window behavior unevenly across the panel; a uniform start removes the asymmetry and excludes the corrupted window for all models with no per-RQ special-casing. For RQ6 (frozen-context sampling, not a time series) the shakedown/corruption window is excluded from the eligible context pool.
+
+**RQ5 dependent variable — derived quantity.** RQ5's headline dependent variable, trade-driven dHHI, requires pre-trade portfolio weights, which are **not directly logged for any model**. They are reconstructed from the prior decision period's post-trade holdings re-priced at the current period's prices, normalized to risky-position weights; the reconstruction has been validated as robust. A forward-only Phase B logging change to persist a direct pre-trade snapshot is recommended (it would make the Phase B dependent variable logged rather than reconstructed, removing the assumption that between-period holdings change only via price drift — which a 15% stop-loss trigger would violate); it is additive and does not affect Phase A pilot data.
+
+**Gemini availability (Phase A).** Disclosed as a **time series with mechanism**, not a single percentage (a cumulative 49.5% is misleading — the series is episodic and the current rate is low). Weekly failure rate: ~28 / 52 / 70 / 49 / 94 / 26 / ~0% (worst week mid-May, not the April launch); trailing five sessions ~4.6%. Failure mode: ~73% server-side deadline/timeout, ~22% rate-limiting, driven by **open-bell congestion** (all six models firing at 09:31 ET); a clean monotonic **tick-position gradient** (~76% failure on the first tick of the session, declining to near-zero by the close); a mild Monday–Wednesday skew; **uncorrelated with market volatility** (r = −0.12). The missingness is **missing-at-random conditional on within-session tick-position** (MAR | tick-position); it is not MNAR with respect to market conditions. A residual MNAR channel — failures could correlate with would-be reasoning-trace length — is disclosed as a limitation, boundable by comparing near-deadline-latency vs fast successful calls. The current rate is to be re-confirmed before the OSF deposit.
+
+**Per-RQ handling of the tick-position selection bias.** Within-session tick-position is a registered cohort-wide analysis covariate / stratification dimension; each RQ conditions on it appropriately:
+
+- **RQ1.** Registered stratification dimension; cross-model herding reported full-panel (headline) and stratified by tick-position bucket. Gemini-pair concordance compared **within** strata; in the open-bell stratum, where Gemini coverage falls below a pre-registered minimum, it is reported **under-covered / not estimated**. A non-open-tick sensitivity analysis is registered.
+- **RQ2 / RQ3.** Both exposed (disposition and confidence behavior vary by time of day). Tick-position included as a covariate; Gemini's estimates reported conditional on tick-position; a non-open-restricted sensitivity analysis is registered.
+- **RQ4.** Minimally exposed (factor exposure is a slow-moving holdings property). No primary tick-position covariate; a coverage check confirms Gemini's factor-exposure sampling is not materially time-of-day-skewed.
+- **RQ5.** The headline regression carries within-session tick-position fixed effects (δₚ), absorbing time-of-day level differences in trade-driven concentration change and making β robust to the cohort's uneven tick-position composition. β remains one coefficient (one headline p-value; FDR membership unaffected). Drawdown depth is near-constant within a session, so Gemini's close-skew does not restrict the range of DD observed; the handling targets the dHHI_trade side. A non-open-restricted sensitivity analysis is registered.
+- **RQ6.** The frozen-context sample is tick-position-stratified with identical composition across models, and the measurement batch is run off-peak, so the cross-model divergence comparison is like-for-like and does not reproduce live open-bell congestion. Gemini's open-bell availability is a separate quantity (above) and is not folded into Delta_m.
 
 ---
 
@@ -238,6 +272,7 @@ Append-only. Each entry: date · what changed · why. No edits above this line a
 |------|--------|-----------|
 | 2026-05-19 | Initial registration (v1). | Locks design before the live (confirmatory) phase. |
 | 2026-05-20 | Reconciled phase dates to one canonical timeline: Phase A (paper) 2026-04-09 → 2026-10-31; Phase B (live) 2026-11-01 → 2027-11-01 (12-month live window). | Aligned `settings.json`, `README.md`, and `v1.json`; the prior draft ended paper on 2026-10-09 with an approximate live window. No change to research questions, metrics, or decision rules. |
+| 2026-05-22 | Landed the ratified RQ5/RQ6 specification. **RQ5** → four registered metrics (dropped `num_positions`) plus the pooled drawdown-conditioned concentration-response **headline test** (dHHI_trade ~ DD with model + tick-position fixed effects; L = round(n^(1/3)); one BH-family p-value). **RQ6** → reframed from "non-determinism at temperature 0" to "operational reproducibility of deployed agents" (characterization, not in the FDR family) with the Per-Model API Configuration table inline. Added **§3.9 Phase A data integrity** (shakedown April 9–22 / pilot window opens April 23; Sonnet/Opus state-file commingling; RQ5 derived dependent variable; Gemini availability + per-RQ tick-position handling). | Pre-deposit drafting (the OSF deposit has not occurred). Resolves the items raised by the Task 1 RQ5/Gemini diagnostics. Sources: `docs/RQ5-RQ6-specification.md`, `RQ5-pilot-window-and-Phase-A-data-integrity.md`, `Gemini-selection-bias-characterization-and-per-RQ-handling.md`, `RQ5-RQ6-spec-completion.md`. |
 
 ---
 

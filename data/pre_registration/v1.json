@@ -60,7 +60,7 @@
       "operationalization": "Join records on data_inputs_hash (identical across models within a tick). Use each model's raw_decisions (pre-risk-filter). For every model pair on every tick, over tickers both ruled on (>=3 shared): action concordance (3-way BUY/SELL/HOLD exact-match rate) and weight correlation (Pearson r of target_weight vectors).",
       "metric_definition": "Headline = mean pairwise action concordance across all (pair, tick) observations. Chance = shuffled-permutation null: independently permute each model's action vector within a tick (preserving its BUY/SELL/HOLD marginals), recompute grand-mean concordance, repeat to build the null. Excess = observed minus null mean.",
       "prediction": "Observed concordance exceeds the shuffled-null mean by >=0.10, one-sided permutation p<0.05 surviving FDR. Strongest in trending regimes, weakest in vol-spike.",
-      "decision_rule": "Resolved-converge if live-window permutation p<0.05 after Benjamini-Hochberg AND BCa 90% CI for excess concordance excludes 0. Resolved-null if CI includes 0. Interpreted against the RQ6 non-determinism floor (convergence ceiling = 1 - within-model flip rate).",
+      "decision_rule": "Resolved-converge if live-window permutation p<0.05 after Benjamini-Hochberg AND BCa 90% CI for excess concordance excludes 0. Resolved-null if CI includes 0. Interpreted against the RQ6 run-to-run reproducibility floor (convergence ceiling = 1 - within-model run-to-run divergence).",
       "data_window_required": ">=200 pairwise (pair,tick) observations with >=3 shared tickers, live data; >=50 per regime for stratified estimates.",
       "in_fdr_family": true
     },
@@ -117,37 +117,73 @@
     },
     {
       "id": "RQ5",
-      "title": "Behavioral response to portfolio drawdowns",
+      "title": "Path-dependent risk behavior under drawdown",
       "primary": false,
       "methodological": false,
       "status": "Open",
       "hypothesis": {
-        "null": "Concentration, turnover, position size, and cash are unchanged between drawdown and normal days.",
-        "alternative": "Behavior shifts measurably when a model is in drawdown."
+        "null": "beta = 0: trade-driven change in within-equity concentration does not respond to drawdown depth, pooled across the cohort.",
+        "alternative": "beta != 0 (two-sided): models actively concentrate (beta>0) or diversify (beta<0) more when deeper in drawdown."
       },
-      "operationalization": "A model is in drawdown on an EOD when portfolio value is >=10% below its trailing 60-day peak (EOD value). Distinct from the SPY drawdown regime (5% off a 60-day peak) used for stratification. For each EOD compute four behavioral metrics from that day's last portfolio_after snapshot and trade activity; compare drawdown vs normal days.",
-      "metric_definition": "Drawdown-minus-normal difference in: (1) HHI concentration = sum w_i^2; (2) turnover = sum |executed notional| that day / EOD value; (3) average position size = mean holding weight; (4) cash allocation = cash / total value.",
-      "prediction": "In drawdown, models become more conservative: cash up, HHI down, average position size down; turnover rises transiently as positions are cut.",
-      "decision_rule": "Per model with >=1 drawdown episode and a normal-day contrast: Resolved per metric whose BCa 90% CI on the drawdown-minus-normal difference excludes 0 (live data). Pooled HHI-change test enters the FDR family. If no model draws down in the live window, RQ5 is reported Open / not testable on this tape and deferred to the backtest harness.",
-      "data_window_required": ">=1 episode of >=10% drawdown plus >=20 contrasting normal days per model, live data.",
+      "behavioral_metrics": ["hhi", "turnover", "avg_position_size", "cash"],
+      "descriptive_layer": "Per-model characterization on the four behavioral metrics (HHI = sum w_i^2; turnover = sum |executed notional| / EOD value; average position size = mean holding weight; cash = cash / total value) with BCa 90% bootstrap CIs. Descriptive; not in the FDR family. num_positions is NOT a registered RQ5 metric.",
+      "headline_test": {
+        "name": "drawdown_conditioned_concentration_response",
+        "dependent_variable": "trade_driven_delta_hhi",
+        "dependent_variable_definition": "HHI(post-trade normalized risky weights) - HHI(pre-trade price-drifted normalized risky weights), per model per decision period. HHI(w)=sum_i w_i^2 on risky-position weights normalized to sum to 1 (cash excluded). Pre-trade weights are reconstructed from the prior period's post-trade holdings re-priced at current-period prices; RQ5's dependent variable is a derived/reconstructed quantity.",
+        "independent_variable": "drawdown_depth",
+        "independent_variable_definition": "DD = fractional decline of total portfolio value (including cash) from its running peak as of period t; DD>=0, DD=0 at a new peak.",
+        "model": "Pooled panel OLS with model fixed effects and within-session tick-position fixed effects: dHHI_trade = alpha_m + delta_p + beta*DD + epsilon.",
+        "null_hypothesis": "beta = 0",
+        "alternative": "two-sided",
+        "inference": "Moving-block bootstrap over decision periods within model, preserving the panel and serial-correlation structure; B = 10000 replicates.",
+        "block_length_rule": "L = round(n^(1/3)), n = number of decision periods in the analysis window; resolved integer logged once n is fixed.",
+        "block_length_resolved": null,
+        "headline_p_value": "Two-sided percentile-bootstrap p-value on beta: p = 2*min(share beta*<=0, share beta*>=0).",
+        "ci": "BCa CI for beta.",
+        "sensitivity": "Re-run at block lengths floor(L/2) and 2L; these sensitivity runs do NOT enter the FDR family. beta is reported block-length-robust if the sign and BH-adjusted significance of beta are stable across {floor(L/2), L, 2L}.",
+        "parameters": { "L": null, "B": 10000 }
+      },
+      "phase_a_pilot_window": {
+        "rule": "Uniform series start across all six models: the later of (a) the designated Phase A shakedown-period end and (b) the launch-window state-file commingling corruption-end (~2026-04-23). Applied to all RQ Phase A pilot analyses.",
+        "resolved_start": "2026-04-23",
+        "basis": "Phase A shakedown designated 2026-04-09 to 2026-04-22 inclusive; last shakedown-class stabilization commit cacd8058 (2026-04-21, state-file routing fix); commingling corruption cleared ~2026-04-23. Pilot window opens at the first decision period of 2026-04-23.",
+        "scope": "Phase A pilot/exploratory only; does not affect the Phase B confirmatory window (2026-11-01 onward)."
+      },
+      "prediction": "Descriptive layer: in drawdown, models become more conservative (cash up, HHI down, average position size down; turnover rises as positions are cut). Headline: two-sided on beta; pilot is exploratory.",
+      "decision_rule": "Headline: BH correction across the five-RQ family at q; RQ5's null is rejected if its BH-adjusted p < q (live/confirmatory data). The four-metric descriptive layer is reported per model with BCa 90% CIs and does not enter the FDR family.",
+      "data_window_required": "Phase A pilot: uniform window from 2026-04-23 (exploratory). Confirmatory: full Phase B window (2026-11-01 onward).",
       "in_fdr_family": true
     },
     {
       "id": "RQ6",
-      "title": "Non-determinism at temperature = 0",
+      "title": "Operational reproducibility of deployed agents",
+      "type": "characterization",
       "primary": false,
       "methodological": true,
       "status": "Open",
-      "hypothesis": {
-        "null": "At temperature=0, identical inputs yield identical decisions (flip rate = 0).",
-        "alternative": "Decisions vary across reruns at temperature=0 (flip rate > 0); irreducible API non-determinism."
-      },
-      "operationalization": "Manual-trigger only. On a seeded random 5% subsample of decision ticks, each model is re-run K=10 times at temperature=0 on the same inputs (scripts/determinism_probe.py -> data/determinism/). For each (model, tick, ticker) compare the action across the K reruns.",
-      "metric_definition": "Per model: decision flip rate = fraction of (tick,ticker) decisions where the K reruns do NOT all agree on the action (headline); mean normalized action entropy; mean target-weight standard deviation across reruns.",
-      "prediction": "Flip rate small but non-zero (~1-10%), larger for reasoning models. Sets the empirical ceiling on RQ1 convergence (two models cannot agree more reliably than one model agrees with itself).",
-      "decision_rule": "Descriptive, NOT part of the FDR family. Resolved once K=10 reruns exist for >=5% of a representative live-week's ticks; report per-model flip rate with a binomial 90% interval and use it to bound RQ1.",
-      "data_window_required": ">=1 representative trading week of ticks, 5% sampled, K=10 reruns each, per model.",
-      "in_fdr_family": false
+      "research_question": "Holding model snapshot, prompt version, and input fixed, how much do a model's trading decisions vary across independent API calls at the model's deployed configuration?",
+      "estimand": "Per-model run-to-run decision divergence Delta_m at the deployed configuration.",
+      "operationalization": "K independent API calls per held-out decision context, at each model's deployed configuration; M regime-stratified frozen contexts; K calls time-clustered per context. The frozen-context sample is tick-position-stratified with identical tick-position composition across all six models, and the measurement batch is run off-peak (not the 09:31 ET open). If calls fail off-peak, Delta_m for that context is computed on the K' <= K successful calls and K' is reported.",
+      "metric_primary": "Delta_m = mean over M contexts of (1 - mean pairwise Jaccard similarity of (ticker, action) decision sets across the K calls); J=1 if both sets empty.",
+      "metric_secondary": "Per-model SD of confidence and of size among decisions common to all K calls (descriptive).",
+      "inference": "Per-model Delta_m with BCa bootstrap CI, resampling contexts, B = 10000. No hypothesis is tested.",
+      "decision_rule": "Report Delta_m and CI per model with deployed configuration; interpret as a comparison of deployed agents, not intrinsic model stochasticity; use Delta_m to qualify RQ1-RQ5 reproducibility. No NHST.",
+      "in_fdr_family": false,
+      "parameters": { "K": null, "M": null, "B": 10000 },
+      "notes": "K, M pinned before OSF deposit; recommended K >= 10, M >= 30.",
+      "per_model_api_configuration": {
+        "note": "Canonical deployed-configuration record, reproduced inline so RQ6 is self-contained. [VERIFY] = filled by the per-model API-config verification (a hard pre-deposit dependency of RQ6); [PIN] = dated immutable snapshot ID resolved before the deposit (Claude rows use the dateless 4.6-generation canonical snapshot, no [PIN] needed).",
+        "columns": ["model", "provider", "pinned_snapshot_id", "thinking_reasoning_mode", "reasoning_effort_provider_standard", "temperature_behavior", "temperature_value_used"],
+        "rows": [
+          ["Claude Sonnet 4.6", "Anthropic", "claude-sonnet-4-6 (dateless canonical snapshot)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Claude Opus 4.6", "Anthropic", "claude-opus-4-6 (dateless canonical snapshot)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["GPT-5.4", "OpenAI", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Gemini 3.1 Pro", "Google", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Grok 4.20 Reasoning", "xAI", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["DeepSeek v4-pro", "DeepSeek", "[PIN]", "Enabled", "high", "Silently ignored (inoperative in thinking mode)", "n/a (inoperative)"]
+        ]
+      }
     }
   ],
   "methodological_commitments": {
@@ -188,8 +224,8 @@
       "note": "No paper-phase result is reported as confirmatory."
     },
     "api_nondeterminism": {
-      "rule": "Frontier model APIs are not bitwise deterministic even at temperature=0 (RQ6). Measured RQ1 convergence has a ceiling below 1.0.",
-      "interpretation": "RQ1 convergence is read relative to (1 - within-model flip rate), never against a naive 100%."
+      "rule": "Frontier model APIs are not run-to-run deterministic at the deployed configuration (RQ6 measures this as per-model decision divergence Delta_m). Measured RQ1 convergence has a ceiling below 1.0.",
+      "interpretation": "RQ1 convergence is read relative to (1 - within-model run-to-run divergence), never against a naive 100%."
     },
     "locked_definitions": {
       "closed_trade": "Closed only on full exit (residual shares < 0.01). Partial trims never close a position; re-entry after exit is an independent trade.",
