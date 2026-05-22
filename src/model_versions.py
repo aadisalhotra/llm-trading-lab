@@ -21,13 +21,24 @@ def _log_path(model_key: str):
     return MODEL_VERSIONS_DIR / f"{model_key}.jsonl"
 
 
-def record_observation(model_key: str, observed_version: str, run_date: datetime) -> None:
-    """Append every observed version. Cheap, idempotent-ish (one row per run)."""
+def record_observation(model_key: str, observed_version: str, run_date: datetime,
+                       api_success: bool = True) -> None:
+    """Append every observed version (success OR failure). One row per run.
+
+    `api_success` is recorded so detect_version_transition can compare only
+    successful observations. Failed calls are still logged here for
+    audit/history, but they record a *synthetic* observed_version — BaseAdapter
+    sets model_id_returned to the configured id on failure — so comparing them
+    would fire a spurious transition on every failure→recovery cycle (e.g. real
+    model_version → configured alias → real model_version). Defaults to True so
+    older callers and pre-existing rows are treated as successful.
+    """
     MODEL_VERSIONS_DIR.mkdir(parents=True, exist_ok=True)
     record = {
         "date": run_date.strftime("%Y-%m-%d"),
         "model_key": model_key,
         "observed_version": observed_version,
+        "api_success": bool(api_success),
         "timestamp": datetime.utcnow().isoformat(),
     }
     with open(_log_path(model_key), "a", encoding="utf-8") as f:
@@ -43,9 +54,13 @@ def detect_version_transition(model_key: str, run_date: datetime) -> dict[str, A
     day of the month. Must be called AFTER `record_observation` has appended
     the current run's observation.
 
-    Returns a transition record (and appends it to the per-model log) when the
-    two most recent observations differ, else None. TRANSITION event rows are
-    skipped when reading so they never count as observations.
+    Only api_success=true observations are compared. Failed calls are still
+    recorded (for audit) but log a synthetic observed_version (the configured
+    id, per BaseAdapter), so a failure→recovery cycle must not register as a
+    transition. Returns a transition record (and appends it to the per-model
+    log) when the two most recent successful observations differ, else None.
+    TRANSITION event rows are skipped when reading so they never count as
+    observations.
     """
     path = _log_path(model_key)
     if not path.exists():
@@ -63,6 +78,12 @@ def detect_version_transition(model_key: str, run_date: datetime) -> dict[str, A
             # Skip transition event rows (and any legacy/malformed rows missing
             # observed_version) so only real observations are compared.
             if row.get("type") == "TRANSITION" or "observed_version" not in row:
+                continue
+            # Compare only SUCCESSFUL observations. Failed calls log the
+            # configured id as a synthetic observation; comparing them would
+            # fire a spurious transition on every failure→recovery cycle.
+            # Rows predating the api_success field default to True.
+            if not row.get("api_success", True):
                 continue
             observations.append(row)
     if len(observations) < 2:

@@ -277,8 +277,11 @@ def run_one_model(
         logger.warning("[%s] memory: hit-detection failed: %s", model_key, e)
         memory_hit = False
 
-    # Record version observation regardless of success
-    record_observation(model_key, decision_result.model_id_returned, run_date)
+    # Record the observed version on every run, success or failure (failures
+    # log the configured id as a synthetic observation). The api_success flag
+    # lets detect_version_transition compare only successful observations.
+    record_observation(model_key, decision_result.model_id_returned, run_date,
+                       api_success=decision_result.success)
     transition = detect_version_transition(model_key, run_date)
     if transition:
         send_alert("INFO", f"Model transition: {model_key}",
