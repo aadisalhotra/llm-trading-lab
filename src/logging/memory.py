@@ -23,8 +23,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, Iterable
 
 from ..config_loader import TRADES_DIR
 
@@ -136,6 +136,105 @@ def read_recent_decisions(
                 if len(out) >= limit:
                     return out
     return out
+
+
+def read_last_action_per_ticker(
+    model_key: str,
+    tickers: Iterable[str],
+    now: datetime | None = None,
+    max_lookback_days: int = 60,
+) -> dict[str, dict[str, Any]]:
+    """Most-recent executed BUY/SELL per requested ticker, for this model only.
+
+    Complements ``read_recent_decisions``: that returns a global, length-capped
+    chronological feed (a recent-activity narrative); this returns a per-ticker
+    lookup so a model can see its own last action on EACH ticker it is
+    considering — including a ticker it sold to zero, which drops out of both
+    the holdings table and the last-N window and is otherwise invisible.
+
+    Walks ``/data/trades/{model_key}_YYYY-MM.jsonl`` newest-first and records the
+    first (i.e. most recent) executed BUY/SELL it sees for each requested ticker.
+    Bounded work: it early-exits as soon as every requested ticker is resolved,
+    and stops once it crosses ``max_lookback_days`` before ``now`` (default 60).
+    A ticker with no executed trade in that window is simply absent from the
+    result — the caller renders that as "(no prior trade)".
+
+    Returns ``{TICKER: {action, timestamp, date, shares, price, confidence}}``.
+    Best-effort: read failures are logged and swallowed, never raised.
+    """
+    want = {str(t).upper().strip() for t in (tickers or []) if str(t).strip()}
+    if not want or not TRADES_DIR.exists():
+        return {}
+
+    ref = now or datetime.utcnow()
+    try:
+        cutoff_str = (ref.date() - timedelta(days=max_lookback_days)).strftime("%Y-%m-%d")
+    except (AttributeError, ValueError):
+        cutoff_str = ""
+
+    pattern = re.compile(rf"^{re.escape(model_key)}_(\d{{4}})-(\d{{2}})\.jsonl$")
+    candidates: list[tuple[int, int, Any]] = []
+    for fp in TRADES_DIR.iterdir():
+        if not fp.is_file():
+            continue
+        m = pattern.match(fp.name)
+        if m:
+            candidates.append((int(m.group(1)), int(m.group(2)), fp))
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)  # newest month first
+
+    result: dict[str, dict[str, Any]] = {}
+    remaining = set(want)
+    for _, _, fp in candidates:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except OSError as e:
+            logger.warning("memory: failed to read %s: %s", fp, e)
+            continue
+        for line in reversed(lines):  # newest record first within the file
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            rec_date = rec.get("date", "")
+            # Logs are append-only chronological and we walk newest->oldest, so
+            # the first record older than the lookback cutoff means everything
+            # remaining is older too — stop entirely.
+            if cutoff_str and rec_date and rec_date < cutoff_str:
+                return result
+            rec_ts = rec.get("timestamp", "")
+            for ex in reversed(rec.get("executions") or []):
+                if not ex.get("executed"):
+                    continue
+                side = ex.get("side")
+                if side not in ("BUY", "SELL"):
+                    continue
+                t = str(ex.get("ticker", "")).upper().strip()
+                if t not in remaining:
+                    continue
+                decision = ex.get("decision") or {}
+                try:
+                    shares_val = float(ex.get("shares") or 0)
+                except (TypeError, ValueError):
+                    shares_val = 0.0
+                price = ex.get("fill_price")
+                conf = decision.get("confidence")
+                ts = ex.get("timestamp") or rec_ts
+                result[t] = {
+                    "action": side,
+                    "timestamp": ts,
+                    "date": rec_date or (str(ts)[:10] if ts else ""),
+                    "shares": shares_val,
+                    "price": float(price) if isinstance(price, (int, float)) else None,
+                    "confidence": conf if isinstance(conf, (int, float)) else None,
+                }
+                remaining.discard(t)
+                if not remaining:
+                    return result  # every requested ticker resolved
+    return result
 
 
 def detect_memory_hit(decision_result: Any) -> bool:

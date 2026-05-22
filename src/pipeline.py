@@ -69,6 +69,7 @@ from .logging import (
     log_daily_snapshot,
     log_intraday_snapshot,
     read_recent_decisions,
+    read_last_action_per_ticker,
     detect_memory_hit,
 )
 from .reports import generate_daily_report
@@ -86,6 +87,7 @@ from .prompt_builder import (
     build_screening_prompt,
     hash_inputs,
     parse_screening_response,
+    uses_per_ticker_last_action,
 )
 
 
@@ -239,6 +241,24 @@ def run_one_model(
         logger.warning("[%s] memory: recent-decisions read failed: %s — continuing without memory", model_key, e)
         recent_decisions = []
 
+    # ---- v2 anti-reversal: most-recent executed BUY/SELL per shortlisted ticker ----
+    # Additive to the last-10 rolling memory above. The last-10 is a global
+    # recent-activity narrative; this is a per-ticker lookup so the model can see
+    # its own prior action on EACH ticker it is considering — including names it
+    # sold to zero, which drop out of both the holdings table and the last-10
+    # window. Gated to the v2 prompt: under v1 we skip the walk, so live behavior
+    # and cost are unchanged until v2 ships.
+    last_actions: dict[str, Any] = {}
+    if uses_per_ticker_last_action(settings.get("prompt_version", "")):
+        try:
+            last_actions = read_last_action_per_ticker(model_key, shortlisted, now=run_date)
+            logger.info("[%s] memory: per-ticker last-action resolved for %d/%d shortlisted",
+                        model_key, len(last_actions), len(shortlisted))
+        except Exception as e:
+            logger.warning("[%s] memory: per-ticker last-action read failed: %s — continuing without it",
+                           model_key, e)
+            last_actions = {}
+
     # ---- Step 2: Trading decision call (full data, shortlisted stocks) ----
     system_prompt, user_prompt, prompt_version, images = build_prompts(
         snapshot_before,
@@ -252,6 +272,7 @@ def run_one_model(
         sentiment_data=sentiment_data,
         shortlisted_symbols=shortlisted,
         recent_decisions=recent_decisions,
+        last_actions=last_actions,
     )
 
     # Only send images to vision-capable models. Text-only adapters can

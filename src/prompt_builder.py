@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 from datetime import datetime, time as dtime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -43,6 +44,22 @@ NYSE_OPEN = dtime(9, 30)
 NYSE_CLOSE = dtime(16, 0)
 
 
+def _prompt_major_version(version: str) -> int:
+    """Leading integer of a prompt-version tag ('v2', 'v2.1' -> 2). 0 if unparsable."""
+    m = re.match(r"v?(\d+)", str(version or "").strip(), re.IGNORECASE)
+    return int(m.group(1)) if m else 0
+
+
+def uses_per_ticker_last_action(version: str) -> bool:
+    """Whether this prompt version surfaces per-ticker last-action + the anti-reversal rule.
+
+    A v2 feature: the inline LAST_ACTION column and the instruction that depends
+    on it activate together when the prompt major version is >= 2, so the two
+    halves always deploy as one change (and v1 prompts are untouched).
+    """
+    return _prompt_major_version(version) >= 2
+
+
 def load_prompt_template(version: str) -> str:
     path = PROMPTS_DIR / f"{version}.txt"
     with open(path, "r", encoding="utf-8") as f:
@@ -56,18 +73,48 @@ def _format_universe_block(universe: dict[str, Any]) -> str:
     return "UNIVERSE (these are the only tickers you may trade):\n" + "\n".join(rows)
 
 
-def _format_market_data_block(market_data: dict[str, pd.DataFrame]) -> str:
+def _format_last_action_cell(
+    last_actions: dict[str, dict[str, Any]] | None, ticker: str
+) -> str:
+    """Inline last-action cell: 'BUY 2026-05-22 14:30' or '(no prior trade)'."""
+    if last_actions is None:
+        return ""
+    la = last_actions.get(ticker.upper())
+    if not la:
+        return "(no prior trade)"
+    when = str(la.get("timestamp") or "")[:16].replace("T", " ")  # YYYY-MM-DD HH:MM
+    action = str(la.get("action") or "?")
+    return f"{action} {when}".strip()
+
+
+def _format_market_data_block(
+    market_data: dict[str, pd.DataFrame],
+    last_actions: dict[str, dict[str, Any]] | None = None,
+) -> str:
     """Compact, neutral OHLCV summary per ticker.
 
     For each ticker we render: last close, 1d %, 5d %, 30d %, 30d high/low,
     avg volume. Neutral framing — no labels like "strong" or "weak".
+
+    When ``last_actions`` is provided (v2+), each row also carries a
+    YOUR_LAST_ACTION column — this model's most recent executed BUY/SELL on that
+    ticker and when, or "(no prior trade)". That is the per-ticker signal the v2
+    anti-reversal rule reads, placed inline next to the data the model already
+    evaluates for each name. Under v1 the argument is None and the column is
+    omitted, so the block is byte-identical to before.
     """
+    show_last = last_actions is not None
     lines = ["MARKET DATA (last close + recent context):"]
     header = f"  {'TICKER':<6} {'CLOSE':>10} {'1D%':>7} {'5D%':>7} {'30D%':>8} {'30D_HI':>10} {'30D_LO':>10} {'AVG_VOL':>14}"
+    if show_last:
+        header += "  YOUR_LAST_ACTION"
     lines.append(header)
     for ticker, df in market_data.items():
         if df is None or df.empty:
-            lines.append(f"  {ticker:<6} {'NO DATA':>10}")
+            row = f"  {ticker:<6} {'NO DATA':>10}"
+            if show_last:
+                row += f"  {_format_last_action_cell(last_actions, ticker)}"
+            lines.append(row)
             continue
         close = float(df["Close"].iloc[-1])
         prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else close
@@ -79,9 +126,12 @@ def _format_market_data_block(market_data: dict[str, pd.DataFrame]) -> str:
         pct_1d = (close / prev - 1) * 100 if prev else 0
         pct_5d = (close / d5 - 1) * 100 if d5 else 0
         pct_30d = (close / d30 - 1) * 100 if d30 else 0
-        lines.append(
+        row = (
             f"  {ticker:<6} {close:>10.2f} {pct_1d:>+7.2f} {pct_5d:>+7.2f} {pct_30d:>+8.2f} {hi30:>10.2f} {lo30:>10.2f} {vol:>14,.0f}"
         )
+        if show_last:
+            row += f"  {_format_last_action_cell(last_actions, ticker)}"
+        lines.append(row)
     return "\n".join(lines)
 
 
@@ -374,6 +424,20 @@ _RECENT_DECISIONS_INSTRUCTION = (
     "same headline."
 )
 
+# v2 anti-reversal rule. Pairs with the YOUR_LAST_ACTION column on the market-data
+# block; the two are one feature and deploy together (gated on prompt v2+).
+_LAST_ACTION_INSTRUCTION = (
+    "ANTI-REVERSAL RULE: The YOUR_LAST_ACTION column in the market-data block above "
+    "shows your own most recent executed trade on each ticker and when. Before you "
+    "BUY or SELL a ticker, check that column. Do NOT reverse your last action on a "
+    "ticker — do not sell a position you just bought, and do not re-buy a ticker you "
+    "just sold — unless the market data or news has materially changed since that "
+    "action. A ticker you sold to zero still shows its SELL there even though it no "
+    "longer appears in your holdings; treat that as a deliberate exit, not an "
+    "invitation to re-enter. '(no prior trade)' means you have no recent action on "
+    "that ticker and may act freely."
+)
+
 
 def _format_recent_decisions_block(recent: list[dict[str, Any]] | None) -> str:
     """Render the model's own last N executed BUY/SELL decisions.
@@ -429,6 +493,7 @@ def build_prompts(
     sentiment_data: dict[str, float] | None = None,
     shortlisted_symbols: list[str] | None = None,
     recent_decisions: list[dict[str, Any]] | None = None,
+    last_actions: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[str, str, str, list[bytes]]:
     """Build (system_prompt, user_prompt, prompt_version, images).
 
@@ -457,6 +522,16 @@ def build_prompts(
         scoped_data = market_data
         scoped_syms = universe_syms
 
+    # Per-ticker last-action is a v2 feature: the inline column and its
+    # anti-reversal instruction render together, and only when the prompt is
+    # v2+. Under v1, effective_last_actions is None -> the market-data block and
+    # the rest of the prompt are unchanged.
+    use_last_action = uses_per_ticker_last_action(version)
+    effective_last_actions = last_actions if use_last_action else None
+    market_data_section = _format_market_data_block(scoped_data, effective_last_actions)
+    if use_last_action:
+        market_data_section = f"{market_data_section}\n\n{_LAST_ACTION_INSTRUCTION}"
+
     parts = [
         f"DATE: {run_date.strftime('%Y-%m-%d')}",
         f"EXECUTION MODE: {settings['mode'].upper()}",
@@ -472,7 +547,7 @@ def build_prompts(
         "",
         _format_universe_block(universe),
         "",
-        _format_market_data_block(scoped_data),
+        market_data_section,
         "",
         _format_portfolio_block(portfolio_state, int(settings["portfolio_rules"]["max_positions"])),
         "",
