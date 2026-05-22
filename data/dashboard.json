@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-22T21:19:48.259264",
+  "generated_at": "2026-05-22T22:09:16.799005",
   "phase": "Phase A - Paper Trading",
   "mode": "paper",
   "experiment_day": 44,
@@ -26,7 +26,7 @@
       "last_api_success": true,
       "rank": 1,
       "cohort": "core",
-      "display_name": "DeepSeek Reasoner",
+      "display_name": "DeepSeek V4 Pro",
       "recent_summaries": [
         {
           "timestamp": "2026-05-22T19:35:53.331980",
@@ -1408,7 +1408,7 @@
       "model_id": "deepseek-v4-pro",
       "enabled": true,
       "cohort": "core",
-      "display_name": "DeepSeek Reasoner"
+      "display_name": "DeepSeek V4 Pro"
     },
     {
       "model_key": "claude_opus",
@@ -3757,6 +3757,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 24,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 111216.9262439785,
+        "benchmark": 745.6400146484375,
+        "trades_today": 24,
+        "runs_today": 16
       }
     ],
     "gpt": [
@@ -3864,6 +3871,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 25,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 117488.35632754689,
+        "benchmark": 745.6400146484375,
+        "trades_today": 25,
+        "runs_today": 16
       }
     ],
     "gemini": [
@@ -3971,6 +3985,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 40,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 108998.71071583136,
+        "benchmark": 745.6400146484375,
+        "trades_today": 40,
+        "runs_today": 16
       }
     ],
     "grok": [
@@ -4078,6 +4099,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 31,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 114637.53348914294,
+        "benchmark": 745.6400146484375,
+        "trades_today": 31,
+        "runs_today": 16
       }
     ],
     "deepseek": [
@@ -4185,6 +4213,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 37,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 123105.1812977495,
+        "benchmark": 745.6400146484375,
+        "trades_today": 37,
+        "runs_today": 16
       }
     ],
     "claude_opus": [
@@ -4292,6 +4327,13 @@
         "benchmark": 745.6400146484375,
         "trades_today": 14,
         "runs_today": 15
+      },
+      {
+        "timestamp": "2026-05-22T18:08:41.593303-04:00",
+        "value": 112810.00499664899,
+        "benchmark": 745.6400146484375,
+        "trades_today": 14,
+        "runs_today": 16
       }
     ]
   },
@@ -4739,7 +4781,7 @@
       "enabled": true,
       "vision_capable": false,
       "cohort": "core",
-      "display_name": "DeepSeek Reasoner",
+      "display_name": "DeepSeek V4 Pro",
       "_pin_note": "Deliberately repointed deepseek-v4-flash -> deepseek-v4-pro on 2026-05-21: the deepseek-reasoner alias deprecates 2026-07-24 and maps to sub-frontier v4-flash; v4-pro is DeepSeek's current frontier reasoning tier, restoring cohort parity. No dated immutable snapshot exists beneath deepseek-v4-pro, so this is the most specific callable id (same standard as the dateless Claude ids); residual drift risk if DeepSeek repoints it. Runs in thinking mode at reasoning_effort=high (see deepseek_adapter.py)."
     },
     "claude_opus": {
@@ -4814,16 +4856,16 @@
     },
     {
       "model_key": "deepseek",
-      "cost_today_usd": 0.0,
-      "cost_week_usd": 0.0,
-      "cost_month_usd": 0.0,
-      "cost_total_usd": 1.2041,
-      "cost_per_trade_usd": 0.0014,
+      "cost_today_usd": 0.3906,
+      "cost_week_usd": 0.4878,
+      "cost_month_usd": 0.6804,
+      "cost_total_usd": 1.9732,
+      "cost_per_trade_usd": 0.0023,
       "trades_executed_total": 862,
       "trades_executed_month": 447,
       "trades_executed_today": 37,
       "gross_pnl_usd": 23105.18,
-      "net_pnl_usd": 23103.98,
+      "net_pnl_usd": 23103.21,
       "is_profitable": true
     },
     {
@@ -4881,9 +4923,9 @@
         ]
       },
       "deepseek": {
-        "spend_usd": 0.0,
+        "spend_usd": 0.6804,
         "cap_usd": 3.0,
-        "pct_of_cap": 0.0,
+        "pct_of_cap": 0.2268,
         "status": "ok",
         "models": [
           "deepseek"
@@ -5682,7 +5724,7 @@
     }
   ],
   "market_brief": {
-    "brief": "Welcome. U.S. equities: S&P +0.37%, Nasdaq +0.19%, Dow +0.58%. Technology led sectors (+1.94%) while Commodities lagged (-0.65%). Gemini 3.1 Pro led the day at +1.33%. 5 of 6 models green on the day. Cumulative leader: DeepSeek Reasoner at +23.11%. Key headline: Stock Market Today: S&P 500 and Nasdaq turn higher, Dow on pace for fresh record; investors digest Nvidia earnings; oil trims gain; Walma... \u2014 market reaction muted.",
+    "brief": "Welcome. U.S. equities: S&P +0.37%, Nasdaq +0.19%, Dow +0.58%. Technology led sectors (+1.94%) while Commodities lagged (-0.65%). Gemini 3.1 Pro led the day at +1.33%. 5 of 6 models green on the day. Cumulative leader: DeepSeek V4 Pro at +23.11%. Key headline: Stock Market Today: S&P 500 and Nasdaq turn higher, Dow on pace for fresh record; investors digest Nvidia earnings; oil trims gain; Walma... \u2014 market reaction muted.",
     "key_moves": "QCOM +11.6% (held by 6/6) | MRK +5.6% (held by 1/6) | AMD +4.0% (held by 4/6)",
     "as_of_date": "Friday, May 22",
     "macro_sentence": "Key headline: Stock Market Today: S&P 500 and Nasdaq turn higher, Dow on pace for fresh record; investors digest Nvidia earnings; oil trims gain; Walma... \u2014 market reaction muted.",
