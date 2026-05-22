@@ -29,11 +29,19 @@ COST_PER_MTOK: dict[str, dict[str, float]] = {
     # send is now grok-4.20-0309-reasoning.
     "grok-4":                      {"input": 5.00,  "output": 15.00},
     "grok-4.20-0309-reasoning":    {"input": 5.00,  "output": 25.00},
-    # DeepSeek — chat is the legacy entry, reasoner is the production
-    # string we now send. Reasoner bills more on output because the
-    # internal reasoning trace counts as output tokens.
+    # DeepSeek — v4-pro is the production string we now send (the
+    # deepseek-reasoner alias was repointed to deepseek-v4-pro on 2026-05-21).
+    # v4-flash is what the provider returned 2026-04-24..2026-05-21 after it
+    # drifted the reasoner alias; kept so a historical recompute of that window
+    # resolves a real cost. Rates are DeepSeek's STANDARD post-promotional list
+    # pricing — NOT the 75%-off promo, which expires 2026-05-31 — so the table
+    # reflects the cost that applies going forward. Reasoning traces count as
+    # output tokens, so output bills higher. chat/reasoner are retained as
+    # legacy entries for older returned IDs.
     "deepseek-chat":     {"input": 0.27,  "output": 1.10},
     "deepseek-reasoner": {"input": 0.55,  "output": 2.19},
+    "deepseek-v4-pro":   {"input": 1.74,  "output": 3.48},
+    "deepseek-v4-flash": {"input": 0.14,  "output": 0.28},
 }
 
 
