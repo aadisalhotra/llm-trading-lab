@@ -34,17 +34,36 @@ class DeepSeekAdapter(BaseAdapter):
         if not api_key:
             raise RuntimeError("DEEPSEEK_API_KEY not set")
 
+        # deepseek-v4-pro runs in thinking mode at high reasoning effort. Both
+        # controls travel in the request body: with the OpenAI SDK they map to
+        # the top-level `reasoning_effort` kwarg and
+        # `extra_body={"thinking": {"type": "enabled"}}` respectively, which is
+        # exactly what these top-level JSON fields produce on the wire (this
+        # adapter posts raw). Note the thinking value is the string "enabled",
+        # not a boolean.
+        #
+        # No temperature is sent: DeepSeek thinking mode silently ignores it.
+        # Production never sets temperature anyway; the only caller that does is
+        # the RQ6 determinism probe (determinism_probe.py:169), which therefore
+        # can no longer hold DeepSeek at temperature=0 — its reruns now reflect
+        # thinking-mode default sampling.
+        #
+        # max_tokens is the shared budget for the reasoning trace + the final
+        # JSON answer, raised from 4096 to 16384 so a long high-effort trace
+        # can't truncate the decision (v4-pro supports far more, and reasoning
+        # tokens are billed regardless of the cap, so the headroom is free on
+        # short replies).
         payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "max_tokens": 4096,
+            "max_tokens": 16384,
             "response_format": {"type": "json_object"},
+            "reasoning_effort": "high",
+            "thinking": {"type": "enabled"},
         }
-        if self.temperature is not None:
-            payload["temperature"] = self.temperature
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
