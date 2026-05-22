@@ -72,7 +72,7 @@ from .logging import (
     detect_memory_hit,
 )
 from .reports import generate_daily_report
-from .model_versions import detect_monthly_transition, record_observation
+from .model_versions import detect_version_transition, record_observation
 from .portfolio import (
     check_portfolio_stop,
     check_position_stops,
@@ -279,7 +279,7 @@ def run_one_model(
 
     # Record version observation regardless of success
     record_observation(model_key, decision_result.model_id_returned, run_date)
-    transition = detect_monthly_transition(model_key, run_date)
+    transition = detect_version_transition(model_key, run_date)
     if transition:
         send_alert("INFO", f"Model transition: {model_key}",
                    f"{transition['old_version']} -> {transition['new_version']}", transition,

@@ -1,8 +1,9 @@
-"""Model version tracking + monthly upgrade checker.
+"""Model version tracking + drift detector.
 
-Logs every observed model id (returned by the API on each call) and, on the
-first trading day of each month, records a transition row if the version
-changed from the prior month.
+Logs every observed model id (returned by the API on each call) and, on every
+run, records a transition row if the observed version changed from the
+previous observation — catching mid-month provider-side alias repoints, not
+just first-of-month upgrades.
 """
 from __future__ import annotations
 
@@ -33,48 +34,55 @@ def record_observation(model_key: str, observed_version: str, run_date: datetime
         f.write(json.dumps(record) + "\n")
 
 
-def detect_monthly_transition(model_key: str, run_date: datetime) -> dict[str, Any] | None:
-    """If today is the first observation of a new month AND the version changed
-    from the last observation of the prior month, return a transition record.
-    Returns None otherwise.
+def detect_version_transition(model_key: str, run_date: datetime) -> dict[str, Any] | None:
+    """Compare the latest observation against the previous one for this model.
+
+    Fires on ANY change in the observed model id — mid-month or month-boundary
+    alike — so a provider repointing a floating alias (as DeepSeek did on
+    2026-04-24) is caught on the tick it happens, not just on the first trading
+    day of the month. Must be called AFTER `record_observation` has appended
+    the current run's observation.
+
+    Returns a transition record (and appends it to the per-model log) when the
+    two most recent observations differ, else None. TRANSITION event rows are
+    skipped when reading so they never count as observations.
     """
     path = _log_path(model_key)
     if not path.exists():
         return None
-    rows: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    if len(rows) < 2:
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            # Skip transition event rows (and any legacy/malformed rows missing
+            # observed_version) so only real observations are compared.
+            if row.get("type") == "TRANSITION" or "observed_version" not in row:
+                continue
+            observations.append(row)
+    if len(observations) < 2:
         return None
 
-    today_str = run_date.strftime("%Y-%m")
-    today_rows = [r for r in rows if r["date"].startswith(today_str)]
-    prior_rows = [r for r in rows if not r["date"].startswith(today_str)]
-    if not today_rows or not prior_rows:
-        return None
-
-    # Only fire on the FIRST observation of this month
-    if len(today_rows) > 1:
-        return None
-
-    last_prior = prior_rows[-1]
-    today_first = today_rows[0]
-    if last_prior["observed_version"] == today_first["observed_version"]:
+    previous = observations[-2]
+    current = observations[-1]
+    if previous["observed_version"] == current["observed_version"]:
         return None
 
     transition = {
         "date": run_date.strftime("%Y-%m-%d"),
         "model_key": model_key,
-        "old_version": last_prior["observed_version"],
-        "new_version": today_first["observed_version"],
-        "previous_observation_date": last_prior["date"],
+        "old_version": previous["observed_version"],
+        "new_version": current["observed_version"],
+        "previous_observation_date": previous["date"],
     }
     logger.warning("MODEL TRANSITION %s: %s → %s", model_key,
                    transition["old_version"], transition["new_version"])
-    # Append to the per-model log as a typed event too
+    # Append to the per-model log as a typed event too (same row format).
     transition_record = {**transition, "type": "TRANSITION"}
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(transition_record) + "\n")

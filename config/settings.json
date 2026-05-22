@@ -23,12 +23,12 @@
     "halt_on_stop_loss": true
   },
   "models": {
-    "claude":      {"provider": "anthropic", "model": "claude-sonnet-4-6", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "Claude Sonnet 4.6"},
-    "gpt":         {"provider": "openai",    "model": "gpt-5.4",           "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "GPT-5.4"},
-    "gemini":      {"provider": "google",    "model": "gemini-3.1-pro-preview", "enabled": true, "vision_capable": true,  "cohort": "core", "display_name": "Gemini 3.1 Pro"},
+    "claude":      {"provider": "anthropic", "model": "claude-sonnet-4-6", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "Claude Sonnet 4.6", "_pin_status": "UNPINNED: Anthropic echoes the alias unchanged; current dated snapshot id unconfirmed. Resolve manually before pinning (a wrong id silently changes the running model)."},
+    "gpt":         {"provider": "openai",    "model": "gpt-5.4-2026-03-05", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "GPT-5.4"},
+    "gemini":      {"provider": "google",    "model": "gemini-3.1-pro-preview", "enabled": true, "vision_capable": true,  "cohort": "core", "display_name": "Gemini 3.1 Pro", "_pin_status": "UNPINNED: Google echoes the alias unchanged. The adapter now captures response.model_version, so the real dated id will surface in model_id_returned on the next live run; pin from that."},
     "grok":        {"provider": "xai",       "model": "grok-4.20-0309-reasoning", "enabled": true, "vision_capable": true,  "cohort": "core", "display_name": "Grok 4.20 (Reasoning)"},
-    "deepseek":    {"provider": "deepseek",  "model": "deepseek-reasoner",        "enabled": true, "vision_capable": false, "cohort": "core", "display_name": "DeepSeek Reasoner"},
-    "claude_opus": {"provider": "anthropic", "model": "claude-opus-4-6",   "enabled": true, "vision_capable": true,  "cohort": "expansion", "display_name": "Claude Opus 4.6"}
+    "deepseek":    {"provider": "deepseek",  "model": "deepseek-v4-flash", "enabled": true, "vision_capable": false, "cohort": "core", "display_name": "DeepSeek Reasoner", "_pin_note": "Pinned to the id DeepSeek's API echoes as the serving model; the deepseek-reasoner alias was repointed to this on 2026-04-24. Not a dated snapshot, so residual drift risk remains if DeepSeek repoints deepseek-v4-flash. Assumes the echoed id is directly callable; verify on the next live run."},
+    "claude_opus": {"provider": "anthropic", "model": "claude-opus-4-6", "enabled": true, "vision_capable": true,  "cohort": "expansion", "display_name": "Claude Opus 4.6", "_pin_status": "UNPINNED: Anthropic echoes the alias unchanged; current dated snapshot id unconfirmed. Resolve manually before pinning (a wrong id silently changes the running model)."}
   },
   "benchmark_ticker": "SPY",
   "prompt_version": "v1",

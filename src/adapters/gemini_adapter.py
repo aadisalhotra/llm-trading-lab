@@ -51,6 +51,16 @@ class GeminiAdapter(BaseAdapter):
 
         text = getattr(response, "text", "") or ""
 
+        # Real model identifier for drift detection. The Gemini REST API returns
+        # a `modelVersion` field naming the dated snapshot that actually served
+        # the request (the alias gemini-3.1-pro-preview resolves to a pinned
+        # build), and the Python SDK surfaces it as response.model_version. We
+        # capture it when present so a provider-side alias repoint shows up in
+        # model_id_returned, falling back to the configured id only when the
+        # response doesn't expose it. If model_version is absent, Gemini drift
+        # is NOT observable via the echo and must be tracked another way.
+        returned_id = getattr(response, "model_version", None) or self.model
+
         # Gemini exposes usage_metadata on responses with prompt_token_count
         # and candidates_token_count. Names differ slightly across SDK
         # versions; tolerate both.
@@ -60,10 +70,11 @@ class GeminiAdapter(BaseAdapter):
         if usage:
             in_tok = int(getattr(usage, "prompt_token_count", 0) or 0)
             out_tok = int(getattr(usage, "candidates_token_count", 0) or 0)
+        # Cost stays keyed on the configured id (unchanged) — pricing is out of scope.
         cost = compute_call_cost_usd(self.model, in_tok, out_tok)
         metadata: dict[str, Any] = {
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
-        return text, self.model, metadata  # Gemini SDK doesn't echo the model id back
+        return text, returned_id, metadata
