@@ -28,155 +28,60 @@
     ]
   },
   "daily": {
-    "date": "2026-05-21",
-    "sent_count": 10,
+    "date": "2026-05-22",
+    "sent_count": 6,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "milestone:claude:10",
-      "milestone:gpt:15",
-      "milestone:gemini:5",
-      "milestone:grok:10",
-      "milestone:deepseek:20",
-      "milestone:claude_opus:10",
-      "news:TJX:c8bc4c61dd",
-      "news:GE:aacda4ee33",
-      "budget:warn",
-      "news:NVDA:6117f3a9d5",
-      "news:COST:6117f3a9d5"
+      "ath:gemini",
+      "ath:deepseek",
+      "news:NVDA:6dcb39157d",
+      "news:AMZN:e0e77c0bd6",
+      "news:TJX:d923e01f2f",
+      "budget:warn"
     ],
-    "overflow": [
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on NVDA (held by 6)",
-        "body": "A <b>very positive</b> headline (sentiment +0.74) is affecting <b>NVDA</b>, held by 6 models (Claude Opus 4.6, Claude Sonnet 4.6, DeepSeek Reasoner, GPT-5.4, Gemini 3.1 Pro, Grok 4.20 (Reasoning)):<br><i>&ldquo;Stock Market Today, May 21: Markets Edge Upwards Again on Iran Peace Hopes&rdquo;</i> \u2014 Yahoo.",
-        "context": {
-          "models": [
-            "Claude Opus 4.6",
-            "Claude Sonnet 4.6",
-            "DeepSeek Reasoner",
-            "GPT-5.4",
-            "Gemini 3.1 Pro",
-            "Grok 4.20 (Reasoning)"
-          ],
-          "numbers": {
-            "Ticker": "NVDA",
-            "Sentiment": "+0.74 (very positive)",
-            "Models holding": "6",
-            "Source": "Yahoo"
-          }
-        },
-        "fired_at_et": "2026-05-21 18:20 ET",
-        "timestamp": "2026-05-21T22:20:05.337041+00:00"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on COST (held by 4)",
-        "body": "A <b>very positive</b> headline (sentiment +0.74) is affecting <b>COST</b>, held by 4 models (Claude Sonnet 4.6, DeepSeek Reasoner, GPT-5.4, Grok 4.20 (Reasoning)):<br><i>&ldquo;Stock Market Today, May 21: Markets Edge Upwards Again on Iran Peace Hopes&rdquo;</i> \u2014 Yahoo.",
-        "context": {
-          "models": [
-            "Claude Sonnet 4.6",
-            "DeepSeek Reasoner",
-            "GPT-5.4",
-            "Grok 4.20 (Reasoning)"
-          ],
-          "numbers": {
-            "Ticker": "COST",
-            "Sentiment": "+0.74 (very positive)",
-            "Models holding": "4",
-            "Source": "Yahoo"
-          }
-        },
-        "fired_at_et": "2026-05-21 18:20 ET",
-        "timestamp": "2026-05-21T22:20:05.337815+00:00"
-      }
-    ],
+    "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-05-21T13:33:16.552773+00:00",
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-05-22T21:08:34.746362+00:00",
         "disposition": "sent"
       },
       {
-        "kind": "milestone",
+        "kind": "ath",
         "severity": "INFO",
-        "title": "Claude Sonnet 4.6 crossed +10%",
-        "timestamp": "2026-05-21T21:06:59.837015+00:00",
+        "title": "DeepSeek Reasoner hit a new all-time high",
+        "timestamp": "2026-05-22T21:08:36.736862+00:00",
         "disposition": "sent"
       },
       {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "GPT-5.4 crossed +15%",
-        "timestamp": "2026-05-21T21:07:00.631890+00:00",
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on NVDA (held by 5)",
+        "timestamp": "2026-05-22T21:08:37.787810+00:00",
         "disposition": "sent"
       },
       {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro crossed +5%",
-        "timestamp": "2026-05-21T21:07:01.232892+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "Grok 4.20 (Reasoning) crossed +10%",
-        "timestamp": "2026-05-21T21:07:01.852795+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "DeepSeek Reasoner crossed +20%",
-        "timestamp": "2026-05-21T21:07:02.487587+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "Claude Opus 4.6 crossed +10%",
-        "timestamp": "2026-05-21T21:07:02.994449+00:00",
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AMZN (held by 4)",
+        "timestamp": "2026-05-22T21:08:38.874534+00:00",
         "disposition": "sent"
       },
       {
         "kind": "news_impact",
         "severity": "WARN",
         "title": "Very Positive news on TJX (held by 6)",
-        "timestamp": "2026-05-21T21:07:03.525070+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on GE (held by 6)",
-        "timestamp": "2026-05-21T21:07:04.020525+00:00",
+        "timestamp": "2026-05-22T21:08:39.989511+00:00",
         "disposition": "sent"
       },
       {
         "kind": "budget",
         "severity": "WARN",
         "title": "Monthly API budget approaching cap",
-        "timestamp": "2026-05-21T21:07:06.077511+00:00",
+        "timestamp": "2026-05-22T21:08:43.004319+00:00",
         "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on NVDA (held by 6)",
-        "timestamp": "2026-05-21T22:20:05.337041+00:00",
-        "disposition": "overflow"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on COST (held by 4)",
-        "timestamp": "2026-05-21T22:20:05.337815+00:00",
-        "disposition": "overflow"
       }
     ]
   }
