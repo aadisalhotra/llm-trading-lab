@@ -83,9 +83,16 @@ Across **521 closed (full-exit) trades**, entry confidence correlates with the p
 
 ---
 
-## RQ6 — Non-determinism at temperature = 0
+## RQ6 — API non-determinism characterization (operational reproducibility of the deployed agents)
 
-**Status: ⚪ Open.** Manual-trigger only. Run `python scripts/determinism_probe.py` to re-run a seeded 5% subsample of ticks K=10× at temperature 0; the analyzer in `research_metrics.py` then reports per-model decision flip rate, action entropy, and weight dispersion. This number is the empirical ceiling for RQ1 and should be measured before RQ1 is resolved.
+**Status: ⚪ Open.** Frozen-context probe not yet run.
+
+- *Question:* How run-to-run reproducible is each model's decision-making at the configuration it is actually deployed and traded at?
+- *Operationalization:* Measured at the deployed configuration — provider-default sampling, no temperature parameter set — not at temperature 0. The deployed pipeline sends no temperature parameter to any model, so temperature 0 would characterize an off-deployment configuration for the entire cohort; the original temperature-0 framing is withdrawn. Per-model temperature behavior (four of six models honor temperature) is a disclosed fact in the per-model API-configuration table, not the basis for the reframe.
+- *Metric:* Δ_m — per-model run-to-run decision divergence across repeated calls at the deployed configuration. Replaces the superseded flip-rate metric.
+- *Type:* Characterization research question, not a null-hypothesis test.
+- *Multiple-testing:* Not a member of the Benjamini-Hochberg FDR family.
+- *Cross-reference:* METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis"; `PRE_REGISTRATION.md` RQ6 entry and §3.6.
 
 ---
 

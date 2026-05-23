@@ -10,6 +10,8 @@ Consistency: RQ6 below consolidates and is consistent with the earlier METHODOLO
 
 ## Decision 1 — RQ6: reframe RATIFIED
 
+> **Superseded-by note.** The temperature rationale in this Decision — that temperature 0 is a no-op across most or all of the cohort — is superseded. The RQ6 deployed-configuration reframe rests on the deployed pipeline sending no temperature parameter to any model (so temperature 0 is an off-deployment configuration for the whole cohort), not on per-model temperature honoring; the verification found four of six models honor temperature. See the RQ6 Rationale Correction (`RQ6-rationale-correction.md`) and the corrected METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis". The original temperature-premise wording below is retained as a historical record of the decision as first made.
+
 Ratification. The reframe from "API non-determinism at temperature 0" to "operational reproducibility of the deployed agents at the deployed configuration" is ratified. Temperature 0 is a no-op across most or all of the cohort (DeepSeek V4 thinking mode silently ignores temperature; OpenAI and xAI reasoning models constrain or ignore it; Anthropic constrains temperature when extended thinking is enabled). "Non-determinism at temperature 0" therefore measures a configuration the experiment never trades at. The reframe measures the run-to-run reproducibility that actually propagates into RQ1–RQ5.
 
 ### RQ6 specification

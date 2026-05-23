@@ -14,6 +14,8 @@
 
 ## A. METHODOLOGY.md — committable named sections
 
+> **Superseded-by note.** The RQ6 rationale in this Section A — the temperature-premise wording in its "API Non-Determinism (RQ6)" subsection — is superseded by `RQ6-rationale-correction.md`. The RQ6 deployed-configuration reframe rests on the deployed pipeline sending no temperature parameter to any model (so temperature 0 is an off-deployment configuration for the whole cohort), not on per-model temperature honoring; the verification found four of six models honor temperature. The original wording below is retained as a historical record.
+
 METHODOLOGY.md uses **named** sections, not numbered ones. Add the four sections
 below. The "API Non-Determinism" section **replaces** whatever obsolete
 temperature-0 / non-determinism text METHODOLOGY.md currently carries; Operations

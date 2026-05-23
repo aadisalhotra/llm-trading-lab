@@ -154,13 +154,14 @@ Each RQ is stated with a null/alternative hypothesis, the operational definition
 > **Holding model snapshot, prompt version, and input fixed, how much do a model's trading decisions vary across independent API calls at the model's deployed configuration?**
 
 - **Status:** Open (frozen-context probe not yet run)
-- **Type.** Characterization research question — **not** a null-hypothesis test, and **not** a member of the BH FDR family; it produces no headline p-value. (This reframe replaces the original "non-determinism at temperature 0": temperature 0 is a no-op across the reasoning cohort — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".)
+- **Type.** Characterization research question — **not** a null-hypothesis test, and **not** a member of the BH FDR family; it produces no headline p-value. (This reframe replaces the original "non-determinism at temperature 0": the deployed pipeline sends no temperature parameter to any of the six models, so every model runs at its provider-default sampling configuration; temperature 0 is an off-deployment configuration for the entire cohort, which is why RQ6 is operationalized at the deployed configuration rather than at temperature 0 — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".)
 - **Estimand.** Per-model run-to-run decision divergence Delta_m at the deployed configuration.
 - **Operationalization.** A pre-registered, regime-stratified sample of **M** frozen decision-period input bundles. For each context, **K** independent API calls in one **time-clustered batch** at the model's deployed configuration (Per-Model API Configuration table below). The frozen-context sample is **tick-position-stratified with identical composition across all six models**, and the measurement batch is **run off-peak** (not the 09:31 ET open). If calls fail off-peak, Delta_m for that context uses the **K′ ≤ K** successful calls and K′ is reported.
 - **Metric.** Per context c: decision set D = {(ticker, action)} (action ∈ {BUY, SELL}). delta_c = 1 − mean pairwise Jaccard over the C(K′,2) call-pairs (J = 1 if both sets empty). **Delta_m = mean(delta_c)** over the M contexts. Secondary (descriptive): SD of confidence and of size among decisions common to all K calls.
 - **Inference.** Per-model Delta_m with a **BCa bootstrap CI resampling contexts, B = 10,000**. No hypothesis is tested.
 - **Parameters.** K and M pinned in `v1.json` before the OSF deposit; recommended K ≥ 10, M ≥ 30.
 - **Decision / interpretation rule.** Report Delta_m and its CI per model alongside the model's deployed configuration; interpret as a comparison of **deployed agents**, not intrinsic model stochasticity; use Delta_m to qualify the RQ1–RQ5 interpretation (a high-Delta_m model carries substantial run-to-run measurement noise).
+- **Scope:** RQ6 covers all six models uniformly on the deployed-configuration basis; it is not partitioned by temperature-honoring behavior. The verified per-model temperature behavior — four models (GPT-5.4, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6) honor temperature and are deterministic at temperature 0; two (Grok 4.20 Reasoning, DeepSeek v4-pro) silently ignore it — is recorded as a disclosed fact in the per-model API-configuration record, not as a basis for the RQ6 design.
 
 **Per-Model API Configuration** (reproduced inline so this entry is self-contained):
 
@@ -212,7 +213,7 @@ The paper-trading phase (Apr–Oct 2026) is **pilot data**: it exists to validat
 
 ### 3.6 API non-determinism characterization (RQ6, deployed configuration)
 
-Frontier model APIs are not run-to-run deterministic at the **deployed configuration**; RQ6 measures this as per-model decision divergence Delta_m. (Temperature 0 is a no-op across the reasoning cohort, so the original temperature-0 framing is withdrawn — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".) The **measured** convergence in RQ1 therefore has a ceiling below 1.0; RQ1 is read relative to (1 − within-model run-to-run divergence), never against a naïve 100%.
+Frontier model APIs are not run-to-run deterministic at the **deployed configuration**; RQ6 measures this as per-model decision divergence Delta_m. (The deployed pipeline sends no temperature parameter to any model, so temperature 0 is an off-deployment configuration for the entire cohort; the original temperature-0 framing is therefore withdrawn — see METHODOLOGY § "API Non-Determinism (RQ6) — Deployed-Configuration Basis".) The **measured** convergence in RQ1 therefore has a ceiling below 1.0; RQ1 is read relative to (1 − within-model run-to-run divergence), never against a naïve 100%.
 
 ### 3.7 Locked operational definitions
 
@@ -249,6 +250,41 @@ Discloses the Phase A (pilot) data-quality issues and the registered handling. P
 - **RQ4.** Minimally exposed (factor exposure is a slow-moving holdings property). No primary tick-position covariate; a coverage check confirms Gemini's factor-exposure sampling is not materially time-of-day-skewed.
 - **RQ5.** The headline regression carries within-session tick-position fixed effects (δₚ), absorbing time-of-day level differences in trade-driven concentration change and making β robust to the cohort's uneven tick-position composition. β remains one coefficient (one headline p-value; FDR membership unaffected). Drawdown depth is near-constant within a session, so Gemini's close-skew does not restrict the range of DD observed; the handling targets the dHHI_trade side. A non-open-restricted sensitivity analysis is registered.
 - **RQ6.** The frozen-context sample is tick-position-stratified with identical composition across models, and the measurement batch is run off-peak, so the cross-model divergence comparison is like-for-like and does not reproduce live open-bell congestion. Gemini's open-bell availability is a separate quantity (above) and is not folded into Delta_m.
+
+**Gemini snapshot-identifier limitation.** Gemini 3.1 Pro is pinned to the alias `gemini-3.1-pro-preview`. Google's API echoes only this alias in response metadata and exposes no dated, immutable build identifier. Consequently, if Google repoints the alias to a different underlying build, the change is not detectable from API response metadata, and Gemini's snapshot stability cannot be verified from the logs. This is a known data-integrity limitation. The compensating control — model-lifecycle monitoring of the alias — is specified in the Forced-Change / Deprecation Exposure section and is partial (it detects announced changes, not a fully silent repoint).
+
+### 3.10 Forced-Change / Deprecation Exposure — Confirmatory Model Set
+
+**Purpose.** The confirmatory window runs November 1, 2026 – November 1, 2027. Some pinned models carry documented or structural exposure to a provider-forced model change inside that window. This section discloses the exposure and pre-specifies the handling.
+
+**Exposure table.** Populated from the model-lifecycle monitor as of the OSF deposit date.
+
+| Model | Provider | Lifecycle status | Retirement floor / change exposure | Inside confirmatory window? | Source |
+|---|---|---|---|---|---|
+| `claude-sonnet-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-17 | Yes | `<Anthropic deprecations page — fill URL>` |
+| `claude-opus-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-05 | Yes | `<Anthropic deprecations page — fill URL>` |
+| Gemini 3.1 Pro (`gemini-3.1-pro-preview`) | Google | Active — preview (pre-GA) build | Structural preview-supersession risk; no dated retirement floor published | Yes — undated, structural | https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview |
+| GPT-5.4 | OpenAI | `[VERIFY — deprecation audit pending]` | `[VERIFY]` | `[VERIFY]` | `<OpenAI deprecations page — fill URL>` |
+| Grok 4.20 Reasoning | xAI | `[VERIFY — deprecation audit pending]` | `[VERIFY]` | `[VERIFY]` | `<xAI model page — fill URL>` |
+| DeepSeek v4-pro | DeepSeek | Active | No retirement announced as of audit | No (none published) | `<DeepSeek docs — fill URL>` |
+
+The GPT-5.4 and Grok 4.20 rows are pending the OpenAI and xAI deprecation audit, which must complete before the OSF deposit.
+
+**Anthropic retirement-floor exposure.** `claude-sonnet-4-6` and `claude-opus-4-6` carry documented "not sooner than" retirement floors inside the confirmatory window. These are floors — earliest-possible dates, which may be extended. No current Anthropic model has a floor past 2027-11-01, so the exposure cannot be removed by snapshot selection.
+
+**Gemini preview-build supersession exposure.** Gemini 3.1 Pro is pinned to `gemini-3.1-pro-preview`, a preview (pre-GA) build; Google exposes no dated, general-availability snapshot for this model. Preview builds carry elevated supersession risk: a preview is typically deprecated or replaced when the provider ships the general-availability version. If a GA `gemini-3.1-pro` is released during the confirmatory window, the pinned preview build may be deprecated, retired, or repointed — a provider-forced change inside the window. This is forced-change exposure of the same class as the Anthropic floors; the difference is that it is undated and structural, not a published floor.
+
+**Pre-specified handling.**
+1. *No mid-window migration.* If a pinned model undergoes a provider-forced change during the confirmatory window, the response is truncation, not replacement — the pipeline does not migrate to a successor model. Mid-window migration would itself be the regime change the pinned-snapshot methodology exists to prevent.
+2. *Truncation point = the change date.* The affected model's confirmatory series ends there; data after it is exploratory only.
+3. Surviving models continue, unaffected.
+4. The incident is logged and reported in the paper's limitations.
+
+**Per-RQ degradation.** Per-model RQs (RQ2, RQ3, RQ4, RQ5) degrade gracefully — the affected model's series truncates, the others continue. RQ6 (characterization) is unaffected. RQ1 (cross-model herding) is a cohort-level construct and does not degrade per-model: a mid-window cohort-size reduction changes the set of model pairs the herding statistic is computed over, so RQ1's headline statistic is not directly comparable across a cohort-size change. RQ1's handling of a mid-window cohort reduction is a registered open methodology item, to be finalized at the September methodology review and locked in the OSF pre-registration before the confirmatory phase begins. No estimator is claimed in the interim.
+
+**Monitoring mechanism.** A weekly model-lifecycle monitoring job watches all six providers' model-lifecycle and deprecation pages, alerting on a lifecycle status change, a retirement-floor date change, or a retirement announcement. *Gemini alias coverage:* the job explicitly covers `gemini-3.1-pro-preview`, watching Google's model documentation and release notes for (a) a published change to the underlying build the alias resolves to, (b) a deprecation or retirement notice, and (c) the release of a GA `gemini-3.1-pro`. This is the compensating control for the fact that Google's API echoes only the alias and no dated build, so a repoint of the underlying build is not detectable from API response metadata. The control is **partial**: it detects announced changes, not a fully silent, unannounced repoint; that residual is disclosed as a limitation. The monitor's state as of the OSF deposit date populates the exposure table. Implementation is an Operations task.
+
+**September pre-read.** This disclosure is a component of the September data-integrity pre-read.
 
 ---
 

@@ -1326,9 +1326,10 @@ def _load_determinism_records() -> list[dict[str, Any]]:
 def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
     """RQ6 — operational reproducibility of deployed agents (characterization).
 
-    Reframed from "non-determinism at temperature 0" (temperature is a no-op
-    across the reasoning cohort) to run-to-run divergence at each model's
-    DEPLOYED configuration. Reads frozen-context probe output from
+    Reframed from "non-determinism at temperature 0" (the deployed pipeline
+    sets no temperature parameter for any model, so temperature 0 is an
+    off-deployment configuration for the entire cohort) to run-to-run
+    divergence at each model's DEPLOYED configuration. Reads frozen-context probe output from
     /data/determinism/*.jsonl: K independent calls per held-out decision context
     at the deployed configuration (the probe is tick-position-stratified with
     identical composition across models and run off-peak — a probe-side property;

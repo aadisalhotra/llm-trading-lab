@@ -37,7 +37,7 @@ Given identical information, identical constraints, and identical execution infr
 
 ## Reasoning Configuration and Cross-Model Equivalence
 
-For reasoning-capable models, the reasoning/thinking configuration is part of the pinned model identity. It is set explicitly on every API call and never left to the provider default.
+For reasoning-capable models, the reasoning/thinking configuration is part of the pinned, documented model identity and was verified empirically. The deployed configuration is the provider default for five models — GPT-5.4, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6, and Grok 4.20 Reasoning send no reasoning-effort parameter — and reasoning_effort=high for DeepSeek v4-pro. Per DeepSeek's documentation, "high" is DeepSeek v4-pro's default effort tier ("max" being an optional higher tier), so DeepSeek v4-pro likewise runs at its provider-default reasoning effort. All six models therefore run at provider-standard reasoning effort.
 
 There is no provider-independent unit of reasoning effort — each provider's effort/thinking settings are calibrated to its own scale, and one provider's default does not correspond to another's. The project therefore commits to a single explicit equivalence rule: **all reasoning-capable models in the cohort run at provider-standard (default) reasoning effort, not maximum.** The residual cross-provider non-equivalence this leaves is disclosed as a limitation. Any future move to maximum effort would be a separate, deliberate, cohort-wide change applied consistently to all reasoning models and logged. (This equivalence principle is one of the September methodology-lock items.)
 
@@ -67,9 +67,11 @@ Placeholder key:
 
 ## API Non-Determinism (RQ6) — Deployed-Configuration Basis
 
-RQ6 characterizes API non-determinism. Its original framing — repeated runs at temperature 0 — assumed temperature is a usable control across the cohort. It is not: the cohort is six reasoning models, and reasoning/thinking modes broadly do not honor temperature (DeepSeek V4 thinking mode silently ignores it; other providers' reasoning models commonly ignore, constrain, or do not expose it). Temperature 0 is treated as unavailable for the cohort unless a per-model check proves otherwise.
+RQ6 characterizes API non-determinism. Its original framing — repeated runs at temperature 0 — measures a sampling configuration the experiment never trades at. The deployed trading pipeline sends no temperature parameter to any of the six models: every model adapter omits it, so each model runs at its provider's default sampling configuration, and a provider default is not temperature 0. "Non-determinism at temperature 0" would therefore characterize an off-deployment configuration for the entire cohort.
 
-RQ6 is therefore operationalized on the **deployed configuration** — each model's run-to-run non-determinism is characterized at the exact configuration it is traded at, recorded in the Per-Model API Configuration table. RQ6 is a characterization research question, not a null-hypothesis test, and is not a member of the Benjamini-Hochberg FDR family. Its full operationalization, metric, and inference are specified in the RQ6 entry of the pre-registration.
+Per-model temperature behavior was verified empirically and is recorded as a disclosed fact in the Per-Model API Configuration table: four of the six models (GPT-5.4, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6) honor the temperature parameter and are deterministic at temperature 0 in test calls; two (Grok 4.20 Reasoning, DeepSeek v4-pro) silently ignore it. This per-model behavior is disclosed for completeness; it does not bear on the reframe, because the deployed pipeline sets no temperature parameter for any model — temperature 0 is off-deployment for the whole cohort regardless of which models would honor it.
+
+RQ6 is therefore operationalized on the deployed configuration: each model's run-to-run non-determinism is characterized at the exact configuration it is traded at — provider-default sampling — recorded in the Per-Model API Configuration table. RQ6 is a characterization research question, not a null-hypothesis test, and is not a member of the Benjamini-Hochberg FDR family. Its full operationalization, metric, and inference are specified in the RQ6 entry of the pre-registration.
 
 ## Phase A Data Integrity
 
