@@ -43,7 +43,7 @@ from zoneinfo import ZoneInfo
 EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
-from .alerts import scan_macro_events, send_alert, send_daily_summary
+from .alerts import scan_macro_events, send_alert, send_daily_summary, send_heartbeat
 from .analytics import build_leaderboard, compute_budget_status
 from .config_loader import (
     configure_logging,
@@ -491,6 +491,11 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         logger.error("No prices fetched — aborting tick")
         send_alert("CRITICAL", "Market data failure", "No prices for any symbol",
                    kind="market_data_failure", dedup_key="market_data_failure")
+        # Trip the external liveness watchdog immediately on a known-fatal
+        # intraday abort, rather than waiting out its grace window. EOD runs
+        # outside the watchdog's market-hours scope, so it does not ping.
+        if not is_eod:
+            send_heartbeat(success=False, settings=settings)
         return 1
 
     # Fetch news intelligence ONCE per pipeline tick — not per model — so all
@@ -664,6 +669,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     total_elapsed = time.monotonic() - pipeline_start
     logger.info("==== Pipeline tick complete in %.2fs (%.2fs in parallel model phase) ====",
                 total_elapsed, models_elapsed)
+
+    # Liveness heartbeat — the "a decision tick actually landed" signal for the
+    # external dead-man's-switch. Fires ONLY here: we are past the market-hours
+    # guard (so the market was open) and every model has run to completion. EOD
+    # runs after the close, outside the watchdog's expected window, so it is
+    # intentionally excluded. Best-effort — never raises, never blocks the tick.
+    if not is_eod:
+        send_heartbeat(success=True, settings=settings)
+
     return 0
 
 

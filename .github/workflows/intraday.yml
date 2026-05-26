@@ -104,6 +104,9 @@ jobs:
           # Email alerting (Gmail SMTP) — recipients live in settings.json
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # Liveness heartbeat — external dead-man's-switch ping URL (Healthchecks.io).
+          # Unset = the in-process heartbeat is a clean no-op (src/alerts/heartbeat.py).
+          HEARTBEAT_URL: ${{ secrets.HEARTBEAT_URL }}
         run: |
           MODE="${{ steps.mode.outputs.mode }}"
           FORCE="${{ steps.mode.outputs.force }}"
