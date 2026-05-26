@@ -29,6 +29,10 @@ on:
         description: "Bypass market-open check"
         required: false
         default: "false"
+      simulate_dispatch_failure:
+        description: "TEST ONLY — force the chain's next-tick dispatch to fail, to verify loud failure + notify-failure. Leave false for real runs."
+        required: false
+        default: "false"
   # External kick from cron-job.org (or any other cron-as-a-service).
   # POST to /repos/{owner}/{repo}/dispatches with
   #   {"event_type": "market-open-kick"}
@@ -156,23 +160,108 @@ jobs:
       - name: Chain next tick (intraday or EOD)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # TEST-ONLY fault injection (manual workflow_dispatch input). Empty/false
+          # for every real trigger; when "true" the dispatch is aimed at a
+          # nonexistent workflow so it 404s, exercising the loud-failure path.
+          SIMULATE_FAIL: ${{ github.event.inputs.simulate_dispatch_failure }}
         run: |
           set -e
 
-          dispatch_intraday() {
-            curl -sS -X POST \
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+
+          # Dispatch target. Overridden to a nonexistent workflow ONLY when the
+          # manual simulate_dispatch_failure input is set, so a dry-run can force
+          # the dispatch to fail and verify the loud-failure path end-to-end.
+          WF_FILE="intraday.yml"
+          if [ "${SIMULATE_FAIL}" = "true" ]; then
+            WF_FILE="__simulate_dispatch_failure__.yml"
+            echo "::warning::simulate_dispatch_failure=true — dispatching against ${WF_FILE} to force a failure (dry-run only)"
+          fi
+
+          # jq is preinstalled on ubuntu-latest; guard anyway so a future image
+          # change degrades to "skip verify" rather than failing every dispatch.
+          HAVE_JQ=1
+          command -v jq >/dev/null 2>&1 || { echo "::warning::jq not found — run-creation verify skipped (status-check + retry stay active)"; HAVE_JQ=0; }
+
+          # Latest intraday.yml run id (monotonic); 0 if none/unreadable.
+          latest_run_id() {
+            [ "$HAVE_JQ" = "1" ] || { echo 0; return 0; }
+            curl -sS \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
-              -d '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}'
-            echo "Dispatched next intraday tick"
+              "${API}/actions/workflows/intraday.yml/runs?per_page=1" \
+              | jq -r '.workflow_runs[0].id // 0' 2>/dev/null || echo 0
+          }
+
+          # One dispatch POST. Echoes the HTTP status ("000" on transport error);
+          # the response body (empty on a 204 success) is left in /tmp/disp_body.
+          attempt_dispatch() {
+            local payload="$1" code
+            code=$(curl -sS -o /tmp/disp_body -w '%{http_code}' \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${API}/actions/workflows/${WF_FILE}/dispatches" \
+              -d "$payload") || code="000"
+            echo "$code"
+          }
+
+          # After a 204, confirm a NEW run actually appeared (absorbs API
+          # propagation lag). PURE verification — never used to trigger a
+          # re-dispatch; a false negative here must not re-fire the dispatch.
+          verify_run_created() {
+            local before="$1" i latest
+            [ "$HAVE_JQ" = "1" ] || { echo "Skipping run-creation verify (no jq)"; return 0; }
+            for i in 1 2 3 4 5 6; do
+              sleep 6
+              latest=$(latest_run_id)
+              if [ "${latest:-0}" -gt "${before:-0}" ]; then
+                echo "Confirmed new run id ${latest} (baseline ${before}) after ~$(( i * 6 ))s"
+                return 0
+              fi
+            done
+            echo "No new run id above baseline ${before} after grace window"
+            return 1
+          }
+
+          # Dispatch with status-checking + retry. Retries ONLY on a definitive
+          # non-204 HTTP status (a curl transport error -> "000" also counts),
+          # with backoff. On 204 it stops retrying and verifies run creation.
+          # If all 4 attempts are non-204, OR a 204 yields no run, it returns
+          # non-zero so the chain job fails RED and notify-failure fires — no
+          # more silent green. The verify result NEVER triggers a re-dispatch.
+          dispatch_with_retry() {
+            local payload="$1" label="$2" before attempt code
+            before=$(latest_run_id)
+            for attempt in 1 2 3 4; do
+              code=$(attempt_dispatch "$payload")
+              if [ "$code" = "204" ]; then
+                echo "Dispatch accepted (HTTP 204) for ${label} [attempt ${attempt}]"
+                if verify_run_created "$before"; then
+                  return 0
+                fi
+                echo "::error::Dispatch for ${label} returned 204 but no new run appeared — NOT re-dispatching; failing loud."
+                return 1
+              fi
+              echo "::warning::Dispatch attempt ${attempt}/4 for ${label} failed: HTTP ${code} — body: $(cat /tmp/disp_body 2>/dev/null)"
+              if [ "$attempt" -lt 4 ]; then
+                sleep $(( attempt * 5 ))
+              fi
+            done
+            echo "::error::All 4 dispatch attempts for ${label} failed (last HTTP ${code}). Failing the chain so notify-failure fires."
+            return 1
+          }
+
+          dispatch_intraday() {
+            dispatch_with_retry '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}' "intraday"
           }
 
           dispatch_eod() {
-            # Wait until 21:05 UTC (1h 5m after EDT market close) so
-            # prices settle, then dispatch mode=end-of-day. If we are
-            # already past 21:05, dispatch after a 30s safety buffer.
+            # Wait until 21:05 UTC (1h 5m after EDT market close) so prices
+            # settle, then dispatch mode=end-of-day. If already past 21:05,
+            # dispatch after a 30s safety buffer.
             local h m s now target wait
             h=$(date -u +%H); m=$(date -u +%M); s=$(date -u +%S)
             now=$(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
@@ -183,13 +272,7 @@ jobs:
             fi
             echo "Market closed — waiting ${wait}s before EOD dispatch..."
             sleep "$wait"
-            curl -sS -X POST \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/intraday.yml/dispatches" \
-              -d '{"ref":"main","inputs":{"mode":"end-of-day","force":"false"}}'
-            echo "Dispatched end-of-day run"
+            dispatch_with_retry '{"ref":"main","inputs":{"mode":"end-of-day","force":"false"}}' "end-of-day"
           }
 
           NOW_MIN=$(date -u +%M)
