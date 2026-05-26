@@ -115,3 +115,36 @@ the tail of a tick (it never blocks trading; the tick is already complete).
   logs and emails a diagnostic-rich alert; holiday-accurate via
   `is_market_open_now()`. Complements this watchdog; does not replace it (it runs
   on GitHub, so it can't survive a GitHub-wide outage the way this can).
+
+## Per-boundary idempotency — and the concurrency-group tripwire
+
+`src/logging/boundary_ledger.py` enforces exactly-once decision-making per
+30-minute tick (and once-per-day for EOD). The pipeline records each boundary in
+`data/state/handled_boundaries.json` once its decisions are made, and checks that
+ledger before prompting any model, so a duplicate run for the same boundary
+(a Fix A dispatch retry, a manual force-run, a backup-cron double-fire, or a
+double EOD trigger) cleanly no-ops instead of double-trading. The ledger is
+committed in the same commit as the decision logs, so a boundary's marker exists
+iff its decisions were durably committed.
+
+> ⚠️ **TRIPWIRE — do not remove the intraday concurrency group.** The guard is a
+> read-check-then-write and is race-free *only* because
+> `concurrency: group: intraday-pipeline, cancel-in-progress: false` in
+> `.github/workflows/intraday.yml` serializes runs — each run checks out the
+> prior run's committed ledger before it starts, so two runs for the same
+> boundary never execute at once. **The future Path 2 (stateless external
+> scheduler) rework must keep that concurrency group, or first add the atomic
+> claim-commit hardening** (commit+push a claim before the model loop; abort if
+> the push is rejected non-fast-forward). Without serialization, two concurrent
+> runs could both pass the check before either writes — and both would trade.
+
+**Known limitation (v1, accepted for Phase A paper only):** the boundary is
+marked at *completion*. A hard kill mid-model-loop (runner eviction / OOM) after
+some models have filled but before the commit leaves the boundary unmarked, so a
+retry re-trades the models that already filled. This is a real-money double-trade
+risk in **Phase B** and is tracked as **"per-model idempotency"** on the
+pre-Phase-B list. Do not go live with real money without it.
+
+If the ledger is ever unreadable (corrupt JSON), the guard **fails open**
+(proceeds, so it can never silently halt trading) and fires a CRITICAL email
+*plus* a watchdog `/fail` ping — a loud SMS/push page, not a silent log line.
