@@ -1,8 +1,9 @@
 """Unit tests for the per-boundary idempotency guard. No network.
 
 These encode the dry-run the design specifies: a boundary handled once is not
-re-handled (duplicate run no-ops), a fresh boundary proceeds, EOD is once-per-day,
-and a corrupt ledger fails OPEN (read error surfaced, ledger treated as empty).
+re-handled (duplicate run no-ops), a fresh boundary proceeds, and a corrupt
+ledger fails OPEN (read error surfaced, ledger treated as empty). The guard is
+intraday-only; EOD is not keyed here (it executes no trades).
 Run with: python -m pytest tests/test_boundary_ledger.py
 """
 from __future__ import annotations
@@ -25,25 +26,21 @@ from src.logging.boundary_ledger import (
 # ----- boundary identity -----
 
 def test_boundary_parts_floors_to_30min():
-    assert boundary_parts(datetime(2026, 5, 26, 15, 1, 12), False) == ("2026-05-26", "15:00")
-    assert boundary_parts(datetime(2026, 5, 26, 15, 29, 59), False) == ("2026-05-26", "15:00")
-    assert boundary_parts(datetime(2026, 5, 26, 15, 30, 0), False) == ("2026-05-26", "15:30")
-    assert boundary_parts(datetime(2026, 5, 26, 15, 45, 0), False) == ("2026-05-26", "15:30")
-    assert boundary_parts(datetime(2026, 5, 26, 9, 0, 5), False) == ("2026-05-26", "09:00")
-
-
-def test_boundary_parts_eod():
-    assert boundary_parts(datetime(2026, 5, 26, 16, 5, 0), True) == ("2026-05-26", "EOD")
+    assert boundary_parts(datetime(2026, 5, 26, 15, 1, 12)) == ("2026-05-26", "15:00")
+    assert boundary_parts(datetime(2026, 5, 26, 15, 29, 59)) == ("2026-05-26", "15:00")
+    assert boundary_parts(datetime(2026, 5, 26, 15, 30, 0)) == ("2026-05-26", "15:30")
+    assert boundary_parts(datetime(2026, 5, 26, 15, 45, 0)) == ("2026-05-26", "15:30")
+    assert boundary_parts(datetime(2026, 5, 26, 9, 0, 5)) == ("2026-05-26", "09:00")
 
 
 def test_jittered_starts_same_slot():
     """Two triggers a couple minutes apart for the same tick map to one key."""
-    a = boundary_parts(datetime(2026, 5, 26, 15, 0, 31), False)
-    b = boundary_parts(datetime(2026, 5, 26, 15, 6, 10), False)
+    a = boundary_parts(datetime(2026, 5, 26, 15, 0, 31))
+    b = boundary_parts(datetime(2026, 5, 26, 15, 6, 10))
     assert a == b == ("2026-05-26", "15:00")
 
 
-# ----- the four dry-run behaviours -----
+# ----- the dry-run behaviours -----
 
 def test_fresh_boundary_proceeds(tmp_path):
     led = tmp_path / "ledger.json"
@@ -60,15 +57,6 @@ def test_handled_boundary_no_ops(tmp_path):
     assert err is None
     assert is_boundary_handled(ledger, "2026-05-26", "15:00")      # -> duplicate no-ops
     assert not is_boundary_handled(ledger, "2026-05-26", "15:30")  # a new boundary still proceeds
-
-
-def test_eod_is_once_per_day(tmp_path):
-    """Double-EOD-fire: the second EOD run must no-op."""
-    led = tmp_path / "ledger.json"
-    mark_boundary_handled("2026-05-26", "EOD", path=led)
-    ledger, _ = load_ledger(led)
-    assert is_boundary_handled(ledger, "2026-05-26", "EOD")
-    assert not is_boundary_handled(ledger, "2026-05-27", "EOD")    # next day's EOD proceeds
 
 
 def test_corrupt_ledger_fails_open(tmp_path):

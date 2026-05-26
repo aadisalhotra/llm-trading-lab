@@ -119,13 +119,20 @@ the tail of a tick (it never blocks trading; the tick is already complete).
 ## Per-boundary idempotency — and the concurrency-group tripwire
 
 `src/logging/boundary_ledger.py` enforces exactly-once decision-making per
-30-minute tick (and once-per-day for EOD). The pipeline records each boundary in
+30-minute **intraday** tick. The pipeline records each boundary in
 `data/state/handled_boundaries.json` once its decisions are made, and checks that
 ledger before prompting any model, so a duplicate run for the same boundary
-(a Fix A dispatch retry, a manual force-run, a backup-cron double-fire, or a
-double EOD trigger) cleanly no-ops instead of double-trading. The ledger is
+(a Fix A dispatch retry, a manual force-run, a backup-cron double-fire, or
+multi-trigger redundancy) cleanly no-ops instead of double-trading. The ledger is
 committed in the same commit as the decision logs, so a boundary's marker exists
 iff its decisions were durably committed.
+
+The **EOD wrap-up is deliberately not guarded**: it executes no trades (the
+`is_eod` early-return in `run_one_model` does snapshot/report only), so it carries
+no double-trade risk and keeps its own per-day idempotency (`log_daily_snapshot`,
+the once-per-day digest) plus its intentional two-trigger redundancy (chain
+post-close handoff + the 21:00 UTC cron). Guarding it would needlessly neuter
+that redundancy.
 
 > ⚠️ **TRIPWIRE — do not remove the intraday concurrency group.** The guard is a
 > read-check-then-write and is race-free *only* because

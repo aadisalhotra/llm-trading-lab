@@ -1,16 +1,21 @@
 """Per-boundary idempotency ledger — exactly-once per intraday tick.
 
-A "decision boundary" is one 30-minute intraday tick (keyed by ET trading day +
-the :00/:30 slot it falls in) or the once-daily EOD wrap-up (slot "EOD"). The
-pipeline records each boundary here once its decisions are made, and checks the
-ledger BEFORE prompting any model, so a duplicate run for the same boundary
-cleanly no-ops instead of re-prompting the models and double-trading.
+A "decision boundary" is one 30-minute intraday tick, keyed by ET trading day +
+the :00/:30 slot it falls in. The pipeline records each boundary here once its
+decisions are made, and checks the ledger BEFORE prompting any model, so a
+duplicate run for the same boundary cleanly no-ops instead of re-prompting the
+models and double-trading.
+
+The EOD wrap-up is deliberately NOT guarded: it executes no trades (run_one_model
+has an is_eod early-return — snapshot/report only), so it carries no double-trade
+risk, and it keeps its own per-day idempotency (log_daily_snapshot date-dedup,
+once-per-day digest) plus its intentional two-trigger redundancy (chain post-close
+handoff + the 21:00 UTC cron). Guarding it here would needlessly neuter that
+redundancy.
 
 What this protects against: a Fix A dispatch retry, a manual force-run, a
-backup-cron double-fire, multi-trigger redundancy (Path 1/2), and the
-double-EOD-fire the workflow explicitly allows (chain post-close handoff + the
-21:00 UTC cron) — every one of which can otherwise land two runs on the same
-boundary and trade twice.
+backup-cron double-fire, and multi-trigger redundancy (Path 1/2) — any of which
+can otherwise land two runs on the same intraday boundary and trade twice.
 
 ================================ TRIPWIRE ====================================
 RACE-FREEDOM DEPENDS ON THE intraday-pipeline CONCURRENCY GROUP.
@@ -51,17 +56,17 @@ def _ledger_path(path: Path | None = None) -> Path:
     return path or (STATE_DIR / LEDGER_FILENAME)
 
 
-def boundary_parts(run_date: datetime, is_eod: bool) -> tuple[str, str]:
-    """(day, slot) identity for one tick. day = YYYY-MM-DD (ET); slot = "HH:MM" or "EOD".
+def boundary_parts(run_date: datetime) -> tuple[str, str]:
+    """(day, slot) identity for one intraday tick. day = YYYY-MM-DD (ET); slot = "HH:MM".
 
     `run_date` is the ET-localized run timestamp (datetime.now(EASTERN)). The
     slot floors the start time to the 30-minute boundary, so every trigger for
     the same tick (chain dispatch, backup cron, manual force, repository_dispatch)
     maps to the same key even with a minute or two of start-time jitter.
+
+    EOD is intentionally not keyed here — see the module docstring.
     """
     day = run_date.strftime("%Y-%m-%d")
-    if is_eod:
-        return day, "EOD"
     minute = 0 if run_date.minute < 30 else 30
     return day, f"{run_date.hour:02d}:{minute:02d}"
 
@@ -106,9 +111,9 @@ def mark_boundary_handled(
     """Record (day, slot) as handled and prune to the most recent `keep_days`.
 
     Best-effort: never raises. A failed write means a future duplicate run could
-    re-trade this boundary (same risk class as the partial-completion gap below),
-    so it is logged at ERROR — but it must not crash a tick whose decisions are
-    already made. Returns True on a successful write.
+    re-trade this boundary (same risk class as the partial-completion gap), so it
+    is logged at ERROR — but it must not crash a tick whose decisions are already
+    made. Returns True on a successful write.
 
     On a corrupt existing ledger this overwrites it with a fresh ledger
     containing at least this entry, self-healing the corruption. Past-day entries

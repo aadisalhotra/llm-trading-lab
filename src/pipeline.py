@@ -481,38 +481,45 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             logger.info("Market closed (or outside 09:30-16:00 ET) — skipping intraday tick (use --force-trade to override)")
             return 0
 
-    # --- Per-boundary idempotency guard --------------------------------------
-    # Exactly-once per 30-min tick (and once per day for EOD). Stops a duplicate
-    # run — a Fix A dispatch retry, a manual force-run, a backup-cron double-fire,
-    # multi-trigger redundancy, or a double EOD trigger — from re-prompting the
-    # models and double-trading the same boundary. Checked here, BEFORE the data
-    # fetch and the model loop, so a duplicate exits having done nothing.
+    # --- Per-boundary idempotency guard (intraday only) ----------------------
+    # Exactly-once per 30-min decision tick. Stops a duplicate intraday run — a
+    # Fix A dispatch retry, a manual force-run, a backup-cron double-fire, or
+    # multi-trigger redundancy — from re-prompting the models and double-trading
+    # the same boundary. Checked BEFORE the data fetch and the model loop, so a
+    # duplicate exits having done nothing.
+    #
+    # EOD is intentionally NOT guarded: it executes no trades (run_one_model's
+    # is_eod early-return is snapshot/report only), so it has no double-trade
+    # risk, and it keeps its own per-day idempotency (log_daily_snapshot, digest)
+    # plus its deliberate two-trigger redundancy (chain handoff + 21:00 cron).
     #
     # RACE-FREEDOM DEPENDS ON THE intraday-pipeline CONCURRENCY GROUP in
     # .github/workflows/intraday.yml (cancel-in-progress: false): it serializes
     # runs so each one checks out the prior run's committed ledger before it
     # starts. DO NOT remove that group without the atomic claim-commit hardening
     # (see src/logging/boundary_ledger.py + docs/MONITORING.md).
-    b_day, b_slot = boundary_parts(run_date, is_eod)
-    _ledger, _ledger_err = load_ledger()
-    if _ledger_err is not None:
-        # FAIL OPEN: a silently-halted pipeline is the exact failure class this
-        # workstream exists to kill, so a corrupt ledger must never block trading.
-        # But make it LOUD on real channels, not just a log line — CRITICAL email
-        # (deduped once/day) plus an external-watchdog /fail ping for an SMS/push.
-        logger.error("Idempotency ledger unreadable (%s) — proceeding WITHOUT "
-                     "duplicate protection for %s %s", _ledger_err, b_day, b_slot)
-        send_alert("CRITICAL", "Idempotency ledger unreadable",
-                   f"data/state/handled_boundaries.json could not be read "
-                   f"({_ledger_err}). Proceeding WITHOUT duplicate protection for "
-                   f"boundary {b_day} {b_slot}; a duplicate or concurrent run could "
-                   f"double-trade until this is fixed.",
-                   kind="idempotency_ledger", dedup_key="idempotency_ledger_unreadable")
-        send_heartbeat(success=False, settings=settings)
-    elif is_boundary_handled(_ledger, b_day, b_slot):
-        logger.info("Boundary %s %s already handled — skipping duplicate tick "
-                    "(no models prompted, no trades)", b_day, b_slot)
-        return 0
+    if not is_eod:
+        b_day, b_slot = boundary_parts(run_date)
+        _ledger, _ledger_err = load_ledger()
+        if _ledger_err is not None:
+            # FAIL OPEN: a silently-halted pipeline is the exact failure class
+            # this workstream exists to kill, so a corrupt ledger must never
+            # block trading. But make it LOUD on real channels, not just a log
+            # line — CRITICAL email (deduped once/day) plus an external-watchdog
+            # /fail ping for an SMS/push.
+            logger.error("Idempotency ledger unreadable (%s) — proceeding WITHOUT "
+                         "duplicate protection for %s %s", _ledger_err, b_day, b_slot)
+            send_alert("CRITICAL", "Idempotency ledger unreadable",
+                       f"data/state/handled_boundaries.json could not be read "
+                       f"({_ledger_err}). Proceeding WITHOUT duplicate protection for "
+                       f"boundary {b_day} {b_slot}; a duplicate or concurrent run could "
+                       f"double-trade until this is fixed.",
+                       kind="idempotency_ledger", dedup_key="idempotency_ledger_unreadable")
+            send_heartbeat(success=False, settings=settings)
+        elif is_boundary_handled(_ledger, b_day, b_slot):
+            logger.info("Boundary %s %s already handled — skipping duplicate tick "
+                        "(no models prompted, no trades)", b_day, b_slot)
+            return 0
 
     # Pull market data — intraday 30m bars by default, daily fallback at EOD
     # so the closing prices match what the daily analytics expect.
@@ -629,19 +636,21 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     logger.info("All %d models completed in %.2fs (parallel wall-clock)",
                 len(enabled_models), models_elapsed)
 
-    # Mark this boundary handled now that every model's decisions are made. The
-    # workflow commits this in the SAME commit as the decision logs + state
-    # files, so the marker exists iff the decisions were durably committed.
+    # Mark this intraday boundary handled now that every model's decisions are
+    # made. The workflow commits this in the SAME commit as the decision logs +
+    # state files, so the marker exists iff the decisions were durably committed.
+    # (EOD is not guarded — see the guard block above.)
     #
     # KNOWN LIMITATION (v1 — accepted for Phase A paper, NOT for Phase B):
-    # this marks at COMPLETION. A hard kill mid-loop (runner eviction / OOM)
-    # after some models have filled but before the commit leaves the boundary
-    # UNMARKED, so a retry re-prompts and RE-TRADES the models that already
-    # filled. That is a real-money double-trade risk in Phase B and is tracked
-    # as "per-model idempotency" on the pre-Phase-B list — DO NOT go live with
-    # real money without it. The fix is per-model marking (record each model's
-    # boundary right after it trades, so a retry skips the ones already done).
-    mark_boundary_handled(b_day, b_slot)
+    # marks at COMPLETION. A hard kill mid-loop (runner eviction / OOM) after
+    # some models have filled but before the commit leaves the boundary UNMARKED,
+    # so a retry re-prompts and RE-TRADES the models that already filled. That is
+    # a real-money double-trade risk in Phase B and is tracked as "per-model
+    # idempotency" on the pre-Phase-B list — DO NOT go live with real money
+    # without it. The fix is per-model marking (record each model right after it
+    # trades, so a retry skips the ones already done).
+    if not is_eod:
+        mark_boundary_handled(*boundary_parts(run_date))
 
     # Build dashboard payload (intraday + EOD both refresh this — the dashboard
     # is always live)
