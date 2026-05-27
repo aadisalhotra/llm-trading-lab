@@ -31,12 +31,13 @@
   },
   "daily": {
     "date": "2026-05-27",
-    "sent_count": 4,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "api_failure:gemini",
       "news:MA:305848c696",
-      "budget:critical"
+      "budget:critical",
+      "news:AAPL:38346d83a6"
     ],
     "overflow": [],
     "digest_sent": true,
@@ -67,6 +68,13 @@
         "severity": "CRITICAL",
         "title": "Monthly API budget exceeded",
         "timestamp": "2026-05-27T21:06:45.003444+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AAPL (held by 4)",
+        "timestamp": "2026-05-27T22:07:55.252966+00:00",
         "disposition": "sent"
       }
     ]
