@@ -30,166 +30,20 @@
     ]
   },
   "daily": {
-    "date": "2026-05-26",
-    "sent_count": 10,
+    "date": "2026-05-27",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "ath:gpt",
-      "ath:gemini",
-      "ath:grok",
-      "milestone:gemini:10",
-      "milestone:grok:15",
-      "news:MSFT:09100c99b5",
-      "news:CSCO:09100c99b5",
-      "news:GE:88ba709e8b",
-      "news:RTX:88ba709e8b",
-      "budget:critical"
+      "macro_event:Geopolitical shock"
     ],
-    "overflow": [
-      {
-        "kind": "budget",
-        "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "body": "One or more providers over their monthly cap (trading continues): openai: $20.55 / $20.00 (103% of cap, CRITICAL)",
-        "context": {
-          "budget": {
-            "providers": {
-              "anthropic": {
-                "spend_usd": 62.8819,
-                "cap_usd": 150.0,
-                "pct_of_cap": 0.4192,
-                "status": "ok",
-                "models": [
-                  "claude",
-                  "claude_opus"
-                ]
-              },
-              "openai": {
-                "spend_usd": 20.5514,
-                "cap_usd": 20.0,
-                "pct_of_cap": 1.0276,
-                "status": "critical",
-                "models": [
-                  "gpt"
-                ]
-              },
-              "google": {
-                "spend_usd": 3.8868,
-                "cap_usd": 10.0,
-                "pct_of_cap": 0.3887,
-                "status": "ok",
-                "models": [
-                  "gemini"
-                ]
-              },
-              "xai": {
-                "spend_usd": 10.5767,
-                "cap_usd": 15.0,
-                "pct_of_cap": 0.7051,
-                "status": "ok",
-                "models": [
-                  "grok"
-                ]
-              },
-              "deepseek": {
-                "spend_usd": 0.9656,
-                "cap_usd": 3.0,
-                "pct_of_cap": 0.3219,
-                "status": "ok",
-                "models": [
-                  "deepseek"
-                ]
-              }
-            },
-            "any_warn": false,
-            "any_critical": true,
-            "month_start": "2026-05-01T00:00:00+00:00",
-            "warn_threshold_pct": 0.8,
-            "critical_threshold_pct": 1.0
-          }
-        },
-        "fired_at_et": "2026-05-26 17:06 ET",
-        "timestamp": "2026-05-26T21:06:45.211497+00:00"
-      }
-    ],
-    "digest_sent": true,
+    "overflow": [],
+    "digest_sent": false,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
-        "timestamp": "2026-05-26T17:34:45.194577+00:00",
+        "timestamp": "2026-05-27T16:03:40.149334+00:00",
         "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "GPT-5.4 hit a new all-time high",
-        "timestamp": "2026-05-26T21:06:38.900773+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro hit a new all-time high",
-        "timestamp": "2026-05-26T21:06:39.612793+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
-        "timestamp": "2026-05-26T21:06:40.068006+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro crossed +10%",
-        "timestamp": "2026-05-26T21:06:40.601512+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "milestone",
-        "severity": "INFO",
-        "title": "Grok 4.20 (Reasoning) crossed +15%",
-        "timestamp": "2026-05-26T21:06:41.172793+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on MSFT (held by 4)",
-        "timestamp": "2026-05-26T21:06:41.751613+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on CSCO (held by 4)",
-        "timestamp": "2026-05-26T21:06:42.341793+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on GE (held by 6)",
-        "timestamp": "2026-05-26T21:06:42.837858+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on RTX (held by 4)",
-        "timestamp": "2026-05-26T21:06:43.422585+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "budget",
-        "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "timestamp": "2026-05-26T21:06:45.211497+00:00",
-        "disposition": "overflow"
       }
     ]
   }
