@@ -29,10 +29,6 @@ on:
         description: "Bypass market-open check"
         required: false
         default: "false"
-      simulate_dispatch_failure:
-        description: "TEST ONLY — force the chain's next-tick dispatch to fail, to verify loud failure + notify-failure. Leave false for real runs."
-        required: false
-        default: "false"
   # External kick from cron-job.org (or any other cron-as-a-service).
   # POST to /repos/{owner}/{repo}/dispatches with
   #   {"event_type": "market-open-kick"}
@@ -160,23 +156,10 @@ jobs:
       - name: Chain next tick (intraday or EOD)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # TEST-ONLY fault injection (manual workflow_dispatch input). Empty/false
-          # for every real trigger; when "true" the dispatch is aimed at a
-          # nonexistent workflow so it 404s, exercising the loud-failure path.
-          SIMULATE_FAIL: ${{ github.event.inputs.simulate_dispatch_failure }}
         run: |
           set -e
 
           API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-
-          # Dispatch target. Overridden to a nonexistent workflow ONLY when the
-          # manual simulate_dispatch_failure input is set, so a dry-run can force
-          # the dispatch to fail and verify the loud-failure path end-to-end.
-          WF_FILE="intraday.yml"
-          if [ "${SIMULATE_FAIL}" = "true" ]; then
-            WF_FILE="__simulate_dispatch_failure__.yml"
-            echo "::warning::simulate_dispatch_failure=true — dispatching against ${WF_FILE} to force a failure (dry-run only)"
-          fi
 
           # jq is preinstalled on ubuntu-latest; guard anyway so a future image
           # change degrades to "skip verify" rather than failing every dispatch.
@@ -203,7 +186,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "${API}/actions/workflows/${WF_FILE}/dispatches" \
+              "${API}/actions/workflows/intraday.yml/dispatches" \
               -d "$payload") || code="000"
             echo "$code"
           }
