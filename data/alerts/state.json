@@ -31,18 +31,50 @@
   },
   "daily": {
     "date": "2026-05-29",
-    "sent_count": 1,
+    "sent_count": 5,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:gpt",
+      "ath:grok",
+      "news:GE:5527496d1f",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-05-29T15:02:59.201344+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "GPT-5.4 hit a new all-time high",
+        "timestamp": "2026-05-29T21:07:13.785896+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-05-29T21:07:14.819511+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on GE (held by 6)",
+        "timestamp": "2026-05-29T21:07:15.732119+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-05-29T21:07:18.614359+00:00",
         "disposition": "sent"
       }
     ]
