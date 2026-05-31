@@ -438,6 +438,59 @@ _LAST_ACTION_INSTRUCTION = (
     "that ticker and may act freely."
 )
 
+# v2 output-format JSON contract. The v2 prompt template (prompts/v2.txt) describes
+# the required output in prose ("Trades — a list ... size ... confidence
+# justification ..."), but the pipeline parser (BaseAdapter._parse_response) keys off
+# exact field names it inherited from v1 — `decisions`, `target_weight`,
+# `overall_reasoning`, etc. This appendix is the bridge: it pins the v2 prose to those
+# exact keys so every model emits parseable JSON, and names the four v2-new fields
+# plus position_reviews so they survive normalization instead of being dropped. It is
+# pure serialization — it adds no trading guidance beyond what v2.txt already states.
+# Appended to the system prompt for v2+ only (v1 keeps its own in-template schema),
+# mirroring how _LAST_ACTION_INSTRUCTION is appended to the user prompt for v2+.
+V2_OUTPUT_SCHEMA = """# Output format — JSON schema (authoritative field names)
+
+Return ONLY a single JSON object — no prose before or after, no markdown code
+fences. Use exactly these field names; they are the keys the pipeline parses.
+
+{
+  "overall_reasoning": "<your overall reasoning / market read for this decision period>",
+  "cash_rationale": "<why your current cash level is a deliberate choice; required when cash is near zero or unusually high, otherwise null>",
+  "position_reviews": [
+    {
+      "ticker": "<symbol>",
+      "thesis_status": "intact" | "weakened" | "invalidated",
+      "implication": "<what that status implies for the position>"
+    }
+  ],
+  "decisions": [
+    {
+      "action": "BUY" | "SELL" | "HOLD",
+      "ticker": "<symbol from the universe>",
+      "target_weight": <float 0.0-0.20: the position's desired final share of portfolio value after this trade; this is the trade "size">,
+      "confidence": <integer 1-10, per the confidence anchors above>,
+      "summary": "<one sentence, plain English; surfaced directly on the dashboard>",
+      "reasoning": "<the deeper rationale: signals, drivers, sizing logic>",
+      "confidence_justification": "<maps the score to its anchor band; if confidence >= 8, names the specific driver>",
+      "why_now": "<why acting this period is preferable to waiting>",
+      "reversal_justification": "<required only if this trade reverses your most recent action on this ticker; otherwise null>"
+    }
+  ],
+  "no_trade_reason": "<if you make no trades this period, state why here; otherwise null>"
+}
+
+Notes:
+- `decisions` is the list of trades described above. An empty list (or all HOLDs) is
+  a valid response; if it is empty, set `no_trade_reason`.
+- `target_weight` is the trade size. For a SELL use 0 for a full exit or a smaller
+  weight for a partial trim; for HOLD it is ignored but include the field.
+- `position_reviews` must contain one entry for every open position currently down
+  5% or more from entry (per "Reviewing losing positions" above); otherwise an empty list.
+- `summary` is required on every decision, including HOLDs.
+- `confidence_justification` and `why_now` are required on every BUY and SELL.
+- Use null for `cash_rationale`, `reversal_justification`, and `no_trade_reason`
+  when they do not apply."""
+
 
 def _format_recent_decisions_block(recent: list[dict[str, Any]] | None) -> str:
     """Render the model's own last N executed BUY/SELL decisions.
@@ -497,7 +550,8 @@ def build_prompts(
 ) -> tuple[str, str, str, list[bytes]]:
     """Build (system_prompt, user_prompt, prompt_version, images).
 
-    The system prompt is the raw template — identical across all models and runs.
+    The system prompt is the prompt template (for v2+, with the authoritative
+    JSON output schema appended) — identical across all models and runs.
     The user prompt is the per-run text context (universe, market data, portfolio,
     news headlines + sentiment).
     The images list contains a single composite candlestick PNG of the universe
@@ -507,6 +561,12 @@ def build_prompts(
     universe = load_universe()
     version = settings["prompt_version"]
     system_prompt = load_prompt_template(version)
+    # v2+ describes its output in prose, so the pipeline appends the authoritative
+    # JSON field-name contract (V2_OUTPUT_SCHEMA) here — same key names the parser
+    # already depends on. v1's template carries its own schema, so it is untouched.
+    # Identical across every model and run (the appendix is the same for all).
+    if _prompt_major_version(version) >= 2:
+        system_prompt = f"{system_prompt}\n\n{V2_OUTPUT_SCHEMA}"
     max_trades = int(settings["portfolio_rules"]["max_trades_per_day"])
     universe_syms = [t["symbol"] for t in universe["tickers"]]
 

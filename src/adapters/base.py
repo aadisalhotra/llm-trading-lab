@@ -96,13 +96,32 @@ def repair_json(text: str) -> str:
     return text
 
 
+def _str_or_none(value: Any) -> str | None:
+    """Coerce a value to a stripped string, or None when missing/blank.
+
+    Used for the v2 nullable reasoning fields (`cash_rationale`,
+    `reversal_justification`, `no_trade_reason`): a model that omits the field,
+    sends JSON null, or sends an empty string all collapse to None so downstream
+    "field present?" checks are unambiguous.
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
 @dataclass
 class DecisionResult:
     """Parsed decision returned by a model.
 
-    `decisions` is a list of {action, ticker, target_weight, confidence, reasoning}
-    objects exactly as the model produced them, with light validation/coercion.
+    `decisions` is a list of {action, ticker, target_weight, confidence, summary,
+    reasoning, confidence_justification, why_now, reversal_justification} objects
+    exactly as the model produced them, with light validation/coercion.
     `raw_response` is preserved for debugging and decision logging.
+
+    The v2 prompt adds three period-level reasoning fields alongside
+    `overall_reasoning`: `cash_rationale`, `position_reviews`, and
+    `no_trade_reason`. They are None/[] under v1 (the model never emits them).
     """
     provider: str
     model_id_configured: str
@@ -114,6 +133,10 @@ class DecisionResult:
     success: bool
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    # v2 period-level reasoning fields (additive; None/[] under v1).
+    cash_rationale: str | None = None
+    position_reviews: list[dict[str, Any]] = field(default_factory=list)
+    no_trade_reason: str | None = None
 
 
 class BaseAdapter(ABC):
@@ -270,6 +293,9 @@ class BaseAdapter(ABC):
                 latency_seconds=latency,
                 success=True,
                 metadata={**last_metadata, "attempt": attempt},
+                cash_rationale=parsed.get("cash_rationale"),
+                position_reviews=parsed.get("position_reviews", []),
+                no_trade_reason=parsed.get("no_trade_reason"),
             )
 
         # Defensive fallthrough — the loop always returns above.
@@ -366,9 +392,35 @@ class BaseAdapter(ABC):
                 "confidence": confidence,
                 "summary": summary,
                 "reasoning": str(d.get("reasoning", "")).strip(),
+                # v2 per-trade reasoning fields. Default blank/None so a v1-shaped
+                # decision (or a model that omits them) still normalizes cleanly.
+                "confidence_justification": str(d.get("confidence_justification", "")).strip(),
+                "why_now": str(d.get("why_now", "")).strip(),
+                "reversal_justification": _str_or_none(d.get("reversal_justification")),
             })
+
+        # v2 period-level position reviews — one per open position down >=5%.
+        # Normalize ticker/status casing; keep any entry that names a ticker.
+        position_reviews: list[dict[str, Any]] = []
+        raw_reviews = data.get("position_reviews")
+        if isinstance(raw_reviews, list):
+            for r in raw_reviews:
+                if not isinstance(r, dict):
+                    continue
+                rt = str(r.get("ticker", "")).upper().strip()
+                if not rt:
+                    continue
+                position_reviews.append({
+                    "ticker": rt,
+                    "thesis_status": str(r.get("thesis_status", "")).strip().lower(),
+                    "implication": str(r.get("implication", "")).strip(),
+                })
 
         return {
             "decisions": normalized,
             "overall_reasoning": str(data.get("overall_reasoning", "")).strip(),
+            # v2 period-level reasoning fields (absent under v1 -> None/[]).
+            "cash_rationale": _str_or_none(data.get("cash_rationale")),
+            "position_reviews": position_reviews,
+            "no_trade_reason": _str_or_none(data.get("no_trade_reason")),
         }

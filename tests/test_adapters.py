@@ -1,6 +1,7 @@
 """Adapter tests — focused on the JSON parser. No network calls."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -147,3 +148,126 @@ def test_generate_decision_retries_on_missing_decisions_field(no_retry_sleep):
     assert result.success is True
     assert result.metadata["attempt"] == 2
     assert adapter.call_count == 2
+
+
+# --- v2 schema fields ------------------------------------------------------
+#
+# v2 adds period-level reasoning fields (cash_rationale, position_reviews,
+# no_trade_reason) and per-trade reasoning fields (confidence_justification,
+# why_now, reversal_justification) to the parser WITHOUT renaming any v1 field.
+# These pin that the new fields are captured, normalized, and surfaced on
+# DecisionResult — and that v1-shaped JSON still parses with them defaulted.
+
+
+def test_parse_v2_full_decision_captures_new_fields():
+    raw = json.dumps({
+        "overall_reasoning": "Risk-on tape.",
+        "cash_rationale": "Holding 8% dry powder for pending catalysts.",
+        "position_reviews": [
+            {"ticker": "nvda", "thesis_status": "Weakened", "implication": "Trim if it loses the 100d."}
+        ],
+        "decisions": [
+            {
+                "action": "buy", "ticker": "aapl", "target_weight": 0.1, "confidence": 8,
+                "summary": "Adding AAPL on the breakout.",
+                "reasoning": "Volume-confirmed.",
+                "confidence_justification": "Strong band: the earnings beat is the named driver.",
+                "why_now": "The gap-up confirms today, not later.",
+                "reversal_justification": None,
+            }
+        ],
+        "no_trade_reason": None,
+    })
+    out = BaseAdapter._parse_response(raw)
+    assert out["cash_rationale"].startswith("Holding 8%")
+    assert out["no_trade_reason"] is None
+    assert out["position_reviews"] == [
+        {"ticker": "NVDA", "thesis_status": "weakened", "implication": "Trim if it loses the 100d."}
+    ]
+    d = out["decisions"][0]
+    assert d["ticker"] == "AAPL"
+    assert d["confidence_justification"].startswith("Strong band")
+    assert d["why_now"].startswith("The gap-up")
+    assert d["reversal_justification"] is None
+
+
+def test_parse_v2_reversal_justification_captured():
+    raw = json.dumps({
+        "overall_reasoning": "Defensive.",
+        "decisions": [
+            {"action": "sell", "ticker": "TSLA", "target_weight": 0.0, "confidence": 7,
+             "summary": "Exiting TSLA.", "reasoning": "Thesis broke.",
+             "confidence_justification": "Strong: the guidance cut is the driver.",
+             "why_now": "Act before the close.",
+             "reversal_justification": "Bought 2 days ago; the guidance cut is new since then."},
+        ],
+    })
+    out = BaseAdapter._parse_response(raw)
+    d = out["decisions"][0]
+    assert d["reversal_justification"].startswith("Bought 2 days ago")
+    # absent top-level v2 fields default cleanly
+    assert out["cash_rationale"] is None
+    assert out["position_reviews"] == []
+    assert out["no_trade_reason"] is None
+
+
+def test_parse_v1_shaped_still_parses_with_defaulted_v2_fields():
+    # A v1-era response (no v2 fields at all) must still parse; the new fields
+    # default to None/[]/"" so v1 history and any v1 retry remain valid.
+    raw = '{"overall_reasoning": "x", "decisions": [{"action": "BUY", "ticker": "MSFT", "target_weight": 0.05, "confidence": 6, "reasoning": "ok"}]}'
+    out = BaseAdapter._parse_response(raw)
+    assert out["cash_rationale"] is None
+    assert out["no_trade_reason"] is None
+    assert out["position_reviews"] == []
+    d = out["decisions"][0]
+    assert d["confidence_justification"] == ""
+    assert d["why_now"] == ""
+    assert d["reversal_justification"] is None
+
+
+def test_parse_v2_blank_nullables_collapse_to_none():
+    raw = json.dumps({
+        "overall_reasoning": "x",
+        "cash_rationale": "   ",
+        "no_trade_reason": "",
+        "decisions": [],
+    })
+    out = BaseAdapter._parse_response(raw)
+    assert out["cash_rationale"] is None
+    assert out["no_trade_reason"] is None
+
+
+def test_parse_v2_position_reviews_skips_malformed_entries():
+    raw = json.dumps({
+        "overall_reasoning": "x",
+        "position_reviews": [
+            {"ticker": "AAPL", "thesis_status": "intact", "implication": "hold"},
+            {"thesis_status": "weakened"},   # no ticker -> dropped
+            "not a dict",                      # dropped
+        ],
+        "decisions": [],
+    })
+    out = BaseAdapter._parse_response(raw)
+    assert out["position_reviews"] == [
+        {"ticker": "AAPL", "thesis_status": "intact", "implication": "hold"}
+    ]
+
+
+def test_generate_decision_surfaces_v2_fields_on_result(no_retry_sleep):
+    payload = json.dumps({
+        "overall_reasoning": "ok",
+        "cash_rationale": "Deliberately ~100% deployed; opportunity set is rich.",
+        "position_reviews": [{"ticker": "AMD", "thesis_status": "invalidated", "implication": "Exit in full."}],
+        "decisions": [{"action": "HOLD", "ticker": "AAPL", "target_weight": 0, "confidence": 5,
+                       "summary": "Hold AAPL.", "reasoning": "wait",
+                       "confidence_justification": "Moderate band — mixed signals.",
+                       "why_now": "No edge to act on now.", "reversal_justification": None}],
+        "no_trade_reason": None,
+    })
+    adapter = _StubAdapter([payload])
+    result = adapter.generate_decision("sys", "user")
+    assert result.success is True
+    assert result.cash_rationale.startswith("Deliberately")
+    assert result.position_reviews[0]["thesis_status"] == "invalidated"
+    assert result.no_trade_reason is None
+    assert result.decisions[0]["why_now"] == "No edge to act on now."

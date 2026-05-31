@@ -84,6 +84,14 @@ def log_decision_run(
         "news_headlines_hash": news_headlines_hash,
         "news_sentiment": news_sentiment or {},
         "overall_reasoning": decision_result.overall_reasoning,
+        # v2 period-level reasoning fields. None/[] under v1 (the model never emits
+        # them); the prompt_version stamp above is the authoritative v1/v2 boundary.
+        # The three v2-new per-trade fields (confidence_justification, why_now,
+        # reversal_justification on each decision) persist inside raw_decisions /
+        # accepted_decisions below.
+        "cash_rationale": getattr(decision_result, "cash_rationale", None),
+        "position_reviews": getattr(decision_result, "position_reviews", None) or [],
+        "no_trade_reason": getattr(decision_result, "no_trade_reason", None),
         "raw_decisions": decision_result.decisions,
         "accepted_decisions": accepted_decisions,
         "violations": [
