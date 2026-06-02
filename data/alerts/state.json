@@ -32,9 +32,11 @@
   },
   "daily": {
     "date": "2026-06-02",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "macro_event:Systemic event",
+      "api_failure:gemini"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -44,6 +46,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-06-02T13:35:49.464851+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-06-02T14:04:41.270898+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model gemini failed",
+        "timestamp": "2026-06-02T14:06:55.377812+00:00",
         "disposition": "sent"
       }
     ]
