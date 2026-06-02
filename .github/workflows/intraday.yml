@@ -126,16 +126,30 @@ jobs:
         run: |
           git config user.name "llm-trading-lab-bot"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
           git add data/ logs/ reports/daily/ docs/MODEL_CHANGELOG.md || true
           if git diff --cached --quiet; then
             echo "No data changes to commit"
-          else
-            MODE="${{ steps.mode.outputs.mode }}"
-            git commit -m "${MODE} tick $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git pull --rebase origin main
-            git push
+            exit 0
           fi
+          MODE="${{ steps.mode.outputs.mode }}"
+          git commit -m "${MODE} tick $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Push with rebase-and-retry. A benign concurrent commit (the
+          # competitor-monitor job, keepalive, a human push) or a transient
+          # network blip must NOT fail the tick AND break the self-chain.
+          # Retry up to 5x, rebasing onto the latest remote each attempt.
+          # We never force-push: a genuine rebase conflict fails loud so
+          # notify-failure fires, rather than clobbering the other commit.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              echo "Pushed ${MODE} tick [attempt ${attempt}]"
+              exit 0
+            fi
+            echo "::warning::push attempt ${attempt}/5 failed — aborting any partial rebase and retrying"
+            git rebase --abort 2>/dev/null || true
+            sleep $(( attempt * 5 ))
+          done
+          echo "::error::Could not push tick data after 5 attempts — failing loud so notify-failure fires."
+          exit 1
 
   # Self-perpetuating chain. After each successful intraday tick:
   #   * If still inside market hours (< 20:00 UTC), sleep to the next

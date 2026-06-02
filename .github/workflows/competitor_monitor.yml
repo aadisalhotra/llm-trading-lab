@@ -51,12 +51,23 @@ jobs:
         run: |
           git config user.name "llm-trading-lab-bot"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
           git add reports/competitor_digest_*.md || true
           if git diff --cached --quiet; then
             echo "No digest changes to commit"
-          else
-            git commit -m "competitor digest $(date -u +%Y-%m-%d)"
-            git pull --rebase origin main
-            git push
+            exit 0
           fi
+          git commit -m "competitor digest $(date -u +%Y-%m-%d)"
+          # Rebase-and-retry push (same rationale as intraday.yml): tolerate a
+          # benign concurrent commit or a transient blip without failing the
+          # weekly scan. Never force-push.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              echo "Pushed competitor digest [attempt ${attempt}]"
+              exit 0
+            fi
+            echo "::warning::push attempt ${attempt}/5 failed — aborting any partial rebase and retrying"
+            git rebase --abort 2>/dev/null || true
+            sleep $(( attempt * 5 ))
+          done
+          echo "::error::Could not push competitor digest after 5 attempts."
+          exit 1
