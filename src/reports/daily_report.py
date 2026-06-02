@@ -23,12 +23,13 @@ import pandas as pd
 
 from ..analytics import (
     build_leaderboard,
+    canonical_perf_frame,
+    canonical_spy_return,
     compute_api_cost_summary,
     compute_api_cost_summary_window,
     compute_budget_status,
     compute_metrics,
     compute_spy_benchmark_metrics,
-    load_performance_history,
 )
 from ..config_loader import (
     INTRADAY_DIR,
@@ -48,6 +49,19 @@ logger = logging.getLogger("llmlab.reports")
 DAILY_REPORTS_DIR = REPORTS_DIR / "daily"
 LATENCY_WARN_THRESHOLD = 60.0  # seconds — flag in health section if exceeded
 ERROR_MSG_TRUNCATE = 180        # max chars of error text rendered in the report
+
+# Standing data-integrity disclosure. Claude Opus 4.6's 2026-04-10 → 2026-04-21
+# perf rows reflect the state-file commingling incident (a routing bug saved
+# Opus's portfolio to Sonnet's state file for twelve days; fixed in commit
+# cacd8058, with the frozen/mirrored days deliberately left in the logs as a
+# historical record). Inception-anchored cumulative figures for Opus therefore
+# embed that window — flag it wherever Opus's cumulative return is shown.
+OPUS_COMMINGLING_NOTE = (
+    "_Data integrity: Claude Opus 4.6's 2026-04-10 → 2026-04-21 perf rows reflect "
+    "the state-file commingling incident (fixed in cacd8058; frozen/mirrored days "
+    "retained as a historical record). Opus's inception-anchored cumulative return "
+    "embeds that window and is not strictly comparable over the full history._"
+)
 
 
 # ===========================================================================
@@ -237,8 +251,12 @@ def _read_intraday_curve(model_key: str, run_date: datetime) -> list[dict[str, A
 
 
 def _daily_pnl(model_key: str) -> tuple[float | None, float | None]:
-    """Returns (daily_pnl_dollars, daily_pnl_pct) using the last two perf rows."""
-    df = load_performance_history(model_key)
+    """Returns (daily_pnl_dollars, daily_pnl_pct) using the last two EOD rows.
+
+    Uses the canonical (deduped, inception-sliced) frame so the two rows are
+    consecutive trading dates, not duplicate same-date snapshots.
+    """
+    df = canonical_perf_frame(model_key)
     if df.empty:
         return None, None
     if len(df) == 1:
@@ -418,14 +436,16 @@ def _build_performance_table(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Returns (markdown_table, rows_data_for_reuse)."""
     rows_data: list[dict[str, Any]] = []
+    # Same canonical SPY return + compute_metrics the leaderboard uses, so the
+    # performance table's Cum. Return and Alpha match the leaderboard exactly
+    # and alpha == cum_return − SPY_return reconciles for every model.
+    spy_return = canonical_spy_return(settings)
     for key in model_keys:
-        df = load_performance_history(key)
-        if df.empty:
+        m = compute_metrics(key, settings=settings, spy_return=spy_return)
+        if m["days"] == 0:
             continue
-        today_val = float(df["total_value"].iloc[-1])
-        cash_pct = float(df["cash_pct"].iloc[-1])
-        cum_ret = float(df["cumulative_return"].iloc[-1])
-        daily_pnl, daily_pct = _daily_pnl(key)
+        # Daily P&L in dollars; the % comes from the same canonical metrics.
+        daily_pnl, _ = _daily_pnl(key)
 
         # Total trades today across ALL intraday ticks (not just the last one)
         records = _read_today_trade_records(key, run_date)
@@ -437,23 +457,16 @@ def _build_performance_table(
         # Keep `record` pointing at the most recent tick for api_success display
         record = records[-1] if records else None
 
-        # Alpha vs SPY for the run
-        alpha = None
-        if "benchmark_value" in df.columns and df["benchmark_value"].notna().sum() >= 2:
-            bench = df["benchmark_value"].dropna().astype(float).values
-            if len(bench) >= 2 and bench[0] > 0:
-                alpha = cum_ret - (bench[-1] / bench[0] - 1.0)
-
         api_success = bool(record.get("api_success", True)) if record else False
         rows_data.append({
             "model_key": key,
-            "value": today_val,
+            "value": m["current_value"],
             "daily_pnl": daily_pnl,
-            "daily_pct": daily_pct,
-            "cum_return": cum_ret,
-            "alpha": alpha,
+            "daily_pct": m["daily_pnl_pct"],
+            "cum_return": m["cumulative_return"],
+            "alpha": m["alpha_vs_spy"],
             "trades": n_trades,
-            "cash_pct": cash_pct,
+            "cash_pct": m["current_cash_pct"],
             "api_success": api_success,
         })
 
@@ -963,6 +976,7 @@ def _build_expansion_cohort_section(
             f"{table}"
         )
 
+    sections.append(OPUS_COMMINGLING_NOTE)
     return "\n\n".join(sections)
 
 
@@ -1045,10 +1059,20 @@ def _build_leaderboard_table(
     model_keys: list[str],
     run_date: datetime,
 ) -> str:
-    leaderboard = build_leaderboard(model_keys)
-    prev_ranks = _previous_leaderboard(run_date) or {}
     settings = load_settings()
+    leaderboard = build_leaderboard(model_keys, settings)
+    prev_ranks = _previous_leaderboard(run_date) or {}
     models_cfg = settings.get("models", {})
+
+    # Common window = the most distinct trading dates any model has on the
+    # canonical basis. Post-fix every model equals this; a short-history model
+    # (e.g. added mid-experiment) renders as "N/W" so it's visibly flagged
+    # rather than silently mixed onto a shorter window.
+    common_window = max((r.get("days", 0) for r in leaderboard), default=0)
+
+    def _days_cell(days: int) -> str:
+        days = int(days or 0)
+        return str(days) if days >= common_window else f"{days}/{common_window}"
 
     headers = ["#", "Δ", "Model", "Cohort", "Cum. Return", "Daily P&L", "Sharpe (30d)", "Max DD", "Win Rate", "Days"]
     rows: list[list[str]] = []
@@ -1081,7 +1105,7 @@ def _build_leaderboard_table(
             _num(row["sharpe_30d"]) if row.get("sharpe_30d") is not None else "—",
             _pct(row["max_drawdown"]) if row.get("max_drawdown") is not None else "—",
             _pct(row.get("win_rate"), sign=False) if row.get("win_rate") is not None else "—",
-            str(row.get("days", 0)),
+            _days_cell(row.get("days", 0)),
         ])
 
     # Append the SPY buy-and-hold benchmark as a non-competing reference row
@@ -1091,7 +1115,7 @@ def _build_leaderboard_table(
     starting_capital = float(settings.get("starting_capital", {}).get(
         settings.get("mode", "paper"), 100_000.0
     ))
-    spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital)
+    spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital, settings=settings)
     if spy_metrics is not None:
         rows.append([
             "—",
@@ -1103,10 +1127,13 @@ def _build_leaderboard_table(
             _num(spy_metrics["sharpe_30d"]) if spy_metrics.get("sharpe_30d") is not None else "—",
             _pct(spy_metrics["max_drawdown"]) if spy_metrics.get("max_drawdown") is not None else "—",
             _pct(spy_metrics.get("win_rate"), sign=False) if spy_metrics.get("win_rate") is not None else "—",
-            str(spy_metrics.get("days", 0)),
+            _days_cell(spy_metrics.get("days", 0)),
         ])
 
-    return _format_table(headers, rows, aligns=["R", "C", "L", "C", "R", "R", "R", "R", "R", "R"])
+    table = _format_table(headers, rows, aligns=["R", "C", "L", "C", "R", "R", "R", "R", "R", "R"])
+    if "claude_opus" in model_keys:
+        table = f"{table}\n\n{OPUS_COMMINGLING_NOTE}"
+    return table
 
 
 # ===========================================================================

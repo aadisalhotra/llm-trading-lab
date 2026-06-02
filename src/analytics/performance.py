@@ -36,18 +36,134 @@ def load_performance_history(model_key: str) -> pd.DataFrame:
     return df
 
 
-def compute_metrics(model_key: str) -> dict[str, Any]:
+# ===========================================================================
+# CANONICAL DISPLAY BASIS
+#
+# Every display metric (leaderboard, performance table, SPY row, expansion
+# cohort) is computed from ONE consistent basis so models never get silently
+# mixed across windows:
+#   * one EOD row per trading date (dedupe — the launch/intraday-refactor
+#     window double-wrote some dates; mirrors research_metrics._model_daily_returns)
+#   * sliced to >= the configured inception (drops the pre-inception 2026-04-08
+#     shakedown rows five models carry) — from the COMPUTATION only; the raw
+#     perf logs on disk are never modified
+#   * cumulative return anchored to the initial deployed capital from config
+#     (the clean $100k), identically in every consumer
+#   * alpha benchmarked against the single canonical SPY series shared by all
+#     models, not each model's own benchmark_value column / own anchor
+# ===========================================================================
+
+_UNSET = object()  # sentinel so compute_metrics can tell "compute SPY" from "SPY is None"
+
+
+def _starting_capital(settings: dict[str, Any] | None = None) -> float:
+    """Initial deployed capital per model from config — the clean anchor for
+    cumulative return. Mode-aware (paper vs live)."""
+    settings = settings or load_settings()
+    caps = settings.get("starting_capital", {}) or {}
+    return float(caps.get(settings.get("mode", "paper"), 100_000.0))
+
+
+def _experiment_inception(settings: dict[str, Any] | None = None) -> str | None:
+    """Canonical experiment start date (YYYY-MM-DD) from config, or None."""
+    settings = settings or load_settings()
+    return settings.get("experiment_start_date")
+
+
+def canonical_perf_frame(
+    model_key: str, settings: dict[str, Any] | None = None
+) -> pd.DataFrame:
+    """A model's perf history collapsed to one EOD row per trading date and
+    sliced to >= the canonical inception.
+
+    The single basis every display metric is computed from. The dedupe mirrors
+    ``research_metrics._model_daily_returns`` (groupby date, keep the last EOD
+    snapshot); the inception slice drops pre-inception rows (e.g. the 2026-04-08
+    launch-day shakedown rows) from the COMPUTATION only — the raw logs are
+    never touched.
+    """
     df = load_performance_history(model_key)
-    if df.empty or len(df) < 2:
-        last_api_success = True
-        if not df.empty and "api_success" in df.columns:
-            v = df["api_success"].iloc[-1]
+    if df.empty:
+        return df
+    df = df.copy()
+    df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
+    df = df.groupby("date_str", sort=True).last().reset_index()
+    inception = _experiment_inception(settings)
+    if inception:
+        df = df[df["date_str"] >= inception].reset_index(drop=True)
+    return df
+
+
+def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame | None:
+    """One SPY EOD price series for the whole experiment (deduped, inception-sliced).
+
+    Every model logs the same benchmark (SPY) price per tick, so we union all
+    models' ``benchmark_value`` observations, keep one per date, and slice to
+    >= inception. Returns a DataFrame[date_str, benchmark_value] sorted by date,
+    or None if no benchmark data exists yet.
+    """
+    if not PERFORMANCE_DIR.exists():
+        return None
+    frames = []
+    for fp in PERFORMANCE_DIR.glob("*.jsonl"):
+        df = load_performance_history(fp.stem)
+        if df.empty or "benchmark_value" not in df.columns:
+            continue
+        sub = df[["date", "benchmark_value"]].dropna()
+        if not sub.empty:
+            frames.append(sub)
+    if not frames:
+        return None
+    allrows = pd.concat(frames, ignore_index=True)
+    allrows["date_str"] = allrows["date"].dt.strftime("%Y-%m-%d")
+    allrows = allrows.sort_values("date").groupby("date_str", sort=True).last().reset_index()
+    inception = _experiment_inception(settings)
+    if inception:
+        allrows = allrows[allrows["date_str"] >= inception].reset_index(drop=True)
+    if len(allrows) < 1:
+        return None
+    return allrows[["date_str", "benchmark_value"]]
+
+
+def canonical_spy_return(settings: dict[str, Any] | None = None) -> float | None:
+    """SPY buy-and-hold return over the canonical inception-anchored window —
+    the single SPY return every model's alpha is benchmarked against."""
+    spy = canonical_spy_series(settings)
+    if spy is None or len(spy) < 2:
+        return None
+    vals = spy["benchmark_value"].astype(float).values
+    if vals[0] <= 0:
+        return None
+    return float(vals[-1] / vals[0] - 1.0)
+
+
+def compute_metrics(
+    model_key: str,
+    settings: dict[str, Any] | None = None,
+    spy_return: Any = _UNSET,
+) -> dict[str, Any]:
+    settings = settings or load_settings()
+    starting_capital = _starting_capital(settings)
+    if spy_return is _UNSET:
+        spy_return = canonical_spy_return(settings)
+
+    # Canonical basis: one EOD row per date, sliced to >= inception.
+    df = canonical_perf_frame(model_key, settings)
+
+    def _last_api_success(frame: pd.DataFrame) -> bool:
+        if not frame.empty and "api_success" in frame.columns:
+            v = frame["api_success"].iloc[-1]
             if v is not None and not pd.isna(v):
-                last_api_success = bool(v)
+                return bool(v)
+        return True
+
+    if df.empty or len(df) < 2:
+        cur = float(df["total_value"].iloc[-1]) if not df.empty else 0.0
+        cum = (cur / starting_capital - 1.0) if (not df.empty and starting_capital > 0) else 0.0
         return {
             "model_key": model_key,
-            "days": len(df),
-            "cumulative_return": 0.0,
+            "days": int(len(df)),
+            "cumulative_return": cum,
             "daily_pnl_pct": None,
             "win_rate": None,
             "sharpe_30d": None,
@@ -56,16 +172,19 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
             "alpha_vs_spy": None,
             "streak_count": 0,
             "streak_type": None,
-            "current_value": float(df["total_value"].iloc[-1]) if not df.empty else 0.0,
+            "current_value": cur,
             "current_cash_pct": float(df["cash_pct"].iloc[-1]) if not df.empty else 1.0,
             "num_positions": int(df["num_positions"].iloc[-1]) if not df.empty else 0,
             "halted": bool(df["halted"].iloc[-1]) if not df.empty else False,
-            "last_api_success": last_api_success,
+            "last_api_success": _last_api_success(df),
         }
 
     values = df["total_value"].astype(float).values
     daily_returns = np.diff(values) / values[:-1]
-    cumulative_return = values[-1] / values[0] - 1.0
+    # Cumulative return anchored to the initial deployed capital from config
+    # (the clean $100k) — identical anchor in the leaderboard and the
+    # performance table so the two can never disagree.
+    cumulative_return = (values[-1] / starting_capital - 1.0) if starting_capital > 0 else (values[-1] / values[0] - 1.0)
 
     # Today's % change vs the prior EOD row
     daily_pnl_pct = float(daily_returns[-1]) if len(daily_returns) else None
@@ -84,19 +203,10 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
     sharpe_30 = _sharpe(daily_returns[-30:]) if len(daily_returns) >= 5 else None
     sharpe_90 = _sharpe(daily_returns[-90:]) if len(daily_returns) >= 5 else None
 
-    # Alpha vs benchmark
-    alpha = None
-    if "benchmark_value" in df.columns and df["benchmark_value"].notna().sum() >= 2:
-        bench = df["benchmark_value"].dropna().astype(float).values
-        if len(bench) >= 2 and bench[0] > 0:
-            bench_return = bench[-1] / bench[0] - 1.0
-            alpha = cumulative_return - bench_return
-
-    last_api_success = True
-    if "api_success" in df.columns:
-        v = df["api_success"].iloc[-1]
-        if v is not None and not pd.isna(v):
-            last_api_success = bool(v)
+    # Alpha vs the single canonical SPY series shared by ALL models — measured
+    # on the same inception-anchored window, so alpha == cumulative_return −
+    # SPY_return reconciles for every model (Sonnet included).
+    alpha = (cumulative_return - spy_return) if spy_return is not None else None
 
     # Win/loss streak: count consecutive days of same sign from most recent
     streak_count = 0
@@ -132,44 +242,32 @@ def compute_metrics(model_key: str) -> dict[str, Any]:
         "current_cash_pct": float(df["cash_pct"].iloc[-1]),
         "num_positions": int(df["num_positions"].iloc[-1]),
         "halted": bool(df["halted"].iloc[-1]),
-        "last_api_success": last_api_success,
+        "last_api_success": _last_api_success(df),
     }
 
 
-def compute_spy_benchmark_metrics(starting_capital: float = 100_000.0) -> dict[str, Any] | None:
-    """Synthesize a SPY buy-and-hold portfolio from the benchmark_value series.
+def compute_spy_benchmark_metrics(
+    starting_capital: float = 100_000.0,
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Synthesize a SPY buy-and-hold portfolio from the canonical SPY series.
 
-    Reads any model's perf log to get the SPY closing prices logged at each
-    EOD pass (they all share the same series since the pipeline fetches one
-    benchmark per tick). Computes the same metrics as `compute_metrics`,
-    treating SPY as a single-position portfolio bought at inception with
-    `starting_capital` and held without trading.
+    Uses the single canonical SPY series (``canonical_spy_series`` — deduped,
+    inception-sliced) that every model's alpha is benchmarked against, treating
+    SPY as a single-position portfolio bought at inception with
+    `starting_capital` and held without trading. Because it shares that series,
+    this row's cumulative return is exactly the figure each model's alpha
+    reconciles to (alpha == model_cum − this_cum).
 
     Returns None if no perf log has a usable benchmark_value series yet.
     The output shape matches `compute_metrics()` so the leaderboard table
     can render it as a regular row alongside the model rows.
     """
-    if not PERFORMANCE_DIR.exists():
-        return None
-    # Pick the perf log with the LONGEST benchmark_value series. All models
-    # share the same SPY series since the pipeline fetches one price per
-    # tick, but the per-model logs differ in length (newer models have
-    # fewer rows). Picking the longest gives us the full SPY history.
-    df = pd.DataFrame()
-    best_len = 0
-    for fp in PERFORMANCE_DIR.glob("*.jsonl"):
-        candidate = load_performance_history(fp.stem)
-        if candidate.empty or "benchmark_value" not in candidate.columns:
-            continue
-        n_bench = int(candidate["benchmark_value"].notna().sum())
-        if n_bench >= 2 and n_bench > best_len:
-            df = candidate
-            best_len = n_bench
-    if df.empty or "benchmark_value" not in df.columns:
-        return None
-
-    series = df[["date", "benchmark_value"]].dropna()
-    if len(series) < 2:
+    # The ONE canonical SPY series (deduped, inception-sliced) — the same
+    # series every model's alpha is benchmarked against, so this row's
+    # cumulative return is exactly the figure each model's alpha reconciles to.
+    series = canonical_spy_series(settings)
+    if series is None or len(series) < 2:
         return None
 
     bench = series["benchmark_value"].astype(float).values
@@ -177,7 +275,7 @@ def compute_spy_benchmark_metrics(starting_capital: float = 100_000.0) -> dict[s
     if base_price <= 0:
         return None
     shares = starting_capital / base_price
-    values = bench * shares  # synthetic equity curve
+    values = bench * shares  # synthetic equity curve, anchored to deployed capital
 
     daily_returns = np.diff(values) / values[:-1]
     cumulative_return = float(values[-1] / values[0] - 1.0)
@@ -457,14 +555,22 @@ def _sharpe(returns: np.ndarray, periods_per_year: int = 252) -> float | None:
     return float(mean / std * math.sqrt(periods_per_year))
 
 
-def build_leaderboard(model_keys: list[str]) -> list[dict[str, Any]]:
+def build_leaderboard(
+    model_keys: list[str], settings: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Sort by cumulative return descending.
 
     Tiebreakers (in order): halted/failed runs sink to the bottom, then daily
     cumulative return desc, then alphabetical for stability. This prevents a
     failed model from anchoring rank #1 on tied 0% days.
+
+    Every row is computed on the canonical basis against the SAME canonical SPY
+    return (computed once here and threaded through), so alpha reconciles and no
+    model is measured on a different window than the others.
     """
-    rows = [compute_metrics(k) for k in model_keys]
+    settings = settings or load_settings()
+    spy_return = canonical_spy_return(settings)
+    rows = [compute_metrics(k, settings=settings, spy_return=spy_return) for k in model_keys]
     rows.sort(key=lambda r: (
         bool(r.get("halted", False)),
         not bool(r.get("last_api_success", True)),
