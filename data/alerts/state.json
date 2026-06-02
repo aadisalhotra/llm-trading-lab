@@ -32,14 +32,17 @@
   },
   "daily": {
     "date": "2026-06-02",
-    "sent_count": 3,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "macro_event:Systemic event",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "ath:gemini",
+      "news:ABBV:16d8ffcb88",
+      "news:GE:3a32231344"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -60,6 +63,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-02T14:06:55.377812+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-06-02T21:06:50.400464+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABBV (held by 5)",
+        "timestamp": "2026-06-02T21:06:51.694016+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on GE (held by 5)",
+        "timestamp": "2026-06-02T21:06:52.783108+00:00",
         "disposition": "sent"
       }
     ]
