@@ -32,13 +32,15 @@
   },
   "daily": {
     "date": "2026-06-04",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "ath:deepseek",
+      "news:GE:f3577185ad"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -52,6 +54,20 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-04T19:39:35.295227+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "DeepSeek V4 Pro hit a new all-time high",
+        "timestamp": "2026-06-04T21:07:33.729519+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on GE (held by 5)",
+        "timestamp": "2026-06-04T21:07:34.764743+00:00",
         "disposition": "sent"
       }
     ]
