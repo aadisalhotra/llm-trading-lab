@@ -32,14 +32,15 @@
   },
   "daily": {
     "date": "2026-06-05",
-    "sent_count": 3,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Severe economic data",
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:GE:f3577185ad"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -60,6 +61,13 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-05T14:24:41.194610+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on GE (held by 5)",
+        "timestamp": "2026-06-05T21:07:16.138046+00:00",
         "disposition": "sent"
       }
     ]
