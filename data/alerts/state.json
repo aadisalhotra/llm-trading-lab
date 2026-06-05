@@ -31,51 +31,35 @@
     ]
   },
   "daily": {
-    "date": "2026-06-04",
-    "sent_count": 5,
+    "date": "2026-06-05",
+    "sent_count": 3,
     "dedup_keys": [
+      "macro_event:Severe economic data",
       "macro_event:Geopolitical shock",
-      "api_failure:gemini",
-      "ath:deepseek",
-      "news:GE:f3577185ad",
-      "news:NVDA:2416f3c700"
+      "api_failure:gemini"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
-        "timestamp": "2026-06-04T15:04:50.845066+00:00",
+        "timestamp": "2026-06-05T14:04:41.108429+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-06-05T14:04:42.624905+00:00",
         "disposition": "sent"
       },
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
-        "timestamp": "2026-06-04T19:39:35.295227+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "DeepSeek V4 Pro hit a new all-time high",
-        "timestamp": "2026-06-04T21:07:33.729519+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on GE (held by 5)",
-        "timestamp": "2026-06-04T21:07:34.764743+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on NVDA (held by 6)",
-        "timestamp": "2026-06-04T22:22:35.991565+00:00",
+        "timestamp": "2026-06-05T14:24:41.194610+00:00",
         "disposition": "sent"
       }
     ]
