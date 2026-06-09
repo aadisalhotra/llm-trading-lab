@@ -32,13 +32,15 @@
   },
   "daily": {
     "date": "2026-06-09",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "api_failure:gemini",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "macro_event:Systemic event",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
@@ -52,6 +54,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-06-09T17:03:46.600933+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-06-09T21:07:02.293137+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-06-09T21:07:29.993296+00:00",
         "disposition": "sent"
       }
     ]
