@@ -32,13 +32,15 @@
   },
   "daily": {
     "date": "2026-06-10",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:LLY:8fa997792c",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -52,6 +54,20 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-10T18:07:32.333992+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-06-10T21:07:34.146982+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-06-10T21:07:37.555058+00:00",
         "disposition": "sent"
       }
     ]
