@@ -32,14 +32,17 @@
   },
   "daily": {
     "date": "2026-06-15",
-    "sent_count": 3,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "macro_event:Macro crisis",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:AMD:3635d19993",
+      "news:ABBV:6cf63a1e59",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -60,6 +63,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-15T15:04:09.125310+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AMD (held by 5)",
+        "timestamp": "2026-06-15T21:07:01.095404+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABBV (held by 4)",
+        "timestamp": "2026-06-15T21:07:02.039548+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-06-15T21:07:04.897451+00:00",
         "disposition": "sent"
       }
     ]
