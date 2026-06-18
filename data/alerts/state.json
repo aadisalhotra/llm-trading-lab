@@ -32,13 +32,15 @@
   },
   "daily": {
     "date": "2026-06-18",
-    "sent_count": 5,
+    "sent_count": 7,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "api_failure:gemini",
       "macro_event:Macro crisis",
       "news:ABBV:dff4548093",
-      "budget:critical"
+      "budget:critical",
+      "news:AMD:d3f7274d26",
+      "news:LLY:9feaf9e1ab"
     ],
     "overflow": [],
     "digest_sent": true,
@@ -76,6 +78,20 @@
         "severity": "CRITICAL",
         "title": "Monthly API budget exceeded",
         "timestamp": "2026-06-18T21:07:45.464330+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AMD (held by 4)",
+        "timestamp": "2026-06-18T22:22:58.596933+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 4)",
+        "timestamp": "2026-06-18T22:22:59.323100+00:00",
         "disposition": "sent"
       }
     ]
