@@ -1,0 +1,4292 @@
+{
+  "report_meta": {
+    "period": "2026-05",
+    "period_label": "May 2026",
+    "regime": "v1",
+    "phase": "Phase A - Paper Trading",
+    "pilot_exploratory": true,
+    "data_window": {
+      "calendar_month": {
+        "start": "2026-05-01",
+        "end": "2026-05-31",
+        "first_trading_date": "2026-05-01",
+        "last_trading_date": "2026-05-29",
+        "trading_days": 20
+      },
+      "inception_anchor": {
+        "inception_date": "2026-04-09",
+        "inception_capital_usd": 100000.0,
+        "note": "cumulative_return + equity-curve series only; pre-month pilot data (2026-04-09..2026-04-30) enters ONLY these inception-anchored series, never the monthly behavioral/RQ window."
+      }
+    },
+    "prompt_version": "v1",
+    "prompt_version_note": "May decision records are entirely prompt_version=v1 (verified). settings.json now reads prompt_version=v2 (flipped 2026-05-31, commit deploys v2 from June); the May report pins the v1 regime the data was generated under, NOT the current settings value.",
+    "pinned_snapshots": {
+      "claude": {
+        "display_name": "Claude Sonnet 4.6",
+        "provider": "anthropic",
+        "configured_model": "claude-sonnet-4-6",
+        "cohort": "core",
+        "may_snapshots": [
+          {
+            "snapshot_id": "claude-sonnet-4-6",
+            "first_date": "2026-05-01",
+            "last_date": "2026-05-29",
+            "n_success": 256
+          }
+        ],
+        "snapshot_stable": true
+      },
+      "gpt": {
+        "display_name": "GPT-5.4",
+        "provider": "openai",
+        "configured_model": "gpt-5.4-2026-03-05",
+        "cohort": "core",
+        "may_snapshots": [
+          {
+            "snapshot_id": "gpt-5.4-2026-03-05",
+            "first_date": "2026-05-01",
+            "last_date": "2026-05-29",
+            "n_success": 257
+          }
+        ],
+        "snapshot_stable": true
+      },
+      "gemini": {
+        "display_name": "Gemini 3.1 Pro",
+        "provider": "google",
+        "configured_model": "gemini-3.1-pro-preview",
+        "cohort": "core",
+        "may_snapshots": [
+          {
+            "snapshot_id": "gemini-3.1-pro-preview",
+            "first_date": "2026-05-01",
+            "last_date": "2026-05-29",
+            "n_success": 146
+          }
+        ],
+        "snapshot_stable": true
+      },
+      "grok": {
+        "display_name": "Grok 4.20 (Reasoning)",
+        "provider": "xai",
+        "configured_model": "grok-4.20-0309-reasoning",
+        "cohort": "core",
+        "may_snapshots": [
+          {
+            "snapshot_id": "grok-4.20-0309-reasoning",
+            "first_date": "2026-05-01",
+            "last_date": "2026-05-29",
+            "n_success": 256
+          }
+        ],
+        "snapshot_stable": true
+      },
+      "deepseek": {
+        "display_name": "DeepSeek V4 Pro",
+        "provider": "deepseek",
+        "configured_model": "deepseek-v4-pro",
+        "cohort": "core",
+        "may_snapshots": [
+          {
+            "snapshot_id": "deepseek-v4-flash",
+            "first_date": "2026-04-24",
+            "last_date": "2026-05-21",
+            "n_success": 195
+          },
+          {
+            "snapshot_id": "deepseek-v4-pro",
+            "first_date": "2026-05-21",
+            "last_date": "2026-05-29",
+            "n_success": 62
+          }
+        ],
+        "snapshot_stable": false
+      },
+      "claude_opus": {
+        "display_name": "Claude Opus 4.6",
+        "provider": "anthropic",
+        "configured_model": "claude-opus-4-6",
+        "cohort": "expansion",
+        "may_snapshots": [
+          {
+            "snapshot_id": "claude-opus-4-6",
+            "first_date": "2026-05-01",
+            "last_date": "2026-05-29",
+            "n_success": 255
+          }
+        ],
+        "snapshot_stable": true
+      }
+    },
+    "risk_free_rate": {
+      "value": 0.0368,
+      "as_of": "2026-04-09"
+    },
+    "risk_free_rate_note": "Pinned in settings.json = 0.0368 (3-month T-bill, annualized, as of 2026-04-09 (inception-pinned)). performance[].sharpe is now populated as the descriptive annualized monthly Sharpe (mean daily excess return / daily std * sqrt(252) over May EOD returns), explicitly NOT the Deflated Sharpe Ratio of v1.json sharpe_reporting.",
+    "spy_benchmark": {
+      "ticker": "SPY",
+      "inception_anchor_date": "2026-04-09",
+      "inception_value": 679.9099731445312,
+      "month_end_value": 756.47998046875,
+      "cumulative_return_since_inception": 0.11261786170026067,
+      "monthly_return": 0.049718941012760975,
+      "note": "SPY EOD from perf-log benchmark_value; anchored to the 2026-04-09 model inception EOD.",
+      "descriptive_sharpe": 6.11
+    },
+    "regime_summary": {
+      "total_days": 124,
+      "counts": {
+        "range_bound": 35,
+        "neutral": 31,
+        "bull_trending": 25,
+        "insufficient_history": 20,
+        "drawdown": 10,
+        "vol_spike": 3
+      },
+      "pct": {
+        "range_bound": 0.2823,
+        "neutral": 0.25,
+        "bull_trending": 0.2016,
+        "insufficient_history": 0.1613,
+        "drawdown": 0.0806,
+        "vol_spike": 0.0242
+      },
+      "first_date": "2025-12-01",
+      "last_date": "2026-05-29"
+    },
+    "source_commit": "0af22a93402af63151d216fe51e1fe7b784c38b6",
+    "generated_at_utc": "2026-06-02T02:19:18.032440+00:00",
+    "generator": "scripts/build_monthly_data_layer.py",
+    "bootstrap_config": {
+      "block_length": 5,
+      "rq1_rq2_rq3_n_resamples": 10000,
+      "rq1_n_permutations": 500,
+      "rq5_n_resamples_interim": 2000
+    },
+    "methodology_notes": {
+      "leaderboard_rank_basis": "cumulative_return descending (canonical build_leaderboard basis).",
+      "cumulative_return": "last EOD value / $100,000 inception capital - 1 (== stored cumulative_return field).",
+      "monthly_return": "last May EOD value / first May EOD value - 1 (calendar-month window).",
+      "spy_relative_alpha": "model cumulative_return - SPY cumulative_return, both anchored to 2026-04-09 EOD.",
+      "max_drawdown": "performance[].max_drawdown is May-confined (running peak within May); the underwater chart uses inception-anchored running peak.",
+      "volatility": "annualized std of May daily EOD returns (ddof=1) * sqrt(252).",
+      "turnover": "performance[].turnover and profiles[].turnover_mean_daily are mean daily executed-notional/EOD-value over May (RQ5 _daily_portfolio_features definition).",
+      "win_rate": "day-level: fraction of May trading days with positive EOD return (canonical compute_metrics definition).",
+      "risk_free_rate": "0.0368 annualized (3-month T-bill), as-of inception 2026-04-09; pinned in settings.json.risk_free_rate.",
+      "sharpe": "descriptive annualized monthly Sharpe = mean(daily EOD return - rf/252) / std(daily return, ddof=1) * sqrt(252) over the May calendar month; NOT the Deflated Sharpe.",
+      "concentration": "evidence_metrics.concentration_mean_daily_hhi is the portfolio-concentration (Herfindahl) measure; mean daily HHI of position weights over May. No separate concentration_hhi field was added.",
+      "notable_events": "profiles[].notable_events is objective event extraction (top-3 trades by abs USD value, stop-loss force-sells, drawdown-halt triggers, API/JSON error events) over the calendar month; empty arrays where none.",
+      "halt_gate": "all six compute_rqX verified against v1.json; PASS. Cosmetic only: RQ5 metric label cash_pct (code) == cash (v1.json), same quantity.",
+      "profiles_page_frame": "First full reporting month, May 2026 - Phase A, pilot/exploratory. Behavioral and RQ characterizations are early single-month reads on ~40-110 closed trades per model: descriptive of this month, not pooled inference. Cumulative figures are inception-anchored (2026-04-09, includes the April shakedown); behavioral metrics are May calendar-month only."
+    },
+    "schema_version": "1.0"
+  },
+  "leaderboard": [
+    {
+      "model": "deepseek",
+      "rank": 1,
+      "monthly_return": 0.023658948075639064,
+      "spy_relative_alpha": 0.11403531523279509,
+      "cumulative_return_inception": 0.22665317693305576,
+      "cumulative_return_clean": {
+        "value": 0.0586,
+        "source": "raw",
+        "confidence": "estimable",
+        "model_spliced": true
+      },
+      "data_confidence": "exploratory_model_splice"
+    },
+    {
+      "model": "gpt",
+      "rank": 2,
+      "monthly_return": 0.06478913288545685,
+      "spy_relative_alpha": 0.08259934549901349,
+      "cumulative_return_inception": 0.19521720719927416,
+      "cumulative_return_clean": {
+        "value": 0.0766,
+        "source": "raw",
+        "confidence": "estimable",
+        "model_spliced": false
+      },
+      "data_confidence": "estimable"
+    },
+    {
+      "model": "grok",
+      "rank": 3,
+      "monthly_return": 0.03496560528738968,
+      "spy_relative_alpha": 0.050053523640113395,
+      "cumulative_return_inception": 0.16267138534037406,
+      "cumulative_return_clean": {
+        "value": 0.0459,
+        "source": "defab",
+        "confidence": "estimable",
+        "model_spliced": false
+      },
+      "data_confidence": "estimable"
+    },
+    {
+      "model": "claude_opus",
+      "rank": 4,
+      "monthly_return": 0.01854265564281765,
+      "spy_relative_alpha": 0.02378239287809114,
+      "cumulative_return_inception": 0.1364002545783518,
+      "cumulative_return_clean": {
+        "value": null,
+        "source": "not_estimable",
+        "confidence": "not_reliably_estimable",
+        "model_spliced": false
+      },
+      "data_confidence": "non_estimable_corrupt_book"
+    },
+    {
+      "model": "claude",
+      "rank": 5,
+      "monthly_return": 0.018019430279006876,
+      "spy_relative_alpha": 0.0038643955182930956,
+      "cumulative_return_inception": 0.11648225721855376,
+      "cumulative_return_clean": {
+        "value": null,
+        "source": "not_estimable",
+        "confidence": "not_reliably_estimable",
+        "model_spliced": false
+      },
+      "data_confidence": "non_estimable_corrupt_book"
+    },
+    {
+      "model": "gemini",
+      "rank": 6,
+      "monthly_return": 0.03212981989055663,
+      "spy_relative_alpha": -0.012614569229065564,
+      "cumulative_return_inception": 0.1000032924711951,
+      "cumulative_return_clean": {
+        "value": 0.0494,
+        "source": "defab",
+        "confidence": "estimable",
+        "model_spliced": false
+      },
+      "data_confidence": "exploratory_completeness"
+    },
+    {
+      "model": "spy_benchmark",
+      "rank": null,
+      "monthly_return": 0.049718941012760975,
+      "cumulative_return_inception": 0.11261786170026067,
+      "cumulative_return_clean": {
+        "value": 0.0637,
+        "source": "benchmark",
+        "confidence": "benchmark",
+        "model_spliced": false
+      },
+      "spy_relative_alpha": 0.0,
+      "data_confidence": "benchmark"
+    }
+  ],
+  "performance": {
+    "claude": {
+      "monthly_return": 0.018019430279006876,
+      "max_drawdown": -0.016157835558720968,
+      "volatility": 0.1031411504802699,
+      "sharpe": 1.9894093094758571,
+      "trade_count": 256,
+      "win_rate": 0.5263157894736842,
+      "turnover": 0.35163549427754,
+      "avg_hold_days": 3.2325581395348837,
+      "risk_basis": "non_estimable"
+    },
+    "gpt": {
+      "monthly_return": 0.06478913288545685,
+      "max_drawdown": -0.01942781579416919,
+      "volatility": 0.17458646071113204,
+      "sharpe": 4.648629518751512,
+      "trade_count": 665,
+      "win_rate": 0.5789473684210527,
+      "turnover": 0.5007200318241425,
+      "avg_hold_days": 4.615384615384615,
+      "risk_basis": "raw"
+    },
+    "gemini": {
+      "monthly_return": 0.03212981989055663,
+      "max_drawdown": -0.018829923688472805,
+      "volatility": 0.1395666016519457,
+      "sharpe": 2.8103279379378443,
+      "trade_count": 439,
+      "win_rate": 0.5789473684210527,
+      "turnover": 0.9064775183616888,
+      "avg_hold_days": 4.553571428571429,
+      "risk_basis": "raw_basis_sensitive"
+    },
+    "grok": {
+      "monthly_return": 0.03496560528738968,
+      "max_drawdown": -0.01917479534601796,
+      "volatility": 0.1296054389868112,
+      "sharpe": 3.297673914934214,
+      "trade_count": 591,
+      "win_rate": 0.631578947368421,
+      "turnover": 0.7583369168582539,
+      "avg_hold_days": 5.228260869565218,
+      "risk_basis": "raw_basis_sensitive"
+    },
+    "deepseek": {
+      "monthly_return": 0.023658948075639064,
+      "max_drawdown": -0.013375935058497879,
+      "volatility": 0.11365328427228837,
+      "sharpe": 2.4604880182567257,
+      "trade_count": 551,
+      "win_rate": 0.5263157894736842,
+      "turnover": 0.3451732398995703,
+      "avg_hold_days": 6.795698924731183,
+      "risk_basis": "spliced"
+    },
+    "claude_opus": {
+      "monthly_return": 0.01854265564281765,
+      "max_drawdown": -0.022430696314416854,
+      "volatility": 0.11661977440832107,
+      "sharpe": 1.8301754571383606,
+      "trade_count": 345,
+      "win_rate": 0.5263157894736842,
+      "turnover": 0.4398893671349697,
+      "avg_hold_days": 3.736842105263158,
+      "risk_basis": "non_estimable"
+    },
+    "spy_benchmark": {
+      "monthly_return": 0.049718941012760975,
+      "max_drawdown": null,
+      "volatility": null,
+      "sharpe": 6.11,
+      "trade_count": null,
+      "win_rate": null,
+      "turnover": null,
+      "avg_hold_days": null,
+      "risk_basis": "benchmark"
+    }
+  },
+  "charts": {
+    "equity_curve": {
+      "anchor": {
+        "inception_date": "2026-04-09",
+        "inception_capital_usd": 100000.0,
+        "index_base": 100.0
+      },
+      "series": {
+        "claude": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 104441.9304647003,
+            "indexed_return": 104.44193046470029
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 104478.74133364104,
+            "indexed_return": 104.47874133364104
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 104809.7658576721,
+            "indexed_return": 104.8097658576721
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 106475.52990319823,
+            "indexed_return": 106.47552990319822
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 106915.51051727752,
+            "indexed_return": 106.91551051727753
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 107533.44808453444,
+            "indexed_return": 107.53344808453444
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 107902.3311534157,
+            "indexed_return": 107.9023311534157
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 108194.55823765106,
+            "indexed_return": 108.19455823765105
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 107998.78349319762,
+            "indexed_return": 107.99878349319762
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 109027.07537801513,
+            "indexed_return": 109.02707537801513
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 108872.661816304,
+            "indexed_return": 108.87266181630399
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 110068.21491815567,
+            "indexed_return": 110.06821491815569
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 110602.55686731111,
+            "indexed_return": 110.60255686731111
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 109770.31135621721,
+            "indexed_return": 109.77031135621719
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 109487.54513576278,
+            "indexed_return": 109.48754513576277
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 109706.85554553453,
+            "indexed_return": 109.70685554553454
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 109671.99878616868,
+            "indexed_return": 109.67199878616869
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 109482.82892920151,
+            "indexed_return": 109.48282892920152
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 109602.20672453156,
+            "indexed_return": 109.60220672453156
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 111542.64619151915,
+            "indexed_return": 111.54264619151914
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 111138.49588654096,
+            "indexed_return": 111.13849588654097
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 111360.99879786758,
+            "indexed_return": 111.36099879786758
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 111789.62574833144,
+            "indexed_return": 111.78962574833145
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 111444.53609504318,
+            "indexed_return": 111.44453609504319
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 112862.54527116928,
+            "indexed_return": 112.86254527116928
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 112919.51602677688,
+            "indexed_return": 112.91951602677688
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 111899.32647903822,
+            "indexed_return": 111.89932647903822
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 111771.19641212234,
+            "indexed_return": 111.77119641212234
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 111094.98105544587,
+            "indexed_return": 111.09498105544586
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 111198.03936533697,
+            "indexed_return": 111.19803936533697
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 111232.20613289527,
+            "indexed_return": 111.23220613289526
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 111216.9262439785,
+            "indexed_return": 111.21692624397849
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 111357.01995866546,
+            "indexed_return": 111.35701995866548
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 111226.67197665288,
+            "indexed_return": 111.22667197665288
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 112320.98488689208,
+            "indexed_return": 112.32098488689208
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 111648.22572185537,
+            "indexed_return": 111.64822572185538
+          }
+        ],
+        "gpt": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 100742.50987454224,
+            "indexed_return": 100.74250987454225
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 101766.45427863084,
+            "indexed_return": 101.76645427863085
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 103263.57045464178,
+            "indexed_return": 103.26357045464178
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 106146.61712338567,
+            "indexed_return": 106.14661712338567
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 107935.23539092718,
+            "indexed_return": 107.93523539092718
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 109248.71835600438,
+            "indexed_return": 109.24871835600439
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 110565.06804695974,
+            "indexed_return": 110.56506804695974
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 109609.86780263373,
+            "indexed_return": 109.60986780263373
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 108852.90410904243,
+            "indexed_return": 108.85290410904243
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 111040.40336837774,
+            "indexed_return": 111.04040336837772
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 109673.923695649,
+            "indexed_return": 109.67392369564901
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 112966.23637325272,
+            "indexed_return": 112.96623637325271
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 112631.56640665345,
+            "indexed_return": 112.63156640665346
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 111273.49104418243,
+            "indexed_return": 111.27349104418242
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 111555.61987968585,
+            "indexed_return": 111.55561987968585
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 112152.75376315827,
+            "indexed_return": 112.15275376315827
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 112249.1928482001,
+            "indexed_return": 112.2491928482001
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 111420.8163170668,
+            "indexed_return": 111.4208163170668
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 112759.99456279054,
+            "indexed_return": 112.75999456279054
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 115509.74018182933,
+            "indexed_return": 115.50974018182933
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 114770.91753238472,
+            "indexed_return": 114.77091753238471
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 117233.41420198466,
+            "indexed_return": 117.23341420198466
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 117954.84864091821,
+            "indexed_return": 117.95484864091821
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 115663.24356949334,
+            "indexed_return": 115.66324356949333
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 116304.00343554099,
+            "indexed_return": 116.30400343554099
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 117721.94250264917,
+            "indexed_return": 117.72194250264916
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 117234.3278280001,
+            "indexed_return": 117.23432782800009
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 117124.53231929193,
+            "indexed_return": 117.12453231929194
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 116169.08855148489,
+            "indexed_return": 116.16908855148489
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 116154.2307004931,
+            "indexed_return": 116.15423070049312
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 116336.63495931875,
+            "indexed_return": 116.33663495931874
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 117488.35632754689,
+            "indexed_return": 117.48835632754688
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 118590.9309158953,
+            "indexed_return": 118.5909309158953
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 117570.98090345634,
+            "indexed_return": 117.57098090345634
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 118907.6730338114,
+            "indexed_return": 118.9076730338114
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 119521.72071992741,
+            "indexed_return": 119.52172071992742
+          }
+        ],
+        "gemini": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 96254.7431009819,
+            "indexed_return": 96.2547431009819
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 96513.95186978986,
+            "indexed_return": 96.51395186978986
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 98305.13221963272,
+            "indexed_return": 98.30513221963272
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 100139.59356106109,
+            "indexed_return": 100.13959356106108
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 101296.25698677139,
+            "indexed_return": 101.29625698677138
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 103490.0896173729,
+            "indexed_return": 103.49008961737289
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 103346.11886250379,
+            "indexed_return": 103.3461188625038
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 102196.18548503569,
+            "indexed_return": 102.19618548503568
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 101787.31737251967,
+            "indexed_return": 101.78731737251967
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 103648.36895854035,
+            "indexed_return": 103.64836895854035
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 102874.57025554351,
+            "indexed_return": 102.87457025554352
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 105088.07349972762,
+            "indexed_return": 105.08807349972761
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 105371.44446923523,
+            "indexed_return": 105.37144446923523
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 104754.52540945164,
+            "indexed_return": 104.75452540945165
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 105543.30989170224,
+            "indexed_return": 105.54330989170224
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 106552.58228308028,
+            "indexed_return": 106.55258228308028
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 106576.05964604681,
+            "indexed_return": 106.57605964604682
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 106145.31683173217,
+            "indexed_return": 106.14531683173216
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 106804.0540972103,
+            "indexed_return": 106.8040540972103
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 107938.44003752057,
+            "indexed_return": 107.93844003752058
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 107228.16292529793,
+            "indexed_return": 107.22816292529794
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 108103.81427552947,
+            "indexed_return": 108.10381427552946
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 108072.30342241935,
+            "indexed_return": 108.07230342241935
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 107325.75015593298,
+            "indexed_return": 107.32575015593298
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 107277.44046222916,
+            "indexed_return": 107.27744046222915
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 107750.88851064834,
+            "indexed_return": 107.75088851064834
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 106823.71797455827,
+            "indexed_return": 106.82371797455828
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 107521.97553136444,
+            "indexed_return": 107.52197553136445
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 106675.5588993839,
+            "indexed_return": 106.67555889938392
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 107522.56781512643,
+            "indexed_return": 107.52256781512644
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 107569.51930821037,
+            "indexed_return": 107.56951930821037
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 108998.71071583136,
+            "indexed_return": 108.99871071583136
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 110721.93811202276,
+            "indexed_return": 110.72193811202276
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 108637.05246673357,
+            "indexed_return": 108.63705246673356
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 109302.94234516642,
+            "indexed_return": 109.30294234516641
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 110000.32924711952,
+            "indexed_return": 110.00032924711951
+          }
+        ],
+        "grok": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 101649.18303079224,
+            "indexed_return": 101.64918303079224
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 101465.03652338103,
+            "indexed_return": 101.46503652338103
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 103867.0990948467,
+            "indexed_return": 103.86709909484671
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 106434.57479733197,
+            "indexed_return": 106.43457479733196
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 108848.86146211163,
+            "indexed_return": 108.84886146211163
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 110659.40568754039,
+            "indexed_return": 110.6594056875404
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 111484.80253186566,
+            "indexed_return": 111.48480253186565
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 110577.82112615085,
+            "indexed_return": 110.57782112615087
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 109744.63107446859,
+            "indexed_return": 109.74463107446859
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 112000.9614621784,
+            "indexed_return": 112.0009614621784
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 110931.7003280765,
+            "indexed_return": 110.93170032807652
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 114044.2344455051,
+            "indexed_return": 114.04423444550511
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 113369.73729749866,
+            "indexed_return": 113.36973729749866
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 111938.92406513402,
+            "indexed_return": 111.93892406513402
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 111675.73893499486,
+            "indexed_return": 111.67573893499487
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 112573.19284589194,
+            "indexed_return": 112.57319284589194
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 112339.13275963628,
+            "indexed_return": 112.33913275963627
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 112036.42952205005,
+            "indexed_return": 112.03642952205004
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 113022.7185273958,
+            "indexed_return": 113.02271852739581
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 113867.41771717259,
+            "indexed_return": 113.86741771717259
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 113952.590579623,
+            "indexed_return": 113.95259057962302
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 114805.2055716289,
+            "indexed_return": 114.8052055716289
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 114544.4829318828,
+            "indexed_return": 114.5444829318828
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 112603.8392501354,
+            "indexed_return": 112.6038392501354
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 112691.85443495441,
+            "indexed_return": 112.69185443495442
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 114762.26453395268,
+            "indexed_return": 114.76226453395269
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 114033.21401813159,
+            "indexed_return": 114.0332140181316
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 114052.32908551898,
+            "indexed_return": 114.05232908551899
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 113423.30598251453,
+            "indexed_return": 113.42330598251453
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 113955.69854021718,
+            "indexed_return": 113.95569854021718
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 113414.56410658831,
+            "indexed_return": 113.4145641065883
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 114637.53348914294,
+            "indexed_return": 114.63753348914294
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 115412.83601406893,
+            "indexed_return": 115.41283601406893
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 114582.54554893453,
+            "indexed_return": 114.58254554893452
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 115374.35083538396,
+            "indexed_return": 115.37435083538396
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 116267.1385340374,
+            "indexed_return": 116.2671385340374
+          }
+        ],
+        "deepseek": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 109040.69431655426,
+            "indexed_return": 109.04069431655425
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 108658.20389245605,
+            "indexed_return": 108.65820389245604
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 109755.17739009134,
+            "indexed_return": 109.75517739009133
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 111280.7791321949,
+            "indexed_return": 111.2807791321949
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 113244.34815471382,
+            "indexed_return": 113.24434815471382
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 114299.73839099979,
+            "indexed_return": 114.29973839099978
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 115802.25408379914,
+            "indexed_return": 115.80225408379914
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 114861.63717311935,
+            "indexed_return": 114.86163717311935
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 114222.28120543252,
+            "indexed_return": 114.22228120543252
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 115892.97236664771,
+            "indexed_return": 115.89297236664771
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 114299.08306859892,
+            "indexed_return": 114.29908306859893
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 117692.57528214074,
+            "indexed_return": 117.69257528214074
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 117375.64302251396,
+            "indexed_return": 117.37564302251396
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 116600.74338152734,
+            "indexed_return": 116.60074338152735
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 118066.78482736165,
+            "indexed_return": 118.06678482736166
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 119222.02575938987,
+            "indexed_return": 119.22202575938987
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 119830.25979883461,
+            "indexed_return": 119.83025979883462
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 119040.66752629129,
+            "indexed_return": 119.0406675262913
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 120659.41902446347,
+            "indexed_return": 120.65941902446346
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 121753.09072243918,
+            "indexed_return": 121.75309072243918
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 121365.33006861896,
+            "indexed_return": 121.36533006861896
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 122198.80712327042,
+            "indexed_return": 122.19880712327043
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 122571.55357343217,
+            "indexed_return": 122.57155357343217
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 120932.04443281476,
+            "indexed_return": 120.93204443281476
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 121106.2076914337,
+            "indexed_return": 121.1062076914337
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 122528.30455420072,
+            "indexed_return": 122.52830455420072
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 121848.34772315482,
+            "indexed_return": 121.84834772315483
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 122319.6026025608,
+            "indexed_return": 122.3196026025608
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 121429.7853786274,
+            "indexed_return": 121.42978537862741
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 122246.29262546079,
+            "indexed_return": 122.24629262546078
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 122031.14805228499,
+            "indexed_return": 122.03114805228499
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 123105.1812977495,
+            "indexed_return": 123.1051812977495
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 122552.41178179914,
+            "indexed_return": 122.55241178179914
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 122413.7982212597,
+            "indexed_return": 122.41379822125971
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 122793.96014894143,
+            "indexed_return": 122.79396014894144
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 122665.31769330558,
+            "indexed_return": 122.66531769330558
+          }
+        ],
+        "claude_opus": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 104441.63200752257,
+            "indexed_return": 104.44163200752257
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 104477.0143386795,
+            "indexed_return": 104.47701433867948
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 104809.7658576721,
+            "indexed_return": 104.8097658576721
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 106475.52990319823,
+            "indexed_return": 106.47552990319822
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 106828.27543264921,
+            "indexed_return": 106.8282754326492
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 106949.79414376525,
+            "indexed_return": 106.94979414376525
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 108465.47254158325,
+            "indexed_return": 108.46547254158325
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 108237.99262086181,
+            "indexed_return": 108.23799262086182
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 107998.78349319762,
+            "indexed_return": 107.99878349319762
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 109224.80242325591,
+            "indexed_return": 109.22480242325592
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 109104.63927066974,
+            "indexed_return": 109.10463927066974
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 111848.30031470908,
+            "indexed_return": 111.84830031470906
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 111821.36365452918,
+            "indexed_return": 111.82136365452916
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 110932.81042971686,
+            "indexed_return": 110.93281042971685
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 111451.35812923545,
+            "indexed_return": 111.45135812923546
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 110964.71308533079,
+            "indexed_return": 110.96471308533079
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 111571.19913266199,
+            "indexed_return": 111.57119913266197
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 110978.13375162867,
+            "indexed_return": 110.97813375162869
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 111316.4585935503,
+            "indexed_return": 111.31645859355031
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 113023.60394708271,
+            "indexed_return": 113.0236039470827
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 112722.52473829323,
+            "indexed_return": 112.72252473829323
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 113858.25876158882,
+            "indexed_return": 113.85825876158881
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 113909.26795130903,
+            "indexed_return": 113.90926795130902
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 112511.59546802651,
+            "indexed_return": 112.51159546802651
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 113491.19563062726,
+            "indexed_return": 113.49119563062726
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 114303.69193687191,
+            "indexed_return": 114.30369193687191
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 113094.64103216762,
+            "indexed_return": 113.09464103216762
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 112443.87250627499,
+            "indexed_return": 112.44387250627499
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 111739.78053541928,
+            "indexed_return": 111.73978053541929
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 112578.35408242777,
+            "indexed_return": 112.57835408242778
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 112524.04845207655,
+            "indexed_return": 112.52404845207656
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 112810.00499664899,
+            "indexed_return": 112.810004996649
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 112966.01220217874,
+            "indexed_return": 112.96601220217875
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 112776.55571732235,
+            "indexed_return": 112.77655571732235
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 113770.93985152416,
+            "indexed_return": 113.77093985152416
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 113640.02545783519,
+            "indexed_return": 113.64002545783518
+          }
+        ],
+        "spy_benchmark": [
+          {
+            "date": "2026-04-09",
+            "portfolio_value": 100000.0,
+            "indexed_return": 100.0
+          },
+          {
+            "date": "2026-04-10",
+            "portfolio_value": 99933.82194854504,
+            "indexed_return": 99.93382194854505
+          },
+          {
+            "date": "2026-04-13",
+            "portfolio_value": 100910.4150087368,
+            "indexed_return": 100.9104150087368
+          },
+          {
+            "date": "2026-04-14",
+            "portfolio_value": 102139.99638229045,
+            "indexed_return": 102.13999638229045
+          },
+          {
+            "date": "2026-04-15",
+            "portfolio_value": 102945.9825694625,
+            "indexed_return": 102.9459825694625
+          },
+          {
+            "date": "2026-04-16",
+            "portfolio_value": 103198.95292893087,
+            "indexed_return": 103.19895292893086
+          },
+          {
+            "date": "2026-04-17",
+            "portfolio_value": 104446.18297979873,
+            "indexed_return": 104.44618297979873
+          },
+          {
+            "date": "2026-04-20",
+            "portfolio_value": 104237.32533666916,
+            "indexed_return": 104.23732533666916
+          },
+          {
+            "date": "2026-04-21",
+            "portfolio_value": 103554.88886764346,
+            "indexed_return": 103.55488886764346
+          },
+          {
+            "date": "2026-04-22",
+            "portfolio_value": 104603.55783330617,
+            "indexed_return": 104.60355783330617
+          },
+          {
+            "date": "2026-04-23",
+            "portfolio_value": 104197.62030118554,
+            "indexed_return": 104.19762030118554
+          },
+          {
+            "date": "2026-04-24",
+            "portfolio_value": 105005.07870762488,
+            "indexed_return": 105.00507870762488
+          },
+          {
+            "date": "2026-04-27",
+            "portfolio_value": 105185.98213856904,
+            "indexed_return": 105.18598213856905
+          },
+          {
+            "date": "2026-04-28",
+            "portfolio_value": 104674.15254256307,
+            "indexed_return": 104.67415254256306
+          },
+          {
+            "date": "2026-04-29",
+            "portfolio_value": 104657.97608451617,
+            "indexed_return": 104.65797608451616
+          },
+          {
+            "date": "2026-04-30",
+            "portfolio_value": 105699.28395384234,
+            "indexed_return": 105.69928395384234
+          },
+          {
+            "date": "2026-05-01",
+            "portfolio_value": 105991.97730268784,
+            "indexed_return": 105.99197730268783
+          },
+          {
+            "date": "2026-05-04",
+            "portfolio_value": 105603.68844788142,
+            "indexed_return": 105.60368844788141
+          },
+          {
+            "date": "2026-05-05",
+            "portfolio_value": 106450.86086675113,
+            "indexed_return": 106.45086086675113
+          },
+          {
+            "date": "2026-05-06",
+            "portfolio_value": 107930.46816123852,
+            "indexed_return": 107.93046816123852
+          },
+          {
+            "date": "2026-05-07",
+            "portfolio_value": 107599.54199617672,
+            "indexed_return": 107.59954199617671
+          },
+          {
+            "date": "2026-05-08",
+            "portfolio_value": 108487.89166979738,
+            "indexed_return": 108.48789166979738
+          },
+          {
+            "date": "2026-05-11",
+            "portfolio_value": 108734.98212914326,
+            "indexed_return": 108.73498212914325
+          },
+          {
+            "date": "2026-05-12",
+            "portfolio_value": 108570.25515624601,
+            "indexed_return": 108.570255156246
+          },
+          {
+            "date": "2026-05-13",
+            "portfolio_value": 109177.68923515965,
+            "indexed_return": 109.17768923515965
+          },
+          {
+            "date": "2026-05-14",
+            "portfolio_value": 110039.56589280897,
+            "indexed_return": 110.03956589280897
+          },
+          {
+            "date": "2026-05-15",
+            "portfolio_value": 108715.86123256171,
+            "indexed_return": 108.71586123256172
+          },
+          {
+            "date": "2026-05-18",
+            "portfolio_value": 108639.38662318233,
+            "indexed_return": 108.63938662318233
+          },
+          {
+            "date": "2026-05-19",
+            "portfolio_value": 107915.75494551218,
+            "indexed_return": 107.91575494551218
+          },
+          {
+            "date": "2026-05-20",
+            "portfolio_value": 109021.7866009195,
+            "indexed_return": 109.0217866009195
+          },
+          {
+            "date": "2026-05-21",
+            "portfolio_value": 109237.98738649211,
+            "indexed_return": 109.23798738649211
+          },
+          {
+            "date": "2026-05-22",
+            "portfolio_value": 109667.46247299621,
+            "indexed_return": 109.66746247299622
+          },
+          {
+            "date": "2026-05-26",
+            "portfolio_value": 110395.50183152156,
+            "indexed_return": 110.39550183152156
+          },
+          {
+            "date": "2026-05-27",
+            "portfolio_value": 110376.38093494003,
+            "indexed_return": 110.37638093494002
+          },
+          {
+            "date": "2026-05-28",
+            "portfolio_value": 110985.27825617424,
+            "indexed_return": 110.98527825617424
+          },
+          {
+            "date": "2026-05-29",
+            "portfolio_value": 111261.78617002607,
+            "indexed_return": 111.26178617002607
+          }
+        ]
+      }
+    },
+    "underwater": {
+      "anchor": {
+        "inception_date": "2026-04-09",
+        "definition": "drawdown vs inception-anchored running peak (<=0)"
+      },
+      "series": {
+        "claude": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.0018094694191865823
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.0014162863781840285
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.007524649833297592
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": -0.010081247333965426
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": -0.008098378076839108
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": -0.008413531364006466
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.010123888360491828
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": -0.00904454807477617
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.0036232805906744048
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": -0.001628501742191757
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.003086955976265182
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.009034661001351973
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.0101693635879756
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.016157835558720968
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.01524516506988649
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.014942588785817112
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": -0.015077905420659454
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": -0.013837254383386677
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.014991598526888583
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": -0.005300511027189203
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": -0.011258375431046352
+          }
+        ],
+        "gpt": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": -0.00863925886537975
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.015485577571300535
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.012306148314280008
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": -0.0029625663148896697
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.014984524433276358
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": -0.012487062850408126
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": -0.007201112794504527
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": -0.00634741448483267
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.013680371284386927
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": -0.0018256942701068146
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.006396193500925573
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.01942781579416919
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": -0.013995568850270645
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": -0.001974536366691093
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.006108445911465199
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.007039272494460569
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.015139352981322407
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.01526531517077856
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.013718924658414622
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": -0.003954837963392466
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.00860057345499976
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": 0.0
+          }
+        ],
+        "gemini": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": -0.0013911549927283495
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": -0.012502686364666116
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.01645348120915513
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.007465613890232592
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.00585470819813716
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.004041647024155215
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.006580390748427867
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": -0.00029148696853376066
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.007197378971415369
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": -0.007644261387429796
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": -0.0032646929920678858
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.011841361098587688
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.005382222154364236
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.013211886978430787
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.005376743311957366
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.004942424750687513
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.018829923688472805
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": -0.012815850147246177
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": -0.006517307023411689
+          }
+        ],
+        "grok": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": -0.0018115886613218057
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": -0.00813547124914682
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.01560904641598726
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.009546892456480993
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": -0.005914346755764743
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.01846047185644517
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": -0.020768217893926133
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": -0.012898868643079764
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": -0.014951230933849535
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.017605492581165616
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": -0.008957190366317258
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": -0.0015504223356157532
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.0008035817534106648
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": -0.0022710001558547965
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.01917479534601796
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": -0.01840814731485274
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": -0.000374033890383374
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.006724360186051381
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.00655786018030502
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.012036907056903301
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.007399551502755619
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.012113052349119746
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": -0.0014604919842362563
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.007194091175726669
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": -0.00033345665884410014
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": 0.0
+          }
+        ],
+        "deepseek": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": -0.0035077768579482305
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": -0.008122613140147728
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.013643714372116533
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.013753114321774729
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": -0.00269288235784626
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.009276981984598254
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.006589256118353148
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.0031848115848179814
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.013375935058497879
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": -0.011955024141230286
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": -0.0003528471164032654
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.005900274812492223
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.0020555419550950527
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.009315115632606674
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.002653641391405892
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.004408898356855984
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": -0.004490221371051817
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.005616198028396413
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": -0.0025280913892269385
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": -0.0035730714158979104
+          }
+        ],
+        "claude_opus": [
+          {
+            "date": "2026-04-09",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-10",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-13",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-15",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-16",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-17",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-20",
+            "drawdown": -0.002097256531420455
+          },
+          {
+            "date": "2026-04-21",
+            "drawdown": -0.004302650764801741
+          },
+          {
+            "date": "2026-04-22",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-23",
+            "drawdown": -0.0011001452959422675
+          },
+          {
+            "date": "2026-04-24",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-04-27",
+            "drawdown": -0.00024083209225445046
+          },
+          {
+            "date": "2026-04-28",
+            "drawdown": -0.008185103237298152
+          },
+          {
+            "date": "2026-04-29",
+            "drawdown": -0.0035489335497879138
+          },
+          {
+            "date": "2026-04-30",
+            "drawdown": -0.007899871762844235
+          },
+          {
+            "date": "2026-05-01",
+            "drawdown": -0.002477473339044134
+          },
+          {
+            "date": "2026-05-04",
+            "drawdown": -0.007779881863488325
+          },
+          {
+            "date": "2026-05-05",
+            "drawdown": -0.004755027297351222
+          },
+          {
+            "date": "2026-05-06",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-07",
+            "drawdown": -0.0026638613375878917
+          },
+          {
+            "date": "2026-05-08",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-11",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-12",
+            "drawdown": -0.012270050615020622
+          },
+          {
+            "date": "2026-05-13",
+            "drawdown": -0.003670222170688242
+          },
+          {
+            "date": "2026-05-14",
+            "drawdown": 0.0
+          },
+          {
+            "date": "2026-05-15",
+            "drawdown": -0.0105775315234089
+          },
+          {
+            "date": "2026-05-18",
+            "drawdown": -0.016270860538993515
+          },
+          {
+            "date": "2026-05-19",
+            "drawdown": -0.022430696314416854
+          },
+          {
+            "date": "2026-05-20",
+            "drawdown": -0.015094331820856732
+          },
+          {
+            "date": "2026-05-21",
+            "drawdown": -0.015569431351160845
+          },
+          {
+            "date": "2026-05-22",
+            "drawdown": -0.013067705118815054
+          },
+          {
+            "date": "2026-05-26",
+            "drawdown": -0.011702856767145775
+          },
+          {
+            "date": "2026-05-27",
+            "drawdown": -0.013360340280110794
+          },
+          {
+            "date": "2026-05-28",
+            "drawdown": -0.004660847574739613
+          },
+          {
+            "date": "2026-05-29",
+            "drawdown": -0.005806168355465324
+          }
+        ]
+      }
+    },
+    "correlation_matrix": {
+      "models": [
+        "claude",
+        "gpt",
+        "gemini",
+        "grok",
+        "deepseek",
+        "claude_opus"
+      ],
+      "action_concordance": {
+        "claude": {
+          "claude": 1.0,
+          "gpt": 0.5430691869623167,
+          "gemini": 0.2277777777777778,
+          "grok": 0.2916666666666667,
+          "deepseek": 0.5708621625288292,
+          "claude_opus": 0.8106565896920227
+        },
+        "gpt": {
+          "claude": 0.5430691869623167,
+          "gpt": 1.0,
+          "gemini": 0.625,
+          "grok": 0.4583333333333333,
+          "deepseek": 0.21626984126984128,
+          "claude_opus": 0.5356309523809524
+        },
+        "gemini": {
+          "claude": 0.2277777777777778,
+          "gpt": 0.625,
+          "gemini": 1.0,
+          "grok": 1.0,
+          "deepseek": 0.1111111111111111,
+          "claude_opus": 0.23529411764705882
+        },
+        "grok": {
+          "claude": 0.2916666666666667,
+          "gpt": 0.4583333333333333,
+          "gemini": 1.0,
+          "grok": 1.0,
+          "deepseek": 0.1,
+          "claude_opus": 0.13725490196078433
+        },
+        "deepseek": {
+          "claude": 0.5708621625288292,
+          "gpt": 0.21626984126984128,
+          "gemini": 0.1111111111111111,
+          "grok": 0.1,
+          "deepseek": 1.0,
+          "claude_opus": 0.5315570672713529
+        },
+        "claude_opus": {
+          "claude": 0.8106565896920227,
+          "gpt": 0.5356309523809524,
+          "gemini": 0.23529411764705882,
+          "grok": 0.13725490196078433,
+          "deepseek": 0.5315570672713529,
+          "claude_opus": 1.0
+        }
+      },
+      "weight_correlation": {
+        "claude": {
+          "claude": 1.0,
+          "gpt": 0.5393571619768684,
+          "gemini": 0.18104837854274186,
+          "grok": 0.21090367561676784,
+          "deepseek": 0.08200199568858446,
+          "claude_opus": 0.651476931831256
+        },
+        "gpt": {
+          "claude": 0.5393571619768684,
+          "gpt": 1.0,
+          "gemini": 0.12735301928952392,
+          "grok": 0.2857342169246747,
+          "deepseek": 0.16351957363424197,
+          "claude_opus": 0.5140351493696848
+        },
+        "gemini": {
+          "claude": 0.18104837854274186,
+          "gpt": 0.12735301928952392,
+          "gemini": 1.0,
+          "grok": 0.527503820144526,
+          "deepseek": 0.4901426194299215,
+          "claude_opus": 0.12880515591694697
+        },
+        "grok": {
+          "claude": 0.21090367561676784,
+          "gpt": 0.2857342169246747,
+          "gemini": 0.527503820144526,
+          "grok": 1.0,
+          "deepseek": 0.5928901702486808,
+          "claude_opus": -0.03062103132930629
+        },
+        "deepseek": {
+          "claude": 0.08200199568858446,
+          "gpt": 0.16351957363424197,
+          "gemini": 0.4901426194299215,
+          "grok": 0.5928901702486808,
+          "deepseek": 1.0,
+          "claude_opus": 0.1568140774563568
+        },
+        "claude_opus": {
+          "claude": 0.651476931831256,
+          "gpt": 0.5140351493696848,
+          "gemini": 0.12880515591694697,
+          "grok": -0.03062103132930629,
+          "deepseek": 0.1568140774563568,
+          "claude_opus": 1.0
+        }
+      },
+      "n_shared_ticks": {
+        "claude": {
+          "claude": 0,
+          "gpt": 131,
+          "gemini": 27,
+          "grok": 24,
+          "deepseek": 18,
+          "claude_opus": 254
+        },
+        "gpt": {
+          "claude": 131,
+          "gpt": 0,
+          "gemini": 8,
+          "grok": 8,
+          "deepseek": 12,
+          "claude_opus": 100
+        },
+        "gemini": {
+          "claude": 27,
+          "gpt": 8,
+          "gemini": 0,
+          "grok": 2,
+          "deepseek": 3,
+          "claude_opus": 17
+        },
+        "grok": {
+          "claude": 24,
+          "gpt": 8,
+          "gemini": 2,
+          "grok": 0,
+          "deepseek": 5,
+          "claude_opus": 17
+        },
+        "deepseek": {
+          "claude": 18,
+          "gpt": 12,
+          "gemini": 3,
+          "grok": 5,
+          "deepseek": 0,
+          "claude_opus": 21
+        },
+        "claude_opus": {
+          "claude": 254,
+          "gpt": 100,
+          "gemini": 17,
+          "grok": 17,
+          "deepseek": 21,
+          "claude_opus": 0
+        }
+      },
+      "methodology_ref": "RQ1 join: data_inputs_hash + raw_decisions, >=3 shared tickers; action_concordance = 3-way BUY/SELL/HOLD exact-match rate; weight_correlation = Pearson r of target_weight vectors. The RQ1 headline scalar is the OBSERVATION-WEIGHTED pooled mean of the off-diagonal cells (each cell weighted by its n_shared_ticks); the unweighted mean of the cells differs and is not the headline. Thin cells (low n_shared_ticks, e.g. Gemini pairs reduced by its open-bell failures) should be read with their n_shared_ticks."
+    },
+    "equity_curve_carries_shakedown_fabrication": true
+  },
+  "cross_model_behavioral": {
+    "per_model_trade_activity": {
+      "claude": {
+        "trade_count": 256,
+        "buy_count": 130,
+        "sell_count": 126,
+        "trades_per_active_day": 12.8,
+        "active_trading_days": 20
+      },
+      "gpt": {
+        "trade_count": 665,
+        "buy_count": 319,
+        "sell_count": 346,
+        "trades_per_active_day": 33.25,
+        "active_trading_days": 20
+      },
+      "gemini": {
+        "trade_count": 439,
+        "buy_count": 241,
+        "sell_count": 198,
+        "trades_per_active_day": 21.95,
+        "active_trading_days": 20
+      },
+      "grok": {
+        "trade_count": 591,
+        "buy_count": 317,
+        "sell_count": 274,
+        "trades_per_active_day": 29.55,
+        "active_trading_days": 20
+      },
+      "deepseek": {
+        "trade_count": 551,
+        "buy_count": 263,
+        "sell_count": 288,
+        "trades_per_active_day": 27.55,
+        "active_trading_days": 20
+      },
+      "claude_opus": {
+        "trade_count": 345,
+        "buy_count": 174,
+        "sell_count": 171,
+        "trades_per_active_day": 17.25,
+        "active_trading_days": 20
+      }
+    },
+    "per_model_reversal_churn_rate": {
+      "claude": {
+        "reversal_flip_rate": 0.6722689075630253,
+        "n_flips": 160,
+        "n_reversal_pairs": 238
+      },
+      "gpt": {
+        "reversal_flip_rate": 0.3333333333333333,
+        "n_flips": 219,
+        "n_reversal_pairs": 657
+      },
+      "gemini": {
+        "reversal_flip_rate": 0.60431654676259,
+        "n_flips": 252,
+        "n_reversal_pairs": 417
+      },
+      "grok": {
+        "reversal_flip_rate": 0.531951640759931,
+        "n_flips": 308,
+        "n_reversal_pairs": 579
+      },
+      "deepseek": {
+        "reversal_flip_rate": 0.5233644859813084,
+        "n_flips": 280,
+        "n_reversal_pairs": 535
+      },
+      "claude_opus": {
+        "reversal_flip_rate": 0.6407185628742516,
+        "n_flips": 214,
+        "n_reversal_pairs": 334
+      }
+    },
+    "definition_refs": {
+      "reversal_flip_rate": "in-window executed trades reversing the prior executed side on the same ticker / in-window trades with a known prior side (scripts/behavioral_summary.flip_rate; full-history prior side).",
+      "trade_activity": "executed BUY/SELL only (HOLDs excluded), calendar month."
+    },
+    "window": "calendar_month",
+    "pilot_exploratory": true,
+    "rq1": {
+      "primary": {
+        "status": "not_estimable",
+        "reason": "single_pair_cohort",
+        "deferred_to": "phase_b"
+      },
+      "exploratory_pairwise": {
+        "observed_action_concordance": 0.5960258443256897,
+        "null_action_concordance_mean": 0.47068576039279286,
+        "concordance_excess_over_chance": 0.12534008393289686,
+        "permutation_p_value": 0.001996007984031936,
+        "observed_weight_correlation": 0.4867935222771386,
+        "ci_action_concordance": {
+          "low": 0.5758187833454292,
+          "high": 0.61495272856687
+        },
+        "n_pairwise_observations": 647,
+        "n_ticks": 257,
+        "canonical_definition_ref": "research_metrics.compute_rq1 / v1.json RQ1",
+        "window": "calendar_month",
+        "pilot_exploratory": true,
+        "reasons": {
+          "gemini": "completeness",
+          "deepseek": "model_splice",
+          "claude": "corrupt_book",
+          "claude_opus": "corrupt_book"
+        }
+      }
+    },
+    "cross_model_episode_register": []
+  },
+  "profiles": [
+    {
+      "model": "claude",
+      "display_name": "Claude Sonnet 4.6",
+      "cohort": "core",
+      "evidence_metrics": {
+        "monthly_return": 0.018019430279006876,
+        "cumulative_return": 0.11648225721855376,
+        "trade_count": 256,
+        "trades_per_active_day": 12.8,
+        "reversal_flip_rate": 0.6722689075630253,
+        "turnover_mean_daily": 0.35163549427754,
+        "concentration_mean_daily_hhi": 0.09270712278150732,
+        "avg_position_size_mean_daily": 0.06759919708840262,
+        "cash_pct_mean_daily": 0.015718583794702964,
+        "avg_hold_days": 3.2325581395348837,
+        "median_hold_days": 1.0,
+        "same_day_exits": 11,
+        "n_closed_trades": 43,
+        "win_rate_day_level": 0.5263157894736842,
+        "rq3_confidence_outcome_corr": null,
+        "rq2_disposition_difference": null
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "AXP",
+            "action": "SELL",
+            "value": 8925.14,
+            "date": "2026-05-01"
+          },
+          {
+            "ticker": "AAPL",
+            "action": "BUY",
+            "value": 8818.97,
+            "date": "2026-05-01"
+          },
+          {
+            "ticker": "ABBV",
+            "action": "SELL",
+            "value": 7316.36,
+            "date": "2026-05-06"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": [
+          {
+            "timestamp": "2026-05-06T15:32:18.097252",
+            "type": "api_error"
+          }
+        ]
+      },
+      "style_tag": null,
+      "risk_posture_tag": null,
+      "strengths": null,
+      "weaknesses": null,
+      "status": "non_estimable",
+      "decision_completeness": 0.9961
+    },
+    {
+      "model": "gpt",
+      "display_name": "GPT-5.4",
+      "cohort": "core",
+      "evidence_metrics": {
+        "monthly_return": 0.06478913288545685,
+        "cumulative_return": 0.19521720719927416,
+        "trade_count": 665,
+        "trades_per_active_day": 33.25,
+        "reversal_flip_rate": 0.3333333333333333,
+        "turnover_mean_daily": 0.5007200318241425,
+        "concentration_mean_daily_hhi": 0.08314833686418836,
+        "avg_position_size_mean_daily": 0.062472383814022606,
+        "cash_pct_mean_daily": 0.015578726546166797,
+        "avg_hold_days": 4.615384615384615,
+        "median_hold_days": 2.0,
+        "same_day_exits": 11,
+        "n_closed_trades": 78,
+        "win_rate_day_level": 0.5789473684210527,
+        "rq3_confidence_outcome_corr": 0.10386930352598812,
+        "rq2_disposition_difference": -0.1574257747475359
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "WMT",
+            "action": "BUY",
+            "value": 7055.45,
+            "date": "2026-05-14"
+          },
+          {
+            "ticker": "COST",
+            "action": "BUY",
+            "value": 7017.74,
+            "date": "2026-05-18"
+          },
+          {
+            "ticker": "MSFT",
+            "action": "BUY",
+            "value": 6911.81,
+            "date": "2026-05-12"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": []
+      },
+      "style_tag": "High-frequency, low-reversal directional",
+      "risk_posture_tag": "Fully invested, efficient",
+      "strengths": [
+        "Best May return (+6.5%) and best Sharpe (4.65)",
+        "Busiest trader (33/day) yet lowest reversal (0.33) - high throughput without thrashing",
+        "Well-calibrated this month (+0.10)"
+      ],
+      "weaknesses": [
+        "Highest volatility (0.175) - biggest swings, though compensated",
+        "Near-zero cash (1.6%) - no dry powder",
+        "665 trades - highest cost/slippage exposure once live"
+      ],
+      "status": "estimable_primary",
+      "decision_completeness": 1.0
+    },
+    {
+      "model": "gemini",
+      "display_name": "Gemini 3.1 Pro",
+      "cohort": "core",
+      "evidence_metrics": {
+        "monthly_return": 0.03212981989055663,
+        "cumulative_return": 0.1000032924711951,
+        "trade_count": 439,
+        "trades_per_active_day": 21.95,
+        "reversal_flip_rate": 0.60431654676259,
+        "turnover_mean_daily": 0.9064775183616888,
+        "concentration_mean_daily_hhi": 0.06969357183430842,
+        "avg_position_size_mean_daily": 0.061926334520854574,
+        "cash_pct_mean_daily": 0.042940220024737526,
+        "avg_hold_days": 4.553571428571429,
+        "median_hold_days": 2.0,
+        "same_day_exits": 24,
+        "n_closed_trades": 112,
+        "win_rate_day_level": 0.5789473684210527,
+        "rq3_confidence_outcome_corr": 0.08219699471271535,
+        "rq2_disposition_difference": -0.07181259600614441
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "WMT",
+            "action": "BUY",
+            "value": 11027.66,
+            "date": "2026-05-27"
+          },
+          {
+            "ticker": "AMZN",
+            "action": "BUY",
+            "value": 11027.65,
+            "date": "2026-05-27"
+          },
+          {
+            "ticker": "LLY",
+            "action": "SELL",
+            "value": 11009.55,
+            "date": "2026-05-26"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": [
+          {
+            "timestamp": "2026-05-04T13:52:09.012030",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T14:24:46.240403",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T14:51:59.395158",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T15:21:48.454223",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T16:46:44.610116",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T17:22:00.003871",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-04T17:44:02.846818",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-05T13:52:15.342330",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-05T14:19:44.176547",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T14:32:20.404623",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T15:05:33.534832",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T15:35:50.734002",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T16:06:53.607721",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T16:31:49.519037",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T17:01:55.565693",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T17:38:35.867625",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T18:11:03.981117",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-05T18:36:12.282259",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T13:52:05.486231",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-06T14:21:24.525866",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T14:32:04.605694",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T15:02:14.088817",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T15:32:07.086164",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T16:03:56.020537",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T16:32:04.368423",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T17:12:34.224911",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-06T17:35:24.506244",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T18:14:07.442639",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-06T18:37:31.830305",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-06T19:11:56.713063",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-06T19:35:55.476617",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T13:52:01.611193",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-07T14:11:18.787779",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T14:31:58.124971",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T15:02:57.731221",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T15:31:59.104606",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T16:02:34.115425",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T16:31:53.196032",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T17:02:17.177405",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T17:33:24.779483",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T18:02:17.384275",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T18:32:24.466145",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-07T19:12:14.412732",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-07T19:31:53.475180",
+            "type": "rate_limit"
+          },
+          {
+            "timestamp": "2026-05-08T13:52:00.542068",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-08T14:22:28.195239",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T14:52:29.917474",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T15:22:01.246738",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T15:52:03.826327",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T16:23:17.790283",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-08T16:51:48.541389",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-08T17:22:08.448506",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T17:46:00.775330",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-08T18:13:59.584915",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-08T18:52:12.656982",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T13:51:54.765933",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T14:22:01.497087",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T14:52:12.393775",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T15:21:49.377937",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T15:52:06.968806",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T16:22:42.917046",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T16:52:16.792181",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T17:22:10.569864",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T17:51:55.420413",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T18:23:54.414018",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-11T18:52:25.409403",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T19:21:52.947869",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-11T19:51:46.392830",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T13:52:20.657313",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T14:23:11.890592",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T14:52:02.115633",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T15:22:10.539114",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T15:55:42.073344",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T16:23:01.313726",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T16:52:00.935394",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T17:21:56.103507",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-12T17:52:22.077782",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T18:22:15.121123",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T18:53:35.018160",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T19:22:33.540360",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-12T19:52:32.256548",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T13:53:54.212179",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T14:22:35.740890",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T14:52:11.660015",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T15:23:37.225137",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T15:51:54.233513",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T16:22:31.892027",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T16:52:15.532505",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-13T17:22:34.461167",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T17:52:00.491508",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T18:22:17.784834",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-13T18:50:56.431141",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-14T13:51:04.918342",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-14T14:23:13.359608",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-14T14:52:20.787664",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-14T15:22:25.904701",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-14T15:52:14.175024",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-14T16:52:23.382719",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T13:50:37.596520",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T14:23:41.777945",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T14:52:25.614595",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T15:22:17.004051",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T15:52:05.253354",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T16:23:22.762584",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-15T16:52:22.884063",
+            "type": "cancelled"
+          },
+          {
+            "timestamp": "2026-05-15T18:12:36.108913",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-18T15:22:19.651206",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-18T17:51:54.596374",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-20T14:15:45.786846",
+            "type": "deadline_timeout"
+          },
+          {
+            "timestamp": "2026-05-27T17:04:17.287619",
+            "type": "json_parse_error"
+          },
+          {
+            "timestamp": "2026-05-27T18:35:06.379366",
+            "type": "json_parse_error"
+          }
+        ]
+      },
+      "style_tag": "Uncharacterizable this month - 43% of decisions failed",
+      "risk_posture_tag": "Operationally unreliable",
+      "strengths": [
+        "(Provisional, on the 57% of ticks it executed) nominally 3rd in May (+3.2%) and 3rd Sharpe (2.81) - when it acted, it performed"
+      ],
+      "weaknesses": [
+        "43% API failure rate (111 errors: 70 timeout, 30 rate-limit, 9 cancelled, 2 JSON) - 43% of decision points never executed",
+        "#6 cumulative, the only model below SPY",
+        "Every metric - including the May return and Sharpe - is computed on a selection-biased 57% record, not comparable to fully-executing peers"
+      ],
+      "status": "performance_only",
+      "decision_completeness": 0.5681
+    },
+    {
+      "model": "grok",
+      "display_name": "Grok 4.20 (Reasoning)",
+      "cohort": "core",
+      "evidence_metrics": {
+        "monthly_return": 0.03496560528738968,
+        "cumulative_return": 0.16267138534037406,
+        "trade_count": 591,
+        "trades_per_active_day": 29.55,
+        "reversal_flip_rate": 0.531951640759931,
+        "turnover_mean_daily": 0.7583369168582539,
+        "concentration_mean_daily_hhi": 0.0665370847890557,
+        "avg_position_size_mean_daily": 0.05349923194030574,
+        "cash_pct_mean_daily": 0.013019668179904575,
+        "avg_hold_days": 5.228260869565218,
+        "median_hold_days": 3.5,
+        "same_day_exits": 9,
+        "n_closed_trades": 92,
+        "win_rate_day_level": 0.631578947368421,
+        "rq3_confidence_outcome_corr": -0.12612707002806534,
+        "rq2_disposition_difference": -0.05592845389897195
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "TSLA",
+            "action": "SELL",
+            "value": 9996.83,
+            "date": "2026-05-15"
+          },
+          {
+            "ticker": "CSCO",
+            "action": "SELL",
+            "value": 7980.47,
+            "date": "2026-05-19"
+          },
+          {
+            "ticker": "CRM",
+            "action": "SELL",
+            "value": 7759.7,
+            "date": "2026-05-28"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": [
+          {
+            "timestamp": "2026-05-15T16:34:13.198446",
+            "type": "rate_limit"
+          }
+        ]
+      },
+      "style_tag": "Active two-way trader",
+      "risk_posture_tag": "Aggressively deployed",
+      "strengths": [
+        "2nd-best May (+3.5%) and Sharpe (3.30)",
+        "Highest day win rate (0.63) - positive on the most days",
+        "Balanced two-way activity (317 buys / 274 sells)"
+      ],
+      "weaknesses": [
+        "Lowest cash of all (1.3%) - no buffer",
+        "Negative calibration this month (-0.13) - confident on the wrong calls",
+        "High turnover (0.76)"
+      ],
+      "status": "estimable_primary",
+      "decision_completeness": 0.9961
+    },
+    {
+      "model": "deepseek",
+      "display_name": "DeepSeek V4 Pro",
+      "cohort": "core",
+      "evidence_metrics": {
+        "monthly_return": 0.023658948075639064,
+        "cumulative_return": 0.22665317693305576,
+        "trade_count": 551,
+        "trades_per_active_day": 27.55,
+        "reversal_flip_rate": 0.5233644859813084,
+        "turnover_mean_daily": 0.3451732398995703,
+        "concentration_mean_daily_hhi": 0.033150650032629236,
+        "avg_position_size_mean_daily": 0.029854231489493788,
+        "cash_pct_mean_daily": 0.022106237911418525,
+        "avg_hold_days": 6.795698924731183,
+        "median_hold_days": 4.0,
+        "same_day_exits": 7,
+        "n_closed_trades": 93,
+        "win_rate_day_level": 0.5263157894736842,
+        "rq3_confidence_outcome_corr": 0.081453322874341,
+        "rq2_disposition_difference": -0.04025792047258287
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "INTC",
+            "action": "SELL",
+            "value": 5734.41,
+            "date": "2026-05-12"
+          },
+          {
+            "ticker": "MS",
+            "action": "SELL",
+            "value": 4858.54,
+            "date": "2026-05-18"
+          },
+          {
+            "ticker": "TMUS",
+            "action": "BUY",
+            "value": 4821.97,
+            "date": "2026-05-12"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": []
+      },
+      "style_tag": "Diversified, low-turnover, long-hold",
+      "risk_posture_tag": "Broad book, patient",
+      "strengths": [
+        "Most diversified book (HHI 0.033, smallest avg position) - lowest single-name risk of the cohort",
+        "Longest holds (6.8d avg) and lowest turnover (0.345) - minimal churn",
+        "#1 cumulative (+22.7%)"
+      ],
+      "weaknesses": [
+        "Middling May (+2.4%, 4th) - the #1 standing is front-loaded in the April window, not current form",
+        "Lowest-tier day win rate (0.53)"
+      ],
+      "status": "provisional_model_splice",
+      "decision_completeness": 1.0
+    },
+    {
+      "model": "claude_opus",
+      "display_name": "Claude Opus 4.6",
+      "cohort": "expansion",
+      "evidence_metrics": {
+        "monthly_return": 0.01854265564281765,
+        "cumulative_return": 0.1364002545783518,
+        "trade_count": 345,
+        "trades_per_active_day": 17.25,
+        "reversal_flip_rate": 0.6407185628742516,
+        "turnover_mean_daily": 0.4398893671349697,
+        "concentration_mean_daily_hhi": 0.06744402431533404,
+        "avg_position_size_mean_daily": 0.05827961212218193,
+        "cash_pct_mean_daily": 0.07130708321090594,
+        "avg_hold_days": 3.736842105263158,
+        "median_hold_days": 1.0,
+        "same_day_exits": 12,
+        "n_closed_trades": 38,
+        "win_rate_day_level": 0.5263157894736842,
+        "rq3_confidence_outcome_corr": null,
+        "rq2_disposition_difference": null
+      },
+      "notable_events": {
+        "top_trades_by_value": [
+          {
+            "ticker": "MSFT",
+            "action": "BUY",
+            "value": 6776.56,
+            "date": "2026-05-06"
+          },
+          {
+            "ticker": "META",
+            "action": "BUY",
+            "value": 6765.8,
+            "date": "2026-05-27"
+          },
+          {
+            "ticker": "MSFT",
+            "action": "BUY",
+            "value": 6733.76,
+            "date": "2026-05-20"
+          }
+        ],
+        "stop_loss_triggers": [],
+        "drawdown_halt_triggers": [],
+        "api_json_errors": [
+          {
+            "timestamp": "2026-05-06T15:32:02.474764",
+            "type": "api_error"
+          },
+          {
+            "timestamp": "2026-05-06T16:04:22.486045",
+            "type": "api_error"
+          }
+        ]
+      },
+      "style_tag": null,
+      "risk_posture_tag": null,
+      "strengths": null,
+      "weaknesses": null,
+      "status": "non_estimable",
+      "decision_completeness": 0.9922
+    }
+  ],
+  "methodology_data_integrity_rq": {
+    "data_integrity": {
+      "incidents": [
+        {
+          "id": "may26_silent_outage",
+          "date": "2026-05-26",
+          "type": "missing_ticks",
+          "scope": "all_models (systemic)",
+          "detail": "Silent scheduler outage: 3 decision periods missing on 2026-05-26 (10 ticks logged vs the 13-tick healthy cadence), uniform across all six models. Gap spans the ~15:0x-16:0x UTC (~11:00-12:00 ET) window."
+        },
+        {
+          "id": "may27_gemini_json_failure",
+          "date": "2026-05-27",
+          "type": "response_parse_failure",
+          "scope": "gemini",
+          "detail": "Two Gemini ticks on 2026-05-27 (17:04 and 18:35 UTC) failed with 'Model response was not valid JSON even after repair: Unterminated string' \u2014 counted in Gemini's api_failures; no decision recorded."
+        },
+        {
+          "id": "may27_cancelled_run_noise",
+          "date": "2026-05-27",
+          "type": "operational_noise",
+          "scope": "pipeline",
+          "detail": "Cancelled-run noise on 2026-05-27 did NOT corrupt the committed logs: no duplicate (date,timestamp) records were found in any model's May JSONL. Related Gemini '499 operation was cancelled' API errors (9 in May) are folded into Gemini's failure-mode breakdown."
+        },
+        {
+          "id": "gemini_high_failure_rate",
+          "date": "2026-05 (month)",
+          "type": "elevated_api_failure_rate",
+          "scope": "gemini",
+          "detail": "Gemini May api-failure rate is elevated (open-bell congestion). Failure-mode mix this month: 30x 429 You exceeded your current quota, ple, 27x 504 Deadline expired before operation co, 24x Timeout of 600.0s exceeded, last excepti, 19x 504 Deadline Exceeded, 9x 499 The operation was cancelled., 2x Model response was not valid JSON even a. Missingness is MAR|tick-position (monotonic tick-position gradient, market-state independent r=-0.12); reduces power for every Gemini estimate and is handled by tick-position conditioning per docs/Gemini-selection-bias-characterization-and-per-RQ-handling.md."
+        },
+        {
+          "id": "deepseek_midmonth_repoint",
+          "date": "2026-05-21",
+          "type": "model_snapshot_change",
+          "scope": "deepseek",
+          "detail": "DeepSeek floating alias repointed mid-month: model_id_returned changed deepseek-v4-flash -> deepseek-v4-pro on 2026-05-21 (deliberate: v4-flash is sub-frontier; v4-pro restores cohort parity). May DeepSeek data spans two snapshots; recorded in report_meta.pinned_snapshots."
+        }
+      ],
+      "per_model_failure_rate": {
+        "claude": {
+          "records": 257,
+          "api_success": 256,
+          "api_failures": 1,
+          "failure_rate": 0.0038910505836575876
+        },
+        "gpt": {
+          "records": 257,
+          "api_success": 257,
+          "api_failures": 0,
+          "failure_rate": 0.0
+        },
+        "gemini": {
+          "records": 257,
+          "api_success": 146,
+          "api_failures": 111,
+          "failure_rate": 0.43190661478599224
+        },
+        "grok": {
+          "records": 257,
+          "api_success": 256,
+          "api_failures": 1,
+          "failure_rate": 0.0038910505836575876
+        },
+        "deepseek": {
+          "records": 257,
+          "api_success": 257,
+          "api_failures": 0,
+          "failure_rate": 0.0
+        },
+        "claude_opus": {
+          "records": 257,
+          "api_success": 255,
+          "api_failures": 2,
+          "failure_rate": 0.007782101167315175
+        }
+      },
+      "missing_tick_count": 3,
+      "missing_ticks_by_date": {
+        "2026-05-26": 3
+      },
+      "healthy_ticks_per_day_modal": 13,
+      "notes": "Failure rate = api_failures / records over the calendar month. A failed tick still writes a record (no decision). Missing ticks are decision periods with zero records for any model (systemic), distinct from per-model api failures. The 2026-04-09-22 Anthropic state-file commingling defect is pre-May and excluded by the >=2026-04-23 pilot-window rule; it does not affect May data."
+    },
+    "rq_update": {
+      "point_estimates": {
+        "RQ1": {
+          "title": "Decision convergence under identical information sets",
+          "value_observed_action_concordance": 0.5960258443256897,
+          "null_mean": 0.47068576039279286,
+          "excess_over_chance": 0.12534008393289686,
+          "permutation_p_value": 0.001996007984031936,
+          "ci_90": {
+            "low": 0.5758187833454292,
+            "high": 0.61495272856687
+          },
+          "by_regime": {
+            "bull_trending": {
+              "n_observations": 647,
+              "observed_concordance": 0.5960258443256897,
+              "ci_low": 0.5758542962299033,
+              "ci_high": 0.6142695400326292
+            }
+          },
+          "canonical_definition_ref": "compute_rq1 / v1.json RQ1.metric_definition",
+          "window": "calendar_month",
+          "pilot_tag": "Phase A pilot / exploratory",
+          "status": "not_estimable"
+        },
+        "RQ2": {
+          "title": "Disposition effect in sequential trading",
+          "pooled_disposition_difference": -0.07969263107742033,
+          "pooled_PGR": 0.04854918612880396,
+          "pooled_PLR": 0.1282418172062243,
+          "pooled_ci_90": {
+            "low": -0.0913193002998009,
+            "high": -0.0685679517594282
+          },
+          "pooled_p_value": 0.0,
+          "n_sale_records": 990,
+          "per_model": {
+            "claude": {
+              "n_sale_records": 104,
+              "realized_gains": 66,
+              "realized_losses": 60,
+              "paper_gains": 1279,
+              "paper_losses": 191,
+              "PGR": 0.04907063197026022,
+              "PLR": 0.23904382470119523,
+              "disposition_difference": -0.189973192730935,
+              "disposition_ratio": 0.20527881040892193,
+              "ci_difference": {
+                "low": -0.2505821350664354,
+                "high": -0.13113642863082456
+              },
+              "p_value": 0.0,
+              "trust_flag": "non_estimable_corrupt_book"
+            },
+            "gpt": {
+              "n_sale_records": 226,
+              "realized_gains": 140,
+              "realized_losses": 206,
+              "paper_gains": 2601,
+              "paper_losses": 782,
+              "PGR": 0.05107624954396206,
+              "PLR": 0.20850202429149797,
+              "disposition_difference": -0.1574257747475359,
+              "disposition_ratio": 0.24496764344385688,
+              "ci_difference": {
+                "low": -0.18960438585341455,
+                "high": -0.12654773210391562
+              },
+              "p_value": 0.0,
+              "trust_flag": "estimable"
+            },
+            "gemini": {
+              "n_sale_records": 121,
+              "realized_gains": 97,
+              "realized_losses": 101,
+              "paper_gains": 1067,
+              "paper_losses": 550,
+              "PGR": 0.08333333333333333,
+              "PLR": 0.15514592933947774,
+              "disposition_difference": -0.07181259600614441,
+              "disposition_ratio": 0.537128712871287,
+              "ci_difference": {
+                "low": -0.10254670032596795,
+                "high": -0.04179438585831147
+              },
+              "p_value": 0.0,
+              "trust_flag": "exploratory_completeness"
+            },
+            "grok": {
+              "n_sale_records": 241,
+              "realized_gains": 123,
+              "realized_losses": 151,
+              "paper_gains": 2846,
+              "paper_losses": 1400,
+              "PGR": 0.04142809026608286,
+              "PLR": 0.0973565441650548,
+              "disposition_difference": -0.05592845389897195,
+              "disposition_ratio": 0.42552958942181796,
+              "ci_difference": {
+                "low": -0.06949776455879515,
+                "high": -0.04170066152879848
+              },
+              "p_value": 0.0,
+              "trust_flag": "estimable"
+            },
+            "deepseek": {
+              "n_sale_records": 183,
+              "realized_gains": 155,
+              "realized_losses": 133,
+              "paper_gains": 4240,
+              "paper_losses": 1628,
+              "PGR": 0.03526734926052332,
+              "PLR": 0.07552526973310619,
+              "disposition_difference": -0.04025792047258287,
+              "disposition_ratio": 0.466960917652493,
+              "ci_difference": {
+                "low": -0.05551091061222874,
+                "high": -0.024736745366597025
+              },
+              "p_value": 0.0,
+              "trust_flag": "exploratory_model_splice"
+            },
+            "claude_opus": {
+              "n_sale_records": 115,
+              "realized_gains": 105,
+              "realized_losses": 66,
+              "paper_gains": 1411,
+              "paper_losses": 323,
+              "PGR": 0.06926121372031663,
+              "PLR": 0.16966580976863754,
+              "disposition_difference": -0.10040459604832092,
+              "disposition_ratio": 0.4082213960182298,
+              "ci_difference": {
+                "low": -0.1429565835239683,
+                "high": -0.05985291787454392
+              },
+              "p_value": 0.0,
+              "trust_flag": "non_estimable_corrupt_book"
+            }
+          },
+          "canonical_definition_ref": "compute_rq2 helpers (_replay_avg_cost/_pgr_plr) / v1.json RQ2",
+          "windowing_note": "full-history avg-cost replay; sale records attributed by sale-date in the calendar month (behavioral_summary discipline).",
+          "window": "calendar_month",
+          "pilot_tag": "Phase A pilot / exploratory",
+          "status": "estimable_partial_cohort"
+        },
+        "RQ3": {
+          "title": "Confidence calibration on closed trades",
+          "pooled_confidence_outcome_corr": 0.07900945043785665,
+          "pooled_ece": 0.3931,
+          "pooled_brier": 0.3741,
+          "pooled_hit_rate": 0.3259,
+          "pooled_ci_90": {
+            "low": 0.0015057979283128317,
+            "high": 0.15558518002014726
+          },
+          "pooled_p_value": 0.0905,
+          "n_closed_trades": 456,
+          "calibration_curve": [
+            {
+              "confidence": 1,
+              "p_profitable": null,
+              "predicted": 0.1,
+              "count": 0
+            },
+            {
+              "confidence": 2,
+              "p_profitable": null,
+              "predicted": 0.2,
+              "count": 0
+            },
+            {
+              "confidence": 3,
+              "p_profitable": null,
+              "predicted": 0.3,
+              "count": 0
+            },
+            {
+              "confidence": 4,
+              "p_profitable": null,
+              "predicted": 0.4,
+              "count": 0
+            },
+            {
+              "confidence": 5,
+              "p_profitable": 0.25,
+              "predicted": 0.5,
+              "count": 4
+            },
+            {
+              "confidence": 6,
+              "p_profitable": 0.2667,
+              "predicted": 0.6,
+              "count": 60
+            },
+            {
+              "confidence": 7,
+              "p_profitable": 0.314,
+              "predicted": 0.7,
+              "count": 242
+            },
+            {
+              "confidence": 8,
+              "p_profitable": 0.3676,
+              "predicted": 0.8,
+              "count": 136
+            },
+            {
+              "confidence": 9,
+              "p_profitable": 0.4444,
+              "predicted": 0.9,
+              "count": 9
+            },
+            {
+              "confidence": 10,
+              "p_profitable": null,
+              "predicted": 1.0,
+              "count": 0
+            }
+          ],
+          "per_model": {
+            "claude": {
+              "n_closed_trades": 43,
+              "n_usable_confidence": 41,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": -0.1498160827540061,
+              "brier_score": 0.369,
+              "expected_calibration_error": 0.3878,
+              "overall_hit_rate": 0.2927,
+              "corr_ci": {
+                "low": -0.3957582826975895,
+                "high": 0.14162434395294426
+              },
+              "p_value": 0.351,
+              "trust_flag": "non_estimable_corrupt_book"
+            },
+            "gpt": {
+              "n_closed_trades": 78,
+              "n_usable_confidence": 75,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": 0.10386930352598812,
+              "brier_score": 0.3916,
+              "expected_calibration_error": 0.452,
+              "overall_hit_rate": 0.2533,
+              "corr_ci": {
+                "low": -0.15639692265045116,
+                "high": 0.3169879785116638
+              },
+              "p_value": 0.4865,
+              "trust_flag": "estimable"
+            },
+            "gemini": {
+              "n_closed_trades": 112,
+              "n_usable_confidence": 112,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": 0.08219699471271535,
+              "brier_score": 0.3625,
+              "expected_calibration_error": 0.3464,
+              "overall_hit_rate": 0.4196,
+              "corr_ci": {
+                "low": -0.050944530520343624,
+                "high": 0.22688111415254053
+              },
+              "p_value": 0.351,
+              "trust_flag": "exploratory_completeness"
+            },
+            "grok": {
+              "n_closed_trades": 92,
+              "n_usable_confidence": 92,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": -0.12612707002806534,
+              "brier_score": 0.3685,
+              "expected_calibration_error": 0.3543,
+              "overall_hit_rate": 0.3696,
+              "corr_ci": {
+                "low": -0.2921699843331858,
+                "high": 0.03903403541383558
+              },
+              "p_value": 0.1825000000000001,
+              "trust_flag": "estimable"
+            },
+            "deepseek": {
+              "n_closed_trades": 93,
+              "n_usable_confidence": 93,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": 0.081453322874341,
+              "brier_score": 0.399,
+              "expected_calibration_error": 0.4527,
+              "overall_hit_rate": 0.2688,
+              "corr_ci": {
+                "low": -0.07403958404871461,
+                "high": 0.21827240243750748
+              },
+              "p_value": 0.3715,
+              "trust_flag": "exploratory_model_splice"
+            },
+            "claude_opus": {
+              "n_closed_trades": 38,
+              "n_usable_confidence": 38,
+              "min_required": 20,
+              "sufficient": true,
+              "confidence_outcome_corr": 0.11166947580970252,
+              "brier_score": 0.3316,
+              "expected_calibration_error": 0.3737,
+              "overall_hit_rate": 0.2632,
+              "corr_ci": {
+                "low": -0.1290549138234686,
+                "high": 0.41510071866144
+              },
+              "p_value": 0.51,
+              "trust_flag": "non_estimable_corrupt_book"
+            }
+          },
+          "min_closed_trades_for_resolution": 20,
+          "canonical_definition_ref": "compute_rq3 helpers (_closed_trades/_calibration_stats) / v1.json RQ3",
+          "windowing_note": "full-history replay for correct entry confidence/cost basis; trades attributed by full-exit date in the calendar month.",
+          "window": "calendar_month",
+          "pilot_tag": "Phase A pilot / exploratory",
+          "status": "estimable_partial_cohort"
+        }
+      },
+      "accumulating_inputs": {
+        "RQ4": {
+          "title": "Systematic style-factor tilts (FF5 + Momentum)",
+          "status": "Open",
+          "factor_model": "Fama-French 5 (Mkt-RF, SMB, HML, RMW, CMA) + Momentum",
+          "per_model": {
+            "claude": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            },
+            "gpt": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            },
+            "gemini": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            },
+            "grok": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            },
+            "deepseek": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            },
+            "claude_opus": {
+              "n_days": 0,
+              "status": "insufficient",
+              "note": "Need >=10 aligned factor days."
+            }
+          },
+          "tag": "RAW ACCUMULATING INPUT \u2014 not a monthly point estimate; pooled at quarter.",
+          "window": "full Phase-A daily excess returns to date (factor regression; needs >=60 aligned days to resolve)",
+          "n_aligned_factor_days": 0,
+          "factor_data_last_date": "2026-03-31",
+          "blocking_reason": "Open: the Fama-French daily factor cache ends 2026-03-31 (Ken French Data Library publishes with a multi-week lag), while the experiment runs from 2026-04-09 onward \u2014 0 aligned factor days. RQ4 will populate once FF factors for the experiment window publish and >=60 aligned days accrue. Independent of any windowing choice.",
+          "canonical_definition_ref": "compute_rq4 / v1.json RQ4"
+        },
+        "RQ5": {
+          "title": "Path-dependent risk behavior under drawdown",
+          "status": "Testing",
+          "pilot_window_start": "2026-04-23",
+          "drawdown_threshold": -0.1,
+          "total_drawdown_days_across_models": 0,
+          "behavioral_metrics": [
+            "hhi",
+            "turnover",
+            "avg_position_size",
+            "cash_pct"
+          ],
+          "per_model": {
+            "claude": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            },
+            "gpt": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            },
+            "gemini": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            },
+            "grok": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            },
+            "deepseek": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            },
+            "claude_opus": {
+              "n_days": 26,
+              "n_drawdown_days": 0,
+              "status": "no_drawdown_contrast",
+              "note": "No 10% portfolio drawdown observed in the pilot window (or always in one)."
+            }
+          },
+          "headline_test": {
+            "status": "Testing",
+            "name": "drawdown_conditioned_concentration_response",
+            "model": "dHHI_trade = alpha_m + delta_p + beta*DD + epsilon",
+            "n_periods": 1974,
+            "n_models": 6,
+            "block_length": 13,
+            "block_length_rule": "round(n^(1/3))",
+            "beta": -0.013728547180946493,
+            "ci_low": -0.02807459078031202,
+            "ci_high": 0.0014217002864050487,
+            "ci_method": "BCa",
+            "headline_p_value": 0.118,
+            "sensitivity": {
+              "floor_L_over_2": {
+                "block_length": 6,
+                "p_value": 0.17
+              },
+              "2L": {
+                "block_length": 26,
+                "p_value": 0.064
+              }
+            },
+            "block_length_robust_proxy": false,
+            "note": "Headline p (at L) enters the BH family; the floor(L/2)/2L sensitivity runs do NOT. block_length_robust_proxy checks whether all three p-values land on the same side of q; BH-adjusted significance is evaluated at the family level."
+          },
+          "tag": "RAW ACCUMULATING INPUT \u2014 not a monthly point estimate; pooled at quarter.",
+          "window": "canonical Phase-A pilot window (>= 2026-04-23), self-filtered",
+          "bootstrap_note": "interim accumulating estimate at B=2000; quarterly pooling uses locked B=10000.",
+          "canonical_definition_ref": "compute_rq5 / v1.json RQ5"
+        },
+        "RQ6": {
+          "title": "Operational reproducibility of deployed agents",
+          "status": "Open",
+          "estimand": "Per-model run-to-run decision divergence Delta_m at the deployed configuration.",
+          "overall_mean_divergence": null,
+          "per_model": {},
+          "tag": "RAW ACCUMULATING INPUT \u2014 no frozen-context probe data yet (data/determinism/ empty).",
+          "window": "all determinism-probe data (manual off-peak frozen-context probe)",
+          "canonical_definition_ref": "compute_rq6 / v1.json RQ6"
+        }
+      },
+      "fdr_note": "Benjamini-Hochberg FDR (q=0.10, family RQ1-RQ5) is a live-phase confirmatory construct applied to one headline p-value per RQ; it is NOT computed for the pilot monthly. Monthly figures are Phase A pilot/exploratory only."
+    },
+    "known_caveats": {
+      "state_integrity": {
+        "bugs": [
+          {
+            "id": "launch_day_clobber",
+            "occurred": "2026-04-09",
+            "fix_date": "2026-04-10",
+            "fix_commit": "d2e862ca",
+            "models": "all_six"
+          },
+          {
+            "id": "cross_model_commingling",
+            "occurred": "2026-04-10/2026-04-21",
+            "fix_date": "2026-04-21",
+            "fix_commit": "cacd8058",
+            "models": [
+              "claude",
+              "claude_opus"
+            ]
+          }
+        ],
+        "per_model_fabrication": {
+          "claude": {
+            "count": 28,
+            "gross_usd": 233010
+          },
+          "claude_opus": {
+            "count": 32,
+            "gross_usd": 187658
+          },
+          "deepseek": {
+            "count": 1,
+            "gross_usd": 7570
+          },
+          "gemini": {
+            "count": 1,
+            "gross_usd": 5318
+          },
+          "grok": {
+            "count": 1,
+            "gross_usd": 4989
+          },
+          "gpt": {
+            "count": 1,
+            "gross_usd": 1104
+          }
+        },
+        "audit": {
+          "runs": "2800+",
+          "clean_after": "2026-04-23",
+          "clean_runs": {
+            "clean_april": 73,
+            "may": 257,
+            "early_june": 13
+          },
+          "anomalies": 0
+        },
+        "persistence": {
+          "stock_persists_for": [
+            "claude",
+            "claude_opus"
+          ],
+          "carried_forward": {
+            "claude": {
+              "phantom_cash": 297000
+            },
+            "claude_opus": {
+              "phantom_shorts": 575000
+            }
+          },
+          "scope": "phase_a_wide",
+          "consequence": "non_estimable"
+        },
+        "clean_window_figures_source": {
+          "gpt": "raw",
+          "deepseek": "raw",
+          "gemini": "defab",
+          "grok": "defab",
+          "claude": "not_estimable",
+          "claude_opus": "not_estimable"
+        }
+      },
+      "model_identity": {
+        "deepseek_model_splice": {
+          "alias": "deepseek-reasoner",
+          "transitions": [
+            {
+              "date": "2026-04-24",
+              "to": "v4-flash",
+              "note": "sub-frontier/off-spec, silent provider repoint"
+            },
+            {
+              "date": "2026-05-21",
+              "to": "v4-pro",
+              "note": null
+            }
+          ],
+          "off_spec_window": "2026-04-24 to 2026-05-21",
+          "detection": "undetected ~4 weeks; month-boundary-only check",
+          "performance_status": "real, retained model_spliced",
+          "decision_based_status": "exploratory",
+          "first_success_note": "first_date 2026-05-21 is the config-repoint boundary; first logged v4-pro success is 2026-05-22 (n_success unchanged; flagged because the model-identity analysis turns on this boundary)"
+        }
+      }
+    },
+    "inclusion_gates": {
+      "completeness_min": 0.8,
+      "uncorrupted_book": true,
+      "model_identity_stable": true,
+      "may_passing": [
+        "gpt",
+        "grok"
+      ]
+    },
+    "gate_scope_refinement": "book-integrity gate certifies point-return estimability, not daily-risk-path estimability when residual phantom sits in a volatile name; September pass"
+  }
+}
