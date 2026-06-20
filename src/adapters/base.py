@@ -365,7 +365,12 @@ class BaseAdapter(ABC):
             if not isinstance(d, dict):
                 continue
             action = str(d.get("action", "")).upper()
-            if action not in ("BUY", "SELL", "HOLD"):
+            # SHORT/COVER are parsed unconditionally so the short-side direction
+            # is captured in the logs from go-live; the risk engine is what
+            # actually gates whether they execute (rejected while
+            # shorting_enabled is FALSE). Under the v2 prompt the models never
+            # emit them, so this is inert in production until v3 ships.
+            if action not in ("BUY", "SELL", "HOLD", "SHORT", "COVER"):
                 continue
             ticker = str(d.get("ticker", "")).upper().strip()
             if not ticker:
@@ -385,9 +390,19 @@ class BaseAdapter(ABC):
             # calls, etc.) get a defaulted blank — the rest of the pipeline
             # tolerates an empty summary.
             summary = str(d.get("summary", "")).strip()
+            # Direction is encoded on every decision from go-live so RQ1 herding
+            # and the RQ2/RQ3 sign convention can segment long vs short without
+            # reprocessing logs. BUY/SELL -> long, SHORT/COVER -> short, HOLD ->
+            # flat. target_weight stays a positive magnitude for all actions.
+            direction = (
+                "short" if action in ("SHORT", "COVER")
+                else "flat" if action == "HOLD"
+                else "long"
+            )
             normalized.append({
                 "action": action,
                 "ticker": ticker,
+                "direction": direction,
                 "target_weight": max(0.0, min(1.0, target_weight)),
                 "confidence": confidence,
                 "summary": summary,

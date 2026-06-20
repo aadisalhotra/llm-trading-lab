@@ -374,8 +374,9 @@ def run_one_model(
         portfolio.liquidate_all(prices)
         portfolio.halted = True
 
-    # Update intraday counters with this run's trade count
-    n_executed = sum(1 for e in all_exec if e.executed and e.side in ("BUY", "SELL"))
+    # Update intraday counters with this run's trade count. Shorts and covers
+    # are trades too and count toward the daily cap.
+    n_executed = sum(1 for e in all_exec if e.executed and e.side in ("BUY", "SELL", "SHORT", "COVER"))
     portfolio.record_intraday_run(run_date.isoformat(), trades_executed=n_executed)
     save_portfolio(portfolio)
     snapshot_after = portfolio.snapshot(prices)

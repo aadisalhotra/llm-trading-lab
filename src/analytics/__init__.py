@@ -14,3 +14,12 @@ from .performance import (
 from .cost_rates import COST_PER_MTOK, compute_call_cost_usd
 from .research_metrics import compute_all_research_metrics
 from .regime_classifier import classify_regimes, summarize_regimes, ALL_REGIMES
+from .short_metrics import (
+    closed_shorts,
+    short_pnl_summary,
+    short_utilization,
+    gross_hhi,
+    gross_hhi_from_snapshot,
+    closed_trades_by_direction,
+    hit_rate_by_direction,
+)

@@ -102,6 +102,14 @@ def log_decision_run(
             {
                 "ticker": e.ticker,
                 "side": e.side,
+                # Direction of the executed trade, encoded from go-live so the
+                # short side is segmentable without reprocessing: SHORT/COVER ->
+                # short, BUY/SELL -> long, HOLD/SKIP -> flat.
+                "direction": (
+                    "short" if e.side in ("SHORT", "COVER")
+                    else "long" if e.side in ("BUY", "SELL")
+                    else "flat"
+                ),
                 "executed": e.executed,
                 "shares": e.shares,
                 "fill_price": e.fill_price,
@@ -185,6 +193,12 @@ def log_daily_snapshot(
         "halted": snapshot["halted"],
         "benchmark_value": benchmark_value,
         "api_success": api_success,
+        # Exposure block — drawdown-conditional metrics for RQ5. Zero for a
+        # long-only book, so historical rows are semantically unchanged.
+        "gross_exposure_pct": snapshot.get("gross_exposure_pct", snapshot.get("long_exposure_pct", 0.0)),
+        "net_exposure_pct": snapshot.get("net_exposure_pct"),
+        "short_utilization": snapshot.get("short_utilization", 0.0),
+        "num_shorts": snapshot.get("num_shorts", 0),
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -225,6 +239,11 @@ def log_intraday_snapshot(
         "trades_executed_today": trades_executed_today,
         "runs_today": runs_today,
         "api_success": api_success,
+        # Exposure block — zero for a long-only book.
+        "gross_exposure_pct": snapshot.get("gross_exposure_pct", snapshot.get("long_exposure_pct", 0.0)),
+        "net_exposure_pct": snapshot.get("net_exposure_pct"),
+        "short_utilization": snapshot.get("short_utilization", 0.0),
+        "num_shorts": snapshot.get("num_shorts", 0),
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")

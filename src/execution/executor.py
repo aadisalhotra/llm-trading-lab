@@ -22,7 +22,7 @@ logger = logging.getLogger("llmlab.execution")
 class ExecutionResult:
     decision: dict[str, Any]
     executed: bool
-    side: str          # BUY / SELL / SKIP
+    side: str          # BUY / SELL / SHORT / COVER / HOLD / SKIP
     ticker: str
     shares: float
     fill_price: float
@@ -89,19 +89,26 @@ class Executor:
             if ticker not in portfolio.holdings:
                 continue
             h = portfolio.holdings[ticker]
-            shares = h.shares
             price = prices.get(ticker, h.avg_cost)
+            # A short is closed by covering (buy-back); a long by selling.
+            is_short = h.is_short
+            shares = abs(h.shares)
+            side = "COVER" if is_short else "SELL"
+            action = "COVER" if is_short else "SELL"
             d = {
-                "action": "SELL",
+                "action": action,
                 "ticker": ticker,
                 "target_weight": 0.0,
                 "confidence": 10,
                 "reasoning": f"Forced liquidation: {reason}",
             }
             try:
-                portfolio.sell(ticker, shares, price)
+                if is_short:
+                    portfolio.cover(ticker, shares, price)
+                else:
+                    portfolio.sell(ticker, shares, price)
                 results.append(ExecutionResult(
-                    decision=d, executed=True, side="SELL", ticker=ticker,
+                    decision=d, executed=True, side=side, ticker=ticker,
                     shares=shares, fill_price=price, notional=shares * price,
                     order_id=f"FORCED_{reason}",
                 ))
@@ -177,6 +184,44 @@ class Executor:
             shares = min(int(delta_notional / price * 10000) / 10000, h.shares)
             return self._do_sell(portfolio, ticker, shares, price, decision)
 
+        if action == "SHORT":
+            # target_weight is the desired GROSS short weight (|short value| / equity).
+            # Mirror of BUY: grow the short toward the target, never beyond it.
+            if ticker in portfolio.holdings and not portfolio.holdings[ticker].is_short:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Held long — cannot short; SELL first")
+            target_notional = total_value * target_weight
+            current_short = -portfolio.holdings[ticker].market_value(price) if ticker in portfolio.holdings else 0.0
+            delta_notional = target_notional - current_short
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_AT_SHORT_TARGET")
+            # No cash gate: a short sale generates proceeds, it does not consume cash.
+            shares = int(delta_notional / price * 10000) / 10000
+            if shares <= 0:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Computed short quantity rounded to zero")
+            return self._do_short(portfolio, ticker, shares, price, decision)
+
+        if action == "COVER":
+            if ticker not in portfolio.holdings or not portfolio.holdings[ticker].is_short:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Not held short")
+            h = portfolio.holdings[ticker]
+            current_short = -h.market_value(price)              # positive magnitude
+            target_notional = total_value * target_weight       # desired remaining short
+            delta_notional = current_short - target_notional    # amount to cover
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_BELOW_SHORT_TARGET")
+            shares = min(int(delta_notional / price * 10000) / 10000, abs(h.shares))
+            return self._do_cover(portfolio, ticker, shares, price, decision)
+
         return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                ticker=ticker, shares=0, fill_price=price, notional=0,
                                error=f"Unknown action: {action}")
@@ -207,6 +252,35 @@ class Executor:
         if swept:
             logger.info("Swept ghost positions after %s sell: %s", ticker, swept)
         return ExecutionResult(decision=decision, executed=True, side="SELL",
+                               ticker=ticker, shares=shares, fill_price=price,
+                               notional=shares * price, order_id=order_id)
+
+    def _do_short(self, portfolio: Portfolio, ticker: str, shares: float,
+                  price: float, decision: dict[str, Any]) -> ExecutionResult:
+        # Opening/adding a short submits a SELL order on the broker side.
+        if self.mode == "live":
+            order_id, fill_price = self._submit_alpaca_order(ticker, shares, "sell")
+            price = fill_price or price
+        else:
+            order_id = f"PAPER_SHORT_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        portfolio.short(ticker, shares, price)
+        return ExecutionResult(decision=decision, executed=True, side="SHORT",
+                               ticker=ticker, shares=shares, fill_price=price,
+                               notional=shares * price, order_id=order_id)
+
+    def _do_cover(self, portfolio: Portfolio, ticker: str, shares: float,
+                  price: float, decision: dict[str, Any]) -> ExecutionResult:
+        # Covering a short submits a BUY order on the broker side.
+        if self.mode == "live":
+            order_id, fill_price = self._submit_alpaca_order(ticker, shares, "buy")
+            price = fill_price or price
+        else:
+            order_id = f"PAPER_COVER_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        portfolio.cover(ticker, shares, price)
+        swept = portfolio.sweep_ghost_positions()
+        if swept:
+            logger.info("Swept ghost positions after %s cover: %s", ticker, swept)
+        return ExecutionResult(decision=decision, executed=True, side="COVER",
                                ticker=ticker, shares=shares, fill_price=price,
                                notional=shares * price, order_id=order_id)
 

@@ -2,6 +2,37 @@
 
 All changes to the universal trading prompt are logged here. Each version is saved as `vN.txt`.
 
+## v3 — staged 2026-06-20, effective 2026-07-01
+**Author:** Aadi
+**Status:** Staged (built + tested 2026-06-20; activates 2026-07-01 change window)
+**Supersedes:** v2 (active 2026-06-01 – 2026-06-30) — on activation
+
+Prompt text in `prompts/v3.txt` is v2 verbatim plus **shorting-enabling content only** —
+no other edits, so the v2→v3 contrast is unconfounded (anything non-shorting would
+muddy the before/after read on RQ1). Shorting design ratified by Research + PI; not
+re-litigated here. The shorting-only delta:
+
+1. **Operating constraints** — "Long positions only. No short selling…" becomes "Long
+   and short positions are both permitted." Adds the exposure rule book: gross short
+   ≤ 20% of equity, long ≤ 100%, total gross ≤ 120%, net ∈ [−20%, +100%]. Each existing
+   limit (50 positions, 20% per-name, 50 trades/day, drawdown halt) gains a parenthetical
+   that shorts count toward it; the limit *values* are unchanged. The per-position
+   stop line adds the 10% short stop alongside the existing 15% long stop.
+2. **New "Short selling" subsection** — neutral mechanics only (a short profits when
+   price falls; proceeds credit cash; negative quantity; cover to close; 20% gross cap;
+   10% stop; no borrow cost in this phase). Explicitly states there is no expectation
+   to short — a no-short book is valid. No contrarian/differentiation framing (would
+   bias RQ1).
+3. **Output format** — the action enumeration "buy or sell" becomes "buy, sell, short,
+   or cover". The JSON appendix (`prompt_builder.V3_OUTPUT_SCHEMA`) adds SHORT/COVER to
+   the `action` enum and clarifies that `target_weight` is always a positive magnitude
+   (the desired gross weight; for SHORT/COVER it is the gross short weight).
+
+Communicated identically to all six models; API formatting is the only per-model
+difference. Risk engine gates execution behind `portfolio_rules.shorting_enabled`
+(FALSE in production until activation). Confidence self-calibration feedback remains
+deferred (Aug 2026).
+
 ## v2 — 2026-06-01
 **Author:** Aadi
 **Status:** Active (effective 2026-06-01, Phase A)

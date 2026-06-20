@@ -13,13 +13,17 @@
     "max_positions": 50,
     "max_position_pct": 0.20,
     "max_trades_per_day": 50,
-    "allow_shorting": false,
+    "shorting_enabled": false,
+    "max_long_exposure_pct": 1.00,
+    "max_gross_short_pct": 0.20,
+    "max_gross_exposure_pct": 1.20,
     "allow_leverage": false,
     "allow_options": false
   },
   "risk_controls": {
     "stop_loss_portfolio_pct": 0.30,
     "stop_loss_position_pct": 0.15,
+    "stop_loss_short_pct": 0.10,
     "halt_on_stop_loss": true
   },
   "models": {

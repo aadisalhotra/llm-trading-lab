@@ -23,19 +23,38 @@ logger = logging.getLogger("llmlab.portfolio")
 @dataclass
 class Holding:
     ticker: str
-    shares: float
-    avg_cost: float
+    shares: float          # negative for a short position
+    avg_cost: float        # entry price (always positive), magnitude-weighted
+
+    @property
+    def is_short(self) -> bool:
+        return self.shares < 0
+
+    @property
+    def direction(self) -> str:
+        return "short" if self.shares < 0 else "long"
 
     def market_value(self, current_price: float) -> float:
+        # Naturally negative for a short (shares < 0): a short position is a
+        # liability, so it subtracts from total equity.
         return self.shares * current_price
 
     def unrealized_pl(self, current_price: float) -> float:
+        # Sign-correct for both directions: (price - cost) * shares. For a short
+        # (shares < 0) this flips, so a falling price yields a positive P&L.
         return (current_price - self.avg_cost) * self.shares
 
     def unrealized_pl_pct(self, current_price: float) -> float:
+        """Return on the position, expressed relative to its direction.
+
+        Long: gains when price rises. Short: gains when price falls — so the
+        sign is inverted relative to the asset's own return. This is the
+        position's P&L%, not the asset's, so a winning short reads positive.
+        """
         if self.avg_cost == 0:
             return 0.0
-        return (current_price / self.avg_cost) - 1.0
+        asset_return = (current_price / self.avg_cost) - 1.0
+        return -asset_return if self.is_short else asset_return
 
 
 @dataclass
@@ -91,6 +110,39 @@ class Portfolio:
             value += h.market_value(price)
         return value
 
+    # ----- exposure accounting (long-only and short-aware) -----
+    def exposures(self, prices: dict[str, float]) -> dict[str, float]:
+        """Gross/net exposure breakdown as fractions of total equity.
+
+        For a long-only book this is just {long=invested, short=0,
+        net=long, gross=long} — unchanged from before shorting existed. With
+        shorts, gross_long = Σ long MV, gross_short = Σ |short MV|, net =
+        gross_long − gross_short, gross = gross_long + gross_short. All ratios
+        are taken against current equity (total_value), so they move with P&L.
+        """
+        gross_long = 0.0
+        gross_short = 0.0
+        for ticker, h in self.holdings.items():
+            price = prices.get(ticker, h.avg_cost)
+            mv = h.market_value(price)
+            if mv >= 0:
+                gross_long += mv
+            else:
+                gross_short += -mv
+        total = self.total_value(prices)
+        eq = total if total else 0.0
+        ratio = (lambda v: (v / eq) if eq else 0.0)
+        return {
+            "gross_long_value": gross_long,
+            "gross_short_value": gross_short,
+            "gross_value": gross_long + gross_short,
+            "net_value": gross_long - gross_short,
+            "long_exposure_pct": ratio(gross_long),
+            "short_exposure_pct": ratio(gross_short),
+            "gross_exposure_pct": ratio(gross_long + gross_short),
+            "net_exposure_pct": ratio(gross_long - gross_short),
+        }
+
     def snapshot(self, prices: dict[str, float]) -> dict[str, Any]:
         """Dict shape consumed by prompt_builder + dashboard."""
         total = self.total_value(prices)
@@ -104,10 +156,15 @@ class Portfolio:
                 "avg_cost": h.avg_cost,
                 "current_price": price,
                 "market_value": mv,
+                # Signed weight: negative for shorts (mv is negative). The
+                # absolute value is the gross weight used for the per-name cap.
                 "weight": (mv / total) if total else 0.0,
+                "gross_weight": (abs(mv) / total) if total else 0.0,
+                "direction": h.direction,
                 "unrealized_pl": h.unrealized_pl(price),
                 "unrealized_pl_pct": h.unrealized_pl_pct(price),
             })
+        exp = self.exposures(prices)
         return {
             "model_key": self.model_key,
             "total_value": total,
@@ -118,10 +175,28 @@ class Portfolio:
             "inception_value": self.inception_value,
             "inception_date": self.inception_date,
             "cumulative_return": (total / self.inception_value - 1.0) if self.inception_value else 0.0,
+            # Exposure block — short utilization is share of equity held short
+            # (capped at max_gross_short_pct by the risk engine). Zero for a
+            # long-only book, so existing reports are unaffected until shorts
+            # go live.
+            "gross_long_value": exp["gross_long_value"],
+            "gross_short_value": exp["gross_short_value"],
+            "gross_value": exp["gross_value"],
+            "net_value": exp["net_value"],
+            "long_exposure_pct": exp["long_exposure_pct"],
+            "short_exposure_pct": exp["short_exposure_pct"],
+            "gross_exposure_pct": exp["gross_exposure_pct"],
+            "net_exposure_pct": exp["net_exposure_pct"],
+            "short_utilization": exp["short_exposure_pct"],
+            "num_shorts": sum(1 for h in self.holdings.values() if h.is_short),
         }
 
     # ----- mutations -----
     def buy(self, ticker: str, shares: float, price: float) -> None:
+        if ticker in self.holdings and self.holdings[ticker].is_short:
+            # A name held short must be covered (not bought) — mixing both
+            # directions in one holding would make avg_cost meaningless.
+            raise ValueError(f"Cannot BUY {ticker}: position is short — COVER it first")
         cost = shares * price
         if cost > self.cash + 1e-6:
             raise ValueError(f"Insufficient cash for {ticker}: need {cost:.2f}, have {self.cash:.2f}")
@@ -134,6 +209,52 @@ class Portfolio:
             self.holdings[ticker] = Holding(ticker=ticker, shares=shares, avg_cost=price)
         self.cash -= cost
 
+    # ----- short-side mutations -----
+    def short(self, ticker: str, shares: float, price: float) -> float:
+        """Open or add to a short position. `shares` is a positive magnitude.
+
+        A short sale credits the sale proceeds to cash and records the position
+        as a negative share count. The position's market value is therefore
+        negative — it is a liability that subtracts from equity. avg_cost is the
+        magnitude-weighted short entry price. No borrow is modeled (Phase A).
+        Returns the proceeds credited.
+        """
+        if shares <= 0:
+            raise ValueError(f"Cannot short {ticker}: shares must be positive, got {shares}")
+        if ticker in self.holdings and not self.holdings[ticker].is_short:
+            raise ValueError(f"Cannot SHORT {ticker}: position is long — SELL it first")
+        proceeds = shares * price
+        if ticker in self.holdings:
+            h = self.holdings[ticker]
+            existing = abs(h.shares)
+            h.avg_cost = (h.avg_cost * existing + price * shares) / (existing + shares)
+            h.shares -= shares  # more negative
+        else:
+            self.holdings[ticker] = Holding(ticker=ticker, shares=-shares, avg_cost=price)
+        self.cash += proceeds
+        return proceeds
+
+    def cover(self, ticker: str, shares: float, price: float) -> float:
+        """Buy back (cover) part or all of a short. `shares` is a positive magnitude.
+
+        Covering debits the buy-back cost from cash and shrinks the negative
+        share count toward zero. A fully covered position is swept off the
+        books. Returns the cost paid. Covering always completes (it reduces
+        risk), clamped to the open short size.
+        """
+        if ticker not in self.holdings:
+            raise ValueError(f"Cannot cover {ticker}: not held")
+        h = self.holdings[ticker]
+        if not h.is_short:
+            raise ValueError(f"Cannot COVER {ticker}: position is long, not short")
+        shares = min(shares, abs(h.shares))  # clamp to the open short
+        cost = shares * price
+        h.shares += shares  # toward zero
+        self.cash -= cost
+        if abs(h.shares) < self.GHOST_SHARES_EPSILON:
+            del self.holdings[ticker]
+        return cost
+
     # Ghost-position threshold: any residual smaller than this gets swept
     # off the books after a sell. Catches dust like 0.0001 shares left
     # behind by float rounding in fractional executions.
@@ -143,6 +264,10 @@ class Portfolio:
         if ticker not in self.holdings:
             raise ValueError(f"Cannot sell {ticker}: not held")
         h = self.holdings[ticker]
+        if h.is_short:
+            # Reducing a short is a COVER, not a SELL — guard so a SELL can
+            # never flip the sign of a short holding.
+            raise ValueError(f"Cannot SELL {ticker}: position is short — COVER it instead")
         if shares > h.shares + 1e-6:
             shares = h.shares  # clamp
         proceeds = shares * price
@@ -159,16 +284,22 @@ class Portfolio:
         clutter the dashboard and confuse the model. Returns the list of
         ticker symbols that were swept (for logging).
         """
+        # Compare on magnitude so live shorts (negative shares) are never
+        # mistaken for dust — only positions within ±EPSILON of flat are swept.
         ghosts = [t for t, h in self.holdings.items()
-                  if h.shares < self.GHOST_SHARES_EPSILON]
+                  if abs(h.shares) < self.GHOST_SHARES_EPSILON]
         for t in ghosts:
             del self.holdings[t]
         return ghosts
 
     def liquidate_all(self, prices: dict[str, float]) -> None:
         for ticker in list(self.holdings.keys()):
-            price = prices.get(ticker, self.holdings[ticker].avg_cost)
-            self.sell(ticker, self.holdings[ticker].shares, price)
+            h = self.holdings[ticker]
+            price = prices.get(ticker, h.avg_cost)
+            if h.is_short:
+                self.cover(ticker, abs(h.shares), price)
+            else:
+                self.sell(ticker, h.shares, price)
 
 
 # ----- persistence -----
