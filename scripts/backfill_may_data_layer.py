@@ -267,13 +267,61 @@ def apply_backfill(layer: dict) -> list[str]:
             "estimability when residual phantom sits in a volatile name; September pass")
         changes.append("methodology_data_integrity_rq.gate_scope_refinement [ADD]")
 
-    # per-RQ point-estimate status (RQ4/5/6 already have one)
+    # per-RQ point-estimate status (RQ4/5/6 already have one).
+    # RATIFIED CORRECTION (layered on the d413a4ec back-fill): the six-model RQ2/RQ3
+    # pools are SUPERSEDED, not reported. They pool non-estimable models (claude,
+    # claude_opus: corrupt book) and exploratory models (gemini: completeness;
+    # deepseek: model-splice) together with the estimable GPT/Grok, which contradicts
+    # the three-gate inclusion framework. Per-model GPT/Grok is the reported primary.
+    # Pooled values are retained untouched for provenance.
     pe = mdr["rq_update"]["point_estimates"]
-    pe_status = {"RQ1": "not_estimable", "RQ2": "estimable_partial_cohort", "RQ3": "estimable_partial_cohort"}
+    pe_status = {"RQ1": "not_estimable", "RQ2": "superseded_six_model_pool", "RQ3": "superseded_six_model_pool"}
     for rq, st in pe_status.items():
         if rq in pe and pe[rq].get("status") != st:
             pe[rq]["status"] = st
-            changes.append(f"point_estimates.{rq}.status = {st} [ADD]")
+            changes.append(f"point_estimates.{rq}.status = {st} [SET: reclassified]")
+    # RQ2/RQ3 six-model-pool supersession scaffold (idempotent): reported flag,
+    # reported-primary pointer (per-model GPT/Grok cohort), and provenance note.
+    POOL_META = {
+        "RQ2": {"metric": "disposition_difference",
+                "pool_field": "pooled_disposition_difference", "n_field": "n_sale_records"},
+        "RQ3": {"metric": "confidence_outcome_corr",
+                "pool_field": "pooled_confidence_outcome_corr", "n_field": "n_closed_trades"},
+    }
+    for rq, meta in POOL_META.items():
+        node = pe.get(rq)
+        if node is None:
+            continue
+        if node.get("reported") is not False:
+            node["reported"] = False
+            changes.append(f"point_estimates.{rq}.reported = false [ADD: pool not reported]")
+        if "reported_primary" not in node:
+            node["reported_primary"] = {
+                "basis": "per_model",
+                "cohort": ["gpt", "grok"],
+                "status": "estimable",
+                "metric": meta["metric"],
+                "value_ref": f"per_model.gpt.{meta['metric']}, per_model.grok.{meta['metric']}",
+                "note": (
+                    f"Reported primary for {rq} is the per-model GPT and Grok {meta['metric']} "
+                    "-- the two models that clear the three-gate inclusion framework "
+                    "(uncorrupted book, stable model identity, completeness >= 0.80) and are "
+                    "each individually estimable. Authoritative values live in per_model.gpt "
+                    "and per_model.grok and are unchanged."
+                ),
+            }
+            changes.append(f"point_estimates.{rq}.reported_primary [ADD: per-model GPT/Grok primary]")
+        if "supersession_note" not in node:
+            node["supersession_note"] = (
+                f"The six-model pooled {meta['metric']} ({meta['pool_field']}, "
+                f"{meta['n_field']}={node.get(meta['n_field'])}) pools non-estimable models "
+                "(claude, claude_opus: corrupt book) and exploratory models (gemini: "
+                "completeness; deepseek: model-splice) together with the estimable GPT/Grok "
+                "cohort, which contradicts the inclusion framework. It is superseded by the "
+                "per-model GPT/Grok reported primary and is retained for provenance only -- "
+                "not reported."
+            )
+            changes.append(f"point_estimates.{rq}.supersession_note [ADD]")
     # RQ2/RQ3 per-model trust flag
     for rq in ("RQ2", "RQ3"):
         for mk, pm in pe[rq].get("per_model", {}).items():
@@ -366,11 +414,27 @@ def verify(layer: dict, perf_before: dict) -> tuple[bool, list[str]]:
     req("gate_scope_refinement" in mdr, "gate_scope_refinement missing")
     pe = mdr["rq_update"]["point_estimates"]
     req(pe["RQ1"].get("status") == "not_estimable", "RQ1.status missing")
-    req(pe["RQ2"].get("status") == "estimable_partial_cohort" and pe["RQ3"].get("status") == "estimable_partial_cohort",
-        "RQ2/RQ3 status missing")
+    # RQ2/RQ3 six-model pools reclassified as superseded (NOT reported); per-model
+    # GPT/Grok is the reported primary. The pool must never be flagged estimable --
+    # it pools non-estimable (corrupt-book) and exploratory models.
+    req(pe["RQ2"].get("status") == "superseded_six_model_pool" and
+        pe["RQ3"].get("status") == "superseded_six_model_pool",
+        "RQ2/RQ3 status not reclassified to superseded_six_model_pool")
+    req(pe["RQ2"].get("reported") is False and pe["RQ3"].get("reported") is False,
+        "RQ2/RQ3 six-model pool not flagged reported:false")
     for rq in ("RQ2", "RQ3"):
+        rp = pe[rq].get("reported_primary", {})
+        req(rp.get("status") == "estimable" and rp.get("cohort") == ["gpt", "grok"],
+            f"{rq}.reported_primary missing / not the estimable GPT/Grok cohort")
+        # integrity invariant: no figure flagged estimable pools a non-estimable model.
+        req(not str(pe[rq].get("status", "")).startswith("estimable"),
+            f"{rq} pool still flagged estimable while pooling non-estimable models")
         for mk, pm in pe[rq]["per_model"].items():
             req("trust_flag" in pm, f"{rq}.per_model[{mk}].trust_flag missing")
+        # the reported-primary cohort (GPT, Grok) is individually estimable
+        req(pe[rq]["per_model"]["gpt"].get("trust_flag") == "estimable" and
+            pe[rq]["per_model"]["grok"].get("trust_flag") == "estimable",
+            f"{rq}.per_model GPT/Grok not both individually estimable")
 
     # --- RQ-consistency cross-check: observation-weighted off-diagonal action_concordance
     #     == the (now relocated) RQ1 exploratory_pairwise concordance scalar ---
@@ -436,7 +500,7 @@ def main():
     print(f"  2. RQ1 herding consistency (matrix wmean==scalar) : {'PASS' if rq1_ok else 'FAIL'}  (w={weighted:.10f} s={scalar:.10f})")
     print(f"  3. SPY descriptive-Sharpe single-source           : {'PASS' if spy_ok else 'FAIL'}")
     print(f"  4. performance returns unchanged (sharpe/vol/dd)  : {'PASS' if perf_ok else 'FAIL'}")
-    print(f"  -- RQ2/RQ3 : point estimates + per-model trust flags PRESENT (structural; no numeric reconciliation defined for the layer)")
+    print(f"  -- RQ2/RQ3 : six-model pools SUPERSEDED (reported:false); per-model GPT/Grok reported primary (estimable); trust flags present")
     print(f"  -- RQ4/5/6 : accumulating inputs / Open / no-data -> OUT OF SCOPE for the monthly-layer cross-check (NOT asserted)")
     if issues:
         print("\n  ISSUES:")

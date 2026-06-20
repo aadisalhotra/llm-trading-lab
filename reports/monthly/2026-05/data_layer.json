@@ -3853,7 +3853,17 @@
           "windowing_note": "full-history avg-cost replay; sale records attributed by sale-date in the calendar month (behavioral_summary discipline).",
           "window": "calendar_month",
           "pilot_tag": "Phase A pilot / exploratory",
-          "status": "estimable_partial_cohort"
+          "reported_primary": {
+            "basis": "per_model",
+            "cohort": ["gpt", "grok"],
+            "status": "estimable",
+            "metric": "disposition_difference",
+            "value_ref": "per_model.gpt.disposition_difference, per_model.grok.disposition_difference",
+            "note": "Reported primary for RQ2 is the per-model GPT and Grok disposition differences -- the two models that clear the three-gate inclusion framework (uncorrupted book, stable model identity, completeness >= 0.80) and are each individually estimable. Authoritative values live in per_model.gpt and per_model.grok and are unchanged."
+          },
+          "reported": false,
+          "supersession_note": "The six-model pooled disposition difference (pooled_disposition_difference, n_sale_records=990) pools non-estimable models (claude, claude_opus: corrupt book) and exploratory models (gemini: completeness; deepseek: model-splice) together with the estimable GPT/Grok cohort, which contradicts the inclusion framework. It is superseded by the per-model GPT/Grok reported primary and is retained for provenance only -- not reported.",
+          "status": "superseded_six_model_pool"
         },
         "RQ3": {
           "title": "Confidence calibration on closed trades",
@@ -4032,7 +4042,17 @@
           "windowing_note": "full-history replay for correct entry confidence/cost basis; trades attributed by full-exit date in the calendar month.",
           "window": "calendar_month",
           "pilot_tag": "Phase A pilot / exploratory",
-          "status": "estimable_partial_cohort"
+          "reported_primary": {
+            "basis": "per_model",
+            "cohort": ["gpt", "grok"],
+            "status": "estimable",
+            "metric": "confidence_outcome_corr",
+            "value_ref": "per_model.gpt.confidence_outcome_corr, per_model.grok.confidence_outcome_corr",
+            "note": "Reported primary for RQ3 is the per-model GPT and Grok confidence-outcome correlations -- the two models that clear the three-gate inclusion framework (uncorrupted book, stable model identity, completeness >= 0.80) and are each individually estimable. Authoritative values live in per_model.gpt and per_model.grok and are unchanged."
+          },
+          "reported": false,
+          "supersession_note": "The six-model pooled confidence-outcome correlation (pooled_confidence_outcome_corr, n_closed_trades=456) pools non-estimable models (claude, claude_opus: corrupt book) and exploratory models (gemini: completeness; deepseek: model-splice) together with the estimable GPT/Grok cohort, which contradicts the inclusion framework. It is superseded by the per-model GPT/Grok reported primary and is retained for provenance only -- not reported.",
+          "status": "superseded_six_model_pool"
         }
       },
       "accumulating_inputs": {
