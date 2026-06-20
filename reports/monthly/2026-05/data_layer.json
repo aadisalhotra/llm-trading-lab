@@ -155,7 +155,13 @@
       "first_date": "2025-12-01",
       "last_date": "2026-05-29"
     },
-    "source_commit": "0af22a93402af63151d216fe51e1fe7b784c38b6",
+    "source_commit": "b67ac5c2393ed77c75e21359bae694b6bbd9b144",
+    "provenance": {
+      "generated_at_commit": "0af22a93402af63151d216fe51e1fe7b784c38b6",
+      "integrity_backfill_commit": "d413a4ece6512ce841dda72133bfe41195818c7c",
+      "pool_relabel_commit": "b67ac5c2393ed77c75e21359bae694b6bbd9b144",
+      "note": "source_commit == pool_relabel_commit: the last commit to modify this data layer; checking it out reproduces every figure in this report. The build chain: generated_at_commit produced the original generator tree (predates the entire integrity layer, so it reproduces nothing on its own); integrity_backfill_commit added clean-window returns, the three-gate inclusion framework, the DeepSeek model-identity splice record, RQ1 primary deferral, and the SPY benchmark row; pool_relabel_commit reclassified the six-model RQ2/RQ3 pools as superseded (Pages 4-5). source_commit deliberately points at the last DATA commit, not at this metadata correction: this edit changes zero data/figure fields, and a file cannot contain its own hash."
+    },
     "generated_at_utc": "2026-06-02T02:19:18.032440+00:00",
     "generator": "scripts/build_monthly_data_layer.py",
     "bootstrap_config": {
