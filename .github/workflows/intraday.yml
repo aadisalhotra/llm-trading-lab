@@ -335,6 +335,16 @@ jobs:
           VERSION="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
           sed -i "s/__ASSET_VERSION__/${VERSION}/g" dashboard/index.html
           echo "Asset version: ${VERSION}"
+      - name: Copy report PDFs into dashboard artifact
+        run: |
+          # Pages publishes only dashboard/. Copy the monthly report PDFs into
+          # the artifact (CI-ephemeral — nothing is committed) preserving the
+          # reports/monthly/<month>/ path, so reports/monthly/2026-05/...pdf
+          # serves at /reports/monthly/2026-05/...pdf and the link pattern stays
+          # stable for every future month. PDFs only: data_layer.json and the
+          # provenance script remain in the repo (each report cites its source
+          # commit for the underlying data).
+          find reports/monthly -type f -name '*.pdf' -print -exec cp --parents {} dashboard/ \;
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload dashboard artifact
