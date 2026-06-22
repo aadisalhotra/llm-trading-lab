@@ -259,7 +259,7 @@ def apply_backfill(layer: dict) -> list[str]:
         changes.append("known_caveats.model_identity.deepseek_model_splice.first_success_note [ADD]")
     if "inclusion_gates" not in mdr:
         mdr["inclusion_gates"] = {"completeness_min": 0.80, "uncorrupted_book": True,
-                                  "model_identity_stable": True, "may_passing": ["gpt", "grok"]}
+                                  "model_identity_stable": True, "passing": ["gpt", "grok"]}
         changes.append("methodology_data_integrity_rq.inclusion_gates [ADD]")
     if "gate_scope_refinement" not in mdr:
         mdr["gate_scope_refinement"] = (
@@ -409,7 +409,7 @@ def verify(layer: dict, perf_before: dict) -> tuple[bool, list[str]]:
     mdr = layer["methodology_data_integrity_rq"]
     req("known_caveats" in mdr and "state_integrity" in mdr["known_caveats"] and
         "model_identity" in mdr["known_caveats"], "known_caveats incomplete")
-    req("inclusion_gates" in mdr and mdr["inclusion_gates"].get("may_passing") == ["gpt", "grok"],
+    req("inclusion_gates" in mdr and mdr["inclusion_gates"].get("passing") == ["gpt", "grok"],
         "inclusion_gates missing/wrong")
     req("gate_scope_refinement" in mdr, "gate_scope_refinement missing")
     pe = mdr["rq_update"]["point_estimates"]
