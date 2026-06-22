@@ -1,0 +1,88 @@
+{
+  "ledger_version": "1.0",
+  "_README": "Phase-A persistent integrity ledger. These are the CARRIED facts that do NOT recompute month to month: the clean-window anchor, the inception-pinned risk-free rate, the inclusion-gate definitions, the launch-window state-corruption and DeepSeek model-identity-splice events, and the persistent per-model status they imply. scripts/build_monthly_data_layer.py reads this and combines it with the month's decision logs and the de-fabricated clean-window series to emit the integrity layer natively. NEW findings in a future month are APPENDED here (a new integrity_event, a new persistent_model_status entry) and then carry automatically. Per-month-derivable facts (completeness gate, clean-window returns, the passing cohort) are COMPUTED by the builder, never stored here. Extracted verbatim from scripts/backfill_may_data_layer.py and the committed reports/monthly/2026-05/data_layer.json at schema-close.",
+
+  "clean_window_start": "2026-04-23",
+  "shakedown_window": {
+    "start": "2026-04-09",
+    "end": "2026-04-22",
+    "note": "Launch shakedown / state-corruption window. The first fabrication-free trading day is clean_window_start (2026-04-23). De-fab clean-window returns are based at the 2026-04-22 close."
+  },
+
+  "risk_free_rate": {
+    "value": 0.0368,
+    "source": "FRED DGS3MO",
+    "as_of": "2026-04-09",
+    "application": "single uniform constant",
+    "note": "3-month T-bill, annualized, inception-pinned to 2026-04-09. Applied as one uniform constant across all models and all months for the descriptive Sharpe. Emitted into report_meta.risk_free_rate as {value, as_of}."
+  },
+
+  "inclusion_gates": {
+    "completeness_min": 0.80,
+    "gates": ["completeness", "uncorrupted_book", "model_identity_stable"],
+    "gate_definitions": {
+      "completeness": "decision_completeness (api_success / records over the month) >= completeness_min. COMPUTED per month from the decision logs (varies month to month).",
+      "uncorrupted_book": "the model's book is free of carried phantom cash / phantom shorts. CARRIED via persistent_model_status (a corrupt book is a state fact, not a monthly recompute).",
+      "model_identity_stable": "the deployed model identity did not silently change. CARRIED via persistent_model_status / integrity_events.deepseek_identity_splice."
+    },
+    "gate_scope_refinement": "book-integrity gate certifies point-return estimability, not daily-risk-path estimability when residual phantom sits in a volatile name; September pass"
+  },
+
+  "integrity_events": {
+    "launch_window_corruption": {
+      "window": {"start": "2026-04-09", "end": "2026-04-22"},
+      "models_affected": "all_six",
+      "extended_models": {
+        "claude": "2026-04-21",
+        "claude_opus": "2026-04-21",
+        "note": "Sonnet (claude) and Opus (claude_opus) state-commingling extended through 2026-04-21."
+      },
+      "overhang_correction_ref": "scripts/defab_clean_window.py",
+      "bugs": [
+        {"id": "launch_day_clobber", "occurred": "2026-04-09", "fix_date": "2026-04-10", "fix_commit": "d2e862ca", "models": "all_six"},
+        {"id": "cross_model_commingling", "occurred": "2026-04-10/2026-04-21", "fix_date": "2026-04-21", "fix_commit": "cacd8058", "models": ["claude", "claude_opus"]}
+      ],
+      "per_model_fabrication": {
+        "claude": {"count": 28, "gross_usd": 233010},
+        "claude_opus": {"count": 32, "gross_usd": 187658},
+        "deepseek": {"count": 1, "gross_usd": 7570},
+        "gemini": {"count": 1, "gross_usd": 5318},
+        "grok": {"count": 1, "gross_usd": 4989},
+        "gpt": {"count": 1, "gross_usd": 1104}
+      },
+      "audit": {
+        "runs": "2800+",
+        "clean_after": "2026-04-23",
+        "clean_runs": {"clean_april": 73, "may": 257, "early_june": 13},
+        "anomalies": 0
+      },
+      "persistence": {
+        "stock_persists_for": ["claude", "claude_opus"],
+        "carried_forward": {
+          "claude": {"phantom_cash": 297000},
+          "claude_opus": {"phantom_shorts": 575000}
+        },
+        "scope": "phase_a_wide",
+        "consequence": "non_estimable"
+      }
+    },
+    "deepseek_identity_splice": {
+      "alias": "deepseek-reasoner",
+      "transitions": [
+        {"date": "2026-04-24", "to": "v4-flash", "note": "sub-frontier/off-spec, silent provider repoint"},
+        {"date": "2026-05-21", "to": "v4-pro", "note": null}
+      ],
+      "off_spec_window": "2026-04-24 to 2026-05-21",
+      "detection": "undetected ~4 weeks; month-boundary-only check",
+      "performance_status": "real, retained model_spliced",
+      "decision_based_status": "exploratory",
+      "first_success_note": "first_date 2026-05-21 is the config-repoint boundary; first logged v4-pro success is 2026-05-22 (n_success unchanged; flagged because the model-identity analysis turns on this boundary)"
+    }
+  },
+
+  "persistent_model_status": {
+    "claude": {"status": "non_estimable", "failed_gate": "uncorrupted_book", "scope": "phase_a"},
+    "claude_opus": {"status": "non_estimable", "failed_gate": "uncorrupted_book", "scope": "phase_a"},
+    "deepseek": {"status": "exploratory_only", "failed_gate": "model_identity_stable", "scope": "phase_a"}
+  }
+}
