@@ -69,7 +69,7 @@ CASH_SHORT_USD_MIN = 1.0
 OVERSELL_SHARES_MIN = 0.05
 
 
-def load_runs(model_key: str) -> list[dict[str, Any]]:
+def load_runs(model_key: str, months: list[str] = MONTHS) -> list[dict[str, Any]]:
     """All api_success decision-log runs for a model across the in-window months,
     sorted chronologically by (date, timestamp).
 
@@ -78,7 +78,7 @@ def load_runs(model_key: str) -> list[dict[str, Any]]:
     trade chain or the price table.
     """
     runs: list[dict[str, Any]] = []
-    for month in MONTHS:
+    for month in months:
         path = os.path.join(ROOT, "data", "trades", f"{model_key}_{month}.jsonl")
         if not os.path.exists(path):
             continue
@@ -149,7 +149,8 @@ def mark_price(ticker, date, model_key, per_model, pooled, sorted_dates, avg_cos
     return avg_cost, "avg_cost"  # worst case (flagged via source counts)
 
 
-def defab_one_model(model_key, runs, per_model, pooled, all_dates):
+def defab_one_model(model_key, runs, per_model, pooled, all_dates,
+                    base_date=BASE_DATE, end_date=END_DATE, clean_start=CLEAN_START):
     """Chain the de-fab book through every logged trade; snapshot equity per date.
 
     LITERAL chain (no clamping): defab_book = seed + sum of logged executed
@@ -191,7 +192,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates):
         runs_by_date[r["date"]].append(r)
 
     for date in model_dates:
-        window = "clean" if date >= CLEAN_START else "shakedown"
+        window = "clean" if date >= clean_start else "shakedown"
         for run in runs_by_date[date]:
             for ex in run.get("executions") or []:
                 if not (ex.get("executed") and ex.get("side") in ("BUY", "SELL")):
@@ -283,7 +284,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates):
             "defab_num_positions": sum(1 for h in holdings.values() if abs(h["shares"]) >= 1e-9),
             "defab_negative_positions": neg_positions,
         })
-        if date in (BASE_DATE, END_DATE):
+        if date in (base_date, end_date):
             book_snapshots[date] = {
                 "cash": round(cash, 2),
                 "cash_is_negative": cash < -CASH_SHORT_USD_MIN,
@@ -304,12 +305,26 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates):
     }
 
 
-def main() -> int:
-    # load everything
-    all_runs = {mk: load_runs(mk) for mk in MODELS}
+def compute_clean_window(end_date=END_DATE, base_date=BASE_DATE,
+                         clean_start=CLEAN_START, months=MONTHS):
+    """Per-model de-fabricated clean-window result dict (the canonical overhang
+    correction), reusable by the monthly data-layer builder.
+
+    Returns {model_key: result_dict} — the same per-model structure main() writes
+    into defab_clean_window.json under "models". Defaults reproduce the committed
+    May window exactly (base 2026-04-22 -> end 2026-05-29 over Apr+May logs); the
+    builder overrides end_date/months for other report months. end_date is
+    resolved to the last available EOD trading day on or before it, so passing a
+    calendar month-end (e.g. 2026-05-31) lands on the last trading day (5/29)."""
+    # load everything (only the in-window months -> the series is frozen at the
+    # report window; later-month logs never leak into a prior month's figures)
+    all_runs = {mk: load_runs(mk, months) for mk in MODELS}
     all_eod = {mk: eod_run_per_date(runs) for mk, runs in all_runs.items()}
     per_model, pooled = build_price_tables(all_eod)
     all_dates = sorted(set().union(*[set(d.keys()) for d in all_eod.values()]))
+    # resolve end_date to the last actual EOD trading day on or before it
+    _le = [d for d in all_dates if d <= end_date]
+    end_date = _le[-1] if _le else end_date
 
     # canonical perf series (one EOD total_value per date; last row wins on dupes)
     def perf_series(model_key):
@@ -339,7 +354,9 @@ def main() -> int:
 
     results = {}
     for mk in MODELS:
-        d = defab_one_model(mk, all_runs[mk], per_model, pooled, all_dates)
+        d = defab_one_model(mk, all_runs[mk], per_model, pooled, all_dates,
+                            base_date=base_date, end_date=end_date,
+                            clean_start=clean_start)
 
         # Anchor de-fab onto the perf-log basis: defab_equity(D) = perf_tv(D)
         # minus the marked phantom overhang = defab_pooled(D) + (perf_tv(D) -
@@ -351,11 +368,11 @@ def main() -> int:
             offset = (ptv - rec) if (ptv is not None and rec is not None) else 0.0
             row["defab_equity"] = round(row["defab_equity_pooled"] + offset, 2)
         by_date_equity = {row["date"]: row["defab_equity"] for row in d["daily_series"]}
-        d["base_equity"] = by_date_equity.get(BASE_DATE)
-        d["end_equity"] = by_date_equity.get(END_DATE)
+        d["base_equity"] = by_date_equity.get(base_date)
+        d["end_equity"] = by_date_equity.get(end_date)
 
-        raw_base = perf_tv(mk, BASE_DATE)
-        raw_end = perf_tv(mk, END_DATE)
+        raw_base = perf_tv(mk, base_date)
+        raw_end = perf_tv(mk, end_date)
         raw_ret = (raw_end / raw_base - 1.0) if raw_base else None
         defab_ret = (d["end_equity"] / d["base_equity"] - 1.0) if d["base_equity"] else None
         delta_pp = ((defab_ret - raw_ret) * 100.0) if (defab_ret is not None and raw_ret is not None) else None
@@ -370,7 +387,7 @@ def main() -> int:
         # is correct (defab = recorded - frozen overhang). Any drift would mean
         # a residual bug or an unlogged clean-window event.
         overhang = {}
-        for date in (BASE_DATE, END_DATE):
+        for date in (base_date, end_date):
             rc, rh = recorded_book_at(mk, date)
             snap = d["book_snapshots"].get(date, {})
             dh = snap.get("holdings", {})
@@ -381,9 +398,9 @@ def main() -> int:
                 "shares": {t: rh.get(t, 0.0) - dh.get(t, 0.0) for t in allt},
             }
         cash_drift = None
-        if overhang[BASE_DATE]["cash"] is not None and overhang[END_DATE]["cash"] is not None:
-            cash_drift = overhang[END_DATE]["cash"] - overhang[BASE_DATE]["cash"]
-        sh0, sh1 = overhang[BASE_DATE]["shares"], overhang[END_DATE]["shares"]
+        if overhang[base_date]["cash"] is not None and overhang[end_date]["cash"] is not None:
+            cash_drift = overhang[end_date]["cash"] - overhang[base_date]["cash"]
+        sh0, sh1 = overhang[base_date]["shares"], overhang[end_date]["shares"]
         max_share_drift = max((abs(sh1.get(t, 0.0) - sh0.get(t, 0.0))
                                for t in set(sh0) | set(sh1)), default=0.0)
         validation = {
@@ -392,7 +409,7 @@ def main() -> int:
             ) else "FAIL",
             "clean_window_cash_overhang_drift_usd": round(cash_drift, 4) if cash_drift is not None else None,
             "clean_window_max_share_overhang_drift": round(max_share_drift, 4),
-            "shakedown_overhang_cash_usd_at_base": round(overhang[BASE_DATE]["cash"], 2) if overhang[BASE_DATE]["cash"] is not None else None,
+            "shakedown_overhang_cash_usd_at_base": round(overhang[base_date]["cash"], 2) if overhang[base_date]["cash"] is not None else None,
         }
 
         # ---- TRUST: feasibility of the de-fab book. A faithful de-fab book is
@@ -401,8 +418,8 @@ def main() -> int:
         # net-short or net-negative-cash, the logged trades could not have been
         # produced by that book, and the literal equity becomes a leveraged
         # artifact — best-estimate at best, not-reliably-estimable when severe.
-        base_snap = d["book_snapshots"].get(BASE_DATE, {})
-        end_snap = d["book_snapshots"].get(END_DATE, {})
+        base_snap = d["book_snapshots"].get(base_date, {})
+        end_snap = d["book_snapshots"].get(end_date, {})
         infeasible_usd = max(
             abs(base_snap.get("negative_position_value_usd", 0.0)) + max(0.0, -base_snap.get("cash", 0.0)),
             abs(end_snap.get("negative_position_value_usd", 0.0)) + max(0.0, -end_snap.get("cash", 0.0)),
@@ -455,12 +472,18 @@ def main() -> int:
             "infeasibility_usd": round(infeasible_usd, 2),
             "infeasibility_ratio_of_base": round(infeasible_ratio, 4),
             "inconsistencies_detail": d["inconsistencies"],
-            "defab_book_feasibility": {BASE_DATE: base_snap, END_DATE: end_snap},
+            "defab_book_feasibility": {base_date: base_snap, end_date: end_snap},
             "validation": validation,
             "price_source_counts": d["price_source_counts"],
             "defab_daily_equity": d["daily_series"],
             "incon_events": d["incon_events"],
         }
+
+    return results
+
+
+def main() -> int:
+    results = compute_clean_window()
 
     out = {
         "method_note": (

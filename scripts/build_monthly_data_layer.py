@@ -88,6 +88,19 @@ logger = logging.getLogger("llmlab.data_layer")
 INCEPTION_DATE = "2026-04-09"
 INCEPTION_CAPITAL = 100_000.0
 
+# Phase-A persistent integrity ledger (the carried facts that do not recompute
+# monthly). The builder reads this and combines it with the month's decision logs
+# and the de-fabricated clean-window series to emit the integrity layer natively.
+INTEGRITY_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "phase_a_integrity_ledger.json")
+SCHEMA_DOC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "docs", "REPORT_SCHEMA.md")
+
+
+def _load_ledger() -> dict:
+    with open(INTEGRITY_LEDGER, encoding="utf-8") as f:
+        return json.load(f)
+
 
 # ==========================================================================
 # Small utilities
@@ -117,12 +130,15 @@ def _source_commit() -> str:
         return "unknown"
 
 
-def _eod_series(model_key: str):
+def _eod_series(model_key: str, cap: str | None = None):
     """Inception-anchored EOD series for one model.
 
     Dedup the performance log to one row per date (last row = EOD), keep dates
-    >= INCEPTION_DATE (drops the pre-inception 2026-04-08 seed rows). Returns a
-    list of (date, total_value) sorted by date.
+    >= INCEPTION_DATE (drops the pre-inception 2026-04-08 seed rows). When `cap`
+    is given (the report month-end), dates after it are dropped so the monthly
+    report is frozen at its own month — later-month EOD rows never leak into a
+    prior month's cumulative return or equity curve. Returns a list of
+    (date, total_value) sorted by date.
     """
     df = load_performance_history(model_key)
     if df.empty:
@@ -131,14 +147,16 @@ def _eod_series(model_key: str):
     for _, r in df.iterrows():
         d = r["date"].strftime("%Y-%m-%d")
         eod[d] = float(r["total_value"])  # last write per date wins (chronological)
-    return [(d, v) for d, v in sorted(eod.items()) if d >= INCEPTION_DATE]
+    return [(d, v) for d, v in sorted(eod.items())
+            if d >= INCEPTION_DATE and (cap is None or d <= cap)]
 
 
-def _spy_eod_series():
+def _spy_eod_series(cap: str | None = None):
     """Shared SPY EOD series from benchmark_value across all perf logs.
 
     All models log the same SPY price per tick; the union (last non-null per
-    date) gives the full SPY series. Anchored to INCEPTION_DATE.
+    date) gives the full SPY series. Anchored to INCEPTION_DATE; capped at the
+    report month-end when `cap` is given (same freeze rule as _eod_series).
     """
     spy = {}
     for fp in sorted((TRADES_DIR.parent / "performance").glob("*.jsonl")):
@@ -151,7 +169,8 @@ def _spy_eod_series():
                 continue
             d = r["date"].strftime("%Y-%m-%d")
             spy[d] = float(bv)  # last write per date wins
-    return [(d, v) for d, v in sorted(spy.items()) if d >= INCEPTION_DATE]
+    return [(d, v) for d, v in sorted(spy.items())
+            if d >= INCEPTION_DATE and (cap is None or d <= cap)]
 
 
 def _max_drawdown(values):
@@ -763,6 +782,501 @@ def _pinned_snapshots(model_keys, win_start, win_end, settings):
 
 
 # ==========================================================================
+# Native integrity / provenance emission (Phase-A ledger + computed gates).
+# This encodes the framework ratified at the May schema-close
+# (scripts/backfill_may_data_layer.py) as a BUILD: persistent facts come from
+# phase_a_integrity_ledger.json; per-month facts (completeness gate, clean-window
+# returns, the passing cohort) are COMPUTED here, never hand-walked.
+# ==========================================================================
+
+def _decision_completeness(layer):
+    """api_success / records per model, from the integrity block (Gemini ~0.57).
+    Identical definition to scripts/backfill_may_data_layer._decision_completeness."""
+    fr = layer["methodology_data_integrity_rq"]["data_integrity"]["per_model_failure_rate"]
+    out = {}
+    for k, v in fr.items():
+        rec = v.get("records") or 0
+        out[k] = round(v["api_success"] / rec, 4) if rec else None
+    return out
+
+
+def _evaluate_gates(model_keys, decision_completeness, clean_results, ledger):
+    """Apply the three-gate inclusion framework per model and derive the full
+    data-confidence taxonomy.
+
+    Carried gate failures (uncorrupted_book, model_identity_stable) come from the
+    ledger's persistent_model_status; the completeness gate is COMPUTED from this
+    month's decision logs (it varies month to month — e.g. Gemini fails it in May
+    with an otherwise-clean book). The clean-window source/value/trust come from
+    the committed de-fab overhang correction (clean_results)."""
+    comp_min = ledger["inclusion_gates"]["completeness_min"]
+    pms = ledger.get("persistent_model_status", {})
+    book_fail = {m for m, s in pms.items() if s.get("failed_gate") == "uncorrupted_book"}
+    identity_fail = {m for m, s in pms.items() if s.get("failed_gate") == "model_identity_stable"}
+
+    out = {}
+    for mk in model_keys:
+        comp = decision_completeness.get(mk)
+        gate_completeness = comp is not None and comp >= comp_min
+        gate_book = mk not in book_fail
+        gate_identity = mk not in identity_fail
+        model_spliced = mk in identity_fail
+        all_pass = gate_completeness and gate_book and gate_identity
+
+        # ---- clean-window figure from the committed de-fab overhang correction ----
+        cr = clean_results.get(mk, {})
+        trust = cr.get("trust")
+        delta_pp = cr.get("delta_pp")
+        defab_ret = cr.get("defab_clean_return")
+        if trust == "not_reliably_estimable" or defab_ret is None:
+            clean_source = "not_estimable"
+            clean_value = None
+            clean_confidence = "not_reliably_estimable"
+        else:
+            # source label: de-fab CONFIRMS raw within rounding (|delta|<0.05pp) -> "raw";
+            # otherwise a real bounded correction was applied -> "defab". The emitted
+            # VALUE is always the de-fab figure (round 4); the label conveys trust basis.
+            clean_source = "raw" if abs(delta_pp) < 0.05 else "defab"
+            clean_value = round(defab_ret, 4)
+            clean_confidence = "estimable"
+
+        # ---- taxonomy (gate priority: book > identity > completeness) ----
+        if not gate_book:
+            data_confidence = "non_estimable_corrupt_book"
+            profile_status = "non_estimable"
+        elif not gate_identity:
+            data_confidence = "exploratory_model_splice"
+            profile_status = "provisional_model_splice"
+        elif not gate_completeness:
+            data_confidence = "exploratory_completeness"
+            profile_status = "performance_only"
+        else:
+            data_confidence = "estimable"
+            profile_status = "estimable_primary"
+
+        # ---- risk_basis: gates certify the POINT return, not the daily-risk path.
+        # A de-fab-corrected series is basis-sensitive for Sharpe/vol/DD even when
+        # the point return is estimable (gate_scope_refinement). ----
+        if clean_source == "not_estimable":
+            risk_basis = "non_estimable"
+        elif model_spliced:
+            risk_basis = "spliced"
+        elif clean_source == "defab":
+            risk_basis = "raw_basis_sensitive"
+        else:  # clean_source == "raw"
+            risk_basis = "raw"
+
+        out[mk] = {
+            "gate_completeness": gate_completeness,
+            "gate_uncorrupted_book": gate_book,
+            "gate_model_identity_stable": gate_identity,
+            "all_pass": all_pass,
+            "model_spliced": model_spliced,
+            "clean_source": clean_source,
+            "clean_value": clean_value,
+            "clean_confidence": clean_confidence,
+            "data_confidence": data_confidence,
+            "profile_status": profile_status,
+            "rq_trust_flag": data_confidence,  # same four-tier taxonomy
+            "risk_basis": risk_basis,
+        }
+    return out
+
+
+def _rq1_reason(gate):
+    """The single-word RQ1 exclusion reason from a model's gate result."""
+    if not gate["gate_uncorrupted_book"]:
+        return "corrupt_book"
+    if not gate["gate_model_identity_stable"]:
+        return "model_splice"
+    if not gate["gate_completeness"]:
+        return "completeness"
+    return None
+
+
+def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month,
+                     spy_clean_value, spy_descriptive_sharpe):
+    """Emit the integrity / provenance layer onto the freshly-built non-integrity
+    layer. Computes nothing about returns/behavior (those are the base build);
+    only ADDS the integrity framework — gate taxonomy, clean-window figures, the
+    persistent caveats from the ledger, the RQ supersession, and provenance.
+
+    Mirrors the field set ratified in scripts/backfill_may_data_layer.apply_backfill,
+    but every per-model value is COMPUTED (gates/clean-window) or read from the
+    ledger (persistent facts), not hand-coded."""
+    rm = layer["report_meta"]
+    rf = ledger["risk_free_rate"]
+
+    # ---- report_meta ----
+    rm["schema_version"] = "1.0"
+    rm["risk_free_rate"] = {"value": rf["value"], "as_of": rf["as_of"]}
+    # rf as-of correction (inception-pinned), preserving the rest of the note text.
+    if isinstance(rm.get("risk_free_rate_note"), str) and "as of 2026-06-01" in rm["risk_free_rate_note"]:
+        rm["risk_free_rate_note"] = rm["risk_free_rate_note"].replace(
+            "as of 2026-06-01", f"as of {rf['as_of']} (inception-pinned)")
+    mn = rm.get("methodology_notes", {})
+    if isinstance(mn.get("risk_free_rate"), str) and "source date 2026-06-01" in mn["risk_free_rate"]:
+        mn["risk_free_rate"] = mn["risk_free_rate"].replace(
+            "source date 2026-06-01", f"as-of inception {rf['as_of']}")
+
+    # DeepSeek snapshot first-date correction: only when the model identity
+    # spliced WITHIN this month (multi-leg). Correct each leg's first_date to the
+    # canonical transition boundary from the ledger (config-repoint date), which
+    # the month-local log scan cannot see across the month boundary.
+    splice = ledger["integrity_events"]["deepseek_identity_splice"]
+    ds_snap = rm.get("pinned_snapshots", {}).get("deepseek", {})
+    legs = ds_snap.get("may_snapshots") or ds_snap.get("snapshots") or []
+    if len(legs) > 1:
+        boundary = {f"deepseek-{t['to']}": t["date"] for t in splice["transitions"]}
+        for leg in legs:
+            if leg.get("snapshot_id") in boundary:
+                leg["first_date"] = boundary[leg["snapshot_id"]]
+
+    rm["spy_benchmark"]["descriptive_sharpe"] = spy_descriptive_sharpe
+
+    # ---- leaderboard: rename + clean/confidence + SPY row ----
+    spy_cum_inception = rm["spy_benchmark"].get("cumulative_return_since_inception")
+    spy_month = rm["spy_benchmark"].get("monthly_return")
+    for row in layer["leaderboard"]:
+        if "cumulative_return" in row and "cumulative_return_inception" not in row:
+            row["cumulative_return_inception"] = row.pop("cumulative_return")
+        mk = row["model"]
+        g = gates.get(mk)
+        if g:
+            row["cumulative_return_clean"] = {
+                "value": g["clean_value"], "source": g["clean_source"],
+                "confidence": g["clean_confidence"], "model_spliced": g["model_spliced"],
+            }
+            row["data_confidence"] = g["data_confidence"]
+    layer["leaderboard"].append({
+        "model": "spy_benchmark", "rank": None,
+        "monthly_return": spy_month,
+        "cumulative_return_inception": spy_cum_inception,
+        "cumulative_return_clean": {"value": spy_clean_value, "source": "benchmark",
+                                    "confidence": "benchmark", "model_spliced": False},
+        "spy_relative_alpha": 0.0,
+        "data_confidence": "benchmark",
+    })
+
+    # ---- performance: risk_basis + SPY row ----
+    for mk in model_keys:
+        p = layer["performance"].get(mk)
+        if p is not None and gates.get(mk):
+            p["risk_basis"] = gates[mk]["risk_basis"]
+    layer["performance"]["spy_benchmark"] = {
+        "monthly_return": spy_month, "max_drawdown": None, "volatility": None,
+        "sharpe": spy_descriptive_sharpe, "trade_count": None, "win_rate": None,
+        "turnover": None, "avg_hold_days": None, "risk_basis": "benchmark",
+    }
+
+    # ---- charts: conditional shakedown-fabrication flag ----
+    # True iff this report's inception-anchored equity curve spans the launch
+    # shakedown window (so the 4/9-4/22 fabricated segment is carried/shaded).
+    # Computed from the actual curve span, so it falls to False automatically once
+    # a report's curve no longer reaches back into the shakedown window.
+    shake_end = ledger["shakedown_window"]["end"]
+    curve_dates = sorted({pt["date"] for s in layer["charts"]["equity_curve"]["series"].values()
+                          for pt in s})
+    layer["charts"]["equity_curve_carries_shakedown_fabrication"] = bool(
+        curve_dates and curve_dates[0] <= shake_end <= curve_dates[-1])
+
+    # ---- cross_model_behavioral: restructure rq1 + episode register ----
+    cmb = layer["cross_model_behavioral"]
+    if "rq1_herding_point_estimate" in cmb and "rq1" not in cmb:
+        numeric = cmb.pop("rq1_herding_point_estimate")
+        numeric["reasons"] = {mk: _rq1_reason(gates[mk]) for mk in model_keys
+                              if gates.get(mk) and _rq1_reason(gates[mk])}
+        cmb["rq1"] = {
+            "primary": {"status": "not_estimable", "reason": "single_pair_cohort",
+                        "deferred_to": "phase_b"},
+            "exploratory_pairwise": numeric,
+        }
+    cmb.setdefault("cross_model_episode_register", [])
+
+    # ---- profiles: status, decision_completeness, suppress non-estimable ----
+    dc = _decision_completeness(layer)
+    for prof in layer["profiles"]:
+        mk = prof["model"]
+        g = gates.get(mk, {})
+        prof["status"] = g.get("profile_status")
+        prof["decision_completeness"] = dc.get(mk)
+        if g.get("profile_status") == "non_estimable":
+            em = prof.get("evidence_metrics", {})
+            for f in ("rq2_disposition_difference", "rq3_confidence_outcome_corr"):
+                if em.get(f) is not None:
+                    em[f] = None
+            # corrupt-book deployment/cash characterizations are uncertifiable -> null
+            for f in ("style_tag", "risk_posture_tag", "strengths", "weaknesses"):
+                prof[f] = None
+
+    # ---- methodology_data_integrity_rq ----
+    mdr = layer["methodology_data_integrity_rq"]
+    lw = ledger["integrity_events"]["launch_window_corruption"]
+    clean_window_figures_source = {mk: gates[mk]["clean_source"] for mk in model_keys if gates.get(mk)}
+    mdr["known_caveats"] = {
+        "state_integrity": {
+            "bugs": lw["bugs"],
+            "per_model_fabrication": lw["per_model_fabrication"],
+            "audit": lw["audit"],
+            "persistence": lw["persistence"],
+            "clean_window_figures_source": clean_window_figures_source,
+        },
+        "model_identity": {
+            "deepseek_model_splice": {
+                "alias": splice["alias"],
+                "transitions": splice["transitions"],
+                "off_spec_window": splice["off_spec_window"],
+                "detection": splice["detection"],
+                "performance_status": splice["performance_status"],
+                "decision_based_status": splice["decision_based_status"],
+                "first_success_note": splice["first_success_note"],
+            },
+        },
+    }
+    # inclusion_gates: definitions from the ledger; passing cohort COMPUTED this
+    # month. The cohort lives under the STABLE key `passing` (fixed schema: the
+    # quarterly aggregator and every downstream consumer read one key, never a
+    # month-built one). Month identity stays in report_meta.period.
+    mdr["inclusion_gates"] = {
+        "completeness_min": ledger["inclusion_gates"]["completeness_min"],
+        "uncorrupted_book": True,
+        "model_identity_stable": True,
+        "passing": [mk for mk in model_keys if gates.get(mk, {}).get("all_pass")],
+    }
+    mdr["gate_scope_refinement"] = ledger["inclusion_gates"]["gate_scope_refinement"]
+
+    # RQ point-estimate reclassification: RQ1 not estimable as primary (single-pair
+    # cohort); RQ2/RQ3 six-model pools SUPERSEDED (they pool non-estimable + exploratory
+    # models with the estimable cohort) -> per-model GPT/Grok reported primary.
+    pe = mdr["rq_update"]["point_estimates"]
+    if "RQ1" in pe:
+        pe["RQ1"]["status"] = "not_estimable"
+    rq_estimable = [mk for mk in model_keys
+                    if gates.get(mk, {}).get("rq_trust_flag") == "estimable"]
+    # exploratory / non-estimable enumeration for the supersession prose, in
+    # model_keys order, with each model's exclusion reason derived from its gate.
+    nonest = [mk for mk in model_keys
+              if gates.get(mk, {}).get("profile_status") == "non_estimable"]
+    _EXPL_REASON = {"performance_only": "completeness", "provisional_model_splice": "model-splice"}
+    explor = [(mk, _EXPL_REASON[gates[mk]["profile_status"]]) for mk in model_keys
+              if gates.get(mk, {}).get("profile_status") in _EXPL_REASON]
+    _DISPLAY = {"gpt": "GPT", "grok": "Grok", "gemini": "Gemini",
+                "deepseek": "DeepSeek", "claude": "Claude Sonnet", "claude_opus": "Claude Opus"}
+    _COUNT = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+    est_and = " and ".join(_DISPLAY.get(m, m) for m in rq_estimable)        # "GPT and Grok"
+    est_slash = "/".join(_DISPLAY.get(m, m) for m in rq_estimable)          # "GPT/Grok"
+    est_refs = " and ".join(f"per_model.{m}" for m in rq_estimable)         # "per_model.gpt and per_model.grok"
+    nonest_str = ", ".join(nonest)                                          # "claude, claude_opus"
+    explor_str = "; ".join(f"{mk}: {why}" for mk, why in explor)            # "gemini: completeness; deepseek: model-splice"
+    POOL_META = {
+        "RQ2": {"metric": "disposition_difference", "pool_field": "pooled_disposition_difference",
+                "n_field": "n_sale_records", "pool_phrase": "disposition difference",
+                "primary_phrase": "disposition differences"},
+        "RQ3": {"metric": "confidence_outcome_corr", "pool_field": "pooled_confidence_outcome_corr",
+                "n_field": "n_closed_trades", "pool_phrase": "confidence-outcome correlation",
+                "primary_phrase": "confidence-outcome correlations"},
+    }
+    for rq, meta in POOL_META.items():
+        node = pe.get(rq)
+        if node is None:
+            continue
+        node["status"] = "superseded_six_model_pool"
+        node["reported"] = False
+        node["reported_primary"] = {
+            "basis": "per_model",
+            "cohort": rq_estimable,
+            "status": "estimable",
+            "metric": meta["metric"],
+            "value_ref": ", ".join(f"per_model.{mk}.{meta['metric']}" for mk in rq_estimable),
+            "note": (
+                f"Reported primary for {rq} is the per-model {est_and} {meta['primary_phrase']} -- "
+                f"the {_COUNT.get(len(rq_estimable), len(rq_estimable))} models that clear the "
+                "three-gate inclusion framework (uncorrupted book, stable model identity, "
+                "completeness >= 0.80) and are each individually estimable. Authoritative values "
+                f"live in {est_refs} and are unchanged."
+            ),
+        }
+        node["supersession_note"] = (
+            f"The six-model pooled {meta['pool_phrase']} ({meta['pool_field']}, "
+            f"{meta['n_field']}={node.get(meta['n_field'])}) pools non-estimable models "
+            f"({nonest_str}: corrupt book) and exploratory models ({explor_str}) together with "
+            f"the estimable {est_slash} cohort, which contradicts the inclusion framework. It is "
+            f"superseded by the per-model {est_slash} reported primary and is retained for "
+            "provenance only -- not reported."
+        )
+        for mk, pm in node.get("per_model", {}).items():
+            if gates.get(mk):
+                pm["trust_flag"] = gates[mk]["rq_trust_flag"]
+
+    # ---- provenance / source_commit (the one inherently two-step field) ----
+    rm["source_commit"] = None  # reconcile after commit (see note)
+    rm["provenance"] = {
+        "generated_at_commit": _source_commit(),  # HEAD at build (build-time)
+        "integrity_refs": {
+            "ledger": "scripts/phase_a_integrity_ledger.json",
+            "defab_overhang": "scripts/defab_clean_window.py",
+            "schema": "docs/REPORT_SCHEMA.md",
+        },
+        "note": (
+            "generated_at_commit is HEAD at build (build-time; on its own it predates this "
+            "file and reproduces nothing). source_commit is null at emit: it must point at the "
+            "commit that reproduces this report, which the builder cannot know before "
+            "committing. MANDATORY RELEASE GATE -- a published monthly layer must NOT carry a "
+            "null source_commit: after the data-layer commits, run "
+            f"`git log -1 --format=%H -- reports/monthly/{month}/data_layer.json` and write that "
+            "hash into report_meta.source_commit before the report is published. The integrity "
+            "layer is emitted NATIVELY in this single build from integrity_refs (the Phase-A "
+            "ledger + the committed de-fab overhang correction), superseding May's three-commit "
+            "hand chain (generator -> integrity back-fill -> pool relabel)."
+        ),
+    }
+    return layer
+
+
+# ==========================================================================
+# Self-validation: the builder errors out rather than emit a bad layer.
+# ==========================================================================
+
+def _schema_validate(layer):
+    """Structural validation against docs/REPORT_SCHEMA.md: every required field
+    present with the right type. Returns a list of issue strings (empty == pass)."""
+    issues = []
+
+    def req(cond, msg):
+        if not cond:
+            issues.append(msg)
+
+    req(set(layer) >= {"report_meta", "leaderboard", "performance", "charts",
+                       "cross_model_behavioral", "profiles", "methodology_data_integrity_rq"},
+        "top-level keys missing")
+    rm = layer.get("report_meta", {})
+    req(rm.get("schema_version") == "1.0", "report_meta.schema_version != '1.0'")
+    req(isinstance(rm.get("risk_free_rate"), dict) and "value" in rm["risk_free_rate"]
+        and "as_of" in rm["risk_free_rate"], "report_meta.risk_free_rate not {value, as_of}")
+    req(isinstance(rm.get("spy_benchmark"), dict)
+        and rm["spy_benchmark"].get("descriptive_sharpe") is not None,
+        "report_meta.spy_benchmark.descriptive_sharpe missing")
+    prov = rm.get("provenance", {})
+    req(isinstance(prov, dict) and "generated_at_commit" in prov, "report_meta.provenance.generated_at_commit missing")
+    req("source_commit" in rm, "report_meta.source_commit missing (populate-or-null)")
+
+    lb = {r.get("model"): r for r in layer.get("leaderboard", [])}
+    req("spy_benchmark" in lb, "leaderboard missing spy_benchmark row")
+    for mk, r in lb.items():
+        req("cumulative_return" not in r, f"leaderboard[{mk}] still has old cumulative_return")
+        req("cumulative_return_inception" in r, f"leaderboard[{mk}].cumulative_return_inception missing")
+        cc = r.get("cumulative_return_clean")
+        req(isinstance(cc, dict) and {"value", "source", "confidence", "model_spliced"} <= set(cc),
+            f"leaderboard[{mk}].cumulative_return_clean malformed")
+        req("data_confidence" in r, f"leaderboard[{mk}].data_confidence missing")
+
+    perf = layer.get("performance", {})
+    req("spy_benchmark" in perf, "performance missing spy_benchmark row")
+    for mk, p in perf.items():
+        if p is None:
+            continue
+        req("risk_basis" in p, f"performance[{mk}].risk_basis missing")
+
+    req("equity_curve_carries_shakedown_fabrication" in layer.get("charts", {}),
+        "charts.equity_curve_carries_shakedown_fabrication missing")
+    cmb = layer.get("cross_model_behavioral", {})
+    req("rq1_herding_point_estimate" not in cmb, "cross_model_behavioral.rq1 not restructured")
+    req(cmb.get("rq1", {}).get("primary", {}).get("status") == "not_estimable",
+        "cross_model_behavioral.rq1.primary.status missing")
+    req("observed_action_concordance" in cmb.get("rq1", {}).get("exploratory_pairwise", {}),
+        "cross_model_behavioral.rq1.exploratory_pairwise.observed_action_concordance missing")
+    req("cross_model_episode_register" in cmb, "cross_model_episode_register missing")
+
+    for prof in layer.get("profiles", []):
+        mk = prof.get("model")
+        for f in ("status", "decision_completeness", "evidence_metrics", "notable_events",
+                  "style_tag", "risk_posture_tag", "strengths", "weaknesses"):
+            req(f in prof, f"profiles[{mk}].{f} missing (populate-or-null)")
+        req("data_caveat" not in prof, f"profiles[{mk}].data_caveat not dropped")
+
+    mdr = layer.get("methodology_data_integrity_rq", {})
+    for f in ("data_integrity", "rq_update", "known_caveats", "inclusion_gates", "gate_scope_refinement"):
+        req(f in mdr, f"methodology_data_integrity_rq.{f} missing")
+    ig = mdr.get("inclusion_gates", {})
+    req(ig.get("completeness_min") is not None and isinstance(ig.get("passing"), list),
+        "inclusion_gates malformed (completeness_min / passing)")
+    pe = mdr.get("rq_update", {}).get("point_estimates", {})
+    req(pe.get("RQ1", {}).get("status") == "not_estimable", "RQ1.status != not_estimable")
+    for rq in ("RQ2", "RQ3"):
+        n = pe.get(rq, {})
+        req(n.get("status") == "superseded_six_model_pool", f"{rq}.status not superseded")
+        req(n.get("reported") is False, f"{rq}.reported != false")
+        req(n.get("reported_primary", {}).get("status") == "estimable", f"{rq}.reported_primary missing")
+        req(not str(n.get("status", "")).startswith("estimable"),
+            f"{rq} pool flagged estimable while pooling non-estimable models")
+    return issues
+
+
+def _rq_consistency_check(layer):
+    """The read-only RQ-consistency cross-check, applied to any month's layer:
+    the OBSERVATION-WEIGHTED off-diagonal action_concordance of the correlation
+    matrix must equal the relocated RQ1 exploratory_pairwise concordance scalar.
+
+    This is the identical reconciliation embedded in
+    scripts/backfill_may_data_layer.verify (the definition-of-done). It is run
+    UNCHANGED there against the reproduce-May candidate (Part 4); here it is
+    applied generally so every monthly build is held to the same invariant.
+    Returns (reconciles: bool, weighted, scalar)."""
+    cm = layer["charts"]["correlation_matrix"]
+    ac, ns, mods = cm["action_concordance"], cm["n_shared_ticks"], cm["models"]
+    num = den = 0.0
+    for a in mods:
+        for b in mods:
+            if a >= b:
+                continue
+            v, w = ac[a][b], ns[a][b]
+            if v is not None and w:
+                num += v * w
+                den += w
+    weighted = num / den if den else None
+    scalar = layer["cross_model_behavioral"]["rq1"]["exploratory_pairwise"]["observed_action_concordance"]
+    reconciles = weighted is not None and scalar is not None and abs(weighted - scalar) < 1e-9
+    return reconciles, weighted, scalar
+
+
+def _self_validate(layer):
+    """Schema validation + the read-only RQ-consistency cross-check + SPY
+    single-source invariant. Returns (ok, report_lines). The builder errors out
+    on any failure rather than emit a bad layer.
+
+    NOTE: the full scripts/backfill_may_data_layer.verify carries May-specific
+    literal asserts (SPY clean 0.0637, descriptive Sharpe 6.11) and post-authoring
+    interpretive-field asserts — it is the May definition-of-done and is run
+    UNCHANGED by the reproduce-May regression test, not here. This general
+    per-build validator reuses verify's RQ-consistency reconciliation algorithm
+    verbatim (_rq_consistency_check) so the same invariant holds every month."""
+    schema_issues = _schema_validate(layer)
+
+    reconciles, weighted, scalar = _rq_consistency_check(layer)
+    rq_issue = [] if reconciles else [
+        f"RQ-consistency FAIL: weighted off-diag mean {weighted} != scalar {scalar}"]
+
+    # SPY descriptive-Sharpe single-source: the performance row and report_meta
+    # must agree (general invariant, no month-specific literal).
+    spy_perf = (layer["performance"].get("spy_benchmark") or {}).get("sharpe")
+    spy_meta = (layer["report_meta"].get("spy_benchmark") or {}).get("descriptive_sharpe")
+    spy_issue = [] if spy_perf == spy_meta else [
+        f"SPY single-source FAIL: performance {spy_perf} != report_meta {spy_meta}"]
+
+    lines = [
+        f"  schema validation (REPORT_SCHEMA)                : {'PASS' if not schema_issues else 'FAIL'}",
+        f"  RQ-consistency cross-check (matrix wmean==scalar): {'PASS' if reconciles else 'FAIL'}"
+        + (f"  (w={weighted:.10f} s={scalar:.10f})" if weighted is not None and scalar is not None else ""),
+        f"  SPY descriptive-Sharpe single-source             : {'PASS' if not spy_issue else 'FAIL'}",
+    ]
+    all_issues = schema_issues + rq_issue + spy_issue
+    if all_issues:
+        lines.append("  ISSUES:")
+        lines += [f"    - {i}" for i in all_issues]
+    return (len(all_issues) == 0), lines
+
+
+# ==========================================================================
 # Driver
 # ==========================================================================
 
@@ -777,7 +1291,15 @@ def build(month: str) -> dict:
     win_end = f"{month}-{calendar.monthrange(yy, mm)[1]:02d}"
 
     logger.info("Loading full decision history for %d models...", len(model_keys))
-    full_records = {k: load_decision_records(k) for k in model_keys}
+    # MONTH-END FREEZE: a monthly report is a deterministic function of the data
+    # available through its own month-end. Cap the full decision history at
+    # win_end so the inception-anchored series, the RQ2/RQ3 replay, and the
+    # accumulating RQ inputs are frozen at the report month and never drift as
+    # later-month logs accrue. (Pre-window history is retained for cost-basis
+    # replay; only post-month records are dropped.) Calendar-month windows are
+    # unaffected — they already restrict to [win_start, win_end].
+    full_records = {k: [r for r in load_decision_records(k) if r.get("date", "") <= win_end]
+                    for k in model_keys}
     may_records = {k: [r for r in full_records[k] if win_start <= r.get("date", "") <= win_end]
                    for k in model_keys}
 
@@ -796,7 +1318,7 @@ def build(month: str) -> dict:
     # ====================================================================
     # Inception-anchored series + leaderboard + performance
     # ====================================================================
-    spy_series = _spy_eod_series()
+    spy_series = _spy_eod_series(cap=win_end)
     spy_dates = [d for d, _ in spy_series]
     spy_vals = {d: v for d, v in spy_series}
     spy_inception = spy_vals.get(INCEPTION_DATE) or (spy_series[0][1] if spy_series else None)
@@ -810,7 +1332,7 @@ def build(month: str) -> dict:
     underwater_series = {}
     leaderboard_rows = []
     for key in model_keys:
-        series = _eod_series(key)
+        series = _eod_series(key, cap=win_end)
         if not series:
             perf[key] = None
             continue
@@ -1145,7 +1667,7 @@ def build(month: str) -> dict:
         },
     }
 
-    return {
+    layer = {
         "report_meta": report_meta,
         "leaderboard": leaderboard,
         "performance": perf,
@@ -1168,6 +1690,48 @@ def build(month: str) -> dict:
         },
     }
 
+    # ====================================================================
+    # Native integrity / provenance layer (Phase-A ledger + computed gates)
+    # ====================================================================
+    from scripts.defab_clean_window import compute_clean_window
+    ledger = _load_ledger()
+
+    # De-fab clean-window overhang correction (committed scripts/defab_clean_window
+    # logic, reused). Window: shakedown-end base -> report month-end, over the
+    # inception..report-month decision logs. For May this reduces to the committed
+    # default window (base 2026-04-22 -> 2026-05-29) and reproduces it exactly.
+    inception_ym = INCEPTION_DATE[:7]
+    months_in_window = []
+    y, m = (int(x) for x in inception_ym.split("-"))
+    ey, em = (int(x) for x in month.split("-"))
+    while (y, m) <= (ey, em):
+        months_in_window.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    logger.info("De-fab clean-window overhang correction (%s)...", "/".join(months_in_window))
+    clean_results = compute_clean_window(
+        end_date=win_end, base_date=ledger["shakedown_window"]["end"],
+        clean_start=ledger["clean_window_start"], months=months_in_window)
+
+    # SPY clean-window return + descriptive (May-window) Sharpe — both derived,
+    # single-sourced into the leaderboard/performance SPY rows.
+    base_date = ledger["shakedown_window"]["end"]
+    spy_clean_value = None
+    if spy_vals.get(base_date) and spy_dates:
+        spy_clean_value = round(spy_vals[spy_dates[-1]] / spy_vals[base_date] - 1.0, 4)
+    spy_month_daily = list(np.diff([v for _, v in spy_may]) / np.array([v for _, v in spy_may][:-1])) \
+        if len(spy_may) >= 2 else []
+    _sds = _descriptive_sharpe(spy_month_daily, risk_free_rate)
+    spy_descriptive_sharpe = round(_sds, 2) if _sds is not None else None
+
+    decision_completeness = _decision_completeness(layer)
+    gates = _evaluate_gates(model_keys, decision_completeness, clean_results, ledger)
+    _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month,
+                     spy_clean_value, spy_descriptive_sharpe)
+    return layer
+
 
 def main() -> int:
     configure_logging()
@@ -1178,12 +1742,32 @@ def main() -> int:
 
     layer = build(args.month)
 
+    # ---- self-validation: never emit a bad layer silently (Part 3) ----
+    ok, report = _self_validate(layer)
+    print("\nSELF-VALIDATION")
+    print("-" * 70)
+    for line in report:
+        print(line)
+    print(f"\nOVERALL: {'PASS' if ok else 'FAIL'}")
+    if not ok:
+        logger.error("Self-validation FAILED; data layer NOT written.")
+        return 1
+
     out_path = args.output or str(REPORTS_DIR / "monthly" / args.month / "data_layer.json")
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(layer, f, indent=2, default=str)
     logger.info("Data layer written: %s", out_path)
     print(out_path)
+    # MANDATORY RELEASE GATE: source_commit is null until reconciled post-commit.
+    print(
+        "\nRELEASE GATE — report_meta.source_commit is null and MUST be reconciled "
+        "before this layer is published:\n"
+        f"  1) commit {os.path.relpath(out_path, str(PROJECT_ROOT))}\n"
+        f"  2) HASH=$(git log -1 --format=%H -- {os.path.relpath(out_path, str(PROJECT_ROOT))})\n"
+        "  3) write HASH into report_meta.source_commit, then commit the reconcile.\n"
+        "A published monthly layer with a null source_commit is a release-gate failure."
+    )
     return 0
 
 

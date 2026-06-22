@@ -43,6 +43,8 @@ Four-tier model **data-confidence taxonomy** (`leaderboard[].data_confidence`,
 | `pinned_snapshots[model]` | populate | `{display_name, provider, configured_model, cohort, may_snapshots[], snapshot_stable}`. `may_snapshots[]` = list of `{snapshot_id, first_date, last_date, n_success}` — multi-snapshot models carry **distinct entries** (DeepSeek: `v4-flash` 2026-04-24→2026-05-21, `v4-pro` 2026-05-21→2026-05-29). |
 | `spy_benchmark` | populate | `{ticker, inception_anchor_date, inception_value, month_end_value, cumulative_return_since_inception, monthly_return, descriptive_sharpe: 6.11, note}`. |
 | `regime_summary`, `source_commit`, `generated_at_utc`, `generator`, `bootstrap_config`, `methodology_notes` | populate | |
+| `provenance` | populate | `{generated_at_commit, integrity_refs, note}`. `generated_at_commit` = HEAD at build (build-time). |
+| `source_commit` (release gate) | populate | **MANDATORY RELEASE GATE.** Emitted `null` by the builder (it cannot know, pre-commit, the commit that reproduces the report). After the data layer commits, reconcile: `HASH=$(git log -1 --format=%H -- reports/monthly/<MONTH>/data_layer.json)` → write `HASH` into `report_meta.source_commit`, then commit. A published monthly layer with a `null` `source_commit` is a release-gate failure. |
 
 ## 2. `leaderboard[]` (6 models + `spy_benchmark` row)
 
@@ -103,7 +105,7 @@ Four-tier model **data-confidence taxonomy** (`leaderboard[].data_confidence`,
 - `model_identity.deepseek_model_splice`: `{alias, transitions[{date,to,note}], off_spec_window, detection, performance_status, decision_based_status}`.
 
 ### `inclusion_gates`
-`{completeness_min: 0.80, uncorrupted_book: true, model_identity_stable: true, may_passing: ["gpt","grok"]}`.
+`{completeness_min: 0.80, uncorrupted_book: true, model_identity_stable: true, passing: ["gpt","grok"]}`. The passing cohort is under the **stable** key `passing` (fixed schema — never month-prefixed; month identity lives in `report_meta.period`).
 
 ### `gate_scope_refinement`
 Note: gates certify **point-return** estimability, not **daily-risk-path**
