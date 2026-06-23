@@ -32,9 +32,11 @@
   },
   "daily": {
     "date": "2026-06-23",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "api_failure:claude_opus",
+      "api_failure:claude"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -44,6 +46,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-06-23T13:32:16.424631+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model claude_opus failed",
+        "timestamp": "2026-06-23T14:32:25.391490+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model claude failed",
+        "timestamp": "2026-06-23T14:32:29.470136+00:00",
         "disposition": "sent"
       }
     ]
