@@ -32,14 +32,16 @@
   },
   "daily": {
     "date": "2026-06-25",
-    "sent_count": 3,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "api_failure:gemini",
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "news:LLY:7f2c01d32f",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -60,6 +62,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-06-25T16:32:12.971599+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-06-25T21:07:31.490594+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-06-25T21:07:37.137767+00:00",
         "disposition": "sent"
       }
     ]
