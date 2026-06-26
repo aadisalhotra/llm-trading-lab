@@ -32,18 +32,34 @@
   },
   "daily": {
     "date": "2026-06-26",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:DE:2ae78115da",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-26T15:04:06.682472+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on DE (held by 4)",
+        "timestamp": "2026-06-26T21:06:57.401450+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-06-26T21:07:05.070337+00:00",
         "disposition": "sent"
       }
     ]
