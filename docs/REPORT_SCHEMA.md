@@ -69,8 +69,8 @@ Four-tier model **data-confidence taxonomy** (`leaderboard[].data_confidence`,
 
 | Field | Rule | Notes |
 |---|---|---|
-| `equity_curve` `{anchor, series}` | populate | Series incl. `spy_benchmark`. |
-| `equity_curve_carries_shakedown_fabrication` | populate | `true` — drives the 4/9–4/22 shaded band. |
+| `equity_curve` `{anchor, series, caption}` | populate | Series incl. `spy_benchmark`. **Re-anchored (Phase-A convention):** `anchor` is `{clean_window_start, clean_window_base_date, index_base, excluded_window, note}`; the displayed curve starts at `clean_window_start` (read from the ledger) and indexes off the `clean_window_base_date` close — the 4/9–4/22 launch/shakedown window is excluded, consistent with `cumulative_return_clean`. The inception-anchored cumulative return is unchanged (`leaderboard.cumulative_return_inception`). `caption` is the verbatim chart disclosure. |
+| `equity_curve_carries_shakedown_fabrication` | populate | `false` — re-anchored curves never span the shakedown window. Retained as a standing invariant: a `true` value is a regression and halts the builder (`_self_validate`). |
 | `underwater` `{anchor, series}` | populate | |
 | `correlation_matrix` | populate | `{models, action_concordance, weight_correlation, n_shared_ticks, methodology_ref}`. `n_shared_ticks` (existing name) = per-pair shared-tick count. |
 

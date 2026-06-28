@@ -88,6 +88,16 @@ logger = logging.getLogger("llmlab.data_layer")
 INCEPTION_DATE = "2026-04-09"
 INCEPTION_CAPITAL = 100_000.0
 
+# Phase-A chart disclosure caption for the re-anchored equity curve (Research
+# ruling). Emitted verbatim into charts.equity_curve.caption. The dates here are
+# the fixed Phase-A clean-window anchor (clean_window_start) and the excluded
+# launch/shakedown window; the re-anchor LOGIC reads the date from the ledger.
+EQUITY_CURVE_CAPTION = (
+    "Equity curve anchored at the clean-window start (April 23, 2026), consistent "
+    "with cumulative_return_clean. The April 9–22 launch/shakedown window is "
+    "excluded as non-estimable; see Data Integrity."
+)
+
 # Phase-A persistent integrity ledger (the carried facts that do not recompute
 # monthly). The builder reads this and combines it with the month's decision logs
 # and the de-fabricated clean-window series to emit the integrity layer natively.
@@ -194,6 +204,37 @@ def _underwater(values):
         peak = max(peak, v)
         out.append(_f(v / peak - 1.0) if peak > 0 else 0.0)
     return out
+
+
+def _reanchor_equity_series(series, base_date, clean_start):
+    """Re-anchor an inception-anchored EOD (date, value) series onto the Phase-A
+    clean window for the DISPLAYED equity curve (Research ruling).
+
+    The launch/shakedown window (inception .. base_date) is excluded: only points
+    dated >= clean_start are shown. indexed_return rebases to index_base 100 at the
+    clean-window base close (base_date == the last shakedown day, 2026-04-22), so
+    the month-end index == (1 + raw clean-window return) * 100 and the curve is
+    consistent with cumulative_return_clean (computed from the same 4/22 base).
+    portfolio_value stays the raw EOD book value. base_value falls back to the last
+    value strictly before clean_start when base_date has no own EOD row.
+
+    The inception-anchored cumulative_return is computed separately and is NOT
+    affected by this re-anchor. Returns (points, base_value)."""
+    by_date = dict(series)
+    base_value = by_date.get(base_date)
+    if base_value is None:
+        prior = [v for d, v in series if d < clean_start]
+        base_value = prior[-1] if prior else None
+    points = []
+    for d, v in series:
+        if d < clean_start:
+            continue
+        points.append({
+            "date": d,
+            "portfolio_value": _f(v),
+            "indexed_return": _f(v / base_value * 100.0) if base_value else None,
+        })
+    return points, base_value
 
 
 def _ann_vol(daily_returns):
@@ -969,11 +1010,14 @@ def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month
         "turnover": None, "avg_hold_days": None, "risk_basis": "benchmark",
     }
 
-    # ---- charts: conditional shakedown-fabrication flag ----
-    # True iff this report's inception-anchored equity curve spans the launch
-    # shakedown window (so the 4/9-4/22 fabricated segment is carried/shaded).
-    # Computed from the actual curve span, so it falls to False automatically once
-    # a report's curve no longer reaches back into the shakedown window.
+    # ---- charts: shakedown-fabrication flag (re-anchored Phase-A invariant) ----
+    # True iff the displayed equity curve spans the launch shakedown window (the
+    # 4/9-4/22 fabricated segment). Computed from the actual curve span. Phase-A
+    # equity curves re-anchor at clean_window_start, so a correctly built curve
+    # never reaches back to/before shake_end and this is ALWAYS False. It is
+    # retained as a standing tripwire: a True value means the curve reverted to
+    # carrying the excluded window, which _self_validate treats as a halting
+    # regression (the layer is not emitted).
     shake_end = ledger["shakedown_window"]["end"]
     curve_dates = sorted({pt["date"] for s in layer["charts"]["equity_curve"]["series"].values()
                           for pt in s})
@@ -1241,8 +1285,9 @@ def _rq_consistency_check(layer):
 
 def _self_validate(layer):
     """Schema validation + the read-only RQ-consistency cross-check + SPY
-    single-source invariant. Returns (ok, report_lines). The builder errors out
-    on any failure rather than emit a bad layer.
+    single-source invariant + the re-anchored equity-curve invariant. Returns
+    (ok, report_lines). The builder errors out on any failure rather than emit a
+    bad layer.
 
     NOTE: the full scripts/backfill_may_data_layer.verify carries May-specific
     literal asserts (SPY clean 0.0637, descriptive Sharpe 6.11) and post-authoring
@@ -1263,13 +1308,25 @@ def _self_validate(layer):
     spy_issue = [] if spy_perf == spy_meta else [
         f"SPY single-source FAIL: performance {spy_perf} != report_meta {spy_meta}"]
 
+    # Re-anchored Phase-A invariant: the displayed equity curve must NOT carry the
+    # launch/shakedown window. equity_curve_carries_shakedown_fabrication is
+    # computed from the curve span; for a correctly re-anchored curve it is always
+    # False. A True value is a regression (the curve reverted to spanning the
+    # excluded 4/9-4/22 window) -> halt, do not emit.
+    carries = (layer.get("charts") or {}).get("equity_curve_carries_shakedown_fabrication")
+    anchor_issue = [] if carries is False else [
+        f"equity-curve re-anchor INVARIANT FAIL: equity_curve_carries_shakedown_fabrication "
+        f"is {carries!r} (must be False for a re-anchored Phase-A curve; the displayed curve "
+        f"has reverted to carrying the excluded launch/shakedown window)"]
+
     lines = [
         f"  schema validation (REPORT_SCHEMA)                : {'PASS' if not schema_issues else 'FAIL'}",
         f"  RQ-consistency cross-check (matrix wmean==scalar): {'PASS' if reconciles else 'FAIL'}"
         + (f"  (w={weighted:.10f} s={scalar:.10f})" if weighted is not None and scalar is not None else ""),
         f"  SPY descriptive-Sharpe single-source             : {'PASS' if not spy_issue else 'FAIL'}",
+        f"  equity-curve re-anchor invariant (no shakedown)  : {'PASS' if not anchor_issue else 'FAIL'}",
     ]
-    all_issues = schema_issues + rq_issue + spy_issue
+    all_issues = schema_issues + rq_issue + spy_issue + anchor_issue
     if all_issues:
         lines.append("  ISSUES:")
         lines += [f"    - {i}" for i in all_issues]
@@ -1284,6 +1341,14 @@ def build(month: str) -> dict:
     settings = load_settings()
     model_keys = get_model_keys(settings)
     risk_free_rate = settings.get("risk_free_rate")  # annualized; None => Sharpe stays null
+
+    # Phase-A integrity ledger (carried facts). Loaded once at the top and reused
+    # for both the equity-curve clean-window re-anchor and the native integrity
+    # layer below. The clean-window anchor is read from the ledger, never hardcoded.
+    ledger = _load_ledger()
+    clean_window_start = ledger["clean_window_start"]        # 2026-04-23 (display start)
+    clean_window_base = ledger["shakedown_window"]["end"]    # 2026-04-22 (index-base close)
+
     win_start, _y = f"{month}-01", month
     # last calendar day
     import calendar
@@ -1345,10 +1410,10 @@ def build(month: str) -> dict:
         may_daily = list(np.diff(may_vals) / np.array(may_vals[:-1])) if len(may_vals) >= 2 else []
         mdd_may = _f(_max_drawdown(may_vals))
 
-        equity_series[key] = [
-            {"date": d, "portfolio_value": _f(v), "indexed_return": _f(v / INCEPTION_CAPITAL * 100.0)}
-            for d, v in series
-        ]
+        # Displayed equity curve: re-anchored to the Phase-A clean window (excludes
+        # the 4/9-4/22 launch/shakedown window; indexed off the 4/22 base close).
+        # cumulative_return above stays inception-anchored and is unaffected.
+        equity_series[key], _ = _reanchor_equity_series(series, clean_window_base, clean_window_start)
         uw = _underwater(vals)
         underwater_series[key] = [{"date": d, "drawdown": uw[i]} for i, d in enumerate(dates)]
 
@@ -1369,12 +1434,20 @@ def build(month: str) -> dict:
             "spy_relative_alpha": _f(cumulative - spy_cumulative) if (cumulative is not None and spy_cumulative is not None) else None,
         })
 
-    # SPY equity curve (benchmark line for the chart)
+    # SPY equity curve (benchmark line), re-anchored to the clean-window base on
+    # the same convention as the model series: $100k-normalized benchmark indexed
+    # off the 4/22 close, displayed from clean_window_start. SPY's month-end index
+    # == (1 + SPY clean-window return) * 100, matching its cumulative_return_clean.
+    spy_base_val = spy_vals.get(clean_window_base)
+    if spy_base_val is None:
+        _sp = [spy_vals[d] for d in spy_dates if d < clean_window_start]
+        spy_base_val = _sp[-1] if _sp else None
     equity_series["spy_benchmark"] = [
-        {"date": d, "portfolio_value": _f(spy_vals[d] / spy_inception * INCEPTION_CAPITAL),
-         "indexed_return": _f(spy_vals[d] / spy_inception * 100.0)}
-        for d in spy_dates
-    ] if spy_inception else []
+        {"date": d,
+         "portfolio_value": _f(spy_vals[d] / spy_base_val * INCEPTION_CAPITAL),
+         "indexed_return": _f(spy_vals[d] / spy_base_val * 100.0)}
+        for d in spy_dates if d >= clean_window_start
+    ] if spy_base_val else []
 
     # rank by cumulative_return desc (canonical build_leaderboard basis)
     leaderboard_rows.sort(key=lambda r: -(r["cumulative_return"] if r["cumulative_return"] is not None else -1e9))
@@ -1673,8 +1746,25 @@ def build(month: str) -> dict:
         "performance": perf,
         "charts": {
             "equity_curve": {
-                "anchor": {"inception_date": INCEPTION_DATE, "inception_capital_usd": INCEPTION_CAPITAL, "index_base": 100.0},
+                "anchor": {
+                    "clean_window_start": clean_window_start,
+                    "clean_window_base_date": clean_window_base,
+                    "index_base": 100.0,
+                    "excluded_window": {
+                        "start": ledger["shakedown_window"]["start"],
+                        "end": ledger["shakedown_window"]["end"],
+                    },
+                    "note": (
+                        "Phase-A reporting convention: the displayed equity curve anchors at "
+                        "clean_window_start (read from phase_a_integrity_ledger.json) and indexes "
+                        "off the clean-window base close (clean_window_base_date == the last "
+                        "shakedown day). The launch/shakedown window is excluded from the "
+                        "displayed curve as non-estimable; the inception-anchored cumulative "
+                        "return is unchanged and lives in leaderboard.cumulative_return_inception."
+                    ),
+                },
                 "series": equity_series,
+                "caption": EQUITY_CURVE_CAPTION,
             },
             "underwater": {
                 "anchor": {"inception_date": INCEPTION_DATE, "definition": "drawdown vs inception-anchored running peak (<=0)"},
@@ -1694,7 +1784,7 @@ def build(month: str) -> dict:
     # Native integrity / provenance layer (Phase-A ledger + computed gates)
     # ====================================================================
     from scripts.defab_clean_window import compute_clean_window
-    ledger = _load_ledger()
+    # `ledger` was loaded once at the top of build() (reused here).
 
     # De-fab clean-window overhang correction (committed scripts/defab_clean_window
     # logic, reused). Window: shakedown-end base -> report month-end, over the
