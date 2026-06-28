@@ -370,1286 +370,942 @@
   "charts": {
     "equity_curve": {
       "anchor": {
-        "inception_date": "2026-04-09",
-        "inception_capital_usd": 100000.0,
-        "index_base": 100.0
+        "clean_window_start": "2026-04-23",
+        "clean_window_base_date": "2026-04-22",
+        "index_base": 100.0,
+        "excluded_window": {
+          "start": "2026-04-09",
+          "end": "2026-04-22"
+        },
+        "note": "Phase-A reporting convention: the displayed equity curve anchors at clean_window_start (read from phase_a_integrity_ledger.json) and indexes off the clean-window base close (clean_window_base_date == the last shakedown day). The launch/shakedown window is excluded from the displayed curve as non-estimable; the inception-anchored cumulative return is unchanged and lives in leaderboard.cumulative_return_inception."
       },
       "series": {
         "claude": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 104441.9304647003,
-            "indexed_return": 104.44193046470029
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 104478.74133364104,
-            "indexed_return": 104.47874133364104
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 104809.7658576721,
-            "indexed_return": 104.8097658576721
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 106475.52990319823,
-            "indexed_return": 106.47552990319822
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 106915.51051727752,
-            "indexed_return": 106.91551051727753
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 107533.44808453444,
-            "indexed_return": 107.53344808453444
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 107902.3311534157,
-            "indexed_return": 107.9023311534157
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 108194.55823765106,
-            "indexed_return": 108.19455823765105
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 107998.78349319762,
-            "indexed_return": 107.99878349319762
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 109027.07537801513,
-            "indexed_return": 109.02707537801513
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 108872.661816304,
-            "indexed_return": 108.87266181630399
+            "indexed_return": 99.8583713621816
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 110068.21491815567,
-            "indexed_return": 110.06821491815569
+            "indexed_return": 100.95493668570926
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 110602.55686731111,
-            "indexed_return": 110.60255686731111
+            "indexed_return": 101.44503691751203
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 109770.31135621721,
-            "indexed_return": 109.77031135621719
+            "indexed_return": 100.6816985373818
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 109487.54513576278,
-            "indexed_return": 109.48754513576277
+            "indexed_return": 100.42234440954334
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 109706.85554553453,
-            "indexed_return": 109.70685554553454
+            "indexed_return": 100.62349665453512
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 109671.99878616868,
-            "indexed_return": 109.67199878616869
+            "indexed_return": 100.59152591768374
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 109482.82892920151,
-            "indexed_return": 109.48282892920152
+            "indexed_return": 100.41801868903318
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 109602.20672453156,
-            "indexed_return": 109.60220672453156
+            "indexed_return": 100.52751240416416
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 111542.64619151915,
-            "indexed_return": 111.54264619151914
+            "indexed_return": 102.30729000551662
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 111138.49588654096,
-            "indexed_return": 111.13849588654097
+            "indexed_return": 101.93660198735515
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 111360.99879786758,
-            "indexed_return": 111.36099879786758
+            "indexed_return": 102.14068240550371
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 111789.62574833144,
-            "indexed_return": 111.78962574833145
+            "indexed_return": 102.5338204851759
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 111444.53609504318,
-            "indexed_return": 111.44453609504319
+            "indexed_return": 102.21730309525987
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 112862.54527116928,
-            "indexed_return": 112.86254527116928
+            "indexed_return": 103.51790587783441
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 112919.51602677688,
-            "indexed_return": 112.91951602677688
+            "indexed_return": 103.57015964636858
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 111899.32647903822,
-            "indexed_return": 111.89932647903822
+            "indexed_return": 102.63443836410775
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 111771.19641212234,
-            "indexed_return": 111.77119641212234
+            "indexed_return": 102.51691703605998
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 111094.98105544587,
-            "indexed_return": 111.09498105544586
+            "indexed_return": 101.8966900380121
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 111198.03936533697,
-            "indexed_return": 111.19803936533697
+            "indexed_return": 101.9912154662452
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 111232.20613289527,
-            "indexed_return": 111.23220613289526
+            "indexed_return": 102.02255334029147
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 111216.9262439785,
-            "indexed_return": 111.21692624397849
+            "indexed_return": 102.00853857481805
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 111357.01995866546,
-            "indexed_return": 111.35701995866548
+            "indexed_return": 102.1370330008138
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 111226.67197665288,
-            "indexed_return": 111.22667197665288
+            "indexed_return": 102.01747739358447
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 112320.98488689208,
-            "indexed_return": 112.32098488689208
+            "indexed_return": 103.02118487307526
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 111648.22572185537,
-            "indexed_return": 111.64822572185538
+            "indexed_return": 102.40412790561635
           }
         ],
         "gpt": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 100742.50987454224,
-            "indexed_return": 100.74250987454225
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 101766.45427863084,
-            "indexed_return": 101.76645427863085
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 103263.57045464178,
-            "indexed_return": 103.26357045464178
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 106146.61712338567,
-            "indexed_return": 106.14661712338567
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 107935.23539092718,
-            "indexed_return": 107.93523539092718
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 109248.71835600438,
-            "indexed_return": 109.24871835600439
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 110565.06804695974,
-            "indexed_return": 110.56506804695974
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 109609.86780263373,
-            "indexed_return": 109.60986780263373
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 108852.90410904243,
-            "indexed_return": 108.85290410904243
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 111040.40336837774,
-            "indexed_return": 111.04040336837772
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 109673.923695649,
-            "indexed_return": 109.67392369564901
+            "indexed_return": 98.769385168572
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 112966.23637325272,
-            "indexed_return": 112.96623637325271
+            "indexed_return": 101.73435339431
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 112631.56640665345,
-            "indexed_return": 112.63156640665346
+            "indexed_return": 101.43295862587694
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 111273.49104418243,
-            "indexed_return": 111.27349104418242
+            "indexed_return": 100.2099124901694
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 111555.61987968585,
-            "indexed_return": 111.55561987968585
+            "indexed_return": 100.46399012942962
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 112152.75376315827,
-            "indexed_return": 112.15275376315827
+            "indexed_return": 101.0017528404416
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 112249.1928482001,
-            "indexed_return": 112.2491928482001
+            "indexed_return": 101.08860328596987
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 111420.8163170668,
-            "indexed_return": 111.4208163170668
+            "indexed_return": 100.3425896674988
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 112759.99456279054,
-            "indexed_return": 112.75999456279054
+            "indexed_return": 101.548617568245
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 115509.74018182933,
-            "indexed_return": 115.50974018182933
+            "indexed_return": 104.02496449749424
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 114770.91753238472,
-            "indexed_return": 114.77091753238471
+            "indexed_return": 103.35960069564135
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 117233.41420198466,
-            "indexed_return": 117.23341420198466
+            "indexed_return": 105.5772589487644
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 117954.84864091821,
-            "indexed_return": 117.95484864091821
+            "indexed_return": 106.22696339601876
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 115663.24356949334,
-            "indexed_return": 115.66324356949333
+            "indexed_return": 104.16320551878695
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 116304.00343554099,
-            "indexed_return": 116.30400343554099
+            "indexed_return": 104.74025661605462
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 117721.94250264917,
-            "indexed_return": 117.72194250264916
+            "indexed_return": 106.01721439367016
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 117234.3278280001,
-            "indexed_return": 117.23432782800009
+            "indexed_return": 105.57808173577499
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 117124.53231929193,
-            "indexed_return": 117.12453231929194
+            "indexed_return": 105.47920285441509
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 116169.08855148489,
-            "indexed_return": 116.16908855148489
+            "indexed_return": 104.61875590103243
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 116154.2307004931,
-            "indexed_return": 116.15423070049312
+            "indexed_return": 104.60537532014378
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 116336.63495931875,
-            "indexed_return": 116.33663495931874
+            "indexed_return": 104.76964368849661
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 117488.35632754689,
-            "indexed_return": 117.48835632754688
+            "indexed_return": 105.8068529684443
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 118590.9309158953,
-            "indexed_return": 118.5909309158953
+            "indexed_return": 106.79980198060754
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 117570.98090345634,
-            "indexed_return": 117.57098090345634
+            "indexed_return": 105.88126243869391
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 118907.6730338114,
-            "indexed_return": 118.9076730338114
+            "indexed_return": 107.08505141082199
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 119521.72071992741,
-            "indexed_return": 119.52172071992742
+            "indexed_return": 107.6380462374698
           }
         ],
         "gemini": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 96254.7431009819,
-            "indexed_return": 96.2547431009819
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 96513.95186978986,
-            "indexed_return": 96.51395186978986
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 98305.13221963272,
-            "indexed_return": 98.30513221963272
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 100139.59356106109,
-            "indexed_return": 100.13959356106108
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 101296.25698677139,
-            "indexed_return": 101.29625698677138
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 103490.0896173729,
-            "indexed_return": 103.49008961737289
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 103346.11886250379,
-            "indexed_return": 103.3461188625038
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 102196.18548503569,
-            "indexed_return": 102.19618548503568
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 101787.31737251967,
-            "indexed_return": 101.78731737251967
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 103648.36895854035,
-            "indexed_return": 103.64836895854035
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 102874.57025554351,
-            "indexed_return": 102.87457025554352
+            "indexed_return": 99.25343861097674
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 105088.07349972762,
-            "indexed_return": 105.08807349972761
+            "indexed_return": 101.38902768625636
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 105371.44446923523,
-            "indexed_return": 105.37144446923523
+            "indexed_return": 101.66242414425655
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 104754.52540945164,
-            "indexed_return": 104.75452540945165
+            "indexed_return": 101.06722031617667
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 105543.30989170224,
-            "indexed_return": 105.54330989170224
+            "indexed_return": 101.82823999277777
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 106552.58228308028,
-            "indexed_return": 106.55258228308028
+            "indexed_return": 102.80198651818789
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 106576.05964604681,
-            "indexed_return": 106.57605964604682
+            "indexed_return": 102.82463749012543
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 106145.31683173217,
-            "indexed_return": 106.14531683173216
+            "indexed_return": 102.40905660000361
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 106804.0540972103,
-            "indexed_return": 106.8040540972103
+            "indexed_return": 103.0446066545748
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 107938.44003752057,
-            "indexed_return": 107.93844003752058
+            "indexed_return": 104.13906279672985
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 107228.16292529793,
-            "indexed_return": 107.22816292529794
+            "indexed_return": 103.45378707135228
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 108103.81427552947,
-            "indexed_return": 108.10381427552946
+            "indexed_return": 104.29861594712726
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 108072.30342241935,
-            "indexed_return": 108.07230342241935
+            "indexed_return": 104.26821425974258
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 107325.75015593298,
-            "indexed_return": 107.32575015593298
+            "indexed_return": 103.54793928196169
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 107277.44046222916,
-            "indexed_return": 107.27744046222915
+            "indexed_return": 103.50133006448029
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 107750.88851064834,
-            "indexed_return": 107.75088851064834
+            "indexed_return": 103.9581129865623
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 106823.71797455827,
-            "indexed_return": 106.82371797455828
+            "indexed_return": 103.06357837361442
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 107521.97553136444,
-            "indexed_return": 107.52197553136445
+            "indexed_return": 103.73725762570712
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 106675.5588993839,
-            "indexed_return": 106.67555889938392
+            "indexed_return": 102.92063442122705
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 107522.56781512643,
-            "indexed_return": 107.52256781512644
+            "indexed_return": 103.73782906138713
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 107569.51930821037,
-            "indexed_return": 107.56951930821037
+            "indexed_return": 103.78312788620774
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 108998.71071583136,
-            "indexed_return": 108.99871071583136
+            "indexed_return": 105.16201249575974
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 110721.93811202276,
-            "indexed_return": 110.72193811202276
+            "indexed_return": 106.82458317922192
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 108637.05246673357,
-            "indexed_return": 108.63705246673356
+            "indexed_return": 104.81308442990425
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 109302.94234516642,
-            "indexed_return": 109.30294234516641
+            "indexed_return": 105.45553532915497
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 110000.32924711952,
-            "indexed_return": 110.00032924711951
+            "indexed_return": 106.12837457299493
           }
         ],
         "grok": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 101649.18303079224,
-            "indexed_return": 101.64918303079224
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 101465.03652338103,
-            "indexed_return": 101.46503652338103
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 103867.0990948467,
-            "indexed_return": 103.86709909484671
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 106434.57479733197,
-            "indexed_return": 106.43457479733196
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 108848.86146211163,
-            "indexed_return": 108.84886146211163
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 110659.40568754039,
-            "indexed_return": 110.6594056875404
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 111484.80253186566,
-            "indexed_return": 111.48480253186565
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 110577.82112615085,
-            "indexed_return": 110.57782112615087
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 109744.63107446859,
-            "indexed_return": 109.74463107446859
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 112000.9614621784,
-            "indexed_return": 112.0009614621784
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 110931.7003280765,
-            "indexed_return": 110.93170032807652
+            "indexed_return": 99.0453107543519
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 114044.2344455051,
-            "indexed_return": 114.04423444550511
+            "indexed_return": 101.82433521699427
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 113369.73729749866,
-            "indexed_return": 113.36973729749866
+            "indexed_return": 101.22211079034575
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 111938.92406513402,
-            "indexed_return": 111.93892406513402
+            "indexed_return": 99.94460994241972
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 111675.73893499486,
-            "indexed_return": 111.67573893499487
+            "indexed_return": 99.70962523630357
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 112573.19284589194,
-            "indexed_return": 112.57319284589194
+            "indexed_return": 100.51091649236135
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 112339.13275963628,
-            "indexed_return": 112.33913275963627
+            "indexed_return": 100.30193606647929
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 112036.42952205005,
-            "indexed_return": 112.03642952205004
+            "indexed_return": 100.03166763874935
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 113022.7185273958,
-            "indexed_return": 113.02271852739581
+            "indexed_return": 100.91227526253195
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 113867.41771717259,
-            "indexed_return": 113.86741771717259
+            "indexed_return": 101.66646449336463
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 113952.590579623,
-            "indexed_return": 113.95259057962302
+            "indexed_return": 101.74251103916072
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 114805.2055716289,
-            "indexed_return": 114.8052055716289
+            "indexed_return": 102.50376788988322
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 114544.4829318828,
-            "indexed_return": 114.5444829318828
+            "indexed_return": 102.27098181702961
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 112603.8392501354,
-            "indexed_return": 112.6038392501354
+            "indexed_return": 100.53827911839899
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 112691.85443495441,
-            "indexed_return": 112.69185443495442
+            "indexed_return": 100.6168634302388
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 114762.26453395268,
-            "indexed_return": 114.76226453395269
+            "indexed_return": 102.46542800680041
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 114033.21401813159,
-            "indexed_return": 114.0332140181316
+            "indexed_return": 101.81449563416423
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 114052.32908551898,
-            "indexed_return": 114.05232908551899
+            "indexed_return": 101.83156251210693
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 113423.30598251453,
-            "indexed_return": 113.42330598251453
+            "indexed_return": 101.26993956281032
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 113955.69854021718,
-            "indexed_return": 113.95569854021718
+            "indexed_return": 101.74528598015553
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 113414.56410658831,
-            "indexed_return": 113.4145641065883
+            "indexed_return": 101.26213438345104
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 114637.53348914294,
-            "indexed_return": 114.63753348914294
+            "indexed_return": 102.35406195852603
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 115412.83601406893,
-            "indexed_return": 115.41283601406893
+            "indexed_return": 103.04629041335747
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 114582.54554893453,
-            "indexed_return": 114.58254554893452
+            "indexed_return": 102.30496600480336
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 115374.35083538396,
-            "indexed_return": 115.37435083538396
+            "indexed_return": 103.01192894164994
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 116267.1385340374,
-            "indexed_return": 116.2671385340374
+            "indexed_return": 103.80905397254081
           }
         ],
         "deepseek": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 109040.69431655426,
-            "indexed_return": 109.04069431655425
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 108658.20389245605,
-            "indexed_return": 108.65820389245604
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 109755.17739009134,
-            "indexed_return": 109.75517739009133
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 111280.7791321949,
-            "indexed_return": 111.2807791321949
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 113244.34815471382,
-            "indexed_return": 113.24434815471382
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 114299.73839099979,
-            "indexed_return": 114.29973839099978
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 115802.25408379914,
-            "indexed_return": 115.80225408379914
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 114861.63717311935,
-            "indexed_return": 114.86163717311935
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 114222.28120543252,
-            "indexed_return": 114.22228120543252
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 115892.97236664771,
-            "indexed_return": 115.89297236664771
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 114299.08306859892,
-            "indexed_return": 114.29908306859893
+            "indexed_return": 98.62468856782253
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 117692.57528214074,
-            "indexed_return": 117.69257528214074
+            "indexed_return": 101.5528145311518
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 117375.64302251396,
-            "indexed_return": 117.37564302251396
+            "indexed_return": 101.2793447485112
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 116600.74338152734,
-            "indexed_return": 116.60074338152735
+            "indexed_return": 100.61071090026104
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 118066.78482736165,
-            "indexed_return": 118.06678482736166
+            "indexed_return": 101.87570688396592
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 119222.02575938987,
-            "indexed_return": 119.22202575938987
+            "indexed_return": 102.872523954438
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 119830.25979883461,
-            "indexed_return": 119.83025979883462
+            "indexed_return": 103.39734787345915
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 119040.66752629129,
-            "indexed_return": 119.0406675262913
+            "indexed_return": 102.71603626636248
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 120659.41902446347,
-            "indexed_return": 120.65941902446346
+            "indexed_return": 104.11280042308024
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 121753.09072243918,
-            "indexed_return": 121.75309072243918
+            "indexed_return": 105.05649155088712
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 121365.33006861896,
-            "indexed_return": 121.36533006861896
+            "indexed_return": 104.72190641953551
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 122198.80712327042,
-            "indexed_return": 122.19880712327043
+            "indexed_return": 105.44108467308364
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 122571.55357343217,
-            "indexed_return": 122.57155357343217
+            "indexed_return": 105.76271457224826
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 120932.04443281476,
-            "indexed_return": 120.93204443281476
+            "indexed_return": 104.34803937051944
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 121106.2076914337,
-            "indexed_return": 121.1062076914337
+            "indexed_return": 104.49831876629499
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 122528.30455420072,
-            "indexed_return": 122.52830455420072
+            "indexed_return": 105.72539650338845
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 121848.34772315482,
-            "indexed_return": 121.84834772315483
+            "indexed_return": 105.13868549135682
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 122319.6026025608,
-            "indexed_return": 122.3196026025608
+            "indexed_return": 105.54531487516026
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 121429.7853786274,
-            "indexed_return": 121.42978537862741
+            "indexed_return": 104.7775226563894
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 122246.29262546079,
-            "indexed_return": 122.24629262546078
+            "indexed_return": 105.4820582551919
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 122031.14805228499,
-            "indexed_return": 122.03114805228499
+            "indexed_return": 105.29641751375405
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 123105.1812977495,
-            "indexed_return": 123.1051812977495
+            "indexed_return": 106.22316330647273
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 122552.41178179914,
-            "indexed_return": 122.55241178179914
+            "indexed_return": 105.74619778849328
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 122413.7982212597,
-            "indexed_return": 122.41379822125971
+            "indexed_return": 105.62659298614088
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 122793.96014894143,
-            "indexed_return": 122.79396014894144
+            "indexed_return": 105.95462144198117
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 122665.31769330558,
-            "indexed_return": 122.66531769330558
+            "indexed_return": 105.84362035795611
           }
         ],
         "claude_opus": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 104441.63200752257,
-            "indexed_return": 104.44163200752257
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 104477.0143386795,
-            "indexed_return": 104.47701433867948
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 104809.7658576721,
-            "indexed_return": 104.8097658576721
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 106475.52990319823,
-            "indexed_return": 106.47552990319822
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 106828.27543264921,
-            "indexed_return": 106.8282754326492
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 106949.79414376525,
-            "indexed_return": 106.94979414376525
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 108465.47254158325,
-            "indexed_return": 108.46547254158325
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 108237.99262086181,
-            "indexed_return": 108.23799262086182
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 107998.78349319762,
-            "indexed_return": 107.99878349319762
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 109224.80242325591,
-            "indexed_return": 109.22480242325592
-          },
-          {
             "date": "2026-04-23",
             "portfolio_value": 109104.63927066974,
-            "indexed_return": 109.10463927066974
+            "indexed_return": 99.88998547040578
           },
           {
             "date": "2026-04-24",
             "portfolio_value": 111848.30031470908,
-            "indexed_return": 111.84830031470906
+            "indexed_return": 102.4019250511316
           },
           {
             "date": "2026-04-27",
             "portfolio_value": 111821.36365452918,
-            "indexed_return": 111.82136365452916
+            "indexed_return": 102.37726338127064
           },
           {
             "date": "2026-04-28",
             "portfolio_value": 110932.81042971686,
-            "indexed_return": 110.93281042971685
+            "indexed_return": 101.56375472289001
           },
           {
             "date": "2026-04-29",
             "portfolio_value": 111451.35812923545,
-            "indexed_return": 111.45135812923546
+            "indexed_return": 102.03850742375475
           },
           {
             "date": "2026-04-30",
             "portfolio_value": 110964.71308533079,
-            "indexed_return": 110.96471308533079
+            "indexed_return": 101.59296297495928
           },
           {
             "date": "2026-05-01",
             "portfolio_value": 111571.19913266199,
-            "indexed_return": 111.57119913266197
+            "indexed_return": 102.14822701195061
           },
           {
             "date": "2026-05-04",
             "portfolio_value": 110978.13375162867,
-            "indexed_return": 110.97813375162869
+            "indexed_return": 101.60525017164
           },
           {
             "date": "2026-05-05",
             "portfolio_value": 111316.4585935503,
-            "indexed_return": 111.31645859355031
+            "indexed_return": 101.91500110221214
           },
           {
             "date": "2026-05-06",
             "portfolio_value": 113023.60394708271,
-            "indexed_return": 113.0236039470827
+            "indexed_return": 103.47796602927795
           },
           {
             "date": "2026-05-07",
             "portfolio_value": 112722.52473829323,
-            "indexed_return": 112.72252473829323
+            "indexed_return": 103.20231507628033
           },
           {
             "date": "2026-05-08",
             "portfolio_value": 113858.25876158882,
-            "indexed_return": 113.85825876158881
+            "indexed_return": 104.2421283770126
           },
           {
             "date": "2026-05-11",
             "portfolio_value": 113909.26795130903,
-            "indexed_return": 113.90926795130902
+            "indexed_return": 104.28882948206251
           },
           {
             "date": "2026-05-12",
             "portfolio_value": 112511.59546802651,
-            "indexed_return": 112.51159546802651
+            "indexed_return": 103.00920026573633
           },
           {
             "date": "2026-05-13",
             "portfolio_value": 113491.19563062726,
-            "indexed_return": 113.49119563062726
+            "indexed_return": 103.9060663079423
           },
           {
             "date": "2026-05-14",
             "portfolio_value": 114303.69193687191,
-            "indexed_return": 114.30369193687191
+            "indexed_return": 104.6499415892142
           },
           {
             "date": "2026-05-15",
             "portfolio_value": 113094.64103216762,
-            "indexed_return": 113.09464103216762
+            "indexed_return": 103.54300353313137
           },
           {
             "date": "2026-05-18",
             "portfolio_value": 112443.87250627499,
-            "indexed_return": 112.44387250627499
+            "indexed_return": 102.94719698420226
           },
           {
             "date": "2026-05-19",
             "portfolio_value": 111739.78053541928,
-            "indexed_return": 111.73978053541929
+            "indexed_return": 102.30257053010506
           },
           {
             "date": "2026-05-20",
             "portfolio_value": 112578.35408242777,
-            "indexed_return": 112.57835408242778
+            "indexed_return": 103.0703206458333
           },
           {
             "date": "2026-05-21",
             "portfolio_value": 112524.04845207655,
-            "indexed_return": 112.52404845207656
+            "indexed_return": 103.02060150773794
           },
           {
             "date": "2026-05-22",
             "portfolio_value": 112810.00499664899,
-            "indexed_return": 112.810004996649
+            "indexed_return": 103.28240701182511
           },
           {
             "date": "2026-05-26",
             "portfolio_value": 112966.01220217874,
-            "indexed_return": 112.96601220217875
+            "indexed_return": 103.42523831210544
           },
           {
             "date": "2026-05-27",
             "portfolio_value": 112776.55571732235,
-            "indexed_return": 112.77655571732235
+            "indexed_return": 103.25178275928857
           },
           {
             "date": "2026-05-28",
             "portfolio_value": 113770.93985152416,
-            "indexed_return": 113.77093985152416
+            "indexed_return": 104.16218416276146
           },
           {
             "date": "2026-05-29",
             "portfolio_value": 113640.02545783519,
-            "indexed_return": 113.64002545783518
+            "indexed_return": 104.04232640995758
           }
         ],
         "spy_benchmark": [
           {
-            "date": "2026-04-09",
-            "portfolio_value": 100000.0,
-            "indexed_return": 100.0
-          },
-          {
-            "date": "2026-04-10",
-            "portfolio_value": 99933.82194854504,
-            "indexed_return": 99.93382194854505
-          },
-          {
-            "date": "2026-04-13",
-            "portfolio_value": 100910.4150087368,
-            "indexed_return": 100.9104150087368
-          },
-          {
-            "date": "2026-04-14",
-            "portfolio_value": 102139.99638229045,
-            "indexed_return": 102.13999638229045
-          },
-          {
-            "date": "2026-04-15",
-            "portfolio_value": 102945.9825694625,
-            "indexed_return": 102.9459825694625
-          },
-          {
-            "date": "2026-04-16",
-            "portfolio_value": 103198.95292893087,
-            "indexed_return": 103.19895292893086
-          },
-          {
-            "date": "2026-04-17",
-            "portfolio_value": 104446.18297979873,
-            "indexed_return": 104.44618297979873
-          },
-          {
-            "date": "2026-04-20",
-            "portfolio_value": 104237.32533666916,
-            "indexed_return": 104.23732533666916
-          },
-          {
-            "date": "2026-04-21",
-            "portfolio_value": 103554.88886764346,
-            "indexed_return": 103.55488886764346
-          },
-          {
-            "date": "2026-04-22",
-            "portfolio_value": 104603.55783330617,
-            "indexed_return": 104.60355783330617
-          },
-          {
             "date": "2026-04-23",
-            "portfolio_value": 104197.62030118554,
-            "indexed_return": 104.19762030118554
+            "portfolio_value": 99611.92760501748,
+            "indexed_return": 99.61192760501748
           },
           {
             "date": "2026-04-24",
-            "portfolio_value": 105005.07870762488,
-            "indexed_return": 105.00507870762488
+            "portfolio_value": 100383.85011240112,
+            "indexed_return": 100.38385011240112
           },
           {
             "date": "2026-04-27",
-            "portfolio_value": 105185.98213856904,
-            "indexed_return": 105.18598213856905
+            "portfolio_value": 100556.79206073565,
+            "indexed_return": 100.55679206073565
           },
           {
             "date": "2026-04-28",
-            "portfolio_value": 104674.15254256307,
-            "indexed_return": 104.67415254256306
+            "portfolio_value": 100067.48786630124,
+            "indexed_return": 100.06748786630124
           },
           {
             "date": "2026-04-29",
-            "portfolio_value": 104657.97608451617,
-            "indexed_return": 104.65797608451616
+            "portfolio_value": 100052.02332725307,
+            "indexed_return": 100.05202332725307
           },
           {
             "date": "2026-04-30",
-            "portfolio_value": 105699.28395384234,
-            "indexed_return": 105.69928395384234
+            "portfolio_value": 101047.50368269718,
+            "indexed_return": 101.04750368269717
           },
           {
             "date": "2026-05-01",
-            "portfolio_value": 105991.97730268784,
-            "indexed_return": 105.99197730268783
+            "portfolio_value": 101327.31572246732,
+            "indexed_return": 101.32731572246732
           },
           {
             "date": "2026-05-04",
-            "portfolio_value": 105603.68844788142,
-            "indexed_return": 105.60368844788141
+            "portfolio_value": 100956.1152940601,
+            "indexed_return": 100.9561152940601
           },
           {
             "date": "2026-05-05",
-            "portfolio_value": 106450.86086675113,
-            "indexed_return": 106.45086086675113
+            "portfolio_value": 101766.00401717577,
+            "indexed_return": 101.76600401717577
           },
           {
             "date": "2026-05-06",
-            "portfolio_value": 107930.46816123852,
-            "indexed_return": 107.93046816123852
+            "portfolio_value": 103180.49442757391,
+            "indexed_return": 103.1804944275739
           },
           {
             "date": "2026-05-07",
-            "portfolio_value": 107599.54199617672,
-            "indexed_return": 107.59954199617671
+            "portfolio_value": 102864.13218147405,
+            "indexed_return": 102.86413218147405
           },
           {
             "date": "2026-05-08",
-            "portfolio_value": 108487.89166979738,
-            "indexed_return": 108.48789166979738
+            "portfolio_value": 103713.38596597372,
+            "indexed_return": 103.71338596597373
           },
           {
             "date": "2026-05-11",
-            "portfolio_value": 108734.98212914326,
-            "indexed_return": 108.73498212914325
+            "portfolio_value": 103949.60207990327,
+            "indexed_return": 103.94960207990327
           },
           {
             "date": "2026-05-12",
-            "portfolio_value": 108570.25515624601,
-            "indexed_return": 108.570255156246
+            "portfolio_value": 103792.12467061692,
+            "indexed_return": 103.79212467061691
           },
           {
             "date": "2026-05-13",
-            "portfolio_value": 109177.68923515965,
-            "indexed_return": 109.17768923515965
+            "portfolio_value": 104372.82583556355,
+            "indexed_return": 104.37282583556356
           },
           {
             "date": "2026-05-14",
-            "portfolio_value": 110039.56589280897,
-            "indexed_return": 110.03956589280897
+            "portfolio_value": 105196.77167020025,
+            "indexed_return": 105.19677167020025
           },
           {
             "date": "2026-05-15",
-            "portfolio_value": 108715.86123256171,
-            "indexed_return": 108.71586123256172
+            "portfolio_value": 103931.32268580081,
+            "indexed_return": 103.93132268580081
           },
           {
             "date": "2026-05-18",
-            "portfolio_value": 108639.38662318233,
-            "indexed_return": 108.63938662318233
+            "portfolio_value": 103858.21369126618,
+            "indexed_return": 103.85821369126617
           },
           {
             "date": "2026-05-19",
-            "portfolio_value": 107915.75494551218,
-            "indexed_return": 107.91575494551218
+            "portfolio_value": 103166.4287341777,
+            "indexed_return": 103.1664287341777
           },
           {
             "date": "2026-05-20",
-            "portfolio_value": 109021.7866009195,
-            "indexed_return": 109.0217866009195
+            "portfolio_value": 104223.78440956483,
+            "indexed_return": 104.22378440956483
           },
           {
             "date": "2026-05-21",
-            "portfolio_value": 109237.98738649211,
-            "indexed_return": 109.23798738649211
+            "portfolio_value": 104430.47029105002,
+            "indexed_return": 104.43047029105001
           },
           {
             "date": "2026-05-22",
-            "portfolio_value": 109667.46247299621,
-            "indexed_return": 109.66746247299622
+            "portfolio_value": 104841.04436271639,
+            "indexed_return": 104.84104436271639
           },
           {
             "date": "2026-05-26",
-            "portfolio_value": 110395.50183152156,
-            "indexed_return": 110.39550183152156
+            "portfolio_value": 105537.0430205111,
+            "indexed_return": 105.5370430205111
           },
           {
             "date": "2026-05-27",
-            "portfolio_value": 110376.38093494003,
-            "indexed_return": 110.37638093494002
+            "portfolio_value": 105518.76362640866,
+            "indexed_return": 105.51876362640866
           },
           {
             "date": "2026-05-28",
-            "portfolio_value": 110985.27825617424,
-            "indexed_return": 110.98527825617424
+            "portfolio_value": 106100.86363700728,
+            "indexed_return": 106.10086363700728
           },
           {
             "date": "2026-05-29",
-            "portfolio_value": 111261.78617002607,
-            "indexed_return": 111.26178617002607
+            "portfolio_value": 106365.20255585406,
+            "indexed_return": 106.36520255585407
           }
         ]
-      }
+      },
+      "caption": "Equity curve anchored at the clean-window start (April 23, 2026), consistent with cumulative_return_clean. The April 9\u201322 launch/shakedown window is excluded as non-estimable; see Data Integrity."
     },
     "underwater": {
       "anchor": {
@@ -2696,7 +2352,7 @@
       },
       "methodology_ref": "RQ1 join: data_inputs_hash + raw_decisions, >=3 shared tickers; action_concordance = 3-way BUY/SELL/HOLD exact-match rate; weight_correlation = Pearson r of target_weight vectors. The RQ1 headline scalar is the OBSERVATION-WEIGHTED pooled mean of the off-diagonal cells (each cell weighted by its n_shared_ticks); the unweighted mean of the cells differs and is not the headline. Thin cells (low n_shared_ticks, e.g. Gemini pairs reduced by its open-bell failures) should be read with their n_shared_ticks."
     },
-    "equity_curve_carries_shakedown_fabrication": true
+    "equity_curve_carries_shakedown_fabrication": false
   },
   "cross_model_behavioral": {
     "per_model_trade_activity": {
