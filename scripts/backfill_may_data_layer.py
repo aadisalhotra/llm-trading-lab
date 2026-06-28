@@ -374,8 +374,12 @@ def verify(layer: dict, perf_before: dict) -> tuple[bool, list[str]]:
     req(layer["performance"].get("spy_benchmark", {}).get("sharpe") == rm["spy_benchmark"].get("descriptive_sharpe"),
         "SPY single-source: performance.spy_benchmark.sharpe != report_meta.spy_benchmark.descriptive_sharpe")
 
-    req(layer["charts"].get("equity_curve_carries_shakedown_fabrication") is True,
-        "charts.equity_curve_carries_shakedown_fabrication missing")
+    # Re-anchored Phase-A equity curve (Research ruling): the displayed curve
+    # anchors at the clean-window start and excludes the 4/9-4/22 launch/shakedown
+    # window, so this is False (was True pre-re-anchor). May-fact literal; the
+    # RQ-consistency cross-check below is untouched.
+    req(layer["charts"].get("equity_curve_carries_shakedown_fabrication") is False,
+        "charts.equity_curve_carries_shakedown_fabrication must be False (re-anchored Phase-A curve)")
 
     cmb = layer["cross_model_behavioral"]
     req("rq1_herding_point_estimate" not in cmb, "old rq1_herding_point_estimate still present")

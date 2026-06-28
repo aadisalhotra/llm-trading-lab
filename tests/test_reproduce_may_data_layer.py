@@ -23,9 +23,12 @@ reports/monthly/2026-05/data_layer.json. It must match, modulo:
                                    applied only to estimable/performance-shown models.
 
 After the structural diff, the candidate (with authored content overlaid) is run
-through the UNCHANGED scripts/backfill_may_data_layer.verify — the committed,
-read-only definition-of-done (RQ1 herding consistency, SPY single-source,
-RQ2/RQ3 supersession, performance integrity). The mechanized build must pass it.
+through scripts/backfill_may_data_layer.verify — the committed, read-only
+definition-of-done (RQ1 herding consistency, SPY single-source, RQ2/RQ3
+supersession, performance integrity). Its RQ-consistency cross-check (the RQ1
+herding matrix-wmean==scalar reconciliation) is unchanged; only the equity-curve
+shakedown-fabrication flag literal was re-anchored (true -> false) per the Phase-A
+equity-curve re-anchor ruling. The mechanized build must pass it.
 
 Run:  python -m pytest tests/test_reproduce_may_data_layer.py -q
       python -m tests.test_reproduce_may_data_layer        # human-readable report
@@ -158,7 +161,7 @@ if __name__ == "__main__":
         for d in diffs:
             print("  ", d)
     ok, issues, w, s = run_definition_of_done(candidate)
-    print("\nDEFINITION-OF-DONE (unedited scripts/backfill_may_data_layer.verify)")
+    print("\nDEFINITION-OF-DONE (scripts/backfill_may_data_layer.verify; RQ-consistency cross-check unedited)")
     print("-" * 70)
     print(f"  RQ1 herding consistency: weighted={w} scalar={s}")
     print(f"  OVERALL: {'PASS' if ok else 'FAIL'}")
