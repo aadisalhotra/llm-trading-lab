@@ -31,35 +31,19 @@
     ]
   },
   "daily": {
-    "date": "2026-06-26",
-    "sent_count": 3,
+    "date": "2026-06-29",
+    "sent_count": 1,
     "dedup_keys": [
-      "api_failure:gemini",
-      "news:DE:2ae78115da",
-      "budget:critical"
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "api_failure",
-        "severity": "WARN",
-        "title": "Model gemini failed",
-        "timestamp": "2026-06-26T15:04:06.682472+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on DE (held by 4)",
-        "timestamp": "2026-06-26T21:06:57.401450+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "budget",
+        "kind": "macro_event",
         "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "timestamp": "2026-06-26T21:07:05.070337+00:00",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-06-29T13:32:03.225423+00:00",
         "disposition": "sent"
       }
     ]
