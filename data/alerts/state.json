@@ -32,13 +32,16 @@
   },
   "daily": {
     "date": "2026-06-30",
-    "sent_count": 2,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:PM:91622011d5",
+      "news:UNH:ec001fab1d",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -52,6 +55,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-06-30T17:03:45.485424+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on PM (held by 4)",
+        "timestamp": "2026-06-30T21:07:02.161983+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on UNH (held by 4)",
+        "timestamp": "2026-06-30T21:07:03.156353+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-06-30T21:07:05.218798+00:00",
         "disposition": "sent"
       }
     ]
