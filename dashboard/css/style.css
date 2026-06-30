@@ -719,6 +719,24 @@ body {
 .portfolio-card table.holdings .pos { color: var(--green); }
 .portfolio-card table.holdings .neg { color: var(--red); }
 .portfolio-card .empty { color: var(--text-dim); font-size: 11px; padding: 8px 0; font-style: italic; }
+/* Direction indicator for short positions — distinguishable from a long by
+   more than a bare minus sign (SHORT badge + subtle row tint). */
+.portfolio-card table.holdings .dir-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  margin-left: 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  vertical-align: 1px;
+}
+.portfolio-card table.holdings .dir-badge.short {
+  background: rgba(255, 51, 85, 0.12);
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+.portfolio-card table.holdings tr.holding-short td { background: rgba(255, 51, 85, 0.05); }
+.portfolio-card table.holdings tr.holding-short:hover td { background: rgba(255, 51, 85, 0.12); }
 .halted-badge {
   background: var(--red);
   color: var(--bg);

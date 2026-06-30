@@ -812,7 +812,12 @@ function renderPortfolios(d) {
     const displayName = p.display_name || p.model_key.toUpperCase();
     let holdingsTbl = "";
     if (p.holdings && p.holdings.length) {
-      const sorted = p.holdings.slice().sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      // Sort by GROSS weight (|exposure|) so the largest position is first
+      // regardless of direction. A short's signed weight is negative, which
+      // would otherwise sink a large short below smaller longs. gross_weight
+      // is in the snapshot; fall back to |weight| for older payloads.
+      const grossW = (h) => (h.gross_weight != null ? h.gross_weight : Math.abs(h.weight || 0));
+      const sorted = p.holdings.slice().sort((a, b) => grossW(b) - grossW(a));
       holdingsTbl = `
         <table class="holdings">
           <thead><tr>
@@ -820,16 +825,23 @@ function renderPortfolios(d) {
             <th class="num">PRICE</th><th class="num">WT</th><th class="num">P/L</th>
           </tr></thead>
           <tbody>
-            ${sorted.map(h => `
-              <tr>
-                <td>${h.ticker}</td>
+            ${sorted.map(h => {
+              // Make a short distinguishable by more than a bare minus sign:
+              // a SHORT badge + row tint, consistent with the decision-log
+              // direction stamping (direction: "short"/"long").
+              const isShort = h.direction === "short" || (h.shares || 0) < 0;
+              const dirBadge = isShort ? ` <span class="dir-badge short">SHORT</span>` : "";
+              return `
+              <tr class="${isShort ? "holding-short" : ""}">
+                <td>${h.ticker}${dirBadge}</td>
                 <td class="num">${fmtNum(h.shares, 2)}</td>
                 <td class="num">${fmtNum(h.avg_cost)}</td>
                 <td class="num">${fmtNum(h.current_price)}</td>
                 <td class="num">${fmtPct(h.weight, false)}</td>
                 <td class="num ${colorClass(h.unrealized_pl_pct)}">${fmtPct(h.unrealized_pl_pct)}</td>
               </tr>
-            `).join("")}
+            `;
+            }).join("")}
           </tbody>
         </table>
       `;
@@ -1377,7 +1389,11 @@ function computeSectorWeights(portfolio, sectorMap) {
       "Real Estate": "REIT",
       "Utilities": "Utility",
     }[sec] || sec;
-    weights[short] = (weights[short] || 0) + (h.weight || 0);
+    // Sum GROSS weight (RQ5: concentration on gross weights) so a short adds
+    // to its sector's exposure instead of netting against longs. Summing
+    // signed weight previously let a net-short sector go negative.
+    const gw = h.gross_weight != null ? h.gross_weight : Math.abs(h.weight || 0);
+    weights[short] = (weights[short] || 0) + gw;
   });
   return weights;
 }
@@ -1404,7 +1420,7 @@ function buildSectorCol(name, color, weights, allSectors) {
     row.innerHTML = `
       <span class="h2h-sector-label">${sec}</span>
       <div class="h2h-sector-bar-wrap">
-        <div class="h2h-sector-bar" style="width:${Math.min(w * 100, 100)}%;background:${color}"></div>
+        <div class="h2h-sector-bar" style="width:${Math.max(0, Math.min(w * 100, 100))}%;background:${color}"></div>
       </div>
       <span class="h2h-sector-pct">${pct}%</span>
     `;
