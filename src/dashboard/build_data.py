@@ -561,6 +561,8 @@ def _find_mvp_trade(
 
     For SELLs (realized): P&L is computed from entry price vs exit price.
     For BUYs (unrealized): P&L is computed from fill price vs current market price.
+    For COVERs (realized short): P&L is entry short price vs cover price.
+    For SHORTs (unrealized): P&L is short fill vs current price (gains when it falls).
     If no trades exist with computable P&L, falls back to highest-conviction trade.
 
     Returns a single dict with all fields the frontend needs, or None.
@@ -595,6 +597,8 @@ def _find_mvp_trade(
         )
         # Track open BUY positions per (model, ticker) for SELL P&L computation
         open_buys: dict[str, list[float]] = {}  # ticker -> [fill_prices]
+        # Track open SHORT positions for COVER P&L computation (short side).
+        open_shorts: dict[str, list[float]] = {}  # ticker -> [short fill_prices]
         for fp in files:
             with open(fp, "r", encoding="utf-8") as f:
                 for line in f:
@@ -649,6 +653,23 @@ def _find_mvp_trade(
                                     entry["current_price"] = round(fill_price, 2)
                                     entry["fill_price"] = buy_price  # entry price
                             # If no matching buy, pnl_pct stays None
+                        elif side == "SHORT":
+                            open_shorts.setdefault(ticker, []).append(fill_price)
+                            # Unrealized P&L: a short gains when the price falls,
+                            # so measure the short entry against current market.
+                            cur = global_prices.get(ticker)
+                            if cur and fill_price > 0:
+                                entry["pnl_pct"] = round((fill_price - cur) / fill_price, 4)
+                                entry["current_price"] = round(cur, 2)
+                        elif side == "COVER":
+                            # Realized P&L: match against earliest open SHORT.
+                            if open_shorts.get(ticker):
+                                short_price = open_shorts[ticker].pop(0)
+                                if short_price > 0:
+                                    entry["pnl_pct"] = round((short_price - fill_price) / short_price, 4)
+                                    entry["current_price"] = round(fill_price, 2)
+                                    entry["fill_price"] = short_price  # entry short price
+                            # If no matching short, pnl_pct stays None
 
                         all_by_date.setdefault(date, []).append(entry)
 
