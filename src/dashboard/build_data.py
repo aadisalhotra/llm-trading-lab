@@ -14,6 +14,7 @@ from typing import Any
 
 from ..analytics import (
     build_leaderboard,
+    canonical_spy_series,
     compute_api_cost_summary,
     compute_api_cost_summary_window,
     compute_budget_status,
@@ -1153,19 +1154,21 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     spy_start_capital = float(settings.get("starting_capital", {}).get(
         settings.get("mode", "paper"), 100_000.0
     ))
-    longest_bench: list[dict[str, Any]] = []
-    for key in model_keys:
-        candidate = equity_curves.get(key) or []
-        bench_points = [p for p in candidate if p.get("benchmark") not in (None, 0)]
-        if len(bench_points) > len(longest_bench):
-            longest_bench = bench_points
-    if longest_bench:
-        base = longest_bench[0]["benchmark"]
-        if base and base > 0:
+    # Anchor the SPY buy-and-hold curve on the ONE canonical, deterministic SPY
+    # series (pre-inception rows dropped, one row per date, inception anchor
+    # pinned in the Phase-A ledger) — the same series the leaderboard SPY row and
+    # every model's alpha use, so all four surfaces agree. Previously this
+    # anchored on the first raw benchmark point, which was the pre-inception
+    # 2026-04-08 seed (676.01) and overstated SPY at 10.32% vs the canonical 9.61%.
+    spy_series_df = canonical_spy_series(settings)
+    if spy_series_df is not None and len(spy_series_df):
+        base = float(spy_series_df.iloc[0]["benchmark_value"])
+        if base > 0:
             shares = spy_start_capital / base
             spy_curve = [
-                {"date": p["date"], "value": p["benchmark"] * shares, "benchmark": p["benchmark"]}
-                for p in longest_bench
+                {"date": r["date_str"], "value": float(r["benchmark_value"]) * shares,
+                 "benchmark": float(r["benchmark_value"])}
+                for _, r in spy_series_df.iterrows()
             ]
     if spy_curve:
         equity_curves["spy_benchmark"] = spy_curve

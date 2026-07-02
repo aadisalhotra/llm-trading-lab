@@ -47,7 +47,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.analytics.performance import load_performance_history  # noqa: E402
+from src.analytics.performance import canonical_spy_series, load_performance_history  # noqa: E402
 from src.analytics.regime_classifier import (  # noqa: E402
     classify_regimes,
     label_for_dates,
@@ -162,25 +162,22 @@ def _eod_series(model_key: str, cap: str | None = None):
 
 
 def _spy_eod_series(cap: str | None = None):
-    """Shared SPY EOD series from benchmark_value across all perf logs.
+    """Shared SPY EOD series — the ONE canonical, deterministic series.
 
-    All models log the same SPY price per tick; the union (last non-null per
-    date) gives the full SPY series. Anchored to INCEPTION_DATE; capped at the
-    report month-end when `cap` is given (same freeze rule as _eod_series).
+    Delegates to analytics.canonical_spy_series so the monthly layer reads the
+    exact SPY series the daily-facing surfaces do: pre-inception 2026-04-08 rows
+    dropped, exactly one deterministic row per date, and the inception anchor
+    pinned from the Phase-A integrity ledger (spy_benchmark_anchor = 680.40)
+    instead of an unstable groupby(date).last(). Capped at the report month-end
+    when `cap` is given (the same freeze rule as _eod_series), so a report never
+    sees later-month prices.
     """
-    spy = {}
-    for fp in sorted((TRADES_DIR.parent / "performance").glob("*.jsonl")):
-        df = load_performance_history(fp.stem)
-        if df.empty or "benchmark_value" not in df.columns:
-            continue
-        for _, r in df.iterrows():
-            bv = r.get("benchmark_value")
-            if bv is None or (isinstance(bv, float) and bv != bv):
-                continue
-            d = r["date"].strftime("%Y-%m-%d")
-            spy[d] = float(bv)  # last write per date wins
-    return [(d, v) for d, v in sorted(spy.items())
-            if d >= INCEPTION_DATE and (cap is None or d <= cap)]
+    series = canonical_spy_series()
+    if series is None or series.empty:
+        return []
+    return [(row["date_str"], float(row["benchmark_value"]))
+            for _, row in series.iterrows()
+            if cap is None or row["date_str"] <= cap]
 
 
 def _max_drawdown(values):
