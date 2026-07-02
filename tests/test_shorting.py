@@ -385,12 +385,19 @@ def test_production_flag_off_rejects_shorts():
     assert any(v.rule == "SHORTING_DISABLED" for v in violations)
 
 
-def test_production_config_default_is_false():
+def test_production_config_live_cap_invariants():
+    # Post-July-1 regime: shorting is live, so this guard no longer pins the
+    # flag off. It now pins the ratified risk caps that bound the short book,
+    # so a stray config edit can't silently loosen them.
     settings = load_settings()
-    assert settings["portfolio_rules"]["shorting_enabled"] is False, \
-        "PRODUCTION MUST stay shorting_enabled=FALSE until July 1"
-    assert settings["prompt_version"] == "v2", \
-        "PRODUCTION MUST stay on v2 until July 1"
+    pr = settings["portfolio_rules"]
+    rc = settings["risk_controls"]
+    assert pr["max_gross_short_pct"] == 0.20, \
+        "short-exposure cap must stay at 20%"
+    assert rc["stop_loss_short_pct"] == 0.10, \
+        "short stop-loss must stay at 10%"
+    assert pr["max_gross_exposure_pct"] == 1.20, \
+        "gross-exposure ceiling must stay at 120%"
 
 
 def test_long_path_unchanged_when_flag_off():
