@@ -50,6 +50,12 @@ DAILY_REPORTS_DIR = REPORTS_DIR / "daily"
 LATENCY_WARN_THRESHOLD = 60.0  # seconds — flag in health section if exceeded
 ERROR_MSG_TRUNCATE = 180        # max chars of error text rendered in the report
 
+# Every executed order side that counts as a "trade" in the report — trade
+# counts, per-model trade lists, narratives, and news→trade linkage all key
+# off this. SHORT/COVER were added at the July-1 go-live; before that the
+# universe was BUY/SELL only, so historical (long-only) reports are unchanged.
+EXECUTED_TRADE_SIDES = ("BUY", "SELL", "SHORT", "COVER")
+
 # Standing data-integrity disclosure. Claude Opus 4.6's 2026-04-10 → 2026-04-21
 # perf rows reflect the state-file commingling incident (a routing bug saved
 # Opus's portfolio to Sonnet's state file for twelve days; fixed in commit
@@ -452,7 +458,7 @@ def _build_performance_table(
         n_trades = 0
         for rec in records:
             for e in rec.get("executions", []):
-                if e.get("executed") and e.get("side") in ("BUY", "SELL"):
+                if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES:
                     n_trades += 1
         # Keep `record` pointing at the most recent tick for api_success display
         record = records[-1] if records else None
@@ -524,7 +530,7 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
         return f"API call failed: _{err}_. No trades executed. Portfolio unchanged from prior session."
 
     executed = [e for e in record.get("executions", [])
-                if e.get("executed") and e.get("side") in ("BUY", "SELL")]
+                if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES]
     overall = record.get("overall_reasoning", "").strip()
     portfolio_after = record.get("portfolio_after", {})
     holdings = portfolio_after.get("holdings", []) or snapshot["holdings"]
@@ -537,20 +543,34 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
     else:
         buys = [e for e in executed if e["side"] == "BUY"]
         sells = [e for e in executed if e["side"] == "SELL"]
+        shorts = [e for e in executed if e["side"] == "SHORT"]
+        covers = [e for e in executed if e["side"] == "COVER"]
+
+        def _shares_str(e: dict[str, Any]) -> str:
+            return f"{e['shares']:.0f}" if e["shares"] >= 1 else f"{e['shares']:.4f}"
+
         parts = []
         if buys:
             top = max(buys, key=lambda e: e.get("notional", 0))
-            shares_str = f"{top['shares']:.0f}" if top["shares"] >= 1 else f"{top['shares']:.4f}"
-            parts.append(f"bought {shares_str} {top['ticker']} at {_money(top['fill_price'])}")
+            parts.append(f"bought {_shares_str(top)} {top['ticker']} at {_money(top['fill_price'])}")
             if len(buys) > 1:
                 parts.append(f"plus {len(buys)-1} other buy{'s' if len(buys)>2 else ''}")
         if sells:
             top = max(sells, key=lambda e: e.get("notional", 0))
-            shares_str = f"{top['shares']:.0f}" if top["shares"] >= 1 else f"{top['shares']:.4f}"
             verb = "trimmed" if any(h["ticker"] == top["ticker"] for h in holdings) else "exited"
-            parts.append(f"{verb} {top['ticker']} ({shares_str} sh @ {_money(top['fill_price'])})")
+            parts.append(f"{verb} {top['ticker']} ({_shares_str(top)} sh @ {_money(top['fill_price'])})")
             if len(sells) > 1:
                 parts.append(f"and {len(sells)-1} other sell{'s' if len(sells)>2 else ''}")
+        if shorts:
+            top = max(shorts, key=lambda e: e.get("notional", 0))
+            parts.append(f"shorted {_shares_str(top)} {top['ticker']} at {_money(top['fill_price'])}")
+            if len(shorts) > 1:
+                parts.append(f"plus {len(shorts)-1} other short{'s' if len(shorts)>2 else ''}")
+        if covers:
+            top = max(covers, key=lambda e: e.get("notional", 0))
+            parts.append(f"covered {top['ticker']} ({_shares_str(top)} sh @ {_money(top['fill_price'])})")
+            if len(covers) > 1:
+                parts.append(f"and {len(covers)-1} other cover{'s' if len(covers)>2 else ''}")
         s1 = "Today: " + ", ".join(parts) + "."
 
     # Sentence 2 — reasoning anchor (highest confidence executed trade)
@@ -614,15 +634,15 @@ def _format_trade_summaries_for_model(model_key: str, run_date: datetime) -> str
     """Build the bulleted "Today's trades" list for one model.
 
     Walks every intraday tick of the trading day and lists each executed
-    BUY/SELL with its one-sentence summary, side, ticker, share count, fill
-    price, and confidence. Empty string if the model held all day.
+    BUY/SELL/SHORT/COVER with its one-sentence summary, side, ticker, share
+    count, fill price, and confidence. Empty string if the model held all day.
     """
     records = _read_today_trade_records(model_key, run_date)
     lines: list[str] = []
     for rec in records:
         ts_full = rec.get("timestamp", "")
         for ex in rec.get("executions", []):
-            if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+            if not ex.get("executed") or ex.get("side") not in EXECUTED_TRADE_SIDES:
                 continue
             decision = ex.get("decision") or {}
             summary = (decision.get("summary") or "").strip()
@@ -678,7 +698,7 @@ def _build_intraday_session_table(
         n_trades = 0
         for rec in records:
             for e in rec.get("executions", []):
-                if e.get("executed") and e.get("side") in ("BUY", "SELL"):
+                if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES:
                     n_trades += 1
 
         # Intraday high/low/range from the valuation snapshots
@@ -736,8 +756,8 @@ def _build_news_context_block(
     """Surface the most impactful headlines from the active news cache.
 
     "Impactful" = highest absolute VADER sentiment magnitude. For each top
-    headline we list which models executed BUY/SELL on the affected ticker
-    today, so the report shows the news → reaction linkage even though
+    headline we list which models traded (BUY/SELL/SHORT/COVER) the affected
+    ticker today, so the report shows the news → reaction linkage even though
     nothing in the pipeline causally proves the news drove the trade.
 
     Returns a markdown block ready to drop into the Market Summary section.
@@ -756,7 +776,7 @@ def _build_news_context_block(
         records = _read_today_trade_records(key, run_date)
         for rec in records:
             for ex in rec.get("executions", []):
-                if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+                if not ex.get("executed") or ex.get("side") not in EXECUTED_TRADE_SIDES:
                     continue
                 t = ex.get("ticker", "")
                 if not t:
