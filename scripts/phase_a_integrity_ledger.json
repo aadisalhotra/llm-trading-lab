@@ -9,6 +9,15 @@
     "note": "Launch shakedown / state-corruption window. The first fabrication-free trading day is clean_window_start (2026-04-23). De-fab clean-window returns are based at the 2026-04-22 close."
   },
 
+  "spy_benchmark_anchor": {
+    "date": "2026-04-09",
+    "benchmark_value": 680.4000244140625,
+    "field": "benchmark_value",
+    "source": "First real SPY capture at capital deployment — the 2026-04-09 first post-deployment tick (the day's total_value moves off the $100k seed at this row).",
+    "note": "Canonical inception anchor for every SPY buy-and-hold return and every model's alpha. The 2026-04-09 perf rows carry THREE conflicting benchmark_value observations (676.01 pre-deployment seed = the 2026-04-08 shakedown value; 680.40 first real tick; 679.91 later tick), and pre-inception 2026-04-08 rows @ 676.01 also exist. groupby(date).last() over the unstably-ordered multi-model concat resolved to 676.01 or 679.91 depending on row ordering (10.32% / 9.69% for inception->2026-07-01), a non-deterministic anchor. Pinned to 680.40 so the inception anchor is deterministic: inception->2026-07-01 = 9.61%. All four SPY surfaces (perf-table alpha, leaderboard row, dashboard equity curve, monthly _spy_eod_series) read this pin. Rationale: alpha measures a model against SPY from the same instant the $100k was deployed; prior-close/seed values hand SPY a head start the models did not get.",
+    "resolves": "SPY inception-anchor non-determinism (dated 2026-07-01; leaderboard 10.32% / alpha 9.69% / dashboard 10.32% for one fixed window)"
+  },
+
   "risk_free_rate": {
     "value": 0.0368,
     "source": "FRED DGS3MO",

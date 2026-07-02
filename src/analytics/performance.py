@@ -94,18 +94,51 @@ def canonical_perf_frame(
     return df
 
 
-def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame | None:
-    """One SPY EOD price series for the whole experiment (deduped, inception-sliced).
+def _spy_inception_anchor() -> tuple[str, float] | None:
+    """(date, benchmark_value) inception anchor pinned in the Phase-A integrity
+    ledger, or None if absent/malformed.
 
-    Every model logs the same benchmark (SPY) price per tick, so we union all
-    models' ``benchmark_value`` observations, keep one per date, and slice to
-    >= inception. Returns a DataFrame[date_str, benchmark_value] sorted by date,
-    or None if no benchmark data exists yet.
+    The 2026-04-09 perf rows carry three conflicting SPY captures (676.01 seed,
+    680.40 first real tick, 679.91 later tick), so the anchor is a pinned fact —
+    scripts/phase_a_integrity_ledger.json -> spy_benchmark_anchor — not something
+    derived from row ordering. See that entry for the full provenance.
+    """
+    ledger_path = PERFORMANCE_DIR.parent.parent / "scripts" / "phase_a_integrity_ledger.json"
+    try:
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            anchor = (json.load(f) or {}).get("spy_benchmark_anchor") or {}
+        date = anchor.get("date")
+        value = anchor.get("benchmark_value")
+        if date and value is not None:
+            return str(date), float(value)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame | None:
+    """One SPY EOD price series for the whole experiment — DETERMINISTIC.
+
+    Every model logs the same SPY price per tick, so we union all models'
+    ``benchmark_value`` observations. The launch window double-wrote some dates
+    and carries pre-inception 2026-04-08 shakedown rows, so we:
+
+      * drop pre-inception rows (date < configured inception),
+      * dedupe to exactly one row per date deterministically — models iterated in
+        sorted order, stable-sorted by date, first capture per date wins. This
+        replaces ``groupby(date).last()`` over an unstably-ordered concat, which
+        flipped the inception anchor (676.01 / 679.91) between runs,
+      * pin the inception anchor to the ledger's ``spy_benchmark_anchor`` (the
+        2026-04-09 first-real-tick SPY, 680.40), so bench[0] is a fixed fact
+        rather than an emergent property of row order.
+
+    Returns DataFrame[date_str, benchmark_value] sorted by date, or None. The raw
+    perf logs on disk are never modified — this is a read-time derivation.
     """
     if not PERFORMANCE_DIR.exists():
         return None
     frames = []
-    for fp in PERFORMANCE_DIR.glob("*.jsonl"):
+    for fp in sorted(PERFORMANCE_DIR.glob("*.jsonl")):  # sorted -> deterministic concat order
         df = load_performance_history(fp.stem)
         if df.empty or "benchmark_value" not in df.columns:
             continue
@@ -116,13 +149,25 @@ def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame
         return None
     allrows = pd.concat(frames, ignore_index=True)
     allrows["date_str"] = allrows["date"].dt.strftime("%Y-%m-%d")
-    allrows = allrows.sort_values("date").groupby("date_str", sort=True).last().reset_index()
     inception = _experiment_inception(settings)
     if inception:
-        allrows = allrows[allrows["date_str"] >= inception].reset_index(drop=True)
-    if len(allrows) < 1:
+        allrows = allrows[allrows["date_str"] >= inception]
+    # Deterministic one-row-per-date: stable-sort by date (preserves per-model
+    # append order within a date), then keep the first capture per date.
+    allrows = allrows.sort_values("date", kind="stable")
+    deduped = allrows.drop_duplicates(subset="date_str", keep="first").reset_index(drop=True)
+    # Pin the inception anchor from the ledger (overrides the conflicting 04-09 rows).
+    anchor = _spy_inception_anchor()
+    if anchor is not None:
+        adate, avalue = anchor
+        deduped.loc[deduped["date_str"] == adate, "benchmark_value"] = avalue
+    if len(deduped) < 1:
         return None
-    return allrows[["date_str", "benchmark_value"]]
+    # Reader invariant (halt, not warn): the cleaned series MUST be one-per-date.
+    if not deduped["date_str"].is_unique:
+        dupes = sorted(deduped["date_str"][deduped["date_str"].duplicated()].tolist())
+        raise ValueError(f"canonical SPY series has duplicate dates after dedup: {dupes}")
+    return deduped[["date_str", "benchmark_value"]]
 
 
 def canonical_spy_return(settings: dict[str, Any] | None = None) -> float | None:
