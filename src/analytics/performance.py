@@ -116,6 +116,16 @@ def _spy_inception_anchor() -> tuple[str, float] | None:
     return None
 
 
+def _require_unique_spy_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Reader invariant: the canonical SPY series must have exactly one row per
+    date. Halts (raises) rather than silently returning a duplicated series that
+    would make bench[0]/bench[-1] anchor non-deterministic again."""
+    if not df["date_str"].is_unique:
+        dupes = sorted(df["date_str"][df["date_str"].duplicated()].tolist())
+        raise ValueError(f"canonical SPY series has duplicate dates after dedup: {dupes}")
+    return df
+
+
 def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame | None:
     """One SPY EOD price series for the whole experiment — DETERMINISTIC.
 
@@ -163,10 +173,7 @@ def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame
         deduped.loc[deduped["date_str"] == adate, "benchmark_value"] = avalue
     if len(deduped) < 1:
         return None
-    # Reader invariant (halt, not warn): the cleaned series MUST be one-per-date.
-    if not deduped["date_str"].is_unique:
-        dupes = sorted(deduped["date_str"][deduped["date_str"].duplicated()].tolist())
-        raise ValueError(f"canonical SPY series has duplicate dates after dedup: {dupes}")
+    _require_unique_spy_dates(deduped)  # reader invariant — halt on any residual dup
     return deduped[["date_str", "benchmark_value"]]
 
 

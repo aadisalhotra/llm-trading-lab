@@ -12,7 +12,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR
+from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR, load_settings
+
+
+def _inception_date() -> str | None:
+    """Configured experiment inception (YYYY-MM-DD), or None if unreadable.
+
+    Fail-open: if settings can't be read we return None and the pre-inception
+    writer guard is skipped rather than blocking an EOD snapshot.
+    """
+    try:
+        return load_settings().get("experiment_start_date")
+    except Exception:  # noqa: BLE001 — never block a write on a settings read error
+        return None
 
 
 def _month_tag(d: datetime, inception_date: str) -> str:
@@ -151,16 +163,27 @@ def log_daily_snapshot(
 ) -> None:
     """Append EOD portfolio value to /data/performance/{model}.jsonl.
 
-    Idempotent on date: if today's row already exists, this call is a
-    silent no-op. The EOD pipeline now has two trigger paths — the
-    intraday chain's post-close handoff (primary) and the 21:00 UTC cron
-    (backup) — and both can fire on the same day. A duplicate row would
-    break every downstream analytic that assumes one row per trading
-    day, so we defensively dedupe here.
+    Writer invariants (the perf log is the source of the canonical SPY series):
+      * Pre-inception rows are refused with a hard raise — the launch window
+        seeded 2026-04-08 rows that contaminated the SPY inception anchor, and a
+        pre-inception EOD snapshot is never valid.
+      * Duplicate-date rows are refused via an idempotent no-op (below), NOT a
+        raise: the EOD pipeline has two trigger paths — the intraday chain's
+        post-close handoff (primary) and the 21:00 UTC cron (backup) — and both
+        can fire on the same day. Raising would crash the backup path; the
+        no-op keeps that redundancy while still guaranteeing one row per date,
+        which every downstream analytic (and canonical_spy_series) assumes.
     """
     PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
     path = PERFORMANCE_DIR / f"{model_key}.jsonl"
     today_str = run_date.strftime("%Y-%m-%d")
+
+    inception = _inception_date()
+    if inception and today_str < inception:
+        raise ValueError(
+            f"refusing pre-inception EOD snapshot for {model_key} on {today_str} "
+            f"(inception {inception}); a pre-inception benchmark row is never valid"
+        )
 
     if path.exists():
         try:
