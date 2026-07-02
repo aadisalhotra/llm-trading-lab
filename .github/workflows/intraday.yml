@@ -167,6 +167,24 @@ jobs:
     runs-on: ubuntu-latest
     if: success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Symptom-level monitor for the now-continue-on-error `pages` job: a
+      # genuine, persistent Pages outage would otherwise be silent. This checks
+      # the LIVE public dashboard's generated_at and pages us only if it is more
+      # than 3h behind wall-clock during an established session (12:30–16:00 ET).
+      # Stdlib-only — no pip install. continue-on-error so the monitor can never
+      # red the chain and trip the very CRITICAL alert we just scoped away.
+      - name: Monitor deployed dashboard staleness
+        continue-on-error: true
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python scripts/check_dashboard_staleness.py
       - name: Chain next tick (intraday or EOD)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -316,9 +334,14 @@ jobs:
   pages:
     needs: run
     runs-on: ubuntu-latest
+    # A GitHub Pages deploy timeout is a cosmetic publishing hiccup, not a
+    # trading failure — it must not red the workflow. continue-on-error keeps a
+    # failed deploy from failing the run; the dashboard-staleness monitor in the
+    # `chain` job escalates a genuine, persistent publish outage instead.
+    continue-on-error: true
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -351,9 +374,27 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard
+      # Deploy with a longer timeout and one bounded retry. GitHub Pages
+      # occasionally needs longer than deploy-pages' 10-minute default to report
+      # the deployment live (the failure mode in today's incident); a
+      # slow-but-eventual deploy shouldn't be discarded. Attempt 1 is step-level
+      # continue-on-error so the retry step is reached; the retry fires only if
+      # attempt 1 aborted. The job is continue-on-error, so even both attempts
+      # failing can't red the workflow. Worst case (two 15-min attempts) is
+      # bounded by and hidden under the parallel `chain` job's ~30-min sleep, so
+      # the tick cadence is unchanged.
       - name: Deploy
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 900000
+      - name: Deploy (retry)
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 900000
 
   # If any upstream job fails (pipeline run, self-chain, or Pages deploy),
   # send a single [ALERT] email so a hard failure the in-process alerter
