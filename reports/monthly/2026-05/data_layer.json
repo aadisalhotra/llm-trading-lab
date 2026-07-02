@@ -127,9 +127,9 @@
     "spy_benchmark": {
       "ticker": "SPY",
       "inception_anchor_date": "2026-04-09",
-      "inception_value": 679.9099731445312,
+      "inception_value": 680.4000244140625,
       "month_end_value": 756.47998046875,
-      "cumulative_return_since_inception": 0.11261786170026067,
+      "cumulative_return_since_inception": 0.11181650988358638,
       "monthly_return": 0.049718941012760975,
       "note": "SPY EOD from perf-log benchmark_value; anchored to the 2026-04-09 model inception EOD.",
       "descriptive_sharpe": 6.11
@@ -160,7 +160,20 @@
       "generated_at_commit": "0af22a93402af63151d216fe51e1fe7b784c38b6",
       "integrity_backfill_commit": "d413a4ece6512ce841dda72133bfe41195818c7c",
       "pool_relabel_commit": "b67ac5c2393ed77c75e21359bae694b6bbd9b144",
-      "note": "source_commit == pool_relabel_commit: the last commit to modify this data layer; checking it out reproduces every figure in this report. The build chain: generated_at_commit produced the original generator tree (predates the entire integrity layer, so it reproduces nothing on its own); integrity_backfill_commit added clean-window returns, the three-gate inclusion framework, the DeepSeek model-identity splice record, RQ1 primary deferral, and the SPY benchmark row; pool_relabel_commit reclassified the six-model RQ2/RQ3 pools as superseded (Pages 4-5). source_commit deliberately points at the last DATA commit, not at this metadata correction: this edit changes zero data/figure fields, and a file cannot contain its own hash."
+      "note": "source_commit == pool_relabel_commit: the last commit to modify this data layer; checking it out reproduces every figure in this report. The build chain: generated_at_commit produced the original generator tree (predates the entire integrity layer, so it reproduces nothing on its own); integrity_backfill_commit added clean-window returns, the three-gate inclusion framework, the DeepSeek model-identity splice record, RQ1 primary deferral, and the SPY benchmark row; pool_relabel_commit reclassified the six-model RQ2/RQ3 pools as superseded (Pages 4-5). source_commit deliberately points at the last DATA commit, not at this metadata correction: this edit changes zero data/figure fields, and a file cannot contain its own hash.",
+      "spy_anchor_correction": {
+        "date": "2026-07-01",
+        "field": "report_meta.spy_benchmark inception anchor (+ derived leaderboard spy_relative_alpha and SPY-row cumulative_return_inception)",
+        "from": {
+          "inception_value": 679.9099731445312,
+          "cumulative_return_since_inception": 0.11261786170026067
+        },
+        "to": {
+          "inception_value": 680.4000244140625,
+          "cumulative_return_since_inception": 0.11181650988358638
+        },
+        "reason": "SPY inception-anchor de-contamination. The 2026-04-09 perf rows carry three conflicting benchmark_value captures (676.01 pre-deployment seed / 680.40 first real tick / 679.91 later tick); groupby(date).last() froze 679.91 into this layer. Re-anchored to the pinned deployment-moment SPY (680.40, scripts/phase_a_integrity_ledger.json spy_benchmark_anchor). Only SPY-inception-derived figures move: SPY cumulative-since-inception and the six model spy_relative_alpha (= model_cum - spy_cum). cumulative_return_clean, inclusion gates, RQ pools, and the correlation matrix are byte-identical. Published May prose citing the old 11.26 percent SPY figure requires a Reports erratum (PDF not edited)."
+      }
     },
     "generated_at_utc": "2026-06-02T02:19:18.032440+00:00",
     "generator": "scripts/build_monthly_data_layer.py",
@@ -193,7 +206,7 @@
       "model": "deepseek",
       "rank": 1,
       "monthly_return": 0.023658948075639064,
-      "spy_relative_alpha": 0.11403531523279509,
+      "spy_relative_alpha": 0.11483666704946938,
       "cumulative_return_inception": 0.22665317693305576,
       "cumulative_return_clean": {
         "value": 0.0586,
@@ -207,7 +220,7 @@
       "model": "gpt",
       "rank": 2,
       "monthly_return": 0.06478913288545685,
-      "spy_relative_alpha": 0.08259934549901349,
+      "spy_relative_alpha": 0.08340069731568778,
       "cumulative_return_inception": 0.19521720719927416,
       "cumulative_return_clean": {
         "value": 0.0766,
@@ -221,7 +234,7 @@
       "model": "grok",
       "rank": 3,
       "monthly_return": 0.03496560528738968,
-      "spy_relative_alpha": 0.050053523640113395,
+      "spy_relative_alpha": 0.050854875456787685,
       "cumulative_return_inception": 0.16267138534037406,
       "cumulative_return_clean": {
         "value": 0.0459,
@@ -235,7 +248,7 @@
       "model": "claude_opus",
       "rank": 4,
       "monthly_return": 0.01854265564281765,
-      "spy_relative_alpha": 0.02378239287809114,
+      "spy_relative_alpha": 0.02458374469476543,
       "cumulative_return_inception": 0.1364002545783518,
       "cumulative_return_clean": {
         "value": null,
@@ -249,7 +262,7 @@
       "model": "claude",
       "rank": 5,
       "monthly_return": 0.018019430279006876,
-      "spy_relative_alpha": 0.0038643955182930956,
+      "spy_relative_alpha": 0.004665747334967385,
       "cumulative_return_inception": 0.11648225721855376,
       "cumulative_return_clean": {
         "value": null,
@@ -263,7 +276,7 @@
       "model": "gemini",
       "rank": 6,
       "monthly_return": 0.03212981989055663,
-      "spy_relative_alpha": -0.012614569229065564,
+      "spy_relative_alpha": -0.011813217412391275,
       "cumulative_return_inception": 0.1000032924711951,
       "cumulative_return_clean": {
         "value": 0.0494,
@@ -277,7 +290,7 @@
       "model": "spy_benchmark",
       "rank": null,
       "monthly_return": 0.049718941012760975,
-      "cumulative_return_inception": 0.11261786170026067,
+      "cumulative_return_inception": 0.11181650988358638,
       "cumulative_return_clean": {
         "value": 0.0637,
         "source": "benchmark",
