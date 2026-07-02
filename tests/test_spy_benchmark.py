@@ -99,3 +99,27 @@ def test_writer_noops_on_duplicate_date(tmp_path, monkeypatch):
     decision_log.log_daily_snapshot("testmodel", d, _snapshot(), 700.0)  # duplicate same-date
     lines = [ln for ln in (tmp_path / "testmodel.jsonl").read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(lines) == 1, "duplicate-date row must not be persisted (idempotent no-op)"
+
+
+# ---- Regime SPY snapshot: analysis reads the frozen artifact, not a live fetch ---- #
+
+def test_regime_classification_prefers_frozen_snapshot(tmp_path, monkeypatch):
+    import pandas as pd
+    from src.analytics import regime_classifier as rc
+
+    # A synthetic committed snapshot (deterministic ramp, enough rows for the
+    # trailing 20/60-day windows).
+    dates = pd.bdate_range("2026-01-02", periods=120)
+    closes = [600.0 + i * 0.5 for i in range(len(dates))]
+    snap_csv = tmp_path / "spy_daily.csv"
+    pd.DataFrame({"date": dates, "close": closes}).to_csv(snap_csv, index=False)
+    monkeypatch.setattr(rc, "SPY_SNAPSHOT_CSV", snap_csv)
+
+    # If a snapshot exists, the LIVE fetch must not be called at all.
+    def _boom(*a, **k):
+        raise AssertionError("live yfinance fetch must not run when a snapshot exists")
+    monkeypatch.setattr(rc, "fetch_spy_daily", _boom)
+
+    assert rc.load_spy_snapshot() is not None
+    df = rc.classify_regimes(start="2026-02-01", end="2026-06-30", use_snapshot=True)
+    assert not df.empty and "regime" in df.columns

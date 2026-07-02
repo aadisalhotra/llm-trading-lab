@@ -31,6 +31,8 @@ thresholds, different purpose. See PRE_REGISTRATION.md.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
@@ -45,6 +47,17 @@ logger = logging.getLogger("llmlab.regime")
 
 REGIMES_DIR = DATA_DIR / "regimes"
 _SPY_CACHE = REGIMES_DIR / "spy_daily.csv"
+
+# Committed, dated snapshot of the SPY regime series. fetch_spy_daily() live-
+# queries yfinance and its adjustments drift between fetches (the same class of
+# instability as the perf-log benchmark anchor); for a reproducible pre-registered
+# analysis, regime stratification reads this FROZEN snapshot. Refreshing it
+# (snapshot_spy_daily) is an explicit, provenance-stamped act, not a silent
+# re-query. data/regimes/ is gitignored (regenerable cache); data/regime_snapshots/
+# is committed (immutable provenance).
+SPY_SNAPSHOT_DIR = DATA_DIR / "regime_snapshots"
+SPY_SNAPSHOT_CSV = SPY_SNAPSHOT_DIR / "spy_daily.csv"
+SPY_SNAPSHOT_META = SPY_SNAPSHOT_DIR / "spy_daily.meta.json"
 
 # Labels (exported so callers don't hard-code strings)
 BULL = "bull_trending"
@@ -150,6 +163,66 @@ def fetch_spy_daily(
 
 
 # --------------------------------------------------------------------------
+# Frozen snapshot (provenance) — the reproducible SPY series for RQ analysis
+# --------------------------------------------------------------------------
+
+def load_spy_snapshot() -> pd.Series | None:
+    """The frozen SPY regime series from the committed snapshot, or None if no
+    snapshot has been captured yet. This is the reproducible series the paper's
+    regime stratification reads."""
+    if not SPY_SNAPSHOT_CSV.exists():
+        return None
+    try:
+        s = pd.read_csv(SPY_SNAPSHOT_CSV, parse_dates=["date"]).set_index("date")["close"]
+        s = s[~s.index.duplicated(keep="last")].sort_index()
+        s.name = "close"
+        return s
+    except Exception:
+        logger.exception("Failed to read the committed SPY snapshot")
+        return None
+
+
+def snapshot_spy_daily(start: str = "2015-01-01", end: str | None = None) -> pd.Series:
+    """Capture SPY daily closes to the committed, dated snapshot with provenance.
+
+    This is the ONLY sanctioned way a live yfinance fetch feeds the regime
+    analysis: an explicit, stamped refresh, not a silent per-run re-query.
+    Writes spy_daily.csv + spy_daily.meta.json (captured_at, source, range, row
+    count, content sha256). ``classify_regimes(use_snapshot=True)`` then reads
+    the frozen file. Requires network (yfinance).
+    """
+    end = end or datetime.utcnow().strftime("%Y-%m-%d")
+    series = fetch_spy_daily(start=start, end=end, use_cache=False)  # force a fresh fetch
+    SPY_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    frame = series.rename("close").reset_index()
+    frame.columns = ["date", "close"]
+    frame.to_csv(SPY_SNAPSHOT_CSV, index=False)
+    payload = frame.to_csv(index=False).encode("utf-8")
+    meta = {
+        "captured_at_utc": datetime.utcnow().isoformat(),
+        "source": "yfinance",
+        "ticker": "SPY",
+        "auto_adjust": False,
+        "start": start,
+        "end": end,
+        "n_rows": int(len(frame)),
+        "first_date": frame["date"].min().strftime("%Y-%m-%d") if len(frame) else None,
+        "last_date": frame["date"].max().strftime("%Y-%m-%d") if len(frame) else None,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "note": (
+            "Frozen SPY regime series for regime-stratified RQ analysis. Refresh is an "
+            "explicit provenance-stamped capture (snapshot_spy_daily); analysis reads this "
+            "file, not a live re-query. See classify_regimes(use_snapshot=True)."
+        ),
+    }
+    with open(SPY_SNAPSHOT_META, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+    logger.info("Captured SPY snapshot: %d rows %s..%s -> %s",
+                meta["n_rows"], meta["first_date"], meta["last_date"], SPY_SNAPSHOT_CSV)
+    return series
+
+
+# --------------------------------------------------------------------------
 # Classification
 # --------------------------------------------------------------------------
 
@@ -213,9 +286,29 @@ def classify_regimes(
     end: str | None = None,
     criteria: RegimeCriteria | None = None,
     use_cache: bool = True,
+    use_snapshot: bool = True,
 ) -> pd.DataFrame:
-    """Fetch SPY and classify regimes over [start, end]."""
-    closes = fetch_spy_daily(start=start, end=end, use_cache=use_cache)
+    """Classify regimes over [start, end] from the SPY daily series.
+
+    Reads the committed frozen snapshot (load_spy_snapshot) when use_snapshot is
+    True and a snapshot exists — the reproducible path for the paper. Only when
+    no snapshot has been captured does it fall back to a LIVE yfinance fetch
+    (which can drift between runs), and it warns when it does so. Freeze/refresh
+    the snapshot explicitly with snapshot_spy_daily().
+    """
+    closes: pd.Series | None = None
+    if use_snapshot:
+        snap = load_spy_snapshot()
+        if snap is not None and not snap.empty:
+            closes = snap.loc[start:end] if end else snap.loc[start:]
+    if closes is None or closes.empty:
+        if use_snapshot:
+            logger.warning(
+                "No committed SPY snapshot found — falling back to a LIVE yfinance fetch "
+                "for regime classification (this is NOT the frozen series; run "
+                "snapshot_spy_daily() to freeze a reproducible artifact)."
+            )
+        closes = fetch_spy_daily(start=start, end=end, use_cache=use_cache)
     return classify_regime_series(closes, criteria)
 
 
