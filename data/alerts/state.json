@@ -32,18 +32,58 @@
   },
   "daily": {
     "date": "2026-07-02",
-    "sent_count": 1,
+    "sent_count": 6,
     "dedup_keys": [
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:gemini",
+      "state_ghost:deepseek",
+      "ath:grok",
+      "ath:claude_opus",
+      "news:PM:f24ea79c48"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-02T13:34:21.795238+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-02T21:06:57.100289+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): DeepSeek V4 Pro",
+        "timestamp": "2026-07-02T21:06:58.213196+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-07-02T21:06:59.528141+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 hit a new all-time high",
+        "timestamp": "2026-07-02T21:07:00.598246+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PM (held by 5)",
+        "timestamp": "2026-07-02T21:07:01.743477+00:00",
         "disposition": "sent"
       }
     ]
