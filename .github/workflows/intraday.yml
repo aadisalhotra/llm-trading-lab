@@ -360,7 +360,15 @@ jobs:
   # can't self-report still reaches the inbox.
   notify-failure:
     needs: [run, chain, pages]
-    if: failure()
+    # CRITICAL alerts are scoped to the trading-critical jobs only. A `pages`
+    # (dashboard publish) failure is cosmetic: it stays visible as red in the
+    # Actions tab and is escalated by the dashboard-staleness monitor in the
+    # `chain` job if it genuinely persists — but it must NOT page as CRITICAL.
+    # `!cancelled()` lets this job evaluate even when an upstream job failed; the
+    # explicit result checks keep it from firing on cancellation or on a
+    # pages-only failure. `pages` stays in `needs` so its status still shows in
+    # the FAILED_CONTEXT line when run/chain do fail.
+    if: ${{ !cancelled() && (needs.run.result == 'failure' || needs.chain.result == 'failure') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
