@@ -518,21 +518,30 @@ def _build_performance_table(
 # ===========================================================================
 
 def _model_breakdown(model_key: str, run_date: datetime) -> str:
-    record = _read_today_trade_record(model_key, run_date)
+    records = _read_today_trade_records(model_key, run_date)
     portfolio = load_portfolio(model_key)
     snapshot = portfolio.snapshot({})  # weights based on last avg_cost; only used for structure summary
 
-    if record is None:
+    if not records:
         return f"No decision log entry recorded for {model_key.upper()} today. Likely the model was disabled, the daily run skipped this slot, or the file has not yet been written."
 
-    if not record.get("api_success", True):
-        err = _short_err(record.get("api_error", "unknown error"))
+    last = records[-1]
+    # Whole-day executed trades across every intraday tick, so the one-line
+    # narrative matches the whole-day trade counts and the "Today's trades"
+    # list below instead of describing only the final tick of the session.
+    executed = [e for rec in records for e in rec.get("executions", [])
+                if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES]
+
+    # Nothing traded all day and the final tick errored — surface the failure
+    # (mirrors the prior single-tick behavior for a fully dead session).
+    if not executed and not last.get("api_success", True):
+        err = _short_err(last.get("api_error", "unknown error"))
         return f"API call failed: _{err}_. No trades executed. Portfolio unchanged from prior session."
 
-    executed = [e for e in record.get("executions", [])
-                if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES]
-    overall = record.get("overall_reasoning", "").strip()
-    portfolio_after = record.get("portfolio_after", {})
+    overall = last.get("overall_reasoning", "").strip()
+    # EOD positioning comes from the latest tick that carries a portfolio snapshot.
+    state_rec = next((r for r in reversed(records) if r.get("portfolio_after")), last)
+    portfolio_after = state_rec.get("portfolio_after", {})
     holdings = portfolio_after.get("holdings", []) or snapshot["holdings"]
     cash_pct = portfolio_after.get("cash_pct", snapshot["cash_pct"])
     n_pos = len(holdings)
@@ -613,9 +622,9 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
         if top_h.get("weight", 0) >= 0.18:
             s4 = f"Notable: at the position-cap on {top_h['ticker']}."
 
-    # Sentence 5 — violations or risk
+    # Sentence 5 — violations or risk (aggregated across every tick of the day)
     s5 = ""
-    violations = record.get("violations", [])
+    violations = [v for rec in records for v in (rec.get("violations") or [])]
     if violations:
         rules = sorted({v["rule"] for v in violations})
         s5 = f"Risk filter rejected {len(violations)} decision(s): {', '.join(rules)}."
