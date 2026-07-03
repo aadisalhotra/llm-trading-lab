@@ -3761,7 +3761,8 @@
       "strengths": null,
       "weaknesses": null,
       "status": "non_estimable",
-      "decision_completeness": 0.9963
+      "decision_completeness": 0.9963,
+      "note": "Non-estimable (corrupt Phase-A book); no characterization published."
     },
     {
       "model": "gpt",
@@ -3810,12 +3811,14 @@
         "drawdown_halt_triggers": [],
         "api_json_errors": []
       },
-      "style_tag": null,
-      "risk_posture_tag": null,
+      "style_tag": "Directional conviction, unrewarded this month.",
+      "risk_posture_tag": "De-levered into weakness.",
       "strengths": null,
       "weaknesses": null,
       "status": "estimable_primary",
-      "decision_completeness": 1.0
+      "decision_completeness": 1.0,
+      "evidence": "Trades/day collapsed to 7.5 (May: 33.25 \u2014 cross-regime comparison; the v1\u2192v2 prompt change confounds this delta, illustrative only); reversal rate 0.38; cash rebuilt to 6.2% (May: 1.6%); turnover 0.153; avg hold 16.7d; 158 trades; win rate 0.45; monthly \u22126.34%, max DD \u22127.0%.",
+      "read": "Fewer, larger, longer directional positions under v2; June's losses came from held conviction, not churn."
     },
     {
       "model": "gemini",
@@ -4102,7 +4105,8 @@
       "strengths": null,
       "weaknesses": null,
       "status": "performance_only",
-      "decision_completeness": 0.7852
+      "decision_completeness": 0.7852,
+      "evidence": "78.5% completeness; behavioral metrics selection-biased. Executed-tick evidence, not characterized: 7.9 trades/day; reversal 0.69; monthly \u22120.28%."
     },
     {
       "model": "grok",
@@ -4151,12 +4155,13 @@
         "drawdown_halt_triggers": [],
         "api_json_errors": []
       },
-      "style_tag": null,
-      "risk_posture_tag": null,
+      "style_tag": "Two-way trader, defensively effective.",
+      "risk_posture_tag": "Fully deployed, fast exits.",
       "strengths": null,
       "weaknesses": null,
       "status": "estimable_primary",
-      "decision_completeness": 1.0
+      "decision_completeness": 1.0,
+      "evidence": "18.9 trades/day (highest of cohort); reversal 0.48; cash 0.5%; RQ2 \u22120.096; RQ3 \u22120.052; monthly +0.15% \u2014 flat through a \u22121.55% SPY month."
     },
     {
       "model": "deepseek",
@@ -4210,7 +4215,9 @@
       "strengths": null,
       "weaknesses": null,
       "status": "provisional_model_splice",
-      "decision_completeness": 1.0
+      "decision_completeness": 1.0,
+      "status_tag": "Model-spliced (historical), behavioral exploratory.",
+      "evidence": "11.0 trades/day; reversal 0.47; cash 2.8%; monthly \u22120.40%."
     },
     {
       "model": "claude_opus",
@@ -4269,7 +4276,8 @@
       "strengths": null,
       "weaknesses": null,
       "status": "non_estimable",
-      "decision_completeness": 0.9963
+      "decision_completeness": 0.9963,
+      "note": "Non-estimable (corrupt Phase-A book); no characterization published."
     }
   ],
   "methodology_data_integrity_rq": {
