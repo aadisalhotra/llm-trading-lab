@@ -64,10 +64,24 @@ def test_canonical_spy_series_deterministic():
 
 
 def test_inception_return_is_anchored_961bp():
-    r = canonical_spy_return(load_settings())
-    assert r is not None
+    """Inception->2026-07-01 SPY buy-and-hold, anchored at 680.40, is 9.61%.
+
+    Bounded to the pinned date ON PURPOSE. canonical_spy_return() tracks the
+    latest tick and legitimately drifts as new trading days land (a 2026-07-02
+    tick already moves it off 9.61%), so the live unbounded value is not a stable
+    invariant. The real invariant the 9.61% figure names is the return to the
+    2026-07-01 slice, computed by the same anchor-based definition as
+    canonical_spy_return (vals[-1]/vals[0] - 1)."""
+    ser = canonical_spy_series(load_settings())
+    assert ser is not None and len(ser) >= 2
+    bounded = ser[ser["date_str"] <= "2026-07-01"]
+    assert len(bounded) >= 2 and str(bounded.iloc[-1]["date_str"]) == "2026-07-01", (
+        "2026-07-01 SPY benchmark row missing from the canonical series"
+    )
+    vals = bounded["benchmark_value"].astype(float).values
+    r = float(vals[-1] / vals[0] - 1.0)
     assert round(r, 4) == EXPECTED_INCEPTION_RETURN_07_01, (
-        f"inception->07-01 SPY should be {EXPECTED_INCEPTION_RETURN_07_01:.4f} "
+        f"inception->2026-07-01 SPY should be {EXPECTED_INCEPTION_RETURN_07_01:.4f} "
         f"(anchor 680.40); got {r:.4f}"
     )
 
