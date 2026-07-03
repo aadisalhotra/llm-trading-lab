@@ -1331,6 +1331,90 @@ def _self_validate(layer):
 
 
 # ==========================================================================
+# Regime / prompt-version label — DERIVED from decision-log stamps
+# ==========================================================================
+
+# A month's prompt_version_note is hand-authored provenance prose. May's was
+# pinned at May-build time and references the then-current settings value (since
+# superseded: settings.json now reads v3). It cannot be regenerated verbatim from
+# current state, so it is frozen here to keep reproduce-May an EXACT MATCH. Every
+# other month's note is generated from the derived stamps + the ledger boundary.
+_FROZEN_PROMPT_VERSION_NOTES = {
+    "2026-05": ("May decision records are entirely prompt_version=v1 (verified). "
+                "settings.json now reads prompt_version=v2 (flipped 2026-05-31, "
+                "commit deploys v2 from June); the May report pins the v1 regime the "
+                "data was generated under, NOT the current settings value."),
+}
+
+
+def _month_prompt_versions(records_by_model: dict) -> list[str]:
+    """Distinct prompt_version stamps across the month's decision records, sorted.
+
+    decision_log.py stamps prompt_version on every run; it is the AUTHORITATIVE
+    v1/v2/v3 boundary. settings.json reflects the CURRENT deployment, not the
+    month the data was generated under — reading it would mislabel any past month
+    (e.g. June, run entirely on v2, as the live v3)."""
+    return sorted({
+        (r.get("prompt_version") or "").strip()
+        for recs in records_by_model.values() for r in recs
+        if (r.get("prompt_version") or "").strip()
+    })
+
+
+def _derive_regime_label(month: str, win_start: str, records_by_model: dict,
+                         ledger: dict) -> tuple:
+    """Return (regime, prompt_version, prompt_version_note) derived from the
+    month's per-record prompt_version stamps — never from live settings.
+
+    Single-version month -> the scalar version string (May "v1", June "v2").
+    A month spanning a boundary -> the joined set ("v2+v3"), with the boundary
+    date pulled from the ledger's regime_boundaries and named in the note."""
+    versions = _month_prompt_versions(records_by_model)
+    month_name = datetime.strptime(win_start, "%Y-%m-%d").strftime("%B")
+    boundaries = (ledger.get("regime_boundaries") or {})
+
+    if len(versions) == 1:
+        label = versions[0]
+    elif len(versions) >= 2:
+        label = "+".join(versions)
+    else:
+        label = None  # no stamped records — never expected for a real month
+
+    if month in _FROZEN_PROMPT_VERSION_NOTES:
+        note = _FROZEN_PROMPT_VERSION_NOTES[month]
+    elif len(versions) == 1:
+        v = versions[0]
+        fwd = next((b for b in boundaries.values()
+                    if (b.get("prompt_version") or {}).get("from") == v), None)
+        if fwd:
+            pv = fwd["prompt_version"]
+            clause = (f" Per the regime_boundaries ledger, {pv['to']} activates "
+                      f"{fwd['date']} ({fwd.get('change', '')}); {month_name} is the "
+                      f"pre-boundary {v} regime.")
+        else:
+            clause = ""
+        note = (f"{month_name} decision records are entirely prompt_version={v} "
+                f"(verified from the per-record decision-log stamps, the authoritative "
+                f"regime boundary).{clause} The {month_name} report pins the {v} regime "
+                f"the data was generated under, derived from the stamps, NOT the current "
+                f"settings value.")
+    elif len(versions) >= 2:
+        spans = []
+        for b in boundaries.values():
+            pv = b.get("prompt_version") or {}
+            if pv.get("from") in versions and pv.get("to") in versions:
+                spans.append(f"{pv['from']}->{pv['to']} on {b['date']}")
+        span_clause = (" Boundary: " + "; ".join(spans) + ".") if spans else ""
+        note = (f"{month_name} decision records span prompt_versions "
+                f"{', '.join(versions)} (from the per-record decision-log stamps)."
+                f"{span_clause} Derived from the stamps, NOT live settings.")
+    else:
+        note = ("No prompt_version stamps in this month's decision records; regime "
+                "label unavailable.")
+    return label, label, note
+
+
+# ==========================================================================
 # Driver
 # ==========================================================================
 
@@ -1677,10 +1761,16 @@ def build(month: str) -> dict:
     # ====================================================================
     # report_meta
     # ====================================================================
+    # Regime / prompt-version label DERIVED from the month's per-record
+    # prompt_version stamps (decision_log.py's authoritative boundary), never
+    # from live settings — which reads the CURRENT deployment (v3) and would
+    # mislabel any past month (June ran v2 end-to-end).
+    _regime_label, _prompt_version_label, _prompt_version_note = _derive_regime_label(
+        month, win_start, may_records, ledger)
     report_meta = {
         "period": month,
         "period_label": datetime.strptime(win_start, "%Y-%m-%d").strftime("%B %Y"),
-        "regime": "v1",
+        "regime": _regime_label,
         "phase": settings.get("phase", "Phase A - Paper Trading"),
         "pilot_exploratory": True,
         "data_window": {
@@ -1693,11 +1783,8 @@ def build(month: str) -> dict:
                                           "(2026-04-09..2026-04-30) enters ONLY these inception-anchored series, "
                                           "never the monthly behavioral/RQ window.")},
         },
-        "prompt_version": "v1",
-        "prompt_version_note": ("May decision records are entirely prompt_version=v1 (verified). "
-                                "settings.json now reads prompt_version=v2 (flipped 2026-05-31, "
-                                "commit deploys v2 from June); the May report pins the v1 regime the "
-                                "data was generated under, NOT the current settings value."),
+        "prompt_version": _prompt_version_label,
+        "prompt_version_note": _prompt_version_note,
         "pinned_snapshots": _pinned_snapshots(model_keys, win_start, win_end, settings),
         "risk_free_rate": _f(risk_free_rate),
         "risk_free_rate_note": ("Pinned in settings.json = 0.0368 (3-month T-bill, annualized, as of "
