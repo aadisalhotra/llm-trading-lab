@@ -7,7 +7,8 @@ decision is that a GENUINE, persistent publishing outage would otherwise go
 silent forever. This script is the symptom-level control that closes that gap:
 it fetches the LIVE public dashboard JSON, reads its ``generated_at``, and pages
 us only if the public artifact has fallen more than ``STALE_THRESHOLD_HOURS``
-behind wall-clock during an established trading session.
+behind the freshness we *expect* — the dashboard build the pipeline has already
+committed locally — during an established trading session.
 
 Contract (mirrors the alerting layer's "never crash a tick" rule):
   * NEVER raises out of ``main`` and NEVER exits non-zero in monitor mode. A
@@ -18,6 +19,15 @@ Contract (mirrors the alerting layer's "never crash a tick" rule):
   * Session-guarded: it only alerts once the session is at least 3h old
     (>= 12:30 ET) and before the close (< 16:00 ET), so the legitimately-stale
     overnight dashboard at the open is never a false positive.
+  * Expected-freshness gated (holiday-safe): "stale" is measured against the
+    locally-committed dashboard build, not wall-clock alone. On a market
+    holiday, weekend, or pre-open the pipeline commits no new tick, so the local
+    build is exactly as old as the public one — nothing failed to publish — and
+    the monitor stays quiet. This self-adapts to half-days and any future
+    schedule change with NO market-calendar dependency, which also matters
+    because the ``chain`` job runs no ``pip install``: a calendar import would
+    silently degrade to a weekday-only check and reintroduce the very holiday
+    false positive this guard exists to kill.
 
 Dependencies are stdlib only (plus ``src.config_loader`` for recipients/paths),
 so the ``chain`` job needs no ``pip install``.
@@ -51,6 +61,12 @@ logger = logging.getLogger("llmlab.monitor.staleness")
 
 # --- Tunables -----------------------------------------------------------------
 DASHBOARD_URL = "https://llmtradinglab.ai/data/dashboard.json"
+# The pipeline's committed dashboard build — the freshness we *expect* to be
+# live. The Pages layer publishes exactly this file, so comparing the live
+# artifact against it (rather than wall-clock) is what makes the monitor
+# holiday-safe without any market calendar. Present in every checkout because
+# it is committed by the `run` job.
+LOCAL_DASHBOARD = ROOT / "data" / "dashboard.json"
 STALE_THRESHOLD_HOURS = 3.0
 FETCH_TIMEOUT_SECONDS = 15
 
@@ -101,8 +117,26 @@ def in_alert_window(now: datetime) -> bool:
 
 
 def decide(generated_at: datetime, now: datetime,
-           threshold: float = STALE_THRESHOLD_HOURS) -> dict:
+           threshold: float = STALE_THRESHOLD_HOURS,
+           expected_generated_at: datetime | None = None) -> dict:
     """Decide whether to alert. Pure: same inputs → same output.
+
+    ``generated_at`` is the LIVE public dashboard's timestamp, ``now`` is
+    wall-clock, and ``expected_generated_at`` is the locally-committed build's
+    timestamp — the freshness we expect to be live (see module docstring).
+
+    An alert requires all three of:
+      1. ``in_window``       — inside an established trading session.
+      2. ``is_stale``        — the public artifact trails wall-clock by > threshold.
+      3. ``behind_expected`` — the public artifact ALSO trails the locally-built
+         dashboard by > threshold, i.e. there is genuinely newer committed data
+         that failed to publish. On a holiday / weekend / pre-open no new tick is
+         committed, so live ≈ local and this gate stays shut — the holiday-safe
+         guard, with no market calendar.
+
+    When ``expected_generated_at`` is None (local build unreadable, or a pure
+    unit-test call) the monitor falls back to the wall-clock signal alone:
+    ``behind_expected`` collapses to ``is_stale`` and behaviour is unchanged.
 
     Returns a dict with the decision and every input that fed it, so the CI log
     and the alert body can explain *why* it did or didn't fire.
@@ -110,11 +144,29 @@ def decide(generated_at: datetime, now: datetime,
     stale_h = hours_stale(generated_at, now)
     windowed = in_alert_window(now)
     is_stale = stale_h > threshold
-    alert = bool(windowed and is_stale)
+
+    # Expected-freshness gate: how far the public artifact trails the data we've
+    # already built and committed (positive = public is behind the local build).
+    # None → fall back to the wall-clock signal alone.
+    if expected_generated_at is not None:
+        behind_expected_h = hours_stale(generated_at, expected_generated_at)
+        behind_expected = behind_expected_h > threshold
+    else:
+        behind_expected_h = None
+        behind_expected = is_stale
+
+    alert = bool(windowed and is_stale and behind_expected)
     if not windowed:
         reason = "outside alert window (not an established session)"
     elif not is_stale:
         reason = f"fresh enough ({stale_h:.2f}h <= {threshold:.0f}h)"
+    elif not behind_expected:
+        reason = (f"stale {stale_h:.2f}h vs wall-clock but matches the local build "
+                  f"({behind_expected_h:.2f}h behind committed data <= {threshold:.0f}h) "
+                  f"— no committed tick to publish (holiday/weekend/pre-open)")
+    elif behind_expected_h is not None:
+        reason = (f"STALE {stale_h:.2f}h > {threshold:.0f}h during session; "
+                  f"publish is {behind_expected_h:.2f}h behind committed data")
     else:
         reason = f"STALE {stale_h:.2f}h > {threshold:.0f}h during session"
     return {
@@ -122,8 +174,12 @@ def decide(generated_at: datetime, now: datetime,
         "hours_stale": stale_h,
         "in_window": windowed,
         "is_stale": is_stale,
+        "behind_expected": behind_expected,
+        "hours_behind_expected": behind_expected_h,
         "reason": reason,
         "generated_at": generated_at.isoformat(),
+        "expected_generated_at": (expected_generated_at.isoformat()
+                                  if expected_generated_at is not None else None),
         "now": now.isoformat(),
         "threshold_hours": threshold,
     }
@@ -158,17 +214,50 @@ def fetch_live_generated_at(url: str = DASHBOARD_URL,
         return None
 
 
+def read_local_generated_at(path: Path = LOCAL_DASHBOARD) -> datetime | None:
+    """Return ``generated_at`` from the locally-committed dashboard build (UTC).
+
+    This is the *expected* freshness: the data the pipeline has actually built
+    and committed on disk, which the Pages layer is responsible for publishing.
+    Comparing the live public artifact against THIS — rather than wall-clock —
+    is what makes the monitor self-adapt to holidays, half-days, and any future
+    schedule change with no market-calendar dependency.
+
+    Returns None if the file is missing / unreadable / malformed, in which case
+    the caller falls back to the wall-clock staleness signal alone.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001 — a read blip must not crash the monitor
+        logger.warning("Could not read local dashboard build (%s): %s", path, e)
+        return None
+    raw = payload.get("generated_at")
+    if not raw:
+        logger.warning("Local dashboard build has no 'generated_at' field")
+        return None
+    try:
+        return parse_generated_at(str(raw))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Could not parse local generated_at %r: %s", raw, e)
+        return None
+
+
 def _build_alert(decision: dict) -> tuple[str, str, str]:
     """Return (subject, html_body, text_body) for the staleness alert."""
     stale_h = decision["hours_stale"]
     gen = decision["generated_at"]
     now = decision["now"]
+    expected = decision.get("expected_generated_at") or "unavailable"
+    behind = decision.get("hours_behind_expected")
+    behind_txt = (f"Behind local build: {behind:.1f} hours\n" if behind is not None else "")
     subject = "[ALERT] Public dashboard stale — Pages deploy not publishing"
     text = (
-        "The live public dashboard has fallen behind.\n\n"
-        f"Live generated_at: {gen}\n"
-        f"Now (UTC):         {now}\n"
-        f"Stale by:          {stale_h:.1f} hours (threshold {decision['threshold_hours']:.0f}h)\n\n"
+        "The live public dashboard is behind the data the pipeline has committed.\n\n"
+        f"Live generated_at:  {gen}\n"
+        f"Locally-built:      {expected}\n"
+        f"Now (UTC):          {now}\n"
+        f"Stale by:           {stale_h:.1f} hours (threshold {decision['threshold_hours']:.0f}h)\n"
+        f"{behind_txt}\n"
         "Trading, data, and the self-chain are unaffected — this is the GitHub\n"
         "Pages publish layer. The `pages` job is continue-on-error, so check the\n"
         "Actions tab for red `pages` jobs / deploy-pages timeouts, and check\n"
@@ -192,6 +281,7 @@ def _build_alert(decision: dict) -> tuple[str, str, str]:
     <code>pages</code> jobs and <a href="https://www.githubstatus.com">GitHub Status</a> for a Pages incident.
     <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13px;margin-top:12px;">
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Live generated_at</td><td style="padding:3px 0;color:#111;">{gen}</td></tr>
+      <tr><td style="padding:3px 12px 3px 0;color:#666;">Locally-built (expected)</td><td style="padding:3px 0;color:#111;">{expected}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Now (UTC)</td><td style="padding:3px 0;color:#111;">{now}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Source</td><td style="padding:3px 0;"><a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></td></tr>
     </table>
@@ -255,8 +345,9 @@ def run_monitor() -> int:
         logger.info("No usable generated_at — skipping staleness check (no alert)")
         return 0
 
+    expected = read_local_generated_at()
     now = datetime.now(timezone.utc)
-    decision = decide(generated_at, now)
+    decision = decide(generated_at, now, expected_generated_at=expected)
     logger.info("Dashboard staleness: %s", decision["reason"])
     if decision["alert"]:
         send_staleness_alert(decision)
@@ -284,28 +375,50 @@ def _self_test() -> int:
     now_open = at(tue, 10, 0)  # 10:00 ET — session too young
     now_wknd = at(sat, 14, 0)  # Saturday afternoon
 
+    # A holiday mirrors the real 2026-07-03 15:32 ET false positive: a weekday
+    # inside the session window, the live dashboard hours-old vs wall-clock, but
+    # the LOCAL build is exactly as old — no tick committed today, so nothing
+    # failed to publish.
+    holiday_stale = now_mid - timedelta(hours=17)  # yesterday's close, still live
+
     checks = [
-        # name, generated_at (UTC), now (UTC), expect_alert
-        ("stale 5h, mid-session → ALERT",  now_mid - timedelta(hours=5),    now_mid, True),
-        ("fresh 20m, mid-session → quiet", now_mid - timedelta(minutes=20), now_mid, False),
+        # name, live generated_at (UTC), now (UTC), expected/local build, expect_alert
+        # --- wall-clock path (expected=None): existing behaviour, unchanged ---
+        ("stale 5h, mid-session → ALERT",
+         now_mid - timedelta(hours=5),    now_mid, None, True),
+        ("fresh 20m, mid-session → quiet",
+         now_mid - timedelta(minutes=20), now_mid, None, False),
         ("stale 16h, at the open → quiet (morning guard)",
-         now_open - timedelta(hours=16), now_open, False),
-        ("stale 6h, weekend → quiet",      now_wknd - timedelta(hours=6),   now_wknd, False),
+         now_open - timedelta(hours=16), now_open, None, False),
+        ("stale 6h, weekend → quiet",
+         now_wknd - timedelta(hours=6),   now_wknd, None, False),
         ("boundary 3h01m, mid-session → ALERT",
-         now_mid - timedelta(hours=3, minutes=1), now_mid, True),
+         now_mid - timedelta(hours=3, minutes=1), now_mid, None, True),
         ("boundary 2h59m, mid-session → quiet",
-         now_mid - timedelta(hours=2, minutes=59), now_mid, False),
+         now_mid - timedelta(hours=2, minutes=59), now_mid, None, False),
+        # --- expected-freshness gate (option b, holiday-safe) ---
+        # Holiday weekday, in session, live 17h stale vs wall-clock BUT the local
+        # build is identical (no committed tick today) → publish isn't behind →
+        # quiet, with no market calendar. Regression guard for the 2026-07-03 FP.
+        ("holiday weekday, live == local build → quiet",
+         holiday_stale, now_mid, holiday_stale, False),
+        # Trading day with ticks committing (local build fresh, 20m old) but the
+        # public artifact is stuck 6h behind → genuine publish outage → ALERT.
+        # Regression guard for the correct-fire path.
+        ("trading day w/ fresh ticks, live stuck 6h → ALERT",
+         now_mid - timedelta(hours=6), now_mid, now_mid - timedelta(minutes=20), True),
     ]
     all_ok = True
     print("dashboard-staleness self-test")
     print("-" * 60)
-    for name, gen, now, expect in checks:
-        d = decide(gen, now)
+    for name, gen, now, expected, expect in checks:
+        d = decide(gen, now, expected_generated_at=expected)
         ok = d["alert"] is expect
         all_ok = all_ok and ok
         print(f"  [{'PASS' if ok else 'FAIL'}] {name}")
         print(f"         alert={d['alert']} expected={expect} "
-              f"({d['hours_stale']:.2f}h stale, in_window={d['in_window']})")
+              f"({d['hours_stale']:.2f}h stale, in_window={d['in_window']}, "
+              f"behind_expected={d['hours_behind_expected']})")
     print("-" * 60)
     print("RESULT:", "ALL PASS" if all_ok else "FAILURES PRESENT")
     return 0 if all_ok else 1
