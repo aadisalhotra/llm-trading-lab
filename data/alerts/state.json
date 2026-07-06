@@ -32,13 +32,18 @@
   },
   "daily": {
     "date": "2026-07-06",
-    "sent_count": 2,
+    "sent_count": 7,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:gemini",
+      "state_ghost:deepseek",
+      "ath:grok",
+      "news:PM:9632f24772",
+      "news:PFE:674c22f3b5"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -52,6 +57,41 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-06T15:04:13.903456+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-06T21:06:58.149028+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): DeepSeek V4 Pro",
+        "timestamp": "2026-07-06T21:06:58.861820+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-07-06T21:06:59.975591+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PM (held by 5)",
+        "timestamp": "2026-07-06T21:07:00.571502+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PFE (held by 6)",
+        "timestamp": "2026-07-06T21:07:01.156927+00:00",
         "disposition": "sent"
       }
     ]
