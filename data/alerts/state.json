@@ -33,13 +33,16 @@
   },
   "daily": {
     "date": "2026-07-08",
-    "sent_count": 2,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:deepseek",
+      "news:PM:9632f24772",
+      "news:RTX:250af5c8fe"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -53,6 +56,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-08T14:51:08.009908+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): DeepSeek V4 Pro",
+        "timestamp": "2026-07-08T21:07:33.847559+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PM (held by 5)",
+        "timestamp": "2026-07-08T21:07:41.621981+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on RTX (held by 5)",
+        "timestamp": "2026-07-08T21:07:42.854738+00:00",
         "disposition": "sent"
       }
     ]
