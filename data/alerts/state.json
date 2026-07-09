@@ -33,14 +33,15 @@
   },
   "daily": {
     "date": "2026-07-09",
-    "sent_count": 3,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "api_failure:gemini",
-      "api_failure:deepseek"
+      "api_failure:deepseek",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -61,6 +62,13 @@
         "severity": "WARN",
         "title": "Model deepseek failed",
         "timestamp": "2026-07-09T16:34:34.347477+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-07-09T21:07:12.145257+00:00",
         "disposition": "sent"
       }
     ]
