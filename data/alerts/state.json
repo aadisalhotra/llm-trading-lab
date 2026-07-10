@@ -33,13 +33,15 @@
   },
   "daily": {
     "date": "2026-07-10",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:gemini",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -53,6 +55,20 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-10T15:34:00.504565+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-10T21:07:11.308923+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-07-10T21:07:15.031251+00:00",
         "disposition": "sent"
       }
     ]
