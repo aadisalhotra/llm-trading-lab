@@ -33,13 +33,19 @@
   },
   "daily": {
     "date": "2026-07-13",
-    "sent_count": 2,
+    "sent_count": 8,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:gemini",
+      "state_ghost:deepseek",
+      "ath:gemini",
+      "news:PM:479e363e7b",
+      "news:CVX:ca5b466350",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -53,6 +59,48 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-13T13:35:20.802025+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-13T21:07:09.954421+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): DeepSeek V4 Pro",
+        "timestamp": "2026-07-13T21:07:11.331055+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-07-13T21:07:12.864697+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PM (held by 5)",
+        "timestamp": "2026-07-13T21:07:14.085673+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on CVX (held by 4)",
+        "timestamp": "2026-07-13T21:07:15.362624+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-07-13T21:07:18.274705+00:00",
         "disposition": "sent"
       }
     ]
