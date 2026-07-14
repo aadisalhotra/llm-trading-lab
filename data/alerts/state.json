@@ -33,10 +33,11 @@
   },
   "daily": {
     "date": "2026-07-14",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "api_failure:gemini",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "api_failure:deepseek"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -53,6 +54,13 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-07-14T14:03:53.714096+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model deepseek failed",
+        "timestamp": "2026-07-14T16:36:43.542371+00:00",
         "disposition": "sent"
       }
     ]
