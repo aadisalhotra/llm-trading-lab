@@ -33,14 +33,17 @@
   },
   "daily": {
     "date": "2026-07-17",
-    "sent_count": 3,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Macro crisis",
       "api_failure:gemini",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:gemini",
+      "news:ABBV:c8fdef6e4c",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -61,6 +64,27 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-07-17T14:02:22.009988+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-07-17T21:06:58.918992+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABBV (held by 5)",
+        "timestamp": "2026-07-17T21:07:00.330019+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-07-17T21:07:04.944562+00:00",
         "disposition": "sent"
       }
     ]
