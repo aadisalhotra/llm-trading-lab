@@ -32,43 +32,27 @@
     ]
   },
   "daily": {
-    "date": "2026-07-16",
-    "sent_count": 4,
+    "date": "2026-07-17",
+    "sent_count": 2,
     "dedup_keys": [
-      "api_failure:gemini",
-      "ath:gemini",
-      "news:UNH:2032b58f10",
-      "budget:critical"
+      "macro_event:Macro crisis",
+      "api_failure:gemini"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-07-17T13:32:37.226450+00:00",
+        "disposition": "sent"
+      },
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
-        "timestamp": "2026-07-16T13:34:49.879783+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro hit a new all-time high",
-        "timestamp": "2026-07-16T21:07:31.156385+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on UNH (held by 5)",
-        "timestamp": "2026-07-16T21:07:32.254942+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "budget",
-        "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "timestamp": "2026-07-16T21:07:35.112233+00:00",
+        "timestamp": "2026-07-17T13:34:23.009221+00:00",
         "disposition": "sent"
       }
     ]
