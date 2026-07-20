@@ -33,14 +33,17 @@
   },
   "daily": {
     "date": "2026-07-20",
-    "sent_count": 3,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
       "macro_event:Systemic event",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "ath:gemini",
+      "news:RTX:83a6cfa312",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -61,6 +64,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-20T15:04:38.298171+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-07-20T21:07:39.507209+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on RTX (held by 5)",
+        "timestamp": "2026-07-20T21:07:41.680481+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-07-20T21:07:46.432069+00:00",
         "disposition": "sent"
       }
     ]
