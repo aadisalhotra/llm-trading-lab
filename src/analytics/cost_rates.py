@@ -38,6 +38,13 @@ COST_PER_MTOK: dict[str, dict[str, float]] = {
     # reflects the cost that applies going forward. Reasoning traces count as
     # output tokens, so output bills higher. chat/reasoner are retained as
     # legacy entries for older returned IDs.
+    #
+    # Official-V4 GA (2026-07-20) introduced peak/off-peak pricing: peak
+    # windows 01:00-04:00 and 06:00-10:00 UTC bill at 2x the off-peak rate
+    # (per DeepSeek's announcement, windows stated in UTC). The lab's entire
+    # trading session (13:30-21:00 UTC) is off-peak, so the flat v4-pro
+    # numbers below remain the correct effective rates for every lab call.
+    # Revisit only if the tick schedule ever moves into a peak window.
     "deepseek-chat":     {"input": 0.27,  "output": 1.10},
     "deepseek-reasoner": {"input": 0.55,  "output": 2.19},
     "deepseek-v4-pro":   {"input": 1.74,  "output": 3.48},
