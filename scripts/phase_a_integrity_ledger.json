@@ -127,6 +127,16 @@
         "scope": "all_six_models",
         "detail": "3 of 13 decision cycles lost cohort-wide (12:30, 14:00, 14:30 ET boundaries) — chain/scheduler cause, all six models equally; intraday valuation ticks and the EOD wrap were unaffected.",
         "consequence": "the 2026-07-24 decision-completeness denominator is 10 cycles, not 13, for every model; equity curves uninterrupted"
+      },
+      {
+        "id": "gemini_budget_equalization",
+        "date": "2026-07-27",
+        "effective": "2026-07-28",
+        "type": "config_equalization",
+        "scope": "gemini",
+        "detail": "max_output_tokens raised 4096 -> 16384 (landed 2026-07-27, effective from the first tick of 2026-07-28) per the 2026-07-27 Research ruling ratifying the budget-equity principle: constraint identity is defined at effective decision budget, per provider, not nominal parameter equality. gemini-3.1-pro-preview's hidden thinking spends against the shared output budget, so at 4096 the visible JSON decision truncated mid-string at ~150 tokens with finish_reason=MAX_TOKENS — the mechanism behind the May 0.57 / June 0.79 / July 0.51 completeness failures. Infrastructure class: no monthly change slot consumed, no version boundary, model identity unchanged. Mirrors the 2026-05-21 DeepSeek raise (deepseek_adapter.py, same rationale).",
+        "consequence": "documented segmentation boundary for Gemini's behavioral series — decision-survival rate changes at this date (completeness expected to jump from ~0.51 toward ~1.0), so time-series analyses spanning it must treat it as a regime point. Phase B validation clock: Aug/Sep/Oct 2026, each month >=0.80 completeness AND <=1% MAX_TOKENS-classified failures at this configuration AND identity stable, no averaging across months, August counted from 2026-08-03.",
+        "evidence": "scripts/gemini_finish_reason_probe.py + side_experiments/gemini_finish_reason_probe/ (arm A production replica: 22/23 failures finish_reason=MAX_TOKENS at cap 4096; arm D same prompts verbatim at cap 16384: 15/15 STOP, zero MAX_TOKENS)"
       }
     ]
   }
