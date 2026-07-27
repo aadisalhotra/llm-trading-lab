@@ -49,7 +49,7 @@ Methodology is locked across the whole family: every estimate is **regime-strati
 | 2 | **GPT** | OpenAI | `gpt-5.4` | Core |
 | 3 | **Gemini** | Google | `gemini-3.1-pro-preview` | Core |
 | 4 | **Grok** | xAI | `grok-4.20-reasoning` | Core |
-| 5 | **DeepSeek** | DeepSeek | `deepseek-reasoner` | Core |
+| 5 | **DeepSeek** | DeepSeek | `deepseek-v4-pro` | Core |
 | 6 | **Claude Opus** | Anthropic | `claude-opus-4-6` | Expansion |
 | - | **SPY** | - | S&P 500 ETF (buy & hold) | Benchmark |
 
