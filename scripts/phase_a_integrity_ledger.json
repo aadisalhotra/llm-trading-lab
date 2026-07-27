@@ -86,6 +86,19 @@
       "performance_status": "real, retained model_spliced",
       "decision_based_status": "exploratory",
       "first_success_note": "first_date 2026-05-21 is the config-repoint boundary; first logged v4-pro success is 2026-05-22 (n_success unchanged; flagged because the model-identity analysis turns on this boundary)"
+    },
+    "deepseek_v4_ga_boundary": {
+      "alias": "deepseek-v4-pro",
+      "ga_date": "2026-07-20",
+      "legacy_alias_hard_stop": "2026-07-24T15:59:00Z",
+      "legacy_aliases_retired": ["deepseek-chat", "deepseek-reasoner"],
+      "retirement_impact": "none — the lab moved off deepseek-reasoner 2026-05-21; zero API errors on or after the hard stop",
+      "pre_launch_snapshot": null,
+      "disclosed_gap": true,
+      "alias_echo": "unchanged across the boundary — 231/231 July 2026 observations returned deepseek-v4-pro (data/model_versions/deepseek.jsonl)",
+      "behavioral_shift": "zero behavioral/failure/latency shift observed either side of the GA date (decision logs 2026-07-01..2026-07-27)",
+      "note": "the capture mechanism records only the echoed alias string, so a build swap under the alias is unobservable by design; this is the same limitation already disclosed for Gemini.",
+      "status_impact": "persistent_model_status.deepseek (exploratory_only) unchanged by this event; the July report's DeepSeek section must disclose this boundary with the same candor as the first splice"
     }
   },
 
@@ -103,5 +116,18 @@
       "scope": "all_six_models",
       "note": "v2/long-only (2026-06-01..2026-06-30) vs v3/shorting (2026-07-01+). The before/after analysis (RQ1 herding, RQ2/3 direction segmentation) keys on this boundary."
     }
+  },
+
+  "operational_events": {
+    "2026-07": [
+      {
+        "id": "cycle_gap_2026_07_24",
+        "date": "2026-07-24",
+        "type": "scheduler",
+        "scope": "all_six_models",
+        "detail": "3 of 13 decision cycles lost cohort-wide (12:30, 14:00, 14:30 ET boundaries) — chain/scheduler cause, all six models equally; intraday valuation ticks and the EOD wrap were unaffected.",
+        "consequence": "the 2026-07-24 decision-completeness denominator is 10 cycles, not 13, for every model; equity curves uninterrupted"
+      }
+    ]
   }
 }
