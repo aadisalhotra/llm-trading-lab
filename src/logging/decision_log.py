@@ -90,6 +90,20 @@ def log_decision_run(
         "input_tokens": md.get("input_tokens"),
         "output_tokens": md.get("output_tokens"),
         "cost_usd": md.get("cost_usd"),
+        # Failure forensics (adapters that expose them — Gemini today).
+        # finish_reason distinguishes MAX_TOKENS from soft-stops; hidden
+        # thought tokens bill against the output cap, so together they make
+        # a truncated response explainable from the log alone.
+        "api_finish_reason": md.get("finish_reason"),
+        "thoughts_tokens": md.get("thoughts_tokens"),
+        # Raw model text, persisted ONLY when the call failed to parse —
+        # July's 113 Gemini failures were unautopsiable because this was
+        # discarded. Char-capped as a safety bound (observed failures are
+        # well under 4 KB).
+        "raw_response_on_failure": (
+            (decision_result.raw_response or "")[:20000]
+            if not decision_result.success else None
+        ),
         # News context — hash of the headline set the model saw, plus the
         # per-ticker compound sentiment dict at decision time. Lets us
         # correlate trades back to the exact news inputs they were made on.

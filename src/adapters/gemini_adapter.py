@@ -77,4 +77,21 @@ class GeminiAdapter(BaseAdapter):
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
+
+        # Failure forensics (Operations 2026-07-27): finish_reason separates a
+        # token-budget stop (MAX_TOKENS) from a safety/recitation soft-stop or
+        # a clean STOP — the July completeness investigation stalled because it
+        # was never persisted. thoughts_token_count matters with it: reasoning
+        # models bill hidden thought tokens against max_output_tokens, so a
+        # MAX_TOKENS stop with few visible output tokens is thinking overrun,
+        # not a long answer.
+        candidates = list(getattr(response, "candidates", None) or [])
+        if candidates:
+            fr = getattr(candidates[0], "finish_reason", None)
+            if fr is not None:
+                metadata["finish_reason"] = getattr(fr, "name", str(fr))
+        if usage:
+            thoughts = int(getattr(usage, "thoughts_token_count", 0) or 0)
+            if thoughts:
+                metadata["thoughts_tokens"] = thoughts
         return text, returned_id, metadata
