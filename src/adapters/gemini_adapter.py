@@ -27,7 +27,16 @@ class GeminiAdapter(BaseAdapter):
         genai.configure(api_key=api_key)
         generation_config: dict[str, Any] = {
             "response_mime_type": "application/json",
-            "max_output_tokens": 4096,
+            # Budget-equity raise, 4096 -> 16384 (Research ruling 2026-07-27).
+            # max_output_tokens is a SHARED budget: gemini-3.1-pro's hidden
+            # thinking spends against it before the visible JSON answer is
+            # written, so at 4096 most calls truncated mid-string at ~150
+            # visible tokens with finish_reason=MAX_TOKENS — the May/June/July
+            # completeness epidemic. Same principle and headroom as the
+            # DeepSeek adapter's 2026-05-21 raise: the reasoning trace must
+            # never be able to truncate the decision. Complete answers average
+            # ~660 tokens, so the extra headroom is free on normal replies.
+            "max_output_tokens": 16384,
         }
         if self.temperature is not None:
             generation_config["temperature"] = self.temperature
