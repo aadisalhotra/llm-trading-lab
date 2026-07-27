@@ -34,18 +34,42 @@
   },
   "daily": {
     "date": "2026-07-27",
-    "sent_count": 1,
+    "sent_count": 4,
     "dedup_keys": [
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "state_ghost:gemini",
+      "news:RTX:24440bd615",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-07-27T15:04:36.900431+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-27T21:07:17.633922+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on RTX (held by 5)",
+        "timestamp": "2026-07-27T21:07:18.872136+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-07-27T21:07:20.887692+00:00",
         "disposition": "sent"
       }
     ]
