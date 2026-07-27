@@ -69,6 +69,7 @@ KIND_LABELS: dict[str, str] = {
     "report_failure": "Daily report failure",
     "budget": "API budget threshold",
     "model_transition": "Model version transition",
+    "completeness": "Daily decision completeness",
 }
 
 
@@ -1028,6 +1029,71 @@ def _state_spec(subkind: str, severity: str, key: str, name: str,
     }
 
 
+def detect_completeness_degradation(settings: dict[str, Any], date_str: str) -> list[dict[str, Any]]:
+    """A model's decision completeness (api_success / decision cycles) for
+    `date_str` fell below `alerts.daily_completeness_min`.
+
+    Closes the monitoring hole exposed in July 2026: Gemini failed 11 of 13
+    cycles on 2026-07-14 while the daily digest reported status OK with 0
+    violations — the digest keys off runs/violations and is blind to parse
+    failures. This reads the decision log directly; every row there is a real
+    API decision cycle (the EOD pass never writes one), so mean(api_success)
+    over the day IS the day's completeness, the same quantity the monthly
+    0.80 inclusion gate aggregates.
+    """
+    alerts_cfg = settings.get("alerts", {}) or {}
+    floor = float(alerts_cfg.get("daily_completeness_min", 0.60))
+    if floor <= 0:
+        return []
+    # Don't judge a partial day — a mid-day sweep with 2 rows is noise, and
+    # this detector runs at EOD when the full day is on disk anyway.
+    min_cycles = 5
+
+    specs: list[dict[str, Any]] = []
+    for key in _enabled_model_keys(settings):
+        recs = _read_today_trade_records(key, date_str)
+        n = len(recs)
+        if n < min_cycles:
+            continue
+        fails = [r for r in recs if not r.get("api_success")]
+        rate = (n - len(fails)) / n
+        if rate >= floor:
+            continue
+
+        # Dominant failure signature straight from the recorded api_error, so
+        # the email says WHAT is failing, not just how often.
+        sig_counts: dict[str, int] = {}
+        for r in fails:
+            err = (r.get("api_error") or "unknown").strip()[:80]
+            sig_counts[err] = sig_counts.get(err, 0) + 1
+        top_sig, top_n = max(sig_counts.items(), key=lambda kv: kv[1])
+
+        name = _display_name(settings, key)
+        # A day at less than half the floor is a collapse, not a wobble.
+        severity = "CRITICAL" if rate < floor / 2 else "WARN"
+        specs.append({
+            "kind": "completeness",
+            "severity": severity,
+            "title": f"{name} completeness {rate:.0%} today ({len(fails)}/{n} cycles failed)",
+            "body": f"{name} completed only <b>{n - len(fails)} of {n}</b> decision cycles on "
+                    f"{date_str} — completeness <b>{rate:.2f}</b>, below the {floor:.2f} daily "
+                    f"floor. Dominant failure ({top_n} of {len(fails)}): <i>{top_sig}</i>. "
+                    f"The monthly inclusion gate needs &ge;0.80 — days like this are what push "
+                    f"a model out of the estimable cohort.",
+            "context": {
+                "model": key,
+                "models": [name],
+                "numbers": {
+                    "Completeness": f"{rate:.2f} (floor {floor:.2f})",
+                    "Cycles": f"{n - len(fails)} ok / {len(fails)} failed / {n} total",
+                    "Dominant failure": top_sig,
+                },
+            },
+            "dedup_key": f"completeness:{key}:{date_str}",
+        })
+    return specs
+
+
 def detect_missed_runs(settings: dict[str, Any], date_str: str) -> list[dict[str, Any]]:
     """Detect trading days with no EOD performance row between the previous
     logged day and today. Uses the model with the longest history so a
@@ -1109,6 +1175,7 @@ def run_eod_alert_sweep(summary: dict[str, Any], settings: dict[str, Any] | None
         ("macro_market_events", lambda: detect_macro_market_events(settings)),
         ("state_anomalies", lambda: detect_state_anomalies(settings, date_str)),
         ("missed_runs", lambda: detect_missed_runs(settings, date_str)),
+        ("completeness", lambda: detect_completeness_degradation(settings, date_str)),
         ("oversized_trades", lambda: detect_oversized_trades(settings, date_str)),
         ("negative_crossings", lambda: detect_negative_crossings(settings)),
         ("new_ath", lambda: detect_new_ath(settings)),
