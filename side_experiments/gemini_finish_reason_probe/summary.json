@@ -1,0 +1,91 @@
+{
+  "A": {
+    "model": "gemini-3.1-pro-preview",
+    "calls": 31,
+    "api_errors": 0,
+    "parse_failures": 23,
+    "failure_rate": 0.742,
+    "finish_reason_on_failure": {
+      "MAX_TOKENS": 22,
+      "STOP": 1
+    },
+    "finish_reason_on_success": {
+      "STOP": 8
+    },
+    "failure_signatures": {
+      "unterminated_string": 19,
+      "expecting_value": 2,
+      "extra_data": 1,
+      "missing_decisions": 1
+    },
+    "mean_output_tokens_success": 525,
+    "mean_output_tokens_failure": 194,
+    "total_cost_usd": 1.26,
+    "model_versions_seen": [
+      "gemini-3.1-pro-preview"
+    ]
+  },
+  "B": {
+    "model": "gemini-3.1-pro-preview",
+    "calls": 15,
+    "api_errors": 0,
+    "parse_failures": 6,
+    "failure_rate": 0.4,
+    "finish_reason_on_failure": {
+      "MAX_TOKENS": 6
+    },
+    "finish_reason_on_success": {
+      "STOP": 6,
+      "MAX_TOKENS": 3
+    },
+    "failure_signatures": {
+      "unterminated_string": 6
+    },
+    "mean_output_tokens_success": 347,
+    "mean_output_tokens_failure": 192,
+    "total_cost_usd": 0.61,
+    "model_versions_seen": [
+      "gemini-3.1-pro-preview"
+    ]
+  },
+  "C": {
+    "model": "gemini-3-pro-image",
+    "calls": 15,
+    "api_errors": 0,
+    "parse_failures": 0,
+    "failure_rate": 0.0,
+    "finish_reason_on_failure": {},
+    "finish_reason_on_success": {
+      "STOP": 15
+    },
+    "failure_signatures": {},
+    "mean_output_tokens_success": 671,
+    "mean_output_tokens_failure": null,
+    "total_cost_usd": 0.65,
+    "model_versions_seen": [
+      "gemini-3-pro-image"
+    ]
+  },
+  "D": {
+    "model": "gemini-3.1-pro-preview",
+    "calls": 15,
+    "api_errors": 0,
+    "parse_failures": 1,
+    "failure_rate": 0.067,
+    "finish_reason_on_failure": {
+      "STOP": 1
+    },
+    "finish_reason_on_success": {
+      "STOP": 14
+    },
+    "failure_signatures": {
+      "extra_data": 1
+    },
+    "mean_output_tokens_success": 660,
+    "mean_output_tokens_failure": 882,
+    "total_cost_usd": 0.69,
+    "model_versions_seen": [
+      "gemini-3.1-pro-preview"
+    ]
+  }
+}
