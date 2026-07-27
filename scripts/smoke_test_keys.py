@@ -95,7 +95,10 @@ def test_deepseek():
             "https://api.deepseek.com/chat/completions",
             headers={"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}"},
             json={
-                "model": "deepseek-reasoner",
+                # deepseek-reasoner (the old smoke target) was retired by the
+                # provider on 2026-07-24 15:59 UTC — a ping against it now 404s
+                # even with a valid key. Use the production model id instead.
+                "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "ping"}],
                 "max_tokens": 16,
             },
