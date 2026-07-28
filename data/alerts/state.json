@@ -33,43 +33,75 @@
     ]
   },
   "daily": {
-    "date": "2026-07-27",
-    "sent_count": 4,
+    "date": "2026-07-28",
+    "sent_count": 8,
     "dedup_keys": [
-      "api_failure:gemini",
+      "macro_event:Geopolitical shock",
       "state_ghost:gemini",
-      "news:RTX:24440bd615",
+      "ath:claude",
+      "ath:gemini",
+      "ath:claude_opus",
+      "news:TMO:1d5d2ae3d3",
+      "news:HON:f6a974466d",
       "budget:critical"
     ],
     "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "api_failure",
-        "severity": "WARN",
-        "title": "Model gemini failed",
-        "timestamp": "2026-07-27T15:04:36.900431+00:00",
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-07-28T21:07:20.733925+00:00",
         "disposition": "sent"
       },
       {
         "kind": "state_anomaly",
         "severity": "WARN",
         "title": "State anomaly (ghost): Gemini 3.1 Pro",
-        "timestamp": "2026-07-27T21:07:17.633922+00:00",
+        "timestamp": "2026-07-28T21:07:21.619945+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-07-28T21:07:23.915998+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-07-28T21:07:24.644898+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 hit a new all-time high",
+        "timestamp": "2026-07-28T21:07:25.344678+00:00",
         "disposition": "sent"
       },
       {
         "kind": "news_impact",
         "severity": "WARN",
-        "title": "Very Positive news on RTX (held by 5)",
-        "timestamp": "2026-07-27T21:07:18.872136+00:00",
+        "title": "Very Positive news on TMO (held by 4)",
+        "timestamp": "2026-07-28T21:07:26.106289+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on HON (held by 6)",
+        "timestamp": "2026-07-28T21:07:26.932353+00:00",
         "disposition": "sent"
       },
       {
         "kind": "budget",
         "severity": "CRITICAL",
         "title": "Monthly API budget exceeded",
-        "timestamp": "2026-07-27T21:07:20.887692+00:00",
+        "timestamp": "2026-07-28T21:07:29.120856+00:00",
         "disposition": "sent"
       }
     ]
