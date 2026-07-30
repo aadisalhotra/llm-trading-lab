@@ -34,13 +34,16 @@
   },
   "daily": {
     "date": "2026-07-30",
-    "sent_count": 2,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "state_ghost:gemini",
+      "oversized:gemini:USO:2026-07-30T15:33:51.479735",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -54,6 +57,27 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-07-30T14:02:58.982043+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (ghost): Gemini 3.1 Pro",
+        "timestamp": "2026-07-30T21:07:20.116443+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Gemini 3.1 Pro: 18.0% order in USO",
+        "timestamp": "2026-07-30T21:07:22.002419+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-07-30T21:07:25.581488+00:00",
         "disposition": "sent"
       }
     ]
