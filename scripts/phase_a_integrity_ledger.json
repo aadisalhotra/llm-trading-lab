@@ -1,6 +1,6 @@
 {
-  "ledger_version": "1.0",
-  "_README": "Phase-A persistent integrity ledger. These are the CARRIED facts that do NOT recompute month to month: the clean-window anchor, the inception-pinned risk-free rate, the inclusion-gate definitions, the launch-window state-corruption and DeepSeek model-identity-splice events, and the persistent per-model status they imply. scripts/build_monthly_data_layer.py reads this and combines it with the month's decision logs and the de-fabricated clean-window series to emit the integrity layer natively. NEW findings in a future month are APPENDED here (a new integrity_event, a new persistent_model_status entry) and then carry automatically. Per-month-derivable facts (completeness gate, clean-window returns, the passing cohort) are COMPUTED by the builder, never stored here. Extracted verbatim from scripts/backfill_may_data_layer.py and the committed reports/monthly/2026-05/data_layer.json at schema-close.",
+  "ledger_version": "1.1",
+  "_README": "Phase-A persistent integrity ledger. These are the CARRIED facts that do NOT recompute month to month: the clean-window anchor, the inception-pinned risk-free rate, the inclusion-gate definitions, the launch-window state-corruption and DeepSeek model-identity-splice events, and the persistent per-model status they imply. scripts/build_monthly_data_layer.py reads this and combines it with the month's decision logs and the de-fabricated clean-window series to emit the integrity layer natively. NEW findings in a future month are APPENDED here (a new integrity_event, a new persistent_model_status entry) and then carry automatically. Per-month-derivable facts (completeness gate, clean-window returns, the passing cohort) are COMPUTED by the builder, never stored here. Extracted verbatim from scripts/backfill_may_data_layer.py and the committed reports/monthly/2026-05/data_layer.json at schema-close. v1.1: the single carried state_integrity audit block became audit_certifications — a per-report-month registry of certified audit blocks. A registered month's block is emitted by the builder VERBATIM (the reproduce path); the month immediately after the latest registration is COMPUTED by the builder's conservation audit (per-model run coverage + a replay of the month's fills through the real Portfolio accounting; any in-month violation HALTS the build). RHYTHM: when a computed month's build is accepted, append its emitted audit block here under its month key — the builder logs the registration line at build time.",
 
   "clean_window_start": "2026-04-23",
   "shakedown_window": {
@@ -59,11 +59,20 @@
         "grok": {"count": 1, "gross_usd": 4989},
         "gpt": {"count": 1, "gross_usd": 1104}
       },
-      "audit": {
-        "runs": "2800+",
-        "clean_after": "2026-04-23",
-        "clean_runs": {"clean_april": 73, "may": 257, "early_june": 13},
-        "anomalies": 0
+      "audit_certifications": {
+        "2026-05": {
+          "runs": "2800+",
+          "clean_after": "2026-04-23",
+          "clean_runs": {"clean_april": 73, "may": 257, "early_june": 13},
+          "anomalies": 0
+        },
+        "2026-06": {
+          "runs": "3100+",
+          "clean_after": "2026-04-23",
+          "clean_runs": {"clean_april": 73, "may": 257, "june": 270},
+          "unit": "per_model_runs",
+          "anomalies": 0
+        }
       },
       "persistence": {
         "stock_persists_for": ["claude", "claude_opus"],

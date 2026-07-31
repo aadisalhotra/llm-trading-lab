@@ -82,6 +82,7 @@ from src.config_loader import (  # noqa: E402
     configure_logging,
     load_settings,
 )
+from src.portfolio.portfolio import Portfolio  # noqa: E402
 
 logger = logging.getLogger("llmlab.data_layer")
 
@@ -932,8 +933,161 @@ def _rq1_reason(gate):
     return None
 
 
+# ==========================================================================
+# Conservation audit — carried for registered months, EXECUTED for the build
+# month
+# ==========================================================================
+
+# The audit is direction-complete (all four sides), unlike the BUY/SELL-only
+# RQ trade metrics (_executed_trades).
+_AUDIT_FILL_SIDES = ("BUY", "SELL", "SHORT", "COVER")
+# Replay cash headroom. Conservation is delta-based (equity before vs after the
+# fill AT the fill price), so the level is irrelevant to the check — but the
+# live risk layer enforced cash feasibility at execution time against books the
+# clean-seeded replay cannot reproduce exactly (carried phantom cash/shorts),
+# so the replay must never fail a fill on cash it "doesn't have".
+_AUDIT_SEED_CASH = 10_000_000.0
+_AUDIT_TOL = 1e-6
+
+
+def _audit_fills(rec):
+    """Executed fills of a decision record, in record order, all four sides."""
+    return [ex for ex in (rec.get("executions") or [])
+            if ex.get("executed") and ex.get("side") in _AUDIT_FILL_SIDES]
+
+
+def _next_month(month: str) -> str:
+    y, m = (int(x) for x in month.split("-"))
+    return f"{y + m // 12}-{m % 12 + 1:02d}"
+
+
+def _conservation_audit_block(ledger, full_records, month_records, month, win_start):
+    """The state_integrity.audit block for `month`.
+
+    A month registered in the ledger's audit_certifications is emitted VERBATIM
+    (its certification is closed history — this is the reproduce path; May's
+    committed block round-trips exactly). The month immediately after the latest
+    registration is COMPUTED: per-model decision-run coverage over the build
+    month plus a conservation replay of the month's fills through the real
+    Portfolio accounting. Any in-month violation HALTS the build — a clean
+    certification is never written over a dirty finding.
+
+    Replay semantics: fills are replayed from inception (chronological, per
+    model) so month fills act on the book they actually acted on; steps BEFORE
+    the build month are seeding only (infeasible steps and discontinuities there
+    are logged as warnings — those months are certified by their registered
+    blocks, not re-certified here). A fill that sweeps a sub-epsilon residual
+    (GHOST_SHARES_EPSILON dust, e.g. a 4-dp-rounded sell leaving 0.0001 shares)
+    discards |residual| * price by design; a step is clean if its discontinuity
+    is within that intended sweep allowance.
+    """
+    lw = ledger["integrity_events"]["launch_window_corruption"]
+    certs = lw["audit_certifications"]
+    if month in certs:
+        return certs[month]
+
+    base_month = max(certs)
+    if month != _next_month(base_month):
+        raise RuntimeError(
+            f"CONSERVATION AUDIT HALT: build month {month} does not immediately "
+            f"follow the latest registered audit certification ({base_month}); "
+            f"register the interim months' certifications in "
+            f"audit_certifications before building {month}.")
+    base = certs[base_month]
+
+    # ---- coverage: per-model decision-run count over the build month ----
+    counts = {mk: len(recs) for mk, recs in month_records.items()}
+    if len(set(counts.values())) != 1:
+        raise RuntimeError(
+            "CONSERVATION AUDIT HALT: per-model decision-run counts diverge over "
+            f"{month}: {counts} — a cohort coverage discontinuity is a dirty "
+            "finding; do not certify.")
+    month_runs = next(iter(counts.values()))
+
+    # ---- conservation replay ----
+    eps = Portfolio.GHOST_SHARES_EPSILON
+    violations: list[str] = []
+    seed_warnings = 0
+    dust_sweeps = 0
+    for mk, recs in full_records.items():
+        p = Portfolio(model_key="__audit__", cash=_AUDIT_SEED_CASH, holdings={},
+                      inception_value=_AUDIT_SEED_CASH, inception_date="")
+        last_prices: dict[str, float] = {}
+        for rec in recs:
+            in_month = rec.get("date", "") >= win_start
+            for ex in _audit_fills(rec):
+                ticker = str(ex.get("ticker", "")).upper()
+                side = str(ex.get("side", "")).upper()
+                shares = float(ex.get("shares") or 0.0)
+                price = float(ex.get("fill_price") or 0.0)
+                # Constant-price mark with the traded name at its fill price:
+                # the only thing that can move equity at this step is the fill.
+                marks = {**last_prices, ticker: price}
+                equity_before = p.total_value(marks)
+                held_before = ticker in p.holdings
+                desc = f"{mk} {rec.get('date')} {side} {shares:g} {ticker} @ {price:g}"
+                try:
+                    if side == "BUY":
+                        p.buy(ticker, shares, price)
+                    elif side == "SELL":
+                        p.sell(ticker, shares, price)
+                    elif side == "SHORT":
+                        p.short(ticker, shares, price)
+                    elif side == "COVER":
+                        p.cover(ticker, shares, price)
+                except ValueError as e:
+                    if in_month:
+                        violations.append(f"{desc}: replay infeasible ({e})")
+                    else:
+                        seed_warnings += 1
+                    last_prices = marks
+                    continue
+                disc = p.total_value(marks) - equity_before
+                if abs(disc) > _AUDIT_TOL:
+                    swept_dust = (held_before and ticker not in p.holdings
+                                  and abs(disc) <= eps * price + _AUDIT_TOL)
+                    if swept_dust:
+                        dust_sweeps += 1
+                    elif in_month:
+                        violations.append(f"{desc}: equity discontinuity {disc:+.6f}")
+                    else:
+                        seed_warnings += 1
+                last_prices = marks
+
+    if violations:
+        raise RuntimeError(
+            f"CONSERVATION AUDIT HALT: {len(violations)} conservation violation(s) "
+            f"in {month} — do not write a clean certification over a dirty "
+            "finding:\n  " + "\n  ".join(violations[:20]))
+    if seed_warnings:
+        logger.warning(
+            "Conservation audit: %d pre-window seed irregularities (launch-window "
+            "artifacts; those months are certified by their registered blocks, "
+            "not re-certified here)", seed_warnings)
+    logger.info("Conservation audit %s: %d per-model runs, 0 violations, %d "
+                "intended dust sweeps", month, month_runs, dust_sweeps)
+
+    month_name = datetime.strptime(win_start, "%Y-%m-%d").strftime("%B").lower()
+    clean_runs = {k: v for k, v in base["clean_runs"].items()
+                  if k != f"early_{month_name}"}
+    clean_runs[month_name] = month_runs
+    total_runs = sum(len(recs) for recs in full_records.values())
+    block = {
+        # Cumulative decision runs across all models, inception through the
+        # build month, floored to the hundred (the carried blocks' convention).
+        "runs": f"{total_runs // 100 * 100}+",
+        "clean_after": base["clean_after"],
+        "clean_runs": clean_runs,
+        "unit": "per_model_runs",
+        "anomalies": int(base.get("anomalies", 0)),
+    }
+    logger.info("Audit registration line for audit_certifications on build "
+                "acceptance: \"%s\": %s", month, json.dumps(block))
+    return block
+
+
 def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month,
-                     spy_clean_value, spy_descriptive_sharpe):
+                     spy_clean_value, spy_descriptive_sharpe, audit_block):
     """Emit the integrity / provenance layer onto the freshly-built non-integrity
     layer. Computes nothing about returns/behavior (those are the base build);
     only ADDS the integrity framework — gate taxonomy, clean-window figures, the
@@ -1058,7 +1212,7 @@ def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month
         "state_integrity": {
             "bugs": lw["bugs"],
             "per_model_fabrication": lw["per_model_fabrication"],
-            "audit": lw["audit"],
+            "audit": audit_block,
             "persistence": lw["persistence"],
             "clean_window_figures_source": clean_window_figures_source,
         },
@@ -1902,8 +2056,10 @@ def build(month: str) -> dict:
 
     decision_completeness = _decision_completeness(layer)
     gates = _evaluate_gates(model_keys, decision_completeness, clean_results, ledger)
+    audit_block = _conservation_audit_block(ledger, full_records, may_records,
+                                            month, win_start)
     _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month,
-                     spy_clean_value, spy_descriptive_sharpe)
+                     spy_clean_value, spy_descriptive_sharpe, audit_block)
     return layer
 
 
