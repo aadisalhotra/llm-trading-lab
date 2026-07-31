@@ -151,6 +151,34 @@ jobs:
           echo "::error::Could not push tick data after 5 attempts — failing loud so notify-failure fires."
           exit 1
 
+  # Holiday short-circuit gate. On a non-trading day (NYSE calendar — the same
+  # pandas_market_calendars source the pipeline's own market-open check uses)
+  # the chain job's ~30-minute sleep-and-dispatch loop and the pages deploy are
+  # pure CI-minutes churn: the pipeline no-ops every tick all day. `chain` and
+  # `pages` skip via this job's output; the `run` job is NOT gated — it stays
+  # the market-state authority (is_market_open_now) and keeps firing from the
+  # backup crons. FAIL-OPEN by construction: the script prints "true" on any
+  # internal failure, the pip install is best-effort, and the job is
+  # continue-on-error — a gate infrastructure failure must never kill the
+  # chain on a real trading day (downstream conditions treat anything but an
+  # explicit "false" as open).
+  gate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    outputs:
+      trading: ${{ steps.check.outputs.trading }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install calendar dependency (best-effort)
+        run: pip install "pandas>=2.2.0" "pandas-market-calendars>=4.4.0" || true
+      - name: Trading-day check
+        id: check
+        run: echo "trading=$(python scripts/check_trading_day.py)" >> "$GITHUB_OUTPUT"
+
   # Self-perpetuating chain. After each successful intraday tick:
   #   * If still inside market hours (< 20:00 UTC), sleep to the next
   #     30-minute boundary (:00 or :30) and dispatch intraday.yml again.
@@ -163,9 +191,15 @@ jobs:
   # itself fails — log_daily_snapshot is idempotent on date so a
   # double-fire writes exactly one row per day.
   chain:
-    needs: run
+    needs: [run, gate]
     runs-on: ubuntu-latest
-    if: success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
+    # Holiday short-circuit: skip on an explicit non-trading-day verdict from
+    # the gate (fail-open — a missing/failed gate output reads as open).
+    # workflow_dispatch force=true bypasses the gate like it bypasses the
+    # pipeline's own market-open check.
+    if: >-
+      success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
+      && (needs.gate.outputs.trading != 'false' || github.event.inputs.force == 'true')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -332,13 +366,19 @@ jobs:
           dispatch_intraday
 
   pages:
-    needs: run
+    needs: [run, gate]
     runs-on: ubuntu-latest
     # A GitHub Pages deploy timeout is a cosmetic publishing hiccup, not a
     # trading failure — it must not red the workflow. continue-on-error keeps a
     # failed deploy from failing the run; the dashboard-staleness monitor in the
     # `chain` job escalates a genuine, persistent publish outage instead.
+    # Holiday short-circuit: nothing changed on a non-trading day, so the
+    # deploy is skipped on an explicit gate "false" (fail-open otherwise;
+    # force=true bypasses).
     continue-on-error: true
+    if: >-
+      success()
+      && (needs.gate.outputs.trading != 'false' || github.event.inputs.force == 'true')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
