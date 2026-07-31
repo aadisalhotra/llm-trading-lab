@@ -402,6 +402,20 @@ def _read_today_trade_records(model_key: str, date_str: str) -> list[dict[str, A
     return out
 
 
+def _holding_gross_weight(h: dict[str, Any]) -> float:
+    """A dashboard holding's position size as a MAGNITUDE of equity.
+
+    The 20% cap (and its 2x anomaly threshold) is a cap on position size
+    regardless of direction, but the signed `weight` is negative for a short —
+    so comparing it against a positive threshold made shorts invisible to the
+    anomaly check. Prefer `gross_weight` (|mv|/equity, emitted by the shorting
+    build); fall back to |weight| for pre-shorting snapshots that lack it."""
+    gw = h.get("gross_weight")
+    if gw is None:
+        gw = abs(float(h.get("weight") or 0.0))
+    return float(gw)
+
+
 def _read_dashboard_portfolios() -> list[dict[str, Any]]:
     """Portfolios block from the freshly-rebuilt dashboard.json (has weights)."""
     path = DATA_DIR / "dashboard.json"
@@ -922,8 +936,9 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
         portfolios[key] = p
         name = _display_name(settings, key)
 
-        # Ghost positions
-        ghosts = [t for t, h in p.holdings.items() if h.shares < epsilon]
+        # Ghost positions — magnitude-based, so a live short (negative shares)
+        # is never mistaken for dust; mirrors Portfolio.sweep_ghost_positions.
+        ghosts = [t for t, h in p.holdings.items() if abs(h.shares) < epsilon]
         if ghosts:
             specs.append(_state_spec(
                 "state_ghost", "WARN", key, name,
@@ -967,9 +982,9 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
             continue
         name = _display_name(settings, key)
         over = [
-            (h.get("ticker", "?"), float(h.get("weight") or 0.0))
+            (h.get("ticker", "?"), _holding_gross_weight(h))
             for h in snap.get("holdings", [])
-            if float(h.get("weight") or 0.0) > weight_anomaly_pct
+            if _holding_gross_weight(h) > weight_anomaly_pct
         ]
         if over:
             worst = max(over, key=lambda x: x[1])

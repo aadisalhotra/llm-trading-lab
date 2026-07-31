@@ -317,3 +317,58 @@ def test_digest_send_is_idempotent(iso, monkeypatch):
     assert first is True
     assert second is False          # already sent today
     assert len(iso) == 1
+
+
+def test_state_anomalies_short_aware(iso, monkeypatch):
+    """The state-integrity sweep must be direction-aware (shorting live 7/01):
+    a live short is NOT a ghost position; sub-epsilon dust of EITHER sign is;
+    and the 2x-weight-cap anomaly check sees shorts by gross weight (the
+    signed weight is negative, which previously made shorts invisible)."""
+    import pandas as pd
+
+    import src.portfolio as portfolio_pkg
+    from src.portfolio.portfolio import Holding, Portfolio
+
+    settings = {
+        "portfolio_rules": {"max_positions": 50, "max_position_pct": 0.20},
+        "models": {"gpt": {"display_name": "GPT", "enabled": True}},
+    }
+    book = Portfolio(
+        model_key="gpt", cash=50_000.0,
+        holdings={
+            "NVDA": Holding(ticker="NVDA", shares=-29.7937, avg_cost=194.42),  # live short
+            "AAPL": Holding(ticker="AAPL", shares=0.005, avg_cost=300.0),      # long dust
+            "META": Holding(ticker="META", shares=-0.004, avg_cost=530.0),     # short dust
+            "MSFT": Holding(ticker="MSFT", shares=10.0, avg_cost=400.0),       # normal long
+        },
+        inception_value=100_000.0, inception_date="2026-04-09",
+    )
+    monkeypatch.setattr(portfolio_pkg, "load_portfolio", lambda key: book)
+    monkeypatch.setattr(events, "_perf_history", lambda key: pd.DataFrame())
+    monkeypatch.setattr(events, "_read_dashboard_portfolios", lambda: [{
+        "model_key": "gpt",
+        "holdings": [
+            # short at 45% gross (> 2x the 20% cap) — must be flagged
+            {"ticker": "NVDA", "weight": -0.45, "gross_weight": 0.45, "direction": "short"},
+            # short at 10% gross — fine
+            {"ticker": "TSLA", "weight": -0.10, "gross_weight": 0.10, "direction": "short"},
+            # pre-shorting snapshot shape (no gross_weight): |weight| fallback
+            {"ticker": "MSFT", "weight": 0.12},
+        ],
+    }])
+
+    specs = events.detect_state_anomalies(settings, date_str="2026-07-31")
+
+    ghosts = [s for s in specs if s["dedup_key"] == "state_ghost:gpt"]
+    assert len(ghosts) == 1
+    flagged = ghosts[0]["context"]["numbers"]["Ghost tickers"]
+    assert "AAPL" in flagged and "META" in flagged   # dust, both signs
+    assert "NVDA" not in flagged                     # live short is not dust
+
+    caps = [s for s in specs if s["dedup_key"] == "state_weightcap:gpt"]
+    assert len(caps) == 1
+    assert "NVDA" in caps[0]["body"]
+    assert "TSLA" not in caps[0]["body"] and "MSFT" not in caps[0]["body"]
+
+    # nothing else fired: cash is positive, 4 < 50 positions, one model only
+    assert {s["dedup_key"] for s in specs} == {"state_ghost:gpt", "state_weightcap:gpt"}
