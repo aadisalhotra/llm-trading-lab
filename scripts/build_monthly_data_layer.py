@@ -1200,9 +1200,14 @@ def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month
             for f in ("rq2_disposition_difference", "rq3_confidence_outcome_corr"):
                 if em.get(f) is not None:
                     em[f] = None
-            # corrupt-book deployment/cash characterizations are uncertifiable -> null
-            for f in ("style_tag", "risk_posture_tag", "strengths", "weaknesses"):
-                prof[f] = None
+            # corrupt-book deployment/cash characterizations are uncertifiable -> null.
+            # evidence/read are book-derived claims too (June-onward canonical shape;
+            # keyed on presence so a May build's grandfathered key set is untouched).
+            # note SURVIVES — it is the meta-explanation of the suppression itself.
+            for f in ("style_tag", "risk_posture_tag", "strengths", "weaknesses",
+                      "evidence", "read"):
+                if f in prof:
+                    prof[f] = None
 
     # ---- methodology_data_integrity_rq ----
     mdr = layer["methodology_data_integrity_rq"]
@@ -1382,10 +1387,17 @@ def _schema_validate(layer):
         "cross_model_behavioral.rq1.exploratory_pairwise.observed_action_concordance missing")
     req("cross_model_episode_register" in cmb, "cross_model_episode_register missing")
 
+    # Canonical interpretive shape (REPORT_SCHEMA §6): evidence/read/note are
+    # required from June 2026 onward; May is grandfathered to its committed key
+    # set (strengths/weaknesses populated, the June-shape keys absent).
+    period = str(rm.get("period") or "")
+    profile_fields = ("status", "decision_completeness", "evidence_metrics", "notable_events",
+                      "style_tag", "risk_posture_tag", "strengths", "weaknesses")
+    if period > "2026-05":
+        profile_fields += ("evidence", "read", "note")
     for prof in layer.get("profiles", []):
         mk = prof.get("model")
-        for f in ("status", "decision_completeness", "evidence_metrics", "notable_events",
-                  "style_tag", "risk_posture_tag", "strengths", "weaknesses"):
+        for f in profile_fields:
             req(f in prof, f"profiles[{mk}].{f} missing (populate-or-null)")
         req("data_caveat" not in prof, f"profiles[{mk}].data_caveat not dropped")
 
@@ -1816,6 +1828,13 @@ def build(month: str) -> dict:
             "strengths": None,
             "weaknesses": None,
         })
+        # Canonical interpretive shape from June 2026 (REPORT_SCHEMA §6):
+        # evidence (metric-grounded facts) / read (interpretation) / note
+        # (status explanation), populate-or-null. May is grandfathered to its
+        # committed key set — these keys must NOT appear in a May build
+        # (reproduce-May pins the committed profiles byte-for-byte).
+        if month > "2026-05":
+            profiles[-1].update({"evidence": None, "read": None, "note": None})
 
     # ====================================================================
     # methodology_data_integrity_rq

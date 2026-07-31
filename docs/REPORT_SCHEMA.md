@@ -84,12 +84,40 @@ Four-tier model **data-confidence taxonomy** (`leaderboard[].data_confidence`,
 
 ## 6. `profiles[]` (per model)
 
+**Interpretive-shape normalization (ruled 2026-07-31).** Two interpretive
+shapes exist in committed layers: May's `strengths[]`/`weaknesses[]` bullet
+arrays, and June's `evidence`/`read`/`note` strings. **June's shape is
+canonical from 2026-06 onward; May is grandfathered.** Rationale: the June
+shape separates mechanically checkable facts (`evidence` — a dense
+metric-grounded string) from interpretation (`read`) and status
+meta-explanation (`note`), which is the epistemic structure the reports
+actually use; May's committed layer is frozen and pinned byte-for-byte by the
+reproduce-May regression, so it cannot be migrated.
+
+- **From July 2026** every profile carries **all seven** interpretive keys
+  populate-or-null: `style_tag`, `risk_posture_tag`, `strengths` (legacy,
+  `null`), `weaknesses` (legacy, `null`), `evidence`, `read`, `note`. The
+  builder emits them `null`; `evidence`/`read` (and the tags) are authored in
+  the Reports chat for estimable / performance-shown models and are **forced
+  `null` for `non_estimable`** (book-derived claims, uncertifiable on a
+  phantom book); `note` survives suppression — it explains it.
+- **May 2026 (grandfathered):** `strengths[]`/`weaknesses[]` populated for
+  estimable models; `evidence`/`read`/`note` **absent** (predate the shape).
+- **June 2026 (grandfathered as committed):** the new keys appear only where
+  authored (`evidence`+`read` on gpt; `evidence` on gemini/grok/deepseek;
+  `note` on claude/claude_opus) — absent ≠ null on the rest. Normalization is
+  enforced (builder + `_schema_validate`) from the July build.
+- **Quarterly aggregator rule:** treat a key absent in a grandfathered month
+  as `null` — the union of keys across months is the canonical field set.
+
 | Field | Rule | Notes |
 |---|---|---|
 | `model`, `display_name`, `cohort` | populate | |
 | `status` | populate | Four-tier (`estimable_primary` / `performance_only` / `provisional_model_splice` / `non_estimable`). |
 | `decision_completeness` | populate | `api_success / records`; Gemini 0.5681. |
-| `style_tag`, `risk_posture_tag`, `strengths`, `weaknesses` | nullable | Authored in Reports chat. `risk_posture_tag` is a **retained schema field** but populate-or-null: non-null for estimable / performance-shown models (GPT, Grok, DeepSeek, Gemini), `null` for `non_estimable_corrupt_book` models. **Sonnet/Opus:** `style_tag`/`risk_posture_tag`/`strengths`/`weaknesses` = `null` (non-estimable — not published; the posture tag is a book-derived deployment/cash claim, uncertifiable on a phantom book). The field surviving ≠ populated for all. |
+| `style_tag`, `risk_posture_tag` | nullable | Authored in Reports chat. `risk_posture_tag` is a **retained schema field** but populate-or-null: non-null for estimable / performance-shown models, `null` for `non_estimable_corrupt_book` models (a book-derived deployment/cash claim is uncertifiable on a phantom book). The field surviving ≠ populated for all. |
+| `strengths`, `weaknesses` | nullable (legacy) | May's interpretive shape — populated in May only; `null` from June onward (retained schema fields). |
+| `evidence`, `read`, `note` | nullable (canonical from 2026-06) | `evidence` = metric-grounded factual string; `read` = interpretation; `note` = status meta-explanation (survives non-estimable suppression). Absent in May (grandfathered); partial in June (as committed); required populate-or-null from July. |
 | `evidence_metrics` | populate or null | **Sonnet/Opus:** `rq2_disposition_difference`/`rq3_confidence_outcome_corr` = `null` (not published). DeepSeek RQ values retained but flagged exploratory via `status`. |
 | `notable_events` | populate | Objective extraction; empty arrays where none. |
 | ~~`data_caveat`~~ | **dropped** | Subsumed by `status`. |
