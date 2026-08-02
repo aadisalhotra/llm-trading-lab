@@ -1,0 +1,60 @@
+{
+  "generated": "2026-08-02T17:41:51.383935+00:00",
+  "model_version_field_check": {
+    "model_version_field_present": true,
+    "model_version_verbatim": "gemini-3.1-pro-preview"
+  },
+  "this_run": {
+    "arm": "E-genai",
+    "sdk": "google-genai",
+    "model": "gemini-3.1-pro-preview",
+    "max_output_tokens": 16384,
+    "calls": 15,
+    "api_errors": 0,
+    "parse_failures": 2,
+    "failure_rate": 0.133,
+    "finish_reason_distribution": {
+      "STOP": 15
+    },
+    "failure_signatures": {
+      "extra_data": 2
+    },
+    "mean_output_tokens_success": 735,
+    "mean_thoughts_tokens": 4533,
+    "thoughts_tokens_populated": true,
+    "model_ids_returned": [
+      "gemini-3.1-pro-preview"
+    ],
+    "total_cost_usd": 0.45
+  },
+  "baseline_arm_d_legacy_sdk": {
+    "model": "gemini-3.1-pro-preview",
+    "calls": 15,
+    "api_errors": 0,
+    "parse_failures": 1,
+    "failure_rate": 0.067,
+    "finish_reason_on_failure": {
+      "STOP": 1
+    },
+    "finish_reason_on_success": {
+      "STOP": 14
+    },
+    "failure_signatures": {
+      "extra_data": 1
+    },
+    "mean_output_tokens_success": 660,
+    "mean_output_tokens_failure": 882,
+    "total_cost_usd": 0.69,
+    "model_versions_seen": [
+      "gemini-3.1-pro-preview"
+    ]
+  },
+  "baseline_in_situ": {
+    "window": "2026-07-28..2026-07-30 (legacy SDK, cap 16384, live)",
+    "finish_reason": {
+      "STOP": 39,
+      "MAX_TOKENS": 0
+    },
+    "source": "scripts/phase_a_integrity_ledger.json -> gemini_budget_equalization.in_situ_verification"
+  }
+}
