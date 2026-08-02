@@ -197,7 +197,21 @@
         "defab_overhang": "scripts/defab_clean_window.py",
         "schema": "docs/REPORT_SCHEMA.md"
       },
-      "note": "generated_at_commit is HEAD at build (build-time; on its own it predates this file and reproduces nothing). source_commit is null at emit: it must point at the commit that reproduces this report, which the builder cannot know before committing. MANDATORY RELEASE GATE -- a published monthly layer must NOT carry a null source_commit: after the data-layer commits, run `git log -1 --format=%H -- reports/monthly/2026-07/data_layer.json` and write that hash into report_meta.source_commit before the report is published. The integrity layer is emitted NATIVELY in this single build from integrity_refs (the Phase-A ledger + the committed de-fab overhang correction), superseding May's three-commit hand chain (generator -> integrity back-fill -> pool relabel)."
+      "note": "generated_at_commit is HEAD at build (build-time; on its own it predates this file and reproduces nothing). source_commit is null at emit: it must point at the commit that reproduces this report, which the builder cannot know before committing. MANDATORY RELEASE GATE -- a published monthly layer must NOT carry a null source_commit: after the data-layer commits, run `git log -1 --format=%H -- reports/monthly/2026-07/data_layer.json` and write that hash into report_meta.source_commit before the report is published. The integrity layer is emitted NATIVELY in this single build from integrity_refs (the Phase-A ledger + the committed de-fab overhang correction), superseding May's three-commit hand chain (generator -> integrity back-fill -> pool relabel).",
+      "corrections": {
+        "defab_short_blind_replay": {
+          "date": "2026-08-02",
+          "class": "committed-then-corrected (pre-publication); same class as the SPY inception-anchor correction",
+          "moved": {
+            "gemini.cumulative_return_clean": {"from": 0.1307, "to": 0.1262},
+            "deepseek.cumulative_return_clean": {"from": 0.0424, "to": 0.0357}
+          },
+          "cause": "scripts/defab_clean_window.py replayed BUY/SELL fills only; the July SHORT/COVER fills (v3/shorting regime) were absent from the de-fab chain, so the two shorted models' clean-window returns excluded all short-side cash and P&L. Detected by the module's own overhang-constant conservation check: DeepSeek clean-window cash drift -726.2341 USD == its realized short P&L to the cent; Gemini +9,213.10 USD cash with 17.5522 shares of untracked short inventory.",
+          "fix": "direction-aware replay: SHORT/COVER fills chain into a separate short book (proceeds credited on SHORT, cover cost paid on COVER, open shorts marked as negative value), with an over-cover probe (the short-side analogue of the oversell probe) and the overhang-constant drift check; legitimate logged shorts are excluded from the infeasibility/trust diagnostics, which continue to measure only phantom long-book negatives and negative cash.",
+          "verification": "May window byte-identical for all six models vs the committed defab_clean_window.json; June recomputes exactly to the committed 2026-06 layer values; July overhang-constant check passes all six models at float-noise drift.",
+          "fix_commit": "c26163b5"
+        }
+      }
     }
   },
   "leaderboard": [
