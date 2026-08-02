@@ -90,21 +90,21 @@ def fetch_deepseek_models() -> list[dict[str, Any]]:
 
 
 def fetch_google_models() -> list[dict[str, Any]]:
-    """Use the google-generativeai SDK to list models. Falls back to the
+    """Use the google-genai SDK to list models. Falls back to the
     REST endpoint if the SDK isn't installed in the env this runs from.
     """
     key = os.getenv("GOOGLE_API_KEY")
     if not key:
         raise RuntimeError("GOOGLE_API_KEY missing")
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=key)
+        from google import genai
+        client = genai.Client(api_key=key)
         out = []
-        for m in genai.list_models():
+        for m in client.models.list():
             out.append({
                 "name": m.name,
-                "display_name": getattr(m, "display_name", ""),
-                "supported_actions": list(getattr(m, "supported_generation_methods", []) or []),
+                "display_name": getattr(m, "display_name", "") or "",
+                "supported_actions": list(getattr(m, "supported_actions", []) or []),
                 "input_token_limit": getattr(m, "input_token_limit", None),
                 "output_token_limit": getattr(m, "output_token_limit", None),
             })

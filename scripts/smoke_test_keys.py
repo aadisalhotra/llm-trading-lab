@@ -60,10 +60,11 @@ def test_openai():
 
 def test_google():
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-        model = genai.GenerativeModel("gemini-3.1-pro-preview")
-        resp = model.generate_content("ping")
+        from google import genai
+        client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        resp = client.models.generate_content(
+            model="gemini-3.1-pro-preview", contents="ping",
+        )
         text = (resp.text or "").strip()
         record("Google", True, 200, f"reply={text!r}")
     except Exception as e:
