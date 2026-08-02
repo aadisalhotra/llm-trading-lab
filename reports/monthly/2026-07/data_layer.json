@@ -203,8 +203,14 @@
           "date": "2026-08-02",
           "class": "committed-then-corrected (pre-publication); same class as the SPY inception-anchor correction",
           "moved": {
-            "gemini.cumulative_return_clean": {"from": 0.1307, "to": 0.1262},
-            "deepseek.cumulative_return_clean": {"from": 0.0424, "to": 0.0357}
+            "gemini.cumulative_return_clean": {
+              "from": 0.1307,
+              "to": 0.1262
+            },
+            "deepseek.cumulative_return_clean": {
+              "from": 0.0424,
+              "to": 0.0357
+            }
           },
           "cause": "scripts/defab_clean_window.py replayed BUY/SELL fills only; the July SHORT/COVER fills (v3/shorting regime) were absent from the de-fab chain, so the two shorted models' clean-window returns excluded all short-side cash and P&L. Detected by the module's own overhang-constant conservation check: DeepSeek clean-window cash drift -726.2341 USD == its realized short P&L to the cent; Gemini +9,213.10 USD cash with 17.5522 shares of untracked short inventory.",
           "fix": "direction-aware replay: SHORT/COVER fills chain into a separate short book (proceeds credited on SHORT, cover cost paid on COVER, open shorts marked as negative value), with an over-cover probe (the short-side analogue of the oversell probe) and the overhang-constant drift check; legitimate logged shorts are excluded from the infeasibility/trust diagnostics, which continue to measure only phantom long-book negatives and negative cash.",
@@ -5250,7 +5256,7 @@
       "weaknesses": null,
       "evidence": null,
       "read": null,
-      "note": null,
+      "note": "Non-estimable (corrupt Phase-A book); no characterization published. Both books ran long-only in July (0 short opens each).",
       "status": "non_estimable",
       "decision_completeness": 1.0
     },
@@ -5301,12 +5307,12 @@
         "drawdown_halt_triggers": [],
         "api_json_errors": []
       },
-      "style_tag": null,
-      "risk_posture_tag": null,
+      "style_tag": "Long-only by choice; the book's longest holder.",
+      "risk_posture_tag": "Patient, near-flat, unshorted.",
       "strengths": null,
       "weaknesses": null,
-      "evidence": null,
-      "read": null,
+      "evidence": "Never shorted (0 opens in 31 days of granted capability); avg hold extended again to 22.9d (June: 16.7d \u2014 cross-regime, illustrative only); 10.4 trades/day; reversal 0.37; cash 4.0%; turnover 0.189; 26 closed trades, day win rate 0.52; monthly +0.16% in a +0.17% SPY month; RQ3 +0.395 (n=26, no trend claim).",
+      "read": "Declined the new capability entirely and slowed further into a holder's book; a flat month traded almost perfectly flat.",
       "note": null,
       "status": "estimable_primary",
       "decision_completeness": 1.0
@@ -5831,7 +5837,7 @@
       "risk_posture_tag": null,
       "strengths": null,
       "weaknesses": null,
-      "evidence": null,
+      "evidence": "Completeness 58.7% \u2014 third consecutive gate failure \u2014 segmented at the 7/28 budget equalization: 51.1% pre-fix / 92.3% post-fix, 0 MAX_TOKENS in 39 post-fix cycles. The cohort's only heavy shorter: 36 opens / 26 covers, 22 closed (hit 0.318, \u2212$539 realized), avg/max short exposure 9.25%/20.09%, max utilization-vs-cap 1.0045 (at the cap; enforcement at fill). Monthly +6.78%, best of the experiment; behavioral metrics selection-biased, not characterized.",
       "read": null,
       "note": null,
       "status": "performance_only",
@@ -5884,12 +5890,12 @@
         "drawdown_halt_triggers": [],
         "api_json_errors": []
       },
-      "style_tag": null,
-      "risk_posture_tag": null,
+      "style_tag": "Highest-churn trader in the book, long-only under the new rules.",
+      "risk_posture_tag": "Fully deployed, unhedged.",
       "strengths": null,
       "weaknesses": null,
-      "evidence": null,
-      "read": null,
+      "evidence": "Never shorted (0 opens); 20.8 trades/day and turnover 0.497, both cohort-highs; cash 0.9%; hold 7.0d; 85 closed trades, day win rate 0.57; monthly \u22121.51%, worst estimable July; RQ2 \u22120.129, RQ3 \u22120.013.",
+      "read": "Kept maximum activity and full deployment through a flat tape and paid for it; a high daily win rate lost to asymmetric losers.",
       "note": null,
       "status": "estimable_primary",
       "decision_completeness": 1.0
@@ -5954,9 +5960,9 @@
       "risk_posture_tag": null,
       "strengths": null,
       "weaknesses": null,
-      "evidence": null,
+      "evidence": "Brief shorting trial: 8 opens / 4 covers, 2 closed shorts, both losses (\u2212$726); peak utilization-vs-cap 0.60; 8.9 trades/day; hold 21.1d; cash 6.1%; monthly \u22120.89%. July spans the 7/20 V4-GA disclosed-gap boundary (alias echo 231/231 unchanged, zero observed shift) \u2014 shorting before/after reads through the collision lens, per ledger.",
       "read": null,
-      "note": null,
+      "note": "Model-spliced (historical), behavioral exploratory.",
       "status": "provisional_model_splice",
       "decision_completeness": 0.9929
     },
@@ -6013,7 +6019,7 @@
       "weaknesses": null,
       "evidence": null,
       "read": null,
-      "note": null,
+      "note": "Non-estimable (corrupt Phase-A book); no characterization published. Both books ran long-only in July (0 short opens each).",
       "status": "non_estimable",
       "decision_completeness": 1.0
     }
