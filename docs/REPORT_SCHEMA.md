@@ -81,6 +81,7 @@ Four-tier model **data-confidence taxonomy** (`leaderboard[].data_confidence`,
 | `rq1` | populate | `{primary: {status:"not_estimable", reason:"single_pair_cohort", deferred_to:"phase_b"}, exploratory_pairwise: {<numeric concordance block>, reasons: {gemini:"completeness", deepseek:"model_splice", claude:"corrupt_book", claude_opus:"corrupt_book"}}}`. The numeric concordance scalar lives at `rq1.exploratory_pairwise.observed_action_concordance`. |
 | `cross_model_episode_register` | populate | Cohort-wide behavioral episodes; **`[]`** for May (none formally on record; the 2026-05-26 systemic outage lives under `data_integrity.incidents`). |
 | `per_model_trade_activity`, `per_model_reversal_churn_rate`, `definition_refs`, `window`, `pilot_exploratory` | populate | |
+| `short_activity` | populate (from **July 2026**) | v3/shorting-regime addition (month-gated; May/June grandfathered without it). `{per_model{short_opens, covers, n_short_executions, short_decision_share, n_closed_shorts, short_realized_pnl, short_hit_rate, short_wins, short_losses, avg/max_short_exposure_pct, avg/max_utilization_vs_cap, short_cap_pct, mean/max_eod_gross_exposure_pct, mean/min_eod_net_exposure_pct, mean_eod_gross_hhi}, window, pilot_exploratory, regime_ref, canonical_definition_ref, definition_notes}`. Fixed per-model field set — zero-activity models emit zeros/nulls. Source: `src/analytics/short_metrics.py` + `portfolio_after` exposure snapshots. |
 
 ## 6. `profiles[]` (per model)
 
@@ -128,9 +129,25 @@ reproduce-May regression, so it cannot be migrated.
 `incidents[]`, `per_model_failure_rate`, `missing_tick_count`,
 `missing_ticks_by_date`, `healthy_ticks_per_day_modal`, `notes` — all populate.
 
+**Incidents sourcing (from July 2026):** `incidents[]` is the ledger's
+`operational_events[<month>]` carried **verbatim** (in-situ verification blocks
+included); `[]` when the month has none. May/June carry the frozen May-era list
+(grandfathered as committed).
+
+**`completeness_segmentation` (from July 2026):** populate-or-empty `{}`. For
+each single-model operational event with an `effective` boundary date, the
+builder computes `{model, boundary_effective, pre_fix{window,records,api_success,completeness},
+post_fix{...}, ledger_ref, note}`. The inclusion gate stays whole-month (no
+retroactive repair); the segmentation is the documented regime point (first
+instance: `gemini_budget_equalization`, effective 2026-07-28).
+
 ### `known_caveats`
 - `state_integrity`: `bugs[]` (`launch_day_clobber` 2026-04-09 fix d2e862ca all six; `cross_model_commingling` 2026-04-10/21 fix cacd8058 Sonnet+Opus); `per_model_fabrication{count,gross_usd}`; `audit{runs,clean_after,clean_runs,anomalies}`; `persistence{stock_persists_for, carried_forward, scope, consequence}`; `clean_window_figures_source{model: raw\|defab\|not_estimable}`.
 - `model_identity.deepseek_model_splice`: `{alias, transitions[{date,to,note}], off_spec_window, detection, performance_status, decision_based_status}`.
+- `model_identity.deepseek_v4_ga_boundary` (from **July 2026**): the ledger's
+  `integrity_events.deepseek_v4_ga_boundary` carried **verbatim** (7/20 GA, no
+  pre-launch snapshot — disclosed gap; alias echo unchanged; 7/24 legacy-alias
+  hard stop clean). Present in every layer from the GA month onward.
 
 ### `inclusion_gates`
 `{completeness_min: 0.80, uncorrupted_book: true, model_identity_stable: true, passing: ["gpt","grok"]}`. The passing cohort is under the **stable** key `passing` (fixed schema — never month-prefixed; month identity lives in `report_meta.period`).
@@ -144,4 +161,12 @@ estimability when residual phantom sits in a volatile name (September pass).
   `status`, headline value, `canonical_definition_ref`, `window`, `pilot_tag`.
   RQ1 `status:"not_estimable"`; RQ2/RQ3 `status:"estimable_partial_cohort"`.
 - `RQ2`/`RQ3` `per_model[*].trust_flag` ∈ the four-tier taxonomy.
+- `direction_segmentation` (from **July 2026**): the before-go-live-ratified
+  RQ2/RQ3 long-vs-short segmentation, additive + exploratory. `{per_model{model:
+  {long,short: {n_closed, hit_rate, avg_realized_pnl, confidence_outcome_corr}}},
+  pooled{long,short}, window, pilot_exploratory, short_side_exploratory,
+  windowing_note, canonical_definition_ref, regime_ref}`. The canonical
+  long-only RQ2/RQ3 pipelines are unchanged; this block uses
+  `short_metrics.closed_trades_by_direction` (full-history replay, exit-date
+  month attribution).
 - `fdr_note` — populate.

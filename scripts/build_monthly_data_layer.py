@@ -41,7 +41,7 @@ import os
 import subprocess
 import sys
 from collections import OrderedDict, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
@@ -70,6 +70,13 @@ from src.analytics.research_metrics import (  # noqa: E402
     compute_rq6,
     get_model_keys,
     load_decision_records,
+)
+from src.analytics.short_metrics import (  # noqa: E402
+    _point_biserial,
+    closed_shorts,
+    closed_trades_by_direction,
+    gross_hhi_from_snapshot,
+    short_utilization,
 )
 from src.analytics.statistical_corrections import (  # noqa: E402
     DEFAULT_BLOCK_LENGTH,
@@ -572,6 +579,150 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
     return out
 
 
+# ==========================================================================
+# Short-side activity + RQ2/RQ3 direction segmentation (v3/shorting regime,
+# emitted for months > 2026-06 only — additive; every long-only canonical
+# metric above is byte-unchanged, per the shorting build's ratified design)
+# ==========================================================================
+
+def _short_activity(full_records, month_records, model_keys, settings, win_start, win_end):
+    """Per-model short-side activity over the calendar month.
+
+    All figures come from the ratified additive module src/analytics/short_metrics
+    (utilization / closed-short replay / gross HHI) plus the decision-log
+    portfolio_after exposure snapshots the executor has emitted since go-live.
+    Fixed field set for every model every month: a model with zero short
+    activity emits zeros/nulls, never a dropped key. Closed shorts follow the
+    RQ2/RQ3 windowing discipline — full-history replay, attributed by
+    exit_date in the calendar month."""
+    cap = float((settings.get("portfolio_rules") or {}).get("max_gross_short_pct") or 0.20)
+
+    def _inwin(d):
+        return bool(d) and win_start <= d <= win_end
+
+    per_model = {}
+    for key in model_keys:
+        win = month_records.get(key, [])
+        util = short_utilization(win, short_cap_pct=cap)
+        closed = [t for t in closed_shorts(full_records.get(key, []))
+                  if _inwin(t.get("exit_date", ""))]
+        n = len(closed)
+        wins = sum(t["profitable"] for t in closed)
+        total_pnl = sum(t["realized_pnl"] for t in closed)
+
+        # EOD exposure series: last portfolio_after per date (the _eod_series
+        # convention), so gross/net means are daily, not tick-weighted.
+        eod = OrderedDict()
+        for r in win:
+            pa = r.get("portfolio_after") or {}
+            if r.get("date") and pa:
+                eod[r["date"]] = pa
+        gross = [float(pa["gross_exposure_pct"]) for pa in eod.values()
+                 if pa.get("gross_exposure_pct") is not None]
+        net = [float(pa["net_exposure_pct"]) for pa in eod.values()
+               if pa.get("net_exposure_pct") is not None]
+        ghhi = [gross_hhi_from_snapshot(pa) for pa in eod.values()]
+
+        per_model[key] = {
+            "short_opens": util["short_opens"],
+            "covers": util["covers"],
+            "n_short_executions": util["n_short_executions"],
+            "short_decision_share": _f(util["decision_share"]),
+            "n_closed_shorts": n,
+            "short_realized_pnl": _f(round(total_pnl, 2)),
+            "short_hit_rate": _f(wins / n) if n else None,
+            "short_wins": wins,
+            "short_losses": n - wins,
+            "avg_short_exposure_pct": _f(util["avg_short_exposure_pct"]),
+            "max_short_exposure_pct": _f(util["max_short_exposure_pct"]),
+            "avg_utilization_vs_cap": _f(util["avg_utilization_vs_cap"]),
+            "max_utilization_vs_cap": _f(util["max_utilization_vs_cap"]),
+            "short_cap_pct": _f(util["short_cap_pct"]),
+            "mean_eod_gross_exposure_pct": _f(np.mean(gross)) if gross else None,
+            "max_eod_gross_exposure_pct": _f(max(gross)) if gross else None,
+            "mean_eod_net_exposure_pct": _f(np.mean(net)) if net else None,
+            "min_eod_net_exposure_pct": _f(min(net)) if net else None,
+            "mean_eod_gross_hhi": _f(np.mean(ghhi)) if ghhi else None,
+        }
+    return {
+        "per_model": per_model,
+        "window": "calendar_month",
+        "pilot_exploratory": True,
+        "regime_ref": ("regime_boundaries.shorting_activation — v3/shorting from "
+                       "2026-07-01; this block exists from the July 2026 layer onward "
+                       "(earlier months are long-only and grandfathered without it)."),
+        "canonical_definition_ref": ("src/analytics/short_metrics.py "
+                                     "(short_utilization / closed_shorts / gross_hhi_from_snapshot)"),
+        "definition_notes": {
+            "short_decision_share": "SHORT+COVER executions / all executed trades in the month.",
+            "short_exposure": ("per-tick portfolio_after.short_exposure_pct (|short value| / equity); "
+                               "utilization_vs_cap divides by portfolio_rules.max_gross_short_pct."),
+            "gross_net_exposure": "EOD (last tick per date) portfolio_after gross/net_exposure_pct.",
+            "mean_eod_gross_hhi": ("gross-weight (|market value|) HHI of the EOD book — shorts add "
+                                   "to concentration exactly as equal-sized longs; identical to the "
+                                   "long-only HHI on a long-only book."),
+            "closed_shorts": ("full-history SHORT/COVER replay; a short closes on full cover only; "
+                              "attributed by exit_date in the calendar month; realized P&L = "
+                              "Σ short proceeds − Σ cover cost."),
+        },
+    }
+
+
+def _direction_segmentation(full_records, model_keys, win_start, win_end):
+    """RQ2/RQ3 direction segmentation (long vs short), per the before-go-live
+    ratification: the v2→v3 boundary analyses key on direction-segmented closed
+    trades. Compact per-segment stats (n / hit-rate / avg realized P&L /
+    confidence-outcome correlation) via short_metrics.closed_trades_by_direction —
+    additive and exploratory; the canonical long-only RQ2/RQ3 pipelines above are
+    unchanged. Short side is v3-only and low-n in Phase A."""
+    def _inwin(d):
+        return bool(d) and win_start <= d <= win_end
+
+    def _seg_stats(trades):
+        n = len(trades)
+        if n == 0:
+            return {"n_closed": 0, "hit_rate": None, "avg_realized_pnl": None,
+                    "confidence_outcome_corr": None}
+        wins = sum(t["profitable"] for t in trades)
+        usable = [t for t in trades if t.get("entry_confidence") is not None]
+        corr = _point_biserial(
+            [t["entry_confidence"] for t in usable],
+            [t["profitable"] for t in usable]) if len(usable) >= 5 else None
+        return {
+            "n_closed": n,
+            "hit_rate": _f(wins / n),
+            "avg_realized_pnl": _f(round(sum(t["realized_pnl"] for t in trades) / n, 2)),
+            "confidence_outcome_corr": _f(corr),
+        }
+
+    per_model = {}
+    pooled = {"long": [], "short": []}
+    for key in model_keys:
+        seg = closed_trades_by_direction(full_records.get(key, []))
+        win_seg = {d: [t for t in ts if _inwin(t.get("exit_date", ""))]
+                   for d, ts in seg.items()}
+        pooled["long"].extend(win_seg["long"])
+        pooled["short"].extend(win_seg["short"])
+        per_model[key] = {d: _seg_stats(ts) for d, ts in win_seg.items()}
+    return {
+        "per_model": per_model,
+        "pooled": {d: _seg_stats(ts) for d, ts in pooled.items()},
+        "window": "calendar_month",
+        "pilot_exploratory": True,
+        "short_side_exploratory": True,
+        "windowing_note": ("full-history replay (short_metrics.closed_trades_by_direction), "
+                           "trades attributed by full-exit date in the calendar month — the "
+                           "RQ2/RQ3 windowing discipline. The long segment uses short_metrics' "
+                           "self-contained long replay, NOT the canonical RQ3 pipeline; the "
+                           "canonical pooled/per-model RQ2/RQ3 figures above remain the "
+                           "long-only headline numbers."),
+        "canonical_definition_ref": ("src/analytics/short_metrics.py "
+                                     "(closed_trades_by_direction / hit_rate_by_direction)"),
+        "regime_ref": ("regime_boundaries.shorting_activation — the before/after "
+                       "(v2 long-only vs v3 long+short) analysis keys on this boundary."),
+    }
+
+
 def _err_type(msg):
     """Objective classification of an API/JSON error string."""
     m = (msg or "").lower()
@@ -645,8 +796,15 @@ def _notable_events(full_records, model_keys, win_start, win_end):
 # Data integrity (calendar month)
 # ==========================================================================
 
-def _data_integrity(model_keys, win_start, win_end, settings):
-    """Per-model failure rates, missing-tick count, and the known incidents."""
+def _data_integrity(model_keys, win_start, win_end, settings, ledger):
+    """Per-model failure rates, missing-tick count, and the known incidents.
+
+    Months <= 2026-06 emit the frozen May-era incident list (May's committed
+    layer is byte-pinned by reproduce-May; June shipped the same list and is
+    grandfathered as committed). From July 2026 the incidents are the ledger's
+    operational_events for the build month, carried VERBATIM (including any
+    in-situ verification block), and any single-model event with an `effective`
+    boundary date additionally emits a computed completeness_segmentation."""
     import re
     from collections import Counter
 
@@ -656,6 +814,7 @@ def _data_integrity(model_keys, win_start, win_end, settings):
     month_tag = win_start[:7]
     per_model_fail = {}
     per_model_records = {}
+    per_model_daily = {key: {} for key in model_keys}  # date -> [records, successes]
     tick_hashes_by_date = defaultdict(set)
     gemini_modes = Counter()
     for key in model_keys:
@@ -674,8 +833,11 @@ def _data_integrity(model_keys, win_start, win_end, settings):
                     if not _inwin(r.get("date", "")):
                         continue
                     n += 1
+                    day = per_model_daily[key].setdefault(r.get("date"), [0, 0])
+                    day[0] += 1
                     if r.get("api_success"):
                         succ += 1
+                        day[1] += 1
                     else:
                         fail += 1
                         if key == "gemini":
@@ -704,6 +866,7 @@ def _data_integrity(model_keys, win_start, win_end, settings):
     missing_by_date = {d: modal - c for d, c in per_date_ticks.items() if c < modal}
     missing_tick_count = sum(missing_by_date.values())
 
+    # Frozen May-era incident list (months <= 2026-06 only; see docstring).
     incidents = [
         {
             "id": "may26_silent_outage",
@@ -759,7 +922,7 @@ def _data_integrity(model_keys, win_start, win_end, settings):
         },
     ]
 
-    return {
+    out = {
         "incidents": incidents,
         "per_model_failure_rate": per_model_fail,
         "missing_tick_count": missing_tick_count,
@@ -772,6 +935,48 @@ def _data_integrity(model_keys, win_start, win_end, settings):
                   "pre-May and excluded by the >=2026-04-23 pilot-window rule; it does not "
                   "affect May data."),
     }
+
+    if month_tag > "2026-06":
+        # Incidents: the ledger's operational_events for the build month,
+        # VERBATIM (in-situ verification blocks and all) — the builder reads
+        # the ledger, nothing is hand-fed. A month with no entries emits [].
+        month_events = (ledger.get("operational_events") or {}).get(month_tag, [])
+        out["incidents"] = [dict(ev) for ev in month_events]
+
+        # Completeness segmentation: any single-model event with an `effective`
+        # boundary date splits that model's month at the boundary. The month
+        # gate is still computed over the WHOLE month (no retroactive repair);
+        # the segmentation documents the regime point for time-series analyses.
+        seg = {}
+        for ev in month_events:
+            eff = ev.get("effective")
+            mk = ev.get("scope")
+            if not eff or mk not in per_model_daily:
+                continue
+
+            def _agg(rows):
+                nr = sum(r[0] for r in rows)
+                ns = sum(r[1] for r in rows)
+                return {"records": nr, "api_success": ns,
+                        "completeness": _f(round(ns / nr, 4)) if nr else None}
+
+            daily = per_model_daily[mk]
+            pre_end = (datetime.strptime(eff, "%Y-%m-%d")
+                       - timedelta(days=1)).strftime("%Y-%m-%d")
+            seg[ev["id"]] = {
+                "model": mk,
+                "boundary_effective": eff,
+                "pre_fix": {"window": f"{win_start}..{pre_end}",
+                            **_agg([v for d, v in daily.items() if d and d < eff])},
+                "post_fix": {"window": f"{eff}..{win_end}",
+                             **_agg([v for d, v in daily.items() if d and d >= eff])},
+                "ledger_ref": f"phase_a_integrity_ledger.operational_events['{month_tag}'].{ev['id']}",
+                "note": ("Per-model decision-completeness segmented at the ledger event's "
+                         "effective date. The inclusion gate is computed over the whole "
+                         "month; the segmentation is the documented regime point."),
+            }
+        out["completeness_segmentation"] = seg
+    return out
 
 
 # ==========================================================================
@@ -1233,6 +1438,12 @@ def _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month
             },
         },
     }
+    # DeepSeek V4-GA boundary (disclosed gap): carried VERBATIM from the ledger
+    # for every month from the GA month onward — the July+ reports must disclose
+    # it with the same candor as the first splice (ledger status_impact).
+    ga = ledger["integrity_events"].get("deepseek_v4_ga_boundary")
+    if ga and month >= ga["ga_date"][:7]:
+        mdr["known_caveats"]["model_identity"]["deepseek_v4_ga_boundary"] = ga
     # inclusion_gates: definitions from the ledger; passing cohort COMPUTED this
     # month. The cohort lives under the STABLE key `passing` (fixed schema: the
     # quarterly aggregator and every downstream consumer read one key, never a
@@ -1416,6 +1627,27 @@ def _schema_validate(layer):
         req(n.get("reported_primary", {}).get("status") == "estimable", f"{rq}.reported_primary missing")
         req(not str(n.get("status", "")).startswith("estimable"),
             f"{rq} pool flagged estimable while pooling non-estimable models")
+
+    # July 2026 additions (v3/shorting regime), required populate-or-null from
+    # the July build; grandfathered months carry none of these keys.
+    if period > "2026-06":
+        models = {p.get("model") for p in layer.get("profiles", [])}
+        sa = layer.get("cross_model_behavioral", {}).get("short_activity") or {}
+        req(set(sa.get("per_model") or {}) == models,
+            "cross_model_behavioral.short_activity.per_model missing/incomplete")
+        _SA_KEYS = {"short_opens", "covers", "n_closed_shorts", "short_hit_rate",
+                    "short_realized_pnl", "avg_short_exposure_pct",
+                    "mean_eod_gross_exposure_pct", "mean_eod_net_exposure_pct",
+                    "mean_eod_gross_hhi"}
+        for mk, row in (sa.get("per_model") or {}).items():
+            req(_SA_KEYS <= set(row), f"short_activity.per_model[{mk}] missing keys")
+        ds = mdr.get("rq_update", {}).get("direction_segmentation") or {}
+        req({"per_model", "pooled"} <= set(ds),
+            "rq_update.direction_segmentation missing/malformed")
+        req({"long", "short"} <= set(ds.get("pooled") or {}),
+            "direction_segmentation.pooled missing long/short segments")
+        req("completeness_segmentation" in mdr.get("data_integrity", {}),
+            "data_integrity.completeness_segmentation missing (populate-or-empty)")
     return issues
 
 
@@ -1789,6 +2021,12 @@ def build(month: str) -> dict:
         "pilot_exploratory": True,
     }
 
+    # Short-side activity (v3/shorting regime): additive from the July 2026
+    # layer onward — month-gated so May/June reproduce byte-for-byte.
+    if month > "2026-06":
+        cross_model_behavioral["short_activity"] = _short_activity(
+            full_records, may_records, model_keys, settings, win_start, win_end)
+
     # ====================================================================
     # profiles[] — evidence_metrics ONLY; interpretive fields null
     # ====================================================================
@@ -1839,7 +2077,7 @@ def build(month: str) -> dict:
     # ====================================================================
     # methodology_data_integrity_rq
     # ====================================================================
-    data_integrity = _data_integrity(model_keys, win_start, win_end, settings)
+    data_integrity = _data_integrity(model_keys, win_start, win_end, settings, ledger)
     rq_update = {
         "point_estimates": {
             "RQ1": {
@@ -1930,6 +2168,12 @@ def build(month: str) -> dict:
                      "construct applied to one headline p-value per RQ; it is NOT computed for the "
                      "pilot monthly. Monthly figures are Phase A pilot/exploratory only."),
     }
+
+    # RQ2/RQ3 direction segmentation (before-go-live ratified; v3 regime):
+    # additive from the July 2026 layer onward — month-gated like short_activity.
+    if month > "2026-06":
+        rq_update["direction_segmentation"] = _direction_segmentation(
+            full_records, model_keys, win_start, win_end)
 
     # ====================================================================
     # report_meta
