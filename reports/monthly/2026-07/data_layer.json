@@ -11,7 +11,15 @@
         "end": "2026-07-31",
         "first_trading_date": "2026-07-01",
         "last_trading_date": "2026-07-31",
-        "trading_days": 22
+        "trading_days": 22,
+        "market_regime": {
+          "dominant": "range_bound",
+          "counts": {
+            "range_bound": 22
+          },
+          "trading_days_classified": 22,
+          "source": "src/analytics/regime_classifier.classify_regimes over the cached SPY series (frozen at month-end), labels via label_for_dates"
+        }
       },
       "inception_anchor": {
         "inception_date": "2026-04-09",
@@ -149,8 +157,8 @@
       "first_date": "2025-12-01",
       "last_date": "2026-06-30"
     },
-    "source_commit": "5378da79fec33d6d40116db454860efb267bc15b",
-    "generated_at_utc": "2026-08-02T16:02:46.425010+00:00",
+    "source_commit": null,
+    "generated_at_utc": "2026-08-02T16:56:04.106069+00:00",
     "generator": "scripts/build_monthly_data_layer.py",
     "bootstrap_config": {
       "block_length": 5,
@@ -173,9 +181,17 @@
       "notable_events": "profiles[].notable_events is objective event extraction (top-3 trades by abs USD value, stop-loss force-sells, drawdown-halt triggers, API/JSON error events) over the calendar month; empty arrays where none.",
       "halt_gate": "all six compute_rqX verified against v1.json; PASS. Cosmetic only: RQ5 metric label cash_pct (code) == cash (v1.json), same quantity."
     },
+    "prompt_version_stamps": {
+      "records": 1698,
+      "stamped": 1698,
+      "counts": {
+        "v3": 1698
+      },
+      "note": "per-record prompt_version stamp counts over the calendar month's decision records, all models; the regime label derives from these stamps."
+    },
     "schema_version": "1.0",
     "provenance": {
-      "generated_at_commit": "9eb7c8438bd26d0bfe0ab0b1488209acf11e6394",
+      "generated_at_commit": "66bd38303953e8b90348ce596aa5c3f7eee472ff",
       "integrity_refs": {
         "ledger": "scripts/phase_a_integrity_ledger.json",
         "defab_overhang": "scripts/defab_clean_window.py",
@@ -192,7 +208,7 @@
       "spy_relative_alpha": 0.10002375118879248,
       "cumulative_return_inception": 0.1979514444456998,
       "cumulative_return_clean": {
-        "value": 0.0424,
+        "value": 0.0357,
         "source": "defab",
         "confidence": "estimable",
         "model_spliced": true
@@ -206,7 +222,7 @@
       "spy_relative_alpha": 0.08846232251436725,
       "cumulative_return_inception": 0.18639001577127456,
       "cumulative_return_clean": {
-        "value": 0.1307,
+        "value": 0.1262,
         "source": "defab",
         "confidence": "estimable",
         "model_spliced": false
@@ -5098,6 +5114,30 @@
           "min_eod_net_exposure_pct": 0.8621187756601559,
           "mean_eod_gross_hhi": 0.07936774090834492
         }
+      },
+      "open_at_month_end": {
+        "claude": [],
+        "gpt": [],
+        "gemini": [
+          {
+            "ticker": "META",
+            "shares": -17.5522,
+            "weight": -0.08165515429162266,
+            "gross_weight": 0.08165515429162266,
+            "unrealized_pl_pct": -0.04068796394403118
+          }
+        ],
+        "grok": [],
+        "deepseek": [],
+        "claude_opus": []
+      },
+      "last_short_activity_date": {
+        "claude": null,
+        "gpt": null,
+        "gemini": "2026-07-31",
+        "grok": null,
+        "deepseek": "2026-07-14",
+        "claude_opus": null
       },
       "window": "calendar_month",
       "pilot_exploratory": true,
