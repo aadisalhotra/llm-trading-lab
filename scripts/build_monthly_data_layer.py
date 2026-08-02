@@ -601,6 +601,8 @@ def _short_activity(full_records, month_records, model_keys, settings, win_start
         return bool(d) and win_start <= d <= win_end
 
     per_model = {}
+    open_at_month_end = {}
+    last_short_dates = {}
     for key in model_keys:
         win = month_records.get(key, [])
         util = short_utilization(win, short_cap_pct=cap)
@@ -644,8 +646,27 @@ def _short_activity(full_records, month_records, model_keys, settings, win_start
             "min_eod_net_exposure_pct": _f(min(net)) if net else None,
             "mean_eod_gross_hhi": _f(np.mean(ghhi)) if ghhi else None,
         }
+
+        # Open shorts at month-end: the month's LAST EOD portfolio_after
+        # snapshot (the frozen state record). Empty list where none.
+        last_pa = next(reversed(eod.values())) if eod else {}
+        open_at_month_end[key] = [
+            {"ticker": h.get("ticker"), "shares": _f(h.get("shares")),
+             "weight": _f(h.get("weight")), "gross_weight": _f(h.get("gross_weight")),
+             "unrealized_pl_pct": _f(h.get("unrealized_pl_pct"))}
+            for h in (last_pa.get("holdings") or []) if h.get("direction") == "short"
+        ]
+        # Last date with any executed SHORT/COVER in the calendar month (null
+        # where the model never traded the short side).
+        sc_dates = [r.get("date") for r in win
+                    if any(ex.get("executed") and ex.get("side") in ("SHORT", "COVER")
+                           for ex in (r.get("executions") or []))]
+        last_short_dates[key] = max(sc_dates) if sc_dates else None
+
     return {
         "per_model": per_model,
+        "open_at_month_end": open_at_month_end,
+        "last_short_activity_date": last_short_dates,
         "window": "calendar_month",
         "pilot_exploratory": True,
         "regime_ref": ("regime_boundaries.shorting_activation — v3/shorting from "
@@ -1648,6 +1669,14 @@ def _schema_validate(layer):
             "direction_segmentation.pooled missing long/short segments")
         req("completeness_segmentation" in mdr.get("data_integrity", {}),
             "data_integrity.completeness_segmentation missing (populate-or-empty)")
+        req({"open_at_month_end", "last_short_activity_date"} <= set(sa),
+            "short_activity.open_at_month_end / last_short_activity_date missing")
+        pvs = rm.get("prompt_version_stamps")
+        req(isinstance(pvs, dict) and {"records", "counts"} <= set(pvs),
+            "report_meta.prompt_version_stamps missing/malformed")
+        mreg = ((rm.get("data_window") or {}).get("calendar_month") or {}).get("market_regime")
+        req(isinstance(mreg, dict) and "dominant" in mreg,
+            "report_meta.data_window.calendar_month.market_regime missing")
     return issues
 
 
@@ -2240,6 +2269,40 @@ def build(month: str) -> dict:
             "halt_gate": "all six compute_rqX verified against v1.json; PASS. Cosmetic only: RQ5 metric label cash_pct (code) == cash (v1.json), same quantity.",
         },
     }
+
+    # July 2026 report_meta additions (month-gated like the other v3-regime
+    # blocks): the stamp-count verification behind the regime label, and the
+    # month's market-regime classification from the frozen-cache classifier.
+    if month > "2026-06":
+        _stamps: dict = {}
+        _total = 0
+        for recs in may_records.values():
+            for r in recs:
+                _total += 1
+                v = (r.get("prompt_version") or "").strip()
+                if v:
+                    _stamps[v] = _stamps.get(v, 0) + 1
+        report_meta["prompt_version_stamps"] = {
+            "records": _total,
+            "stamped": int(sum(_stamps.values())),
+            "counts": _stamps,
+            "note": ("per-record prompt_version stamp counts over the calendar month's "
+                     "decision records, all models; the regime label derives from these stamps."),
+        }
+        _mdates = sorted({r.get("date") for recs in may_records.values()
+                          for r in recs if r.get("date")})
+        _rc: dict = {}
+        for d in _mdates:
+            lbl = regime_map.get(d)
+            if lbl:
+                _rc[lbl] = _rc.get(lbl, 0) + 1
+        report_meta["data_window"]["calendar_month"]["market_regime"] = {
+            "dominant": max(_rc, key=_rc.get) if _rc else None,
+            "counts": _rc,
+            "trading_days_classified": int(sum(_rc.values())),
+            "source": ("src/analytics/regime_classifier.classify_regimes over the cached "
+                       "SPY series (frozen at month-end), labels via label_for_dates"),
+        }
 
     layer = {
         "report_meta": report_meta,
