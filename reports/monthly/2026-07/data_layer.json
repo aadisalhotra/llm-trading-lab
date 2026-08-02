@@ -5169,6 +5169,65 @@
         "gross_net_exposure": "EOD (last tick per date) portfolio_after gross/net_exposure_pct.",
         "mean_eod_gross_hhi": "gross-weight (|market value|) HHI of the EOD book \u2014 shorts add to concentration exactly as equal-sized longs; identical to the long-only HHI on a long-only book.",
         "closed_shorts": "full-history SHORT/COVER replay; a short closes on full cover only; attributed by exit_date in the calendar month; realized P&L = \u03a3 short proceeds \u2212 \u03a3 cover cost."
+      },
+      "notable_short_fills": {
+        "designation": "Gemini's four largest short-side COVER fills by dollar value (hub ruling 2026-08-02, PI-relayed) \u2014 selection is mechanical: top 4 of the month's executed COVER fills by notional; every figure source-derived from the decision-log fill records.",
+        "selection": "top 4 of 26 executed COVER fills by |notional|, listed largest first",
+        "source": "decision-log execution records (data/trades/gemini_2026-07.jsonl) \u2014 fill_price/notional/order_id verbatim; summary is the model's own logged decision summary",
+        "fills": [
+          {
+            "model": "gemini",
+            "date": "2026-07-30",
+            "timestamp": "2026-07-30T13:34:22.211460",
+            "ticker": "PG",
+            "side": "COVER",
+            "shares": 114.98729999999999,
+            "fill_price": 143.5399932861328,
+            "notional": 16505.27626999054,
+            "order_id": "PAPER_COVER_PG_20260730133422",
+            "target_weight_after": 0.0,
+            "summary": "Fully covering the Procter & Gamble short to free up short capacity."
+          },
+          {
+            "model": "gemini",
+            "date": "2026-07-28",
+            "timestamp": "2026-07-28T16:03:56.665430",
+            "ticker": "V",
+            "side": "COVER",
+            "shares": 32.752,
+            "fill_price": 367.3599853515625,
+            "notional": 12031.774240234376,
+            "order_id": "PAPER_COVER_V_20260728160356",
+            "target_weight_after": 0.0,
+            "summary": "Fully covering the short position in Visa to mitigate risk following the announcement of a 7% workforce reduction."
+          },
+          {
+            "model": "gemini",
+            "date": "2026-07-29",
+            "timestamp": "2026-07-29T15:34:03.442202",
+            "ticker": "NKE",
+            "side": "COVER",
+            "shares": 276.9327,
+            "fill_price": 42.65999984741211,
+            "notional": 11813.948939743424,
+            "order_id": "PAPER_COVER_NKE_20260729153403",
+            "target_weight_after": 0.0,
+            "summary": "Fully covering the Nike short position to reallocate gross short capacity to higher-conviction catalysts."
+          },
+          {
+            "model": "gemini",
+            "date": "2026-07-30",
+            "timestamp": "2026-07-30T14:34:19.470178",
+            "ticker": "NVDA",
+            "side": "COVER",
+            "shares": 59.1673,
+            "fill_price": 196.9149932861328,
+            "notional": 11650.928482258605,
+            "order_id": "PAPER_COVER_NVDA_20260730143419",
+            "target_weight_after": 0.0,
+            "summary": "Covering the Nvidia short position as robust earnings contribution reports negate the near-term downside thesis."
+          }
+        ]
       }
     },
     "rq1": {
