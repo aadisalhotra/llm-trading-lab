@@ -122,9 +122,11 @@ def build_price_tables(all_eod: dict[str, dict[str, dict[str, Any]]]):
                 if tkr and price and price > 0:
                     per_model[model_key][date][tkr] = float(price)
                     pooled[date][tkr] = float(price)  # all models share same EOD closes
-            # secondary: intraday fills (used only as a last-resort price fill)
+            # secondary: intraday fills (used only as a last-resort price fill).
+            # All four sides — a fill price is a fill price regardless of
+            # direction (holdings-derived EOD closes still take priority).
             for ex in run.get("executions") or []:
-                if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
+                if ex.get("executed") and ex.get("side") in ("BUY", "SELL", "SHORT", "COVER"):
                     tkr = ex.get("ticker")
                     fp = ex.get("fill_price")
                     if tkr and fp and fp > 0:
@@ -166,9 +168,20 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
     audit's zero clean-window violations.)
 
     Returns dict with daily series, base/end equities, and inconsistency tallies
-    (split shakedown vs clean window)."""
+    (split shakedown vs clean window).
+
+    DIRECTION-AWARE (July 2026 fix): the v3/shorting regime logs SHORT/COVER
+    fills from 2026-07-01; the replay chains them into a separate short book
+    (proceeds credited on SHORT, cost paid on COVER, open shorts marked as
+    negative value), exactly as the live Portfolio does. Pre-July months carry
+    zero SHORT/COVER fills, so this is a byte-level no-op for the committed
+    May window (reproduce-May) and for June. LEGITIMATE logged shorts live in
+    the short book and are excluded from the infeasibility/trust diagnostics —
+    those continue to measure only phantom long-book negatives (oversells) and
+    negative cash, the launch-corruption signals they were built for."""
     cash = SEED
-    holdings: dict[str, dict[str, float]] = {}  # ticker -> {shares, avg_cost}
+    holdings: dict[str, dict[str, float]] = {}  # ticker -> {shares, avg_cost} (long book)
+    shorts: dict[str, dict[str, float]] = {}    # ticker -> {shares (magnitude), avg_entry}
 
     incons = {
         "shakedown": {"oversell_count": 0, "oversell_gross_usd": 0.0,
@@ -195,12 +208,45 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
         window = "clean" if date >= clean_start else "shakedown"
         for run in runs_by_date[date]:
             for ex in run.get("executions") or []:
-                if not (ex.get("executed") and ex.get("side") in ("BUY", "SELL")):
+                if not (ex.get("executed") and ex.get("side") in ("BUY", "SELL", "SHORT", "COVER")):
                     continue
                 tkr = ex["ticker"]
                 shares = float(ex.get("shares") or 0.0)
                 fp = float(ex.get("fill_price") or 0.0)
                 if shares <= 0 or fp <= 0:
+                    continue
+                if ex["side"] == "SHORT":
+                    # proceeds credited; magnitude added to the short book
+                    cash += shares * fp
+                    s = shorts.get(tkr)
+                    if s:
+                        s["avg_entry"] = ((s["avg_entry"] * s["shares"] + fp * shares)
+                                          / (s["shares"] + shares))
+                        s["shares"] += shares
+                    else:
+                        shorts[tkr] = {"shares": shares, "avg_entry": fp}
+                    continue
+                if ex["side"] == "COVER":
+                    # cost paid; magnitude reduced. Over-cover (covering more than
+                    # the de-fab short book holds) is the short-side analogue of an
+                    # oversell — measured incrementally, chain never altered.
+                    held_s = shorts.get(tkr, {}).get("shares", 0.0)
+                    held_s_after = held_s - shares
+                    incr_over = max(0.0, -held_s_after) - max(0.0, -held_s)
+                    if incr_over > OVERSELL_SHARES_MIN:
+                        incons[window]["oversell_count"] += 1
+                        incons[window]["oversell_gross_usd"] += incr_over * fp
+                        incon_events.append({"date": date, "window": window,
+                                             "type": "over_cover", "ticker": tkr,
+                                             "logged_shares": shares, "held_short_shares": round(held_s, 4),
+                                             "fill_price": fp, "gross_usd": round(incr_over * fp, 2)})
+                    cash -= shares * fp
+                    if tkr in shorts:
+                        shorts[tkr]["shares"] -= shares
+                        if abs(shorts[tkr]["shares"]) < GHOST_SHARES:
+                            del shorts[tkr]
+                    else:
+                        shorts[tkr] = {"shares": -shares, "avg_entry": fp}
                     continue
                 if ex["side"] == "BUY":
                     cost = shares * fp
@@ -256,8 +302,9 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
 
         # EOD snapshot for `date` (mark every nonzero position, negatives included)
         equity = cash
-        neg_value = 0.0           # $ value of negative (short) positions — infeasibility
+        neg_value = 0.0           # $ value of PHANTOM long-book negatives — infeasibility
         long_value = 0.0
+        short_value = 0.0         # $ value (negative) of the LEGITIMATE short book
         for tkr, h in holdings.items():
             if abs(h["shares"]) < 1e-9:
                 continue
@@ -270,6 +317,17 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
                 neg_value += mv       # negative
             else:
                 long_value += mv
+        # legitimate short book (SHORT/COVER-chained): marked as negative value,
+        # counted in equity but NOT in the infeasibility diagnostics.
+        for tkr, s in shorts.items():
+            if s["shares"] < 1e-9:
+                continue
+            price, src = mark_price(tkr, date, model_key, per_model, pooled,
+                                    sorted_dates, s["avg_entry"])
+            price_source_counts[src] += 1
+            mv = -s["shares"] * price
+            equity += mv
+            short_value += mv
         neg_positions = sum(1 for h in holdings.values() if h["shares"] < -SHARE_EPS)
         # recorded book's own marked total for this date's EOD run (== recorded
         # book marked at pooled prices, verified to the penny). Used in main() to
@@ -281,19 +339,32 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
             "defab_equity_pooled": round(equity, 2),
             "recorded_run_tv": rec_tv,
             "defab_cash": round(cash, 2),
-            "defab_num_positions": sum(1 for h in holdings.values() if abs(h["shares"]) >= 1e-9),
+            "defab_num_positions": (sum(1 for h in holdings.values() if abs(h["shares"]) >= 1e-9)
+                                    + sum(1 for s in shorts.values() if s["shares"] >= 1e-9)),
             "defab_negative_positions": neg_positions,
         })
         if date in (base_date, end_date):
+            # combined net shares per ticker (long book + short book as negative),
+            # matching the recorded book's signed-shares convention so the
+            # overhang-constant check compares like with like.
+            net_shares: dict[str, float] = {}
+            for t, h in holdings.items():
+                if abs(h["shares"]) >= 1e-9:
+                    net_shares[t] = net_shares.get(t, 0.0) + h["shares"]
+            for t, s in shorts.items():
+                if s["shares"] >= 1e-9:
+                    net_shares[t] = net_shares.get(t, 0.0) - s["shares"]
             book_snapshots[date] = {
                 "cash": round(cash, 2),
                 "cash_is_negative": cash < -CASH_SHORT_USD_MIN,
                 "negative_position_count": neg_positions,
                 "negative_position_value_usd": round(neg_value, 2),
                 "long_value_usd": round(long_value, 2),
+                "short_book_value_usd": round(short_value, 2),
+                "short_book_positions": sum(1 for s in shorts.values() if s["shares"] >= 1e-9),
                 "equity": round(equity, 2),
-                "holdings": {t: round(h["shares"], 4) for t, h in holdings.items()
-                             if abs(h["shares"]) >= 1e-9},
+                "holdings": {t: round(sh, 4) for t, sh in net_shares.items()
+                             if abs(sh) >= 1e-9},
             }
 
     return {
