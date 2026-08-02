@@ -167,6 +167,62 @@
           "residual_failures": "2026-07-29 had 2/13 failures, both finish_reason=STOP JSON parse errors (trailing 'Extra data' after the decision object) — the pre-existing, budget-independent failure mode; day completeness 0.846 stayed above both the 0.60 daily alert floor and the 0.80 monthly gate",
           "alert_floor": "daily decision-completeness floor alert stayed quiet all three days, verified non-vacuously: the EOD digest (same dispatch pass that runs the completeness detector) sent on each of 7/28, 7/29, 7/30",
           "note": "2026-07-31 session was mid-day at verification time (2/2 cycles STOP, api_success true). This block is the in-situ confirmation closing the fix package; the Phase B validation clock (Aug/Sep/Oct) proceeds as specified in consequence."
+        },
+        "clock_spec_superseded": {
+          "on": "2026-08-02",
+          "by": "operational_events.2026-08[gemini_sdk_migration_2026_08].phase_b_clock_spec",
+          "reason": "Research integration-path rule (§8): no model enters Phase B on a deprecated integration path. The lab's Gemini client (google-generativeai) is deprecated; migration to google-genai staged 2026-08-02. The 'August counted from 2026-08-03' clause in consequence no longer governs — the validation clock restarts at the first logged post-migration Gemini success, and the 2026-08-03..[cutover] legacy-SDK sliver (empty if cutover lands pre-market 2026-08-03) is discarded from clock credit. The consequence text above is retained verbatim as the committed 2026-07-27 record."
+        }
+      }
+    ],
+    "2026-08": [
+      {
+        "id": "gemini_sdk_migration_2026_08",
+        "date": "2026-08-02",
+        "effective": null,
+        "type": "sdk_migration",
+        "scope": "gemini",
+        "detail": "Client SDK migrated google-generativeai 0.8.6 (deprecated) -> google-genai 2.16.0 per the Research integration-path rule (§8): no model enters Phase B on a deprecated path. Config semantics preserved exactly: same model string (gemini-3.1-pro-preview), same prompts, same JSON response mode, and the same 16384 effective decision budget — GenerateContentConfig(max_output_tokens=16384) serializes to the identical REST field (generationConfig.maxOutputTokens, the shared thinking+output budget) on the same v1beta generateContent endpoint the legacy client called. No sampling parameters sent (wire body verified to carry ONLY systemInstruction, responseMimeType, maxOutputTokens); thinking_config/thinking_level deliberately NOT set — reasoning stays provider-default (RQ6 config row); no SDK-default HTTP retries (fail-fast policy preserved). Infrastructure class: no monthly change slot consumed, no version boundary, model identity unchanged (modelVersion echo verified present under google-genai; alias echoed verbatim, same as legacy).",
+        "forced_sdk_differences": {
+          "empty_soft_stop": "google-genai's response.text returns None instead of raising when the response has no usable part; an empty soft-stop now surfaces as '' and flows through the base adapter's parse-failure retry path WITH finish_reason forensics attached (the legacy path lost them to a fail-fast API error). Affects only the no-usable-part shape — 0 observed in the 2026-07-28..07-31 baseline.",
+          "thoughts_token_count": "populated under google-genai (the legacy SDK reported 0/absent) — thoughts_tokens telemetry carries real values from the migration boundary onward (probe: ~4.5k mean on the replayed decision prompt); pre-boundary zeros are an SDK artifact, not a model change."
+        },
+        "phase_b_clock_spec": {
+          "supersedes": "gemini_budget_equalization.consequence clock clause ('August counted from 2026-08-03'; committed 3815ecf5)",
+          "clock_start": "first logged post-migration Gemini success (timestamp recorded in cutover.first_logged_post_migration_success at observation)",
+          "clock_end": "2026-10-31",
+          "segments": [
+            "post-migration August segment (clock start .. 2026-08-31): counts as a clean-month observation if it passes the gates over its ~4 weeks",
+            "September 2026: whole calendar month",
+            "October 2026: whole calendar month"
+          ],
+          "gates_per_segment": ">=0.80 decision completeness AND <=1% MAX_TOKENS-classified failures AND model identity stable",
+          "no_averaging": true,
+          "discarded_sliver": "2026-08-03..[cutover] on the legacy SDK — no clock credit (empty if cutover lands pre-market 2026-08-03)"
+        },
+        "stabilization_sequence": "2026-07-28 budget fix (16384, in-situ verified) -> 2026-08-03 original clock start (SUPERSEDED, never used) -> SDK migration boundary (cutover pre-market on sign-off; clean first tick, same discipline as the 7/28 fix).",
+        "pre_cutover_validation": {
+          "validated": "2026-08-02",
+          "method": "arm-A replica through the MIGRATED production adapter (src/adapters/gemini_adapter.py _call_api end-to-end, nothing mocked), replaying the 2026-07-27 probe's saved production prompts verbatim at 16384 — the same prompts arm D validated on the legacy SDK.",
+          "new_sdk_arm": {"calls": 16, "finish_reason": {"STOP": 16, "MAX_TOKENS": 0}, "api_errors": 0, "parse_failures": 3, "failure_signatures": {"extra_data": 3}, "mean_output_tokens_success": 735, "mean_thoughts_tokens": 4501, "thoughts_tokens_populated": "16/16", "model_id_echo": "gemini-3.1-pro-preview on 16/16"},
+          "legacy_control_arm_same_day": {"calls": 10, "finish_reason": {"STOP": 10, "MAX_TOKENS": 0}, "parse_failures": 1, "failure_signatures": {"extra_data": 1}, "mean_output_tokens_success": 824, "purpose": "attribution — separates new-client effects from same-day behavior of the unpinned alias"},
+          "residual_mode_attribution": "the only failure mode either arm shows is the pre-existing extra_data signature — a stray trailing '}' after a complete decision object, byte-identical to the legacy failures (arm D 2026-07-27: 1/15; live 2026-07-29 x2 and 2026-07-31 x2). Present on BOTH SDKs same-day => SDK-independent, model-side, budget-independent (finish STOP, not MAX_TOKENS). Not created, not fixed, and not to be fixed by this migration; watched by the continuity diagnostic.",
+          "budget_criterion": "PASS — zero MAX_TOKENS across 26 same-day calls on both SDKs; visible output profile (735/824) consistent with arm D (660) and the live baseline (852).",
+          "telemetry_criterion": "PASS — finish_reason, input/output tokens, thoughts_tokens, and the model_version echo all captured through the migrated adapter's own metadata path; plus 8 offline unit tests pinning request config and forensics extraction against real google-genai response types (tests/test_gemini_adapter.py).",
+          "evidence": "scripts/gemini_genai_migration_probe.py + scripts/gemini_genai_legacy_control.py + side_experiments/gemini_genai_migration_probe/"
+        },
+        "continuity_diagnostic": {
+          "schedule": "first two trading weeks post-cutover, checked daily (early-warning only, NO clock credit)",
+          "baseline_window": "2026-07-28..2026-07-31 (legacy SDK at 16384, live; 2026-08-01/02 weekend — this is the complete 7/28-8/2 pre-migration window)",
+          "baseline": {"records": 52, "api_success": 48, "completeness": 0.9231, "finish_reason": {"STOP": 52, "MAX_TOKENS": 0}, "mean_output_tokens_success": 852, "daily_completeness": {"2026-07-28": 1.0, "2026-07-29": 0.846, "2026-07-30": 1.0, "2026-07-31": 0.846}},
+          "check": "daily decision completeness + finish_reason profile + visible-output-token profile vs baseline; divergence -> immediate investigation, not gate-time discovery",
+          "known_residual_mode": "extra_data trailing-brace failures at ~8-13% of cycles (4/52 live baseline; 2/15 new-SDK probe) — expected to persist post-migration; a RATE change (not mere presence) is the divergence signal",
+          "new_telemetry": "thoughts_tokens populates from the boundary onward — no pre-boundary comparison exists for it (legacy SDK artifact); it joins the baseline going forward"
+        },
+        "cutover": {
+          "landed": null,
+          "first_logged_post_migration_success": null,
+          "note": "cutover lands pre-market on sign-off so the boundary is a clean first tick (same discipline as the 7/28 fix); both fields are recorded here at observation — first_logged_post_migration_success IS the Phase B clock start. Expected 2026-08-03 if sign-off precedes Monday pre-market; slips day-for-day otherwise."
         }
       }
     ]
