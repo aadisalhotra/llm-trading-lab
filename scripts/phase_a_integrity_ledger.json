@@ -220,9 +220,10 @@
           "new_telemetry": "thoughts_tokens populates from the boundary onward — no pre-boundary comparison exists for it (legacy SDK artifact); it joins the baseline going forward"
         },
         "cutover": {
-          "landed": null,
-          "first_logged_post_migration_success": null,
-          "note": "cutover lands pre-market on sign-off so the boundary is a clean first tick (same discipline as the 7/28 fix); both fields are recorded here at observation — first_logged_post_migration_success IS the Phase B clock start. Expected 2026-08-03 if sign-off precedes Monday pre-market; slips day-for-day otherwise."
+          "landed": "2026-08-02T23:38:09Z",
+          "first_logged_post_migration_success": "2026-08-03T14:06:25.440972Z",
+          "note": "cutover lands pre-market on sign-off so the boundary is a clean first tick (same discipline as the 7/28 fix); both fields are recorded here at observation — first_logged_post_migration_success IS the Phase B clock start. Expected 2026-08-03 if sign-off precedes Monday pre-market; slips day-for-day otherwise.",
+          "observed": "2026-08-03 (Operations). landed = commit 441e7a58 ('gemini: SDK migration google-generativeai -> google-genai (semantics preserved)') on main, committer date 2026-08-02T19:38:09-04:00 (23:38:09Z), pushed the same evening — pre-market for 2026-08-03, so the discarded legacy-SDK sliver (phase_b_clock_spec.discarded_sliver) is EMPTY. All four 2026-08-03 cycles at observation time ran through the migrated adapter: thoughts_tokens populated on 4/4 decision records (8526/4653/2506/1044), the new-SDK telemetry signature, including the failed first cycle. first_logged_post_migration_success = the day's second cycle, stamp 2026-08-03T14:06:25.440972 verbatim (naive UTC) from data/trades/gemini_2026-08.jsonl (10:06:25 ET; model_versions echo logged api_success at 14:06:25.436117 with identity gemini-3.1-pro-preview). Cycle 1 (13:41:57Z) was api_success=false on the known SDK-independent extra_data parse mode (finish_reason STOP, not MAX_TOKENS) — a failure, so it does not start the clock. first_logged_post_migration_success IS the Phase B clock start."
         }
       }
     ]
