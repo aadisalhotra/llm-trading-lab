@@ -501,10 +501,14 @@ def compute_api_cost_summary_window(
                 if c is None and (rec_in > 0 or rec_out > 0):
                     # Backfill: the record was written before the cost-rates
                     # prefix-fallback fix landed, but we have token counts.
-                    # Recompute from the rate table now.
+                    # Recompute at the rate in force on the record's date —
+                    # the table is dated rate periods now, and pricing a
+                    # historical call at today's rate misattributes any call
+                    # that straddles a provider price change.
                     c = compute_call_cost_usd(
                         rec.get("model_id_returned") or rec.get("model_id_configured", ""),
                         rec_in, rec_out,
+                        on_date=rec.get("date"),
                     )
                 if c is not None:
                     cost += float(c)
