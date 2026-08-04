@@ -35,18 +35,50 @@
   },
   "daily": {
     "date": "2026-08-04",
-    "sent_count": 1,
+    "sent_count": 5,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:gemini",
+      "ath:claude_opus",
+      "news:MA:b9553161b1",
+      "news:UNP:29e97857c4"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-04T13:32:30.440928+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-04T21:07:18.508656+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 hit a new all-time high",
+        "timestamp": "2026-08-04T21:07:19.596547+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MA (held by 5)",
+        "timestamp": "2026-08-04T21:07:20.660746+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on UNP (held by 6)",
+        "timestamp": "2026-08-04T21:07:21.868189+00:00",
         "disposition": "sent"
       }
     ]
