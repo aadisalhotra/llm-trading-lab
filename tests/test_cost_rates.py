@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.analytics.cost_rates import (  # noqa: E402
     COST_PER_MTOK,
+    RATE_HISTORY,
     compute_call_cost_usd,
 )
 
@@ -42,14 +43,28 @@ def test_gpt54_flat_since_launch():
         assert rate_sum("gpt-5.4", d) == 2.50 + 15.00
 
 
-def test_grok_420_period_split_at_may_1():
+def test_grok_420_period_split_at_may_7():
     model = "grok-4.20-0309-reasoning"
-    # Launch pricing through Apr 30 (cut bounded Apr 30 -> May 1 UTC;
-    # 2026-05-01 is the conservative effective date).
+    # The cut date is bounded, not attested: last old-rate archive capture
+    # 2026-05-01 07:03 UTC, first new-rate capture 2026-05-06 16:31 UTC.
+    # Boundary is archive-conservative — the old (higher) rate holds for the
+    # whole ambiguity window, so every day inside it attributes at $2/$6.
     assert rate_sum(model, "2026-04-15") == 2.00 + 6.00
     assert rate_sum(model, "2026-04-30") == 2.00 + 6.00
-    assert rate_sum(model, "2026-05-01") == 1.25 + 2.50
+    for d in ("2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06"):
+        assert rate_sum(model, d) == 2.00 + 6.00
+    assert rate_sum(model, "2026-05-07") == 1.25 + 2.50
     assert rate_sum(model, "2026-07-31") == 1.25 + 2.50
+
+
+def test_grok_420_period_1_high_tier_is_marked_unverified():
+    # The >200K period-1 tier ($4/$12) could not be confirmed against any
+    # archived capture. It must stay flagged in the table's provenance note
+    # so a future reader does not treat it as verified list pricing.
+    period_1 = RATE_HISTORY["grok-4.20-0309-reasoning"][0]
+    assert "UNVERIFIED" in period_1["note"]
+    assert period_1["tiers"][1]["input"] == 4.00
+    assert period_1["tiers"][1]["output"] == 12.00
 
 
 def test_deepseek_v4_pro_promo_rate_throughout():

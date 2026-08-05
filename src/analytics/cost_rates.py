@@ -16,9 +16,16 @@ any date (they were entry errors, not stale prices):
     (2026-03-05) through today, verified by archived pricing-page snapshots
     (Mar 5 / Apr 25 / Jul 10 / Aug 1 all identical).
   * grok-4.20-*:      carried $5/$25. Actual: $2/$6 at launch, cut to
-    $1.25/$2.50 when grok-4.3 shipped — bounded to the Apr 30 10:51 UTC →
-    May 1 06:52 UTC window by archive captures; we use 2026-05-01 as the
-    conservative effective date (Apr 30 attributes at the old rate).
+    $1.25/$2.50 when grok-4.3 shipped. The cut date is not directly
+    attested: the last old-rate capture is 2026-05-01 07:03 UTC and the
+    first new-rate capture is 2026-05-06 16:31 UTC, so the archive bounds
+    it to (May 1 07:03, May 6 16:31] UTC. We use 2026-05-07 — old rate
+    until a new rate is attested (hub ruling 2026-08-05, strict
+    archive-conservative). Press reporting places the grok-4.3 launch wave
+    at May 4, which the archive does not attest; the 05-07 boundary
+    therefore overstates our own cost by $0.49 relative to a 05-04
+    boundary, which is the correct direction for a cost claim. See
+    CORRECTIONS.md for the ambiguity-window disclosure.
   * gemini-3.1-pro-preview: carried flat $3.50/$14. Actual: tiered
     $2/$12 (prompt ≤200K tokens) / $4/$18 (>200K) since release (2026-02-19).
   * deepseek-v4-pro:  carried $1.74/$3.48 ("post-promo standard"). The 75%-off
@@ -123,10 +130,11 @@ RATE_HISTORY: dict[str, list[dict]] = {
         },
     ],
     # The 4.20 line launched ~2026-03-09 at $2/$6 (<200K prompt tier) and was
-    # cut to $1.25/$2.50 when grok-4.3 shipped. Archive captures bound the cut
-    # to Apr 30 10:51 UTC -> May 1 06:52 UTC; 2026-05-01 is the conservative
-    # effective date (Apr 30 calls attribute at the old rate). The old $5/$25
-    # entry matched no published 4.20-family rate at any date.
+    # cut to $1.25/$2.50 when grok-4.3 shipped. The cut date is bounded, not
+    # attested: last old-rate capture May 1 07:03 UTC, first new-rate capture
+    # May 6 16:31 UTC. Boundary set at 2026-05-07 — old rate until a new rate
+    # is attested (hub ruling 2026-08-05). The old $5/$25 entry matched no
+    # published 4.20-family rate at any date.
     "grok-4.20-0309-reasoning": [
         {
             "effective_from": None,
@@ -134,15 +142,27 @@ RATE_HISTORY: dict[str, list[dict]] = {
                 {"max_input_tokens": 200_000, "input": 2.00, "output": 6.00},
                 {"max_input_tokens": None, "input": 4.00, "output": 12.00},
             ],
-            "note": "Launch pricing (earliest archive capture 2026-03-11).",
+            "note": (
+                "Launch pricing (earliest archive capture 2026-03-11). "
+                "UNVERIFIED: the >200K tier ($4/$12) could not be confirmed "
+                "against any archived capture of the period-1 price page. "
+                "Inert for lab traffic (no logged call exceeds ~11K input "
+                "tokens), so it never priced a record; do not rely on it "
+                "without re-verification."
+            ),
         },
         {
-            "effective_from": "2026-05-01",
+            "effective_from": "2026-05-07",
             "tiers": [
                 {"max_input_tokens": 200_000, "input": 1.25, "output": 2.50},
                 {"max_input_tokens": None, "input": 2.50, "output": 5.00},
             ],
-            "note": "Cut to match grok-4.3 at its launch; unchanged through Grok 4.5 GA (2026-07-08) and today.",
+            "note": (
+                "Cut to match grok-4.3; unchanged through Grok 4.5 GA "
+                "(2026-07-08) and today. Effective date is archive-conservative, "
+                "not attested — see CORRECTIONS.md (ambiguity window "
+                "2026-05-01 07:03 -> 2026-05-06 16:31 UTC)."
+            ),
         },
     ],
     # DeepSeek — reasoning traces count as output tokens, so output bills
