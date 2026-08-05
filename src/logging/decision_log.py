@@ -156,6 +156,13 @@ def log_decision_run(
         "screening_response": screening_response[:2000] if screening_response else "",
         "screening_cost_usd": (screening_metadata or {}).get("cost_usd"),
         "screening_tokens": (screening_metadata or {}).get("output_tokens"),
+        # Screening INPUT tokens (added 2026-08-05, rider 1). Without this the
+        # only way to reprice a historical screening call is to invert its
+        # logged cost against the table that priced it — which works, but ties
+        # every future reprice to a frozen legacy rate table. Logging the count
+        # directly retires that dependency for all records from here forward.
+        # All five adapters already return input_tokens in call metadata.
+        "screening_input_tokens": (screening_metadata or {}).get("input_tokens"),
         # Rolling memory impact — True when the model's reasoning on this
         # tick explicitly cites a prior decision ("already positioned",
         # "previously exited", etc.). Drives the monthly report's memory

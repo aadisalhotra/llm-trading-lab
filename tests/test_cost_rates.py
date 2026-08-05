@@ -11,7 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.analytics.cost_rates import (  # noqa: E402
     COST_PER_MTOK,
+    LEGACY_FLAT_TABLE_PRE_2026_08,
     RATE_HISTORY,
+    backsolve_screening_input_tokens,
     compute_call_cost_usd,
 )
 
@@ -35,6 +37,39 @@ def test_sonnet_rate_unchanged():
 def test_opus_46_is_5_25_not_15_75():
     # The old $15/$75 entry was never a real Opus 4.6 price.
     assert rate_sum("claude-opus-4-6", "2026-04-09") == 5.00 + 25.00
+
+
+def test_opus_46_has_no_long_context_tier():
+    # 4.6-generation models bill the full 1M window at standard pricing, so
+    # the >200K premium ($10/$37.50) carried until 2026-08-05 was a rate the
+    # provider denies. A 500K-token prompt must still price at $5/$25.
+    periods = RATE_HISTORY["claude-opus-4-6"]
+    assert len(periods) == 1
+    assert len(periods[0]["tiers"]) == 1
+    assert periods[0]["tiers"][0]["max_input_tokens"] is None
+    huge = compute_call_cost_usd("claude-opus-4-6", 500_000, 1_000, on_date="2026-07-15")
+    assert huge == (500_000 / 1e6) * 5.00 + (1_000 / 1e6) * 25.00
+
+
+def test_screening_backsolve_inverts_legacy_pricing():
+    # A screening call's input tokens are recoverable from its logged cost.
+    # Build a cost the way the pre-2026-08 table would have, then invert it.
+    in_rate, out_rate = LEGACY_FLAT_TABLE_PRE_2026_08["gpt-5.4"]
+    true_in, true_out = 8_412, 611
+    logged = round((true_in / 1e6) * in_rate + (true_out / 1e6) * out_rate, 6)
+    assert backsolve_screening_input_tokens("gpt-5.4", logged, true_out) == true_in
+    # Prefix fallback works the same way the adapters resolved versioned IDs.
+    assert backsolve_screening_input_tokens("gpt-5.4-2026-03-05", logged, true_out) == true_in
+
+
+def test_screening_backsolve_refuses_impossible_inputs():
+    # Missing pieces, unknown models, and a cost too small to cover the logged
+    # output tokens all return None — never a silent zero.
+    assert backsolve_screening_input_tokens("gpt-5.4", None, 100) is None
+    assert backsolve_screening_input_tokens("gpt-5.4", 0.01, None) is None
+    assert backsolve_screening_input_tokens("not-a-model", 0.01, 100) is None
+    # $0.000001 cannot have paid for 1M output tokens at $30/MTok.
+    assert backsolve_screening_input_tokens("gpt-5.4", 0.000001, 1_000_000) is None
 
 
 def test_gpt54_flat_since_launch():
@@ -113,3 +148,93 @@ def test_cost_per_mtok_compat_view():
     assert COST_PER_MTOK["claude-sonnet-4-6"] == {"input": 3.00, "output": 15.00}
     assert COST_PER_MTOK["claude-opus-4-6"] == {"input": 5.00, "output": 25.00}
     assert COST_PER_MTOK["grok-4.20-0309-reasoning"] == {"input": 1.25, "output": 2.50}
+
+
+# --- rider 1: read-time repricing (2026-08-05) ---------------------------
+
+
+def test_reprice_record_uses_record_date_not_logged_cost():
+    """A record's stored cost is ignored; the date drives the rate period."""
+    from src.analytics.performance import reprice_record_usd
+
+    base = {
+        "model_id_returned": "grok-4.20-0309-reasoning",
+        "input_tokens": 10_000,
+        "output_tokens": 2_000,
+        # Deliberately absurd stored value — repricing must not read it.
+        "cost_usd": 999.99,
+    }
+    before = reprice_record_usd({**base, "date": "2026-05-06"})
+    after = reprice_record_usd({**base, "date": "2026-05-07"})
+    # Inside the ambiguity window: old rate $2/$6.
+    assert before["decision_usd"] == (10_000 / 1e6) * 2.00 + (2_000 / 1e6) * 6.00
+    # From the boundary: cut rate $1.25/$2.50.
+    assert after["decision_usd"] == (10_000 / 1e6) * 1.25 + (2_000 / 1e6) * 2.50
+    assert before["decision_usd"] > after["decision_usd"]
+
+
+def test_reprice_record_prefers_logged_screening_input_over_backsolve():
+    """New records carry screening_input_tokens; the back-solve is skipped."""
+    from src.analytics.performance import reprice_record_usd
+
+    priced = reprice_record_usd({
+        "model_id_returned": "claude-sonnet-4-6",
+        "date": "2026-08-05",
+        "input_tokens": 5_000,
+        "output_tokens": 1_000,
+        "screening_input_tokens": 4_000,
+        "screening_tokens": 500,
+        "screening_cost_usd": 0.123456,
+    })
+    assert priced["screening_backsolved"] is False
+    assert priced["screening_usd"] == (4_000 / 1e6) * 3.00 + (500 / 1e6) * 15.00
+
+
+def test_reprice_record_backsolves_when_input_absent():
+    """Historical records with no screening_input_tokens invert their cost."""
+    from src.analytics.performance import reprice_record_usd
+
+    in_rate, out_rate = LEGACY_FLAT_TABLE_PRE_2026_08["claude-sonnet-4-6"]
+    true_in, true_out = 6_000, 400
+    logged = round((true_in / 1e6) * in_rate + (true_out / 1e6) * out_rate, 6)
+    priced = reprice_record_usd({
+        "model_id_returned": "claude-sonnet-4-6",
+        "date": "2026-06-01",
+        "input_tokens": 5_000,
+        "output_tokens": 1_000,
+        "screening_tokens": true_out,
+        "screening_cost_usd": logged,
+    })
+    assert priced["screening_backsolved"] is True
+    # Sonnet's rate was correct all along, so the repriced screening cost
+    # equals the logged one — the back-solve recovered the right token count.
+    assert abs(priced["screening_usd"] - logged) < 1e-6
+
+
+def test_reprice_record_no_screening_call():
+    from src.analytics.performance import reprice_record_usd
+
+    priced = reprice_record_usd({
+        "model_id_returned": "gpt-5.4",
+        "date": "2026-07-01",
+        "input_tokens": 1_000,
+        "output_tokens": 100,
+    })
+    assert priced["screening_usd"] is None
+    assert priced["screening_backsolved"] is False
+    assert priced["decision_usd"] == (1_000 / 1e6) * 2.50 + (100 / 1e6) * 15.00
+
+
+def test_reprice_record_untokened_shakedown_record_is_unpriced():
+    """April 8-9 records predate token logging — unpriceable, never zero."""
+    from src.analytics.performance import reprice_record_usd
+
+    priced = reprice_record_usd({
+        "model_id_returned": "claude-opus-4-6",
+        "date": "2026-04-08",
+        "input_tokens": None,
+        "output_tokens": None,
+        "cost_usd": None,
+    })
+    assert priced["decision_usd"] is None
+    assert priced["screening_usd"] is None

@@ -361,20 +361,93 @@ def compute_spy_benchmark_metrics(
     }
 
 
+def reprice_record_usd(rec: dict[str, Any]) -> dict[str, Any]:
+    """Reprice one decision-log record at the rates in force on its date.
+
+    Read-time repricing (2026-08-05 rider 1). The stored ``cost_usd`` /
+    ``screening_cost_usd`` fields are NOT read for the total: they were
+    computed at call time against whatever table was live then, and four of
+    the six rates in the pre-2026-08 table were never a published list price
+    (see CORRECTIONS.md). The JSONL history stays immutable — we recompute
+    from the stored token counts and the record's own date, so a call is
+    always priced at the rate in force when it ran.
+
+    Screening calls store output tokens but not input tokens for records
+    written before 2026-08-05. Those are back-solved from the logged screening
+    cost against the frozen legacy table (exact to ±0.2 tokens); records from
+    2026-08-05 onward carry ``screening_input_tokens`` and are priced directly.
+
+    Returns:
+        {
+          "decision_usd": float | None,   # None = no rate for that model/date
+          "screening_usd": float | None,  # None = no screening call, or unpriceable
+          "screening_backsolved": bool,   # True if input tokens were inverted
+        }
+    """
+    from .cost_rates import backsolve_screening_input_tokens, compute_call_cost_usd
+
+    model_id = rec.get("model_id_returned") or rec.get("model_id_configured") or ""
+    on_date = rec.get("date")
+
+    dec_in = int(rec.get("input_tokens") or 0)
+    dec_out = int(rec.get("output_tokens") or 0)
+    decision_usd = (
+        compute_call_cost_usd(model_id, dec_in, dec_out, on_date=on_date)
+        if (dec_in > 0 or dec_out > 0)
+        else None
+    )
+
+    screening_usd = None
+    backsolved = False
+    scr_out = rec.get("screening_tokens")
+    if scr_out is not None:
+        scr_in = rec.get("screening_input_tokens")
+        if scr_in is None:
+            scr_in = backsolve_screening_input_tokens(
+                model_id, rec.get("screening_cost_usd"), scr_out
+            )
+            backsolved = scr_in is not None
+        if scr_in is not None:
+            screening_usd = compute_call_cost_usd(
+                model_id, int(scr_in), int(scr_out), on_date=on_date
+            )
+
+    return {
+        "decision_usd": decision_usd,
+        "screening_usd": screening_usd,
+        "screening_backsolved": backsolved,
+    }
+
+
 def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
-    """Sum token usage and USD cost across every decision-log entry for a model.
+    """Sum token usage and repriced USD cost across a model's decision log.
 
     Walks /data/trades/{model_key}_YYYY-MM.jsonl files (using a regex match
     rather than a glob so prefix-collision keys like "claude" / "claude_opus"
-    don't cross-pollute). Returns:
+    don't cross-pollute).
+
+    Cost is repriced at read time from stored tokens + each record's date (see
+    reprice_record_usd) and INCLUDES the screening call, which the pre-rider-1
+    version omitted entirely. ``input_tokens`` / ``output_tokens`` remain
+    decision-call counts, unchanged, so token-based consumers are unaffected;
+    the screening leg is exposed separately. Returns:
         {
           "calls": int,
           "input_tokens": int,
           "output_tokens": int,
           "total_tokens": int,
-          "cost_usd": float,           # 0.0 if no rates known
-          "cost_known": bool,          # True if every call had a cost rate
+          "cost_usd": float,               # decision + screening, repriced
+          "decision_cost_usd": float,
+          "screening_cost_usd": float,
+          "cost_known": bool,              # True if every call priced
+          "unknown_cost_calls": int,       # no tokens logged, or no rate for model/date
+          "screening_backsolved_calls": int,
         }
+
+    ``unknown_cost_calls`` currently counts only the 37 April 8-9 shakedown
+    records written before token logging landed — they carry no token counts
+    at all, so they were unpriceable under the old logged-cost path too and
+    the count is unchanged by the switch to repricing.
     """
     pattern = re.compile(rf"^{re.escape(model_key)}_\d{{4}}-\d{{2}}\.jsonl$")
     files = sorted(
@@ -385,8 +458,10 @@ def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
     calls = 0
     in_tok = 0
     out_tok = 0
-    cost = 0.0
+    decision_cost = 0.0
+    screening_cost = 0.0
     unknown_cost_calls = 0
+    backsolved_calls = 0
     for fp in files:
         with open(fp, "r", encoding="utf-8") as f:
             for line in f:
@@ -402,19 +477,26 @@ def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
                 calls += 1
                 in_tok += int(rec.get("input_tokens") or 0)
                 out_tok += int(rec.get("output_tokens") or 0)
-                c = rec.get("cost_usd")
-                if c is None:
+                priced = reprice_record_usd(rec)
+                if priced["decision_usd"] is None:
                     unknown_cost_calls += 1
                 else:
-                    cost += float(c)
+                    decision_cost += priced["decision_usd"]
+                if priced["screening_usd"] is not None:
+                    screening_cost += priced["screening_usd"]
+                if priced["screening_backsolved"]:
+                    backsolved_calls += 1
     return {
         "calls": calls,
         "input_tokens": in_tok,
         "output_tokens": out_tok,
         "total_tokens": in_tok + out_tok,
-        "cost_usd": cost,
+        "cost_usd": decision_cost + screening_cost,
+        "decision_cost_usd": decision_cost,
+        "screening_cost_usd": screening_cost,
         "cost_known": unknown_cost_calls == 0 and calls > 0,
         "unknown_cost_calls": unknown_cost_calls,
+        "screening_backsolved_calls": backsolved_calls,
     }
 
 
@@ -445,6 +527,10 @@ def compute_api_cost_summary_window(
     Cheap defensive guard: only opens monthly files whose YYYY-MM tag
     overlaps the requested window, so this stays O(window-months) rather
     than O(all-history) for short windows like "today" or "this week".
+
+    Cost is repriced at read time from stored tokens + record date and
+    includes the screening call (2026-08-05 rider 1) — see
+    reprice_record_usd. The stored cost_usd fields are not summed.
     """
     pattern = re.compile(rf"^{re.escape(model_key)}_(\d{{4}})-(\d{{2}})\.jsonl$")
     files: list[Path] = []
@@ -466,12 +552,13 @@ def compute_api_cost_summary_window(
             files.append(fp)
     files.sort()
 
-    from .cost_rates import compute_call_cost_usd
-
     calls = 0
     in_tok = 0
     out_tok = 0
-    cost = 0.0
+    decision_cost = 0.0
+    screening_cost = 0.0
+    unknown_cost_calls = 0
+    backsolved_calls = 0
     trades_executed = 0
     for fp in files:
         with open(fp, "r", encoding="utf-8") as f:
@@ -493,29 +580,26 @@ def compute_api_cost_summary_window(
                 if until and ts >= until:
                     continue
                 calls += 1
-                rec_in = int(rec.get("input_tokens") or 0)
-                rec_out = int(rec.get("output_tokens") or 0)
-                in_tok += rec_in
-                out_tok += rec_out
-                c = rec.get("cost_usd")
-                if c is None and (rec_in > 0 or rec_out > 0):
-                    # Backfill: the record was written before the cost-rates
-                    # prefix-fallback fix landed, but we have token counts.
-                    # Recompute at the rate in force on the record's date —
-                    # the table is dated rate periods now, and pricing a
-                    # historical call at today's rate misattributes any call
-                    # that straddles a provider price change.
-                    c = compute_call_cost_usd(
-                        rec.get("model_id_returned") or rec.get("model_id_configured", ""),
-                        rec_in, rec_out,
-                        on_date=rec.get("date"),
-                    )
-                if c is not None:
-                    cost += float(c)
+                in_tok += int(rec.get("input_tokens") or 0)
+                out_tok += int(rec.get("output_tokens") or 0)
+                # Every record is repriced from its own tokens and date. The
+                # old path summed the logged cost and only recomputed when it
+                # was null, which propagated the pre-2026-08 rate errors into
+                # every window this function feeds.
+                priced = reprice_record_usd(rec)
+                if priced["decision_usd"] is None:
+                    unknown_cost_calls += 1
+                else:
+                    decision_cost += priced["decision_usd"]
+                if priced["screening_usd"] is not None:
+                    screening_cost += priced["screening_usd"]
+                if priced["screening_backsolved"]:
+                    backsolved_calls += 1
                 # Count BUY/SELL executions for cost-per-trade
                 for ex in rec.get("executions") or []:
                     if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
                         trades_executed += 1
+    cost = decision_cost + screening_cost
     return {
         "calls": calls,
         "trades_executed": trades_executed,
@@ -523,6 +607,10 @@ def compute_api_cost_summary_window(
         "output_tokens": out_tok,
         "total_tokens": in_tok + out_tok,
         "cost_usd": cost,
+        "decision_cost_usd": decision_cost,
+        "screening_cost_usd": screening_cost,
+        "unknown_cost_calls": unknown_cost_calls,
+        "screening_backsolved_calls": backsolved_calls,
         "cost_per_trade_usd": (cost / trades_executed) if trades_executed > 0 else None,
     }
 

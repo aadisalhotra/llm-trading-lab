@@ -12,6 +12,9 @@ any date (they were entry errors, not stale prices):
   * claude-opus-4-6:  carried $15/$75 (the Opus 4.1-generation rate). Actual:
     $5/$25 since the Opus line's cut at Opus 4.5 launch (2025-11-24), confirmed
     unchanged at 4.6 launch (2026-02-05).      [anthropic.com/news/claude-opus-4-6]
+    Single tier: 4.6-generation models bill the full 1M-token window at
+    standard pricing (the >200K premium carried here until 2026-08-05 was a
+    denied rate — removed by hub ruling 2026-08-05).
   * gpt-5.4:          carried $10/$30. Actual: $2.50/$15 from launch day
     (2026-03-05) through today, verified by archived pricing-page snapshots
     (Mar 5 / Apr 25 / Jul 10 / Aug 1 all identical).
@@ -80,16 +83,16 @@ RATE_HISTORY: dict[str, list[dict]] = {
     ],
     # Opus 4.6 launched 2026-02-05 at $5/$25 ("Pricing remains the same at
     # $5/$25" — anthropic.com/news/claude-opus-4-6); the Opus line moved off
-    # $15/$75 at Opus 4.5's launch, 2025-11-24. The >200K-prompt long-context
-    # premium ($10/$37.50) has never applied to a lab call (max ~11K in).
+    # $15/$75 at Opus 4.5's launch, 2025-11-24. SINGLE tier: the provider page
+    # states 4.6-generation models bill the FULL 1M-token context window at
+    # standard pricing, so the >200K long-context premium ($10/$37.50) carried
+    # here until 2026-08-05 was a denied rate, not merely an inert one. Removed
+    # by hub ruling — see CORRECTIONS.md.
     "claude-opus-4-6": [
         {
             "effective_from": None,
-            "tiers": [
-                {"max_input_tokens": 200_000, "input": 5.00, "output": 25.00},
-                {"max_input_tokens": None, "input": 10.00, "output": 37.50},
-            ],
-            "note": "$5/$25 since launch 2026-02-05; the old $15/$75 entry was the Opus 4.1-generation rate and never applied to 4.6.",
+            "tiers": [{"max_input_tokens": None, "input": 5.00, "output": 25.00}],
+            "note": "$5/$25 since launch 2026-02-05, full 1M window at standard pricing (no long-context tier); the old $15/$75 entry was the Opus 4.1-generation rate and never applied to 4.6.",
         },
     ],
     # OpenAI — $2.50/$15 from launch day (2026-03-05) through today, verified
@@ -209,8 +212,85 @@ RATE_HISTORY: dict[str, list[dict]] = {
 }
 
 
+# The flat table that priced every call logged before the 2026-08 restructure,
+# frozen verbatim. It is NOT pricing policy — every rate in it is superseded by
+# RATE_HISTORY above, and four of the six were never a published list price.
+#
+# It survives for exactly one job: back-solving screening input tokens. The
+# decision log stores a screening call's OUTPUT tokens and the USD cost that
+# was computed at call time, but not its input tokens. For any record written
+# before this table was replaced, that stored cost is a two-unknowns equation
+# with one unknown removed — inverting it recovers the input-token count to
+# within the 6dp rounding of the stored cost (±0.2 tokens at these rates).
+#
+# Records written from 2026-08-05 onward carry `screening_input_tokens`
+# directly and never touch this path. Do not add entries here; when the last
+# pre-2026-08 record leaves the analysis window, delete it.
+LEGACY_FLAT_TABLE_PRE_2026_08: dict[str, tuple[float, float]] = {
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-opus-4-6": (15.00, 75.00),
+    "gpt-5.4": (10.00, 30.00),
+    "gemini-3.1-pro-preview": (3.50, 14.00),
+    "grok-4": (5.00, 15.00),
+    "grok-4.20-0309-reasoning": (5.00, 25.00),
+    "deepseek-chat": (0.27, 1.10),
+    "deepseek-reasoner": (0.55, 2.19),
+    "deepseek-v4-pro": (1.74, 3.48),
+    "deepseek-v4-flash": (0.14, 0.28),
+}
+
+
 def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _legacy_rates(model_id: str) -> tuple[float, float] | None:
+    """Legacy flat-table lookup with the same prefix fallback the adapters used."""
+    if not model_id:
+        return None
+    if model_id in LEGACY_FLAT_TABLE_PRE_2026_08:
+        return LEGACY_FLAT_TABLE_PRE_2026_08[model_id]
+    parts = model_id.split("-")
+    while len(parts) > 1:
+        parts.pop()
+        candidate = "-".join(parts)
+        if candidate in LEGACY_FLAT_TABLE_PRE_2026_08:
+            return LEGACY_FLAT_TABLE_PRE_2026_08[candidate]
+    return None
+
+
+def backsolve_screening_input_tokens(
+    model_id: str,
+    screening_cost_usd: float | None,
+    screening_output_tokens: int | None,
+) -> int | None:
+    """Recover a pre-2026-08 screening call's input tokens from its logged cost.
+
+    The logged cost was computed at call time as
+        cost = in/1e6 * old_input_rate + out/1e6 * old_output_rate
+    under the flat table frozen in LEGACY_FLAT_TABLE_PRE_2026_08. Output tokens
+    are logged, so this inverts for input. Exact to ±0.2 tokens (the stored
+    cost is rounded to 6dp).
+
+    Returns None when the model has no legacy rate, when either input is
+    missing, or when the inversion goes materially negative — which would mean
+    the stored cost did not come from the legacy table and the assumption
+    behind this whole path is void for that record. Callers treat None as
+    "screening cost unknown", never zero.
+    """
+    if screening_cost_usd is None or screening_output_tokens is None:
+        return None
+    rates = _legacy_rates(model_id)
+    if rates is None or rates[0] <= 0:
+        return None
+    in_rate, out_rate = rates
+    tokens = (
+        float(screening_cost_usd) * 1_000_000.0
+        - float(screening_output_tokens) * out_rate
+    ) / in_rate
+    if tokens < -1:
+        return None
+    return max(0, round(tokens))
 
 
 def _resolve_history(model_id: str) -> list[dict] | None:
