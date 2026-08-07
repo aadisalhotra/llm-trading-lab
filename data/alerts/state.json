@@ -34,19 +34,51 @@
     ]
   },
   "daily": {
-    "date": "2026-08-06",
-    "sent_count": 1,
+    "date": "2026-08-07",
+    "sent_count": 5,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "missed_run:2026-08-05:2026-08-07",
+      "ath:gemini",
+      "ath:grok",
+      "ath:claude_opus",
+      "news:TMO:04a431bc31"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
-        "kind": "macro_event",
+        "kind": "missed_run",
         "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-08-06T13:32:37.782089+00:00",
+        "title": "Missed scheduled run(s): 1 day(s)",
+        "timestamp": "2026-08-07T21:07:59.445561+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-07T21:08:01.038010+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-08-07T21:08:02.499764+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 hit a new all-time high",
+        "timestamp": "2026-08-07T21:08:03.924130+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TMO (held by 5)",
+        "timestamp": "2026-08-07T21:08:05.514680+00:00",
         "disposition": "sent"
       }
     ]
