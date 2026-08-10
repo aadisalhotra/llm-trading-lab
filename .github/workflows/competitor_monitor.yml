@@ -52,6 +52,10 @@ jobs:
           git config user.name "llm-trading-lab-bot"
           git config user.email "actions@github.com"
           git add reports/competitor_digest_*.md || true
+          # The structured index is the queryable series behind the digests —
+          # it must land in the same commit, or the markdown and the index
+          # drift apart week by week.
+          git add reports/competitor_index.jsonl || true
           if git diff --cached --quiet; then
             echo "No digest changes to commit"
             exit 0

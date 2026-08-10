@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import logging
 import os
 import re
@@ -38,14 +39,45 @@ from src.config_loader import REPORTS_DIR, configure_logging  # noqa: E402
 
 logger = logging.getLogger("llmlab.competitor_monitor")
 
-KEYWORDS = [
-    "LLM trading",
-    "frontier model portfolio",
-    "GPT trading agent",
-    "AI investment decisions",
-    "LLM portfolio management",
-    "language model trading",
-]
+# Keywords grouped by the research area each one is scanning for. The digest
+# reports which area a hit landed in, so "who else is running LLM portfolios"
+# stays separable from the two methodological areas the paper draws on.
+#
+#   trading_agents      — the original scope: who else has frontier models
+#                         running real portfolios.
+#   cross_model_behavior— our own contribution's shape: comparing several
+#                         models' decisions on identical inputs.
+#   decision_uncertainty— the mechanism literature the RQs lean on.
+KEYWORD_AREAS: dict[str, list[str]] = {
+    "trading_agents": [
+        "LLM trading",
+        "frontier model portfolio",
+        "GPT trading agent",
+        "AI investment decisions",
+        "LLM portfolio management",
+        "language model trading",
+    ],
+    "cross_model_behavior": [
+        "cross-model comparison",
+        "multi-model benchmark",
+        "LLM behavioral comparison",
+        "comparing language models decisions",
+        "model agreement",
+    ],
+    "decision_uncertainty": [
+        "LLM decision making under uncertainty",
+        "language model risk preferences",
+        "LLM calibration decisions",
+        "LLM agent rationality",
+        "language model judgment bias",
+    ],
+}
+
+# Flat list — the arXiv query and the existing manual-link path both use it.
+KEYWORDS = [kw for kws in KEYWORD_AREAS.values() for kw in kws]
+
+# Reverse index: keyword -> area, for tagging a hit.
+_KEYWORD_AREA = {kw: area for area, kws in KEYWORD_AREAS.items() for kw in kws}
 
 ARXIV_API = "http://export.arxiv.org/api/query"
 SSRN_SEARCH_URL = "https://www.ssrn.com/index.cfm/en/search/?term={}"
@@ -102,6 +134,30 @@ def _matched_keywords(text: str) -> list[str]:
     return [kw for kw in KEYWORDS if kw.lower() in low]
 
 
+def _matched_areas(matched: list[str]) -> list[str]:
+    """Research areas a hit's matched keywords belong to, in declaration order."""
+    hit = {_KEYWORD_AREA[kw] for kw in matched if kw in _KEYWORD_AREA}
+    return [a for a in KEYWORD_AREAS if a in hit]
+
+
+def _relevance_line(title: str, matched: list[str], areas: list[str]) -> str:
+    """One line on why this paper is in the digest.
+
+    Deliberately mechanical — it states the matched terms and area, and makes
+    no claim about the paper's quality or its bearing on our results. A human
+    reads the abstract; this is triage, not assessment.
+    """
+    if not matched:
+        return "Matched the area query but no keyword appears in the title or abstract — check manually."
+    area_names = {
+        "trading_agents": "another LLM-run portfolio / trading agent",
+        "cross_model_behavior": "cross-model behavioral comparison",
+        "decision_uncertainty": "LLM decision-making under uncertainty",
+    }
+    label = "; ".join(area_names.get(a, a) for a in areas) or "uncategorised"
+    return f"{label} — matched {', '.join(repr(k) for k in matched[:3])}"
+
+
 # --------------------------------------------------------------------------
 # arXiv
 # --------------------------------------------------------------------------
@@ -155,15 +211,21 @@ def fetch_arxiv(days: int, max_results: int = 60) -> list[dict]:
         authors = [html.unescape(a) for a in authors if a]
         cats = [c.get("term", "") for c in entry.findall("a:category", _ATOM)]
         matched = _matched_keywords(f"{title} {summary}")
+        areas = _matched_areas(matched)
+        clean_title = html.unescape(title)
         seen.add(pid)
         papers.append({
             "id": pid,
-            "title": html.unescape(title),
+            "title": clean_title,
             "authors": authors,
             "published": published.strftime("%Y-%m-%d") if published else published_raw[:10],
             "categories": cats,
             "summary": html.unescape(summary),
             "matched_keywords": matched,
+            # Structured triage fields (date/title/venue/relevance).
+            "venue": f"arXiv ({cats[0]})" if cats else "arXiv",
+            "areas": areas,
+            "relevance": _relevance_line(clean_title, matched, areas),
         })
     logger.info("arXiv: %d papers within the last %d days", len(papers), days)
     return papers
@@ -240,7 +302,10 @@ def build_digest(week_tag: str, arxiv_papers: list[dict],
             lines.append("")
             lines.append(f"- **Authors:** {authors or '—'}")
             lines.append(f"- **Published:** {p['published']}  ·  "
+                         f"**Venue:** {p.get('venue') or 'arXiv'}  ·  "
                          f"**Categories:** {', '.join(p['categories']) or '—'}")
+            if p.get("relevance"):
+                lines.append(f"- **Relevance:** {p['relevance']}")
             if p["matched_keywords"]:
                 lines.append(f"- **Matched:** {', '.join(p['matched_keywords'])}")
             abstract = p["summary"]
@@ -278,6 +343,69 @@ def build_digest(week_tag: str, arxiv_papers: list[dict],
     return "\n".join(lines)
 
 
+def structured_entries(week_tag: str, generated_at: datetime,
+                       arxiv_papers: list[dict]) -> list[dict]:
+    """One flat record per hit: date, title, venue, one-line relevance.
+
+    The markdown digest is for reading; this is the queryable series. Twelve
+    weeks of prose can't answer "has anything in cross-model behavioral
+    comparison appeared since June" without re-reading twelve files.
+    """
+    return [{
+        "week": week_tag,
+        "scanned_at": generated_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "date": p["published"],
+        "title": p["title"],
+        "venue": p.get("venue") or "arXiv",
+        "url": p["id"].replace("http://", "https://"),
+        "areas": p.get("areas") or [],
+        "matched_keywords": p.get("matched_keywords") or [],
+        "relevance": p.get("relevance") or "",
+    } for p in arxiv_papers]
+
+
+def append_structured_index(entries: list[dict], week_tag: str,
+                            output_dir: str | None = None) -> str:
+    """Append this week's entries to the append-only JSONL index.
+
+    Idempotent per week: re-running a week replaces that week's rows rather
+    than duplicating them, so a manual re-run or a backfill can't inflate the
+    series. `week_tag` is passed separately from the entries because a week
+    with zero hits still has to purge any prior rows for that week — but the
+    two must agree, or the purge would clear one week while writing another.
+    """
+    mismatched = sorted({e.get("week") for e in entries if e.get("week") != week_tag})
+    if mismatched:
+        raise ValueError(
+            f"append_structured_index: entries carry week(s) {mismatched} but week_tag is "
+            f"{week_tag!r} — refusing to purge one week while appending another")
+
+    out_dir = output_dir or str(REPORTS_DIR)
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "competitor_index.jsonl")
+
+    kept: list[dict] = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if row.get("week") != week_tag:
+                    kept.append(row)
+    kept.extend(entries)
+    with open(path, "w", encoding="utf-8") as f:
+        for row in kept:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    logger.info("Structured index: %d rows total (%d added for %s)",
+                len(kept), len(entries), week_tag)
+    return path
+
+
 def run(days: int = 7, max_results: int = 60, output_dir: str | None = None) -> str:
     generated_at = datetime.now(timezone.utc)
     week_tag = iso_week_tag(generated_at)
@@ -293,6 +421,10 @@ def run(days: int = 7, max_results: int = 60, output_dir: str | None = None) -> 
     out_path = os.path.join(out_dir, f"competitor_digest_{week_tag}.md")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(digest)
+
+    entries = structured_entries(week_tag, generated_at, arxiv_papers)
+    append_structured_index(entries, week_tag, output_dir=out_dir)
+
     logger.info("Competitor digest written: %s (arXiv=%d, SSRN=%d)",
                 out_path, len(arxiv_papers), len(ssrn_results))
     return out_path
