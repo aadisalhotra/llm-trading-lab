@@ -216,6 +216,65 @@
           "fix": "direction-aware replay: SHORT/COVER fills chain into a separate short book (proceeds credited on SHORT, cover cost paid on COVER, open shorts marked as negative value), with an over-cover probe (the short-side analogue of the oversell probe) and the overhang-constant drift check; legitimate logged shorts are excluded from the infeasibility/trust diagnostics, which continue to measure only phantom long-book negatives and negative cash.",
           "verification": "May window byte-identical for all six models vs the committed defab_clean_window.json; June recomputes exactly to the committed 2026-06 layer values; July overhang-constant check passes all six models at float-noise drift.",
           "fix_commit": "c26163b5"
+        },
+        "notable_events_long_only_extractor": {
+          "date": "2026-08-10",
+          "class": "published-then-corrected (post-publication erratum); sixth member of the long-only BUY/SELL filter defect class, and the second to reach this layer \u2014 see corrections.defab_short_blind_replay, which was the same filter in the de-fab replay caught pre-publication",
+          "field": "profiles[].notable_events.top_trades_by_value (gemini, deepseek)",
+          "moved": {
+            "gemini.top_trades_by_value[1]": {
+              "from": {
+                "ticker": "ABT",
+                "action": "SELL",
+                "value": 14808.9
+              },
+              "to": {
+                "ticker": "PG",
+                "action": "COVER",
+                "value": 16505.28
+              }
+            },
+            "gemini.top_trades_by_value[2]": {
+              "from": {
+                "ticker": "SLB",
+                "action": "SELL",
+                "value": 13020.15
+              },
+              "to": {
+                "ticker": "ABT",
+                "action": "SELL",
+                "value": 14808.9
+              }
+            },
+            "deepseek.top_trades_by_value[1]": {
+              "from": {
+                "ticker": "RTX",
+                "action": "SELL",
+                "value": 8546.52
+              },
+              "to": {
+                "ticker": "QCOM",
+                "action": "COVER",
+                "value": 9412.04
+              }
+            },
+            "deepseek.top_trades_by_value[2]": {
+              "from": {
+                "ticker": "GLD",
+                "action": "SELL",
+                "value": 7903.32
+              },
+              "to": {
+                "ticker": "RTX",
+                "action": "SELL",
+                "value": 8546.52
+              }
+            }
+          },
+          "cause": "scripts/build_monthly_data_layer._notable_events filtered executions to (\"BUY\", \"SELL\"), so every SHORT and COVER was dropped before the top-3-by-absolute-USD-value ranking. Shorting activated 2026-07-01, so July is the first month the filter could omit anything: 74 executed SHORT/COVER orders cohort-wide (gemini 62, deepseek 12) were invisible to the ranking. The field's own definition is \"top 3 executed trades by absolute USD value\" \u2014 direction is not part of it.",
+          "fix": "direction-aware extraction over the four position-moving sides (BUY/SELL/SHORT/COVER), named once as _TRADE_SIDES; commit fb65e27a. stop_loss_triggers was extended in the same commit but is unaffected here \u2014 July logged zero FORCED orders (the first is 2026-08-03, gemini COVER META, FORCED_POSITION_STOP), so July's arrays were already correct at empty.",
+          "scope": "top_trades_by_value for gemini and deepseek only. The four unshorted models are unchanged. No metric, gate, return, RQ input, or conservation figure depends on this field \u2014 it is a descriptive per-profile display array. cumulative_return_clean, inclusion gates, RQ pools, short_activity, and the audit block are all byte-identical.",
+          "render": "the published July PDF still shows the pre-correction arrays; a rev. 2 render routes through Reports/Design after this layer lands."
         }
       }
     }
@@ -5168,7 +5227,8 @@
         "short_exposure": "per-tick portfolio_after.short_exposure_pct (|short value| / equity); utilization_vs_cap divides by portfolio_rules.max_gross_short_pct.",
         "gross_net_exposure": "EOD (last tick per date) portfolio_after gross/net_exposure_pct.",
         "mean_eod_gross_hhi": "gross-weight (|market value|) HHI of the EOD book \u2014 shorts add to concentration exactly as equal-sized longs; identical to the long-only HHI on a long-only book.",
-        "closed_shorts": "full-history SHORT/COVER replay; a short closes on full cover only; attributed by exit_date in the calendar month; realized P&L = \u03a3 short proceeds \u2212 \u03a3 cover cost."
+        "closed_shorts": "full-history SHORT/COVER replay; a short closes on full cover only; attributed by exit_date in the calendar month; realized P&L = \u03a3 short proceeds \u2212 \u03a3 cover cost.",
+        "utilization_vs_cap_mechanism": "utilization_vs_cap is measured on per-tick portfolio_after snapshots, but the 20% gross-short cap is enforced at FILL (src/portfolio/risk.py, max_gross_short_pct, projected signed market values against decision-time equity). It is a fill-time constraint, not a continuously-maintained invariant: a book that fills to just under the cap crosses it on any adverse mark, with no order involved. July's single over-cap observation is exactly that and is NOT a breach \u2014 gemini 2026-07-31T15:05:25Z, short_exposure 0.200896 (max_utilization_vs_cap 1.0045), on a tick with NO position-moving execution. The last fill before it (2026-07-31T14:33:48Z, SHORT AAPL) cleared at 0.199761, inside the cap (0.9988x); the 0.1136pp excess came from marks alone, and the next tick's COVER returned exposure to 0.169889. Verified 2026-08-10 across all July ticks: zero fills cleared above the cap, for any model."
       },
       "notable_short_fills": {
         "designation": "Gemini's four largest short-side COVER fills by dollar value (hub ruling 2026-08-02, PI-relayed) \u2014 selection is mechanical: top 4 of the month's executed COVER fills by notional; every figure source-derived from the decision-log fill records.",
@@ -5407,16 +5467,16 @@
             "date": "2026-07-30"
           },
           {
+            "ticker": "PG",
+            "action": "COVER",
+            "value": 16505.28,
+            "date": "2026-07-30"
+          },
+          {
             "ticker": "ABT",
             "action": "SELL",
             "value": 14808.9,
             "date": "2026-07-29"
-          },
-          {
-            "ticker": "SLB",
-            "action": "SELL",
-            "value": 13020.15,
-            "date": "2026-07-27"
           }
         ],
         "stop_loss_triggers": [],
@@ -5990,16 +6050,16 @@
             "date": "2026-07-07"
           },
           {
+            "ticker": "QCOM",
+            "action": "COVER",
+            "value": 9412.04,
+            "date": "2026-07-09"
+          },
+          {
             "ticker": "RTX",
             "action": "SELL",
             "value": 8546.52,
             "date": "2026-07-10"
-          },
-          {
-            "ticker": "GLD",
-            "action": "SELL",
-            "value": 7903.32,
-            "date": "2026-07-27"
           }
         ],
         "stop_loss_triggers": [],

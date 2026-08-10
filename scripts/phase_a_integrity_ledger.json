@@ -173,6 +173,28 @@
           "by": "operational_events.2026-08[gemini_sdk_migration_2026_08].phase_b_clock_spec",
           "reason": "Research integration-path rule (§8): no model enters Phase B on a deprecated integration path. The lab's Gemini client (google-generativeai) is deprecated; migration to google-genai staged 2026-08-02. The 'August counted from 2026-08-03' clause in consequence no longer governs — the validation clock restarts at the first logged post-migration Gemini success, and the 2026-08-03..[cutover] legacy-SDK sliver (empty if cutover lands pre-market 2026-08-03) is discarded from clock credit. The consequence text above is retained verbatim as the committed 2026-07-27 record."
         }
+      },
+
+      {
+        "id": "notable_events_long_only_extractor",
+        "date": "2026-07-01",
+        "discovered": "2026-08-10",
+        "type": "erratum",
+        "scope": "all_six_models (materialised in gemini + deepseek only)",
+        "detail": "scripts/build_monthly_data_layer._notable_events filtered executions to (\"BUY\", \"SELL\") before ranking, so every SHORT and COVER was dropped from top_trades_by_value — a field whose own definition is 'top 3 executed trades by absolute USD value', in which direction plays no part. The filter predates shorting and was correct until the shorting regime activated 2026-07-01 (regime_boundaries.shorting_activation), which is the effective date of the defect and why July is the first affected month: 74 executed SHORT/COVER orders cohort-wide (gemini 62, deepseek 12) were invisible to the ranking. The same BUY/SELL literal also governed the stop-loss extraction in that function, which is how a FORCED short cover would have gone unrecorded; July logged zero FORCED orders so its stop_loss_triggers arrays were already correct at empty, and the first live instance is 2026-08-03 (gemini, COVER META, FORCED_POSITION_STOP, $10,341.32) — inside an unpublished month, so it is a build-forward correctness fix, not an erratum. This is the SIXTH member of the long-only-filter defect class and the SECOND to reach a committed layer; the first was corrections.defab_short_blind_replay (same literal in the de-fab replay, caught pre-publication 2026-08-02).",
+        "consequence": "reports/monthly/2026-07/data_layer.json corrected in place at profiles[gemini|deepseek].notable_events.top_trades_by_value, with the from/to pairs recorded verbatim at report_meta.provenance.corrections.notable_events_long_only_extractor. Correction is descriptive-only: top_trades_by_value feeds no metric, gate, return, RQ input, or conservation figure, so cumulative_return_clean, the inclusion gates, RQ pools, short_activity and the audit block are byte-identical either side of it. The four unshorted models are unchanged. The published July PDF still renders the pre-correction arrays — a rev. 2 render routes through Reports/Design after the layer lands. May and June are unaffected (no shorts before 2026-07-01), so the reproduce-May regression is untouched.",
+        "fix_commit": "fb65e27a (direction-aware extraction over the four position-moving sides, named once as _TRADE_SIDES; two further class members fixed in the same commit — the oversized-trade alert and the cost-per-trade denominator — and four more flagged for Research/prompt decisions rather than changed)",
+        "evidence": "data/trades/{gemini,deepseek}_2026-07.jsonl (74 executed SHORT/COVER orders); the corrected arrays recomputed from those logs through the fixed extractor and diffed against the committed layer; tests/test_direction_aware_extraction.py."
+      },
+
+      {
+        "id": "short_cap_is_a_fill_time_constraint",
+        "date": "2026-07-31",
+        "type": "disclosure",
+        "scope": "all_six_models",
+        "detail": "The 20% gross-short cap is enforced at FILL (src/portfolio/risk.py, max_gross_short_pct, projecting signed market values against decision-time equity), while utilization_vs_cap is measured on per-tick portfolio_after snapshots. The two are not the same quantity: the cap is a fill-time constraint, NOT a continuously-maintained invariant, so a book that fills to just under the cap crosses it on any adverse mark with no order involved. July's max_utilization_vs_cap of 1.0045 for gemini is exactly that and is not a breach — the observation is 2026-07-31T15:05:25Z at short_exposure 0.200896, on a tick with NO position-moving execution; the last fill before it (2026-07-31T14:33:48Z, SHORT AAPL) cleared at 0.199761, inside the cap at 0.9988x, and the next tick's COVER returned exposure to 0.169889. The 0.1136pp excess came from marks alone.",
+        "consequence": "recorded so a reader of the July layer does not parse max_utilization_vs_cap > 1.0 as a risk-control failure. Verified across every July tick for every model: zero fills cleared above the cap. Disclosed at cross_model_behavioral.short_activity.definition_notes.utilization_vs_cap_mechanism in the July layer. No code change — the enforcement point is by design; this entry fixes the reading, not the mechanism.",
+        "evidence": "data/trades/gemini_2026-07.jsonl (the 15:05:25Z tick carries no executed position-moving order); src/portfolio/risk.py max_gross_short_pct enforcement."
       }
     ],
     "2026-08": [
