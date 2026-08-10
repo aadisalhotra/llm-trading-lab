@@ -116,6 +116,48 @@ the tail of a tick (it never blocks trading; the tick is already complete).
   `is_market_open_now()`. Complements this watchdog; does not replace it (it runs
   on GitHub, so it can't survive a GitHub-wide outage the way this can).
 
+## Known blind spot — data completeness is not deploy freshness
+
+**Logged 2026-08-10 for the mid-month batch. Not fixed; scoped here so the next
+fix targets the right symptom.**
+
+`scripts/check_dashboard_staleness.py` answers one question: *is the published
+artifact keeping up with what we built?* It fetches the live dashboard's
+`generated_at` and compares it to the **locally committed** dashboard build. It
+does not, and cannot, answer *did today produce a full trading day of data?*
+
+Those come apart when the chain stops committing. On **2026-08-06** the intraday
+chain halted after 5 of 13 decision cycles (~11:35 ET) and never ran the EOD
+wrap — no performance row, no daily report, no digest, for all six models. The
+staleness monitor stayed quiet and was *correct* to: the pipeline committed its
+5 ticks and then stopped, so the public artifact and the local build were
+equally fresh. Nothing failed to publish. The day published **current-but-stale**
+and the monitor has no vocabulary for that.
+
+The uncomfortable part is that this is the *same property* that makes the
+monitor holiday-safe. Measuring public-vs-local rather than public-vs-wall-clock
+is exactly why a market holiday doesn't page us — the pipeline commits no new
+tick, so both sides age together. A mid-session chain death is indistinguishable
+from a holiday by that test. The holiday-safety and the blind spot are one
+mechanism, so this is not a threshold to retune; a completeness check is a
+different instrument.
+
+This is the same wrong-symptom class as the pre-fix Gemini blind spot: an alert
+that fires reliably on the symptom it watches, while the failure that actually
+costs data expresses itself as a different symptom entirely. Getting the
+threshold right on the wrong quantity buys nothing.
+
+What would actually close it: a check on **expected vs logged cycles for the
+trading day** — count the day's decision records against the session's expected
+boundary count and page when the session ends short. That is squarely the
+planned **B-secondary in-repo log verifier**'s job (above); it reads the
+committed decision logs, which is the surface where this failure is visible.
+Fold this requirement into that build rather than bolting a second check onto
+the staleness monitor, whose contract is deliberately narrow.
+
+Incident record: `scripts/phase_a_integrity_ledger.json` →
+`operational_events["2026-08"].cycle_gap_2026_08_06`.
+
 ## Per-boundary idempotency — and the concurrency-group tripwire
 
 `src/logging/boundary_ledger.py` enforces exactly-once decision-making per
