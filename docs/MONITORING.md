@@ -158,6 +158,42 @@ the staleness monitor, whose contract is deliberately narrow.
 Incident record: `scripts/phase_a_integrity_ledger.json` →
 `operational_events["2026-08"].cycle_gap_2026_08_06`.
 
+### Mid-month batch item 2 — `_previous_leaderboard()` must validate completeness
+
+**Logged 2026-08-10 from the same incident. Not fixed.**
+
+`src/reports/daily_report.py::_previous_leaderboard()` selects the previous
+day's rank baseline by globbing `data/leaderboard/*.json`, keeping stems
+strictly less than the run date, and taking the newest. The predicate is
+**"prior-dated"**. It needs to be **"prior-dated AND a complete six-model EOD
+snapshot."**
+
+The 2026-08-06 file satisfies the current predicate and is not an EOD snapshot
+at all — it is a mid-session intraday write, frozen when the chain halted,
+carrying the 2026-08-05 close. The 2026-08-07 report consumed it for rank
+arrows. Those arrows came out **correct**, because that file holds the 08-05
+ranks and 08-05 was the true prior close — correct by content, not by rule.
+
+The rule fails on a case only slightly different from the one we got: a chain
+halt *later* in a session, after some models had written updated rows and
+others had not, produces a snapshot that is genuinely mixed — part today, part
+yesterday — and the selector would propagate it as "yesterday" with no
+complaint. Same failure at a different clock time, no longer benign.
+
+Fix shape: gate selection on the day having a complete EOD — all six models
+present in `data/performance/{model}.jsonl` for that date — and walk further
+back when it doesn't, rather than trusting the filename. Note this is the same
+defect as the blind spot above wearing different clothes: an instrument
+selecting on an available-but-wrong predicate (freshness there, file date here)
+when the predicate that matters is data completeness. Worth fixing both against
+one definition of "a complete trading day" rather than twice, separately.
+
+The 2026-08-06 file itself now carries a per-row `_staleness` marker
+(`data_as_of: 2026-08-05`, `is_observation_for_file_date: false`, ledger ref) so
+it discloses its own staleness to anything that opens it. That marker is a
+one-off disclosure on a known-bad artifact, **not** the fix — the selector must
+not come to depend on hand-annotated files.
+
 ## Per-boundary idempotency — and the concurrency-group tripwire
 
 `src/logging/boundary_ledger.py` enforces exactly-once decision-making per
