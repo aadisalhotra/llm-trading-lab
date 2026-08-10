@@ -35,18 +35,66 @@
   },
   "daily": {
     "date": "2026-08-10",
-    "sent_count": 1,
+    "sent_count": 7,
     "dedup_keys": [
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "ath:claude",
+      "ath:gemini",
+      "ath:grok",
+      "ath:claude_opus",
+      "news:JPM:817c4e5218",
+      "news:LLY:13fd5d1454"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-08-10T17:32:39.348950+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-08-10T21:08:01.935990+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-10T21:08:03.450061+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-08-10T21:08:04.727897+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Opus 4.6 hit a new all-time high",
+        "timestamp": "2026-08-10T21:08:06.158180+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on JPM (held by 4)",
+        "timestamp": "2026-08-10T21:08:07.502503+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 4)",
+        "timestamp": "2026-08-10T21:08:08.714322+00:00",
         "disposition": "sent"
       }
     ]
