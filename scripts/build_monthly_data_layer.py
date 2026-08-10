@@ -817,6 +817,57 @@ def _notable_events(full_records, model_keys, win_start, win_end):
 # Data integrity (calendar month)
 # ==========================================================================
 
+def _phase_b_clock(ledger, win_start, win_end):
+    """The validation-clock window this build month intersects, or None.
+
+    A validation clock is a *timestamp* boundary, not a date boundary: the
+    Gemini Phase B clock starts at the first logged post-migration success
+    (2026-08-03T14:06:25.440972Z), mid-session on its first day. The existing
+    completeness_segmentation splits on an event's `effective` DATE and cannot
+    express that — the pre-clock cycle on the start date belongs to neither
+    segment. So the segment figure is computed natively here.
+
+    Scans every month's operational_events (not just the build month's — the
+    clock is registered in the month it was declared, 2026-08, but governs
+    September and October too) for an event carrying a phase_b_clock_spec.
+    Returns None when the build month falls outside [clock start .. clock_end],
+    which is what keeps every pre-August month — reproduce-May included — byte
+    identical.
+    """
+    for month_tag, events in (ledger.get("operational_events") or {}).items():
+        for ev in events:
+            spec = ev.get("phase_b_clock_spec")
+            if not spec:
+                continue
+            # The spec names the field; the observed timestamp lives in cutover.
+            start = ((ev.get("cutover") or {}).get("first_logged_post_migration_success") or "")
+            end = spec.get("clock_end") or ""
+            model = ev.get("scope")
+            if not start or not end or model is None:
+                continue
+            # Decision-log timestamps are naive UTC ("2026-08-03T14:06:25.440972");
+            # the ledger stores the same stamp with a trailing Z. Compare naive.
+            start_naive = start[:-1] if start.endswith("Z") else start
+            start_date = start_naive[:10]
+            # Intersect [start_date .. clock_end] with this build month.
+            if win_end < start_date or win_start > end:
+                continue
+            return {
+                "event_id": ev["id"],
+                "declared_in": month_tag,
+                "model": model,
+                "clock_start": start,
+                "clock_start_naive": start_naive,
+                "clock_start_date": start_date,
+                "clock_end": end,
+                "seg_start": max(win_start, start_date),
+                "seg_end": min(win_end, end),
+                "gates_per_segment": spec.get("gates_per_segment"),
+                "no_averaging": spec.get("no_averaging"),
+            }
+    return None
+
+
 def _data_integrity(model_keys, win_start, win_end, settings, ledger):
     """Per-model failure rates, missing-tick count, and the known incidents.
 
@@ -838,6 +889,17 @@ def _data_integrity(model_keys, win_start, win_end, settings, ledger):
     per_model_daily = {key: {} for key in model_keys}  # date -> [records, successes]
     tick_hashes_by_date = defaultdict(set)
     gemini_modes = Counter()
+
+    # Validation-clock segment, accumulated in the same pass as the calendar
+    # figures. `pb` is None for every month outside the clock window, and then
+    # nothing below this executes and no key is emitted.
+    pb = _phase_b_clock(ledger, win_start, win_end)
+    pb_daily = {}                 # date -> [records, successes]
+    pb_counts = [0, 0]            # [records, successes] in-segment
+    pb_pre = [0, 0]               # [records, successes] before the clock start
+    pb_finish = Counter()         # in-segment finish_reason profile
+    pb_missing_ts = 0             # in-segment records carrying no timestamp
+
     for key in model_keys:
         fp = TRADES_DIR / f"{key}_{month_tag}.jsonl"
         n = succ = fail = 0
@@ -867,6 +929,29 @@ def _data_integrity(model_keys, win_start, win_end, settings, ledger):
                     h = r.get("data_inputs_hash")
                     if h:
                         tick_hashes_by_date[r.get("date")].add(h)
+
+                    # ---- validation-clock segment (same pass, scoped model) ----
+                    if pb is not None and key == pb["model"]:
+                        ts = r.get("timestamp") or ""
+                        if not ts:
+                            # No timestamp: cannot place the record relative to a
+                            # timestamp boundary. Counted and disclosed rather than
+                            # silently assigned to either side.
+                            if r.get("date", "") >= pb["clock_start_date"]:
+                                pb_missing_ts += 1
+                            continue
+                        if ts < pb["clock_start_naive"]:
+                            pb_pre[0] += 1
+                            if r.get("api_success"):
+                                pb_pre[1] += 1
+                            continue
+                        pb_counts[0] += 1
+                        pbd = pb_daily.setdefault(r.get("date"), [0, 0])
+                        pbd[0] += 1
+                        if r.get("api_success"):
+                            pb_counts[1] += 1
+                            pbd[1] += 1
+                        pb_finish[r.get("api_finish_reason")] += 1
         per_model_records[key] = n
         per_model_fail[key] = {
             "records": n, "api_success": succ, "api_failures": fail,
@@ -997,6 +1082,63 @@ def _data_integrity(model_keys, win_start, win_end, settings, ledger):
                          "month; the segmentation is the documented regime point."),
             }
         out["completeness_segmentation"] = seg
+
+    # ---- validation-clock segment completeness (ADDITIONAL, never a replacement) ----
+    # per_model_failure_rate above stays the calendar-month figure for every
+    # model including this one. This block answers a different question: how
+    # the scoped model performed inside the validation segment, whose left edge
+    # is a timestamp mid-way through its first day.
+    if pb is not None:
+        nr, ns = pb_counts
+        mt = pb_finish.get("MAX_TOKENS", 0)
+        cal = per_model_fail.get(pb["model"]) or {}
+        out["phase_b_segment_completeness"] = {
+            pb["event_id"]: {
+                "model": pb["model"],
+                "clock_start": pb["clock_start"],
+                "clock_end": pb["clock_end"],
+                "segment_window": f"{pb['clock_start']}..{pb['seg_end']}",
+                "records": nr,
+                "api_success": ns,
+                "completeness": _f(round(ns / nr, 4)) if nr else None,
+                "max_tokens": {
+                    "count": mt,
+                    "share_of_cycles": _f(round(mt / nr, 6)) if nr else None,
+                },
+                "finish_reason_profile": {str(k): v for k, v in sorted(
+                    pb_finish.items(), key=lambda kv: (kv[0] is None, str(kv[0])))},
+                "daily": {d: {"records": v[0], "api_success": v[1],
+                              "completeness": _f(round(v[1] / v[0], 4)) if v[0] else None}
+                          for d, v in sorted(pb_daily.items())},
+                "excluded_pre_clock": {
+                    "records": pb_pre[0], "api_success": pb_pre[1],
+                    "note": ("Cycles on the clock-start date BEFORE the clock-start "
+                             "timestamp. Outside the segment by construction — the clock "
+                             "starts at the first logged post-migration success, so an "
+                             "earlier same-day cycle cannot be inside it."),
+                },
+                "records_without_timestamp": pb_missing_ts,
+                "calendar_month_comparison": {
+                    "records": cal.get("records"),
+                    "api_success": cal.get("api_success"),
+                    "completeness": (_f(round(cal["api_success"] / cal["records"], 4))
+                                     if cal.get("records") else None),
+                },
+                "gates_per_segment": pb["gates_per_segment"],
+                "no_averaging": pb["no_averaging"],
+                "ledger_ref": (f"phase_a_integrity_ledger.operational_events"
+                               f"['{pb['declared_in']}'].{pb['event_id']}.phase_b_clock_spec"),
+                "note": ("Decision completeness over the VALIDATION SEGMENT, whose left "
+                         "edge is the clock-start timestamp, not a calendar date. The "
+                         "denominator is cycles logged at or after that timestamp — it is "
+                         "the logged count, never an assumed ticks-per-day: a day the "
+                         "chain cut short contributes only the cycles it ran (see this "
+                         "month's incidents). Emitted ALONGSIDE per_model_failure_rate, "
+                         "which remains the calendar-month figure for every model; the "
+                         "segment gate reads this block, the monthly inclusion gate reads "
+                         "that one. No averaging across segments."),
+            }
+        }
     return out
 
 
