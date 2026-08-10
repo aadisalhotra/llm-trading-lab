@@ -595,9 +595,13 @@ def compute_api_cost_summary_window(
                     screening_cost += priced["screening_usd"]
                 if priced["screening_backsolved"]:
                     backsolved_calls += 1
-                # Count BUY/SELL executions for cost-per-trade
+                # Count executed position-moving orders for cost-per-trade.
+                # All four directional sides count: a SHORT or COVER costs the
+                # same to decide as a BUY or SELL, so a BUY/SELL-only
+                # denominator overstates cost-per-trade once shorting is live
+                # (74 such orders in July 2026 alone).
                 for ex in rec.get("executions") or []:
-                    if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
+                    if ex.get("executed") and ex.get("side") in ("BUY", "SELL", "SHORT", "COVER"):
                         trades_executed += 1
     cost = decision_cost + screening_cost
     return {

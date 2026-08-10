@@ -1,0 +1,124 @@
+"""Direction-aware extraction — the BUY/SELL-only defect class.
+
+Shorting activated 2026-07-01. Any site that filters executions to
+("BUY", "SELL") silently drops every SHORT and COVER. This class has produced
+repeat members (daily-report render branching, H2H sector bars on signed
+weight, the sign-blind ghost detector, the weight-cap check against a positive
+threshold, and the monthly notable-events extractor fixed here).
+
+The live instance these tests pin: 2026-08-03, Gemini, a FORCED_POSITION_STOP
+COVER of META worth $10,341 — a short stop-out that the old filter made
+invisible to both stop_loss_triggers and top_trades_by_value.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import build_monthly_data_layer as B  # noqa: E402
+from src.alerts import events as EV  # noqa: E402
+
+
+def _rec(date, executions):
+    return {"date": date, "timestamp": f"{date}T14:00:00", "api_success": True,
+            "executions": executions, "portfolio_after": {"total_value": 100000.0}}
+
+
+def _ex(side, ticker, notional, order_id=""):
+    return {"executed": True, "side": side, "ticker": ticker,
+            "notional": notional, "fill_price": 100.0, "order_id": order_id}
+
+
+# ---------------------------------------------------------- the assigned site
+
+def test_forced_short_cover_is_extracted_as_a_stop_loss():
+    recs = {"m": [_rec("2026-08-03", [_ex("COVER", "META", 10341.31, "FORCED_POSITION_STOP")])]}
+    out = B._notable_events(recs, ["m"], "2026-08-01", "2026-08-31")
+    sl = out["m"]["stop_loss_triggers"]
+    assert len(sl) == 1, "a forced short cover is a stop-loss trigger"
+    assert sl[0]["ticker"] == "META"
+    assert sl[0]["side"] == "COVER"
+    assert sl[0]["direction"] == "short"
+    assert sl[0]["order_id"] == "FORCED_POSITION_STOP"
+
+
+def test_forced_long_sell_still_extracted_and_labelled_long():
+    recs = {"m": [_rec("2026-08-03", [_ex("SELL", "AAPL", 5000.0, "FORCED_POSITION_STOP")])]}
+    out = B._notable_events(recs, ["m"], "2026-08-01", "2026-08-31")
+    sl = out["m"]["stop_loss_triggers"]
+    assert len(sl) == 1 and sl[0]["direction"] == "long" and sl[0]["side"] == "SELL"
+
+
+def test_short_and_cover_rank_in_top_trades_by_value():
+    recs = {"m": [_rec("2026-08-03", [
+        _ex("BUY", "AAA", 1000.0),
+        _ex("SHORT", "BBB", 9000.0),
+        _ex("COVER", "CCC", 5000.0),
+        _ex("SELL", "DDD", 2000.0),
+    ])]}
+    out = B._notable_events(recs, ["m"], "2026-08-01", "2026-08-31")
+    top = out["m"]["top_trades_by_value"]
+    assert [t["action"] for t in top] == ["SHORT", "COVER", "SELL"]
+    assert top[0]["value"] == 9000.0
+
+
+def test_hold_and_skip_are_still_excluded():
+    recs = {"m": [_rec("2026-08-03", [
+        {"executed": True, "side": "HOLD", "ticker": "AAA", "notional": 0.0},
+        {"executed": False, "side": "SKIP", "ticker": "BBB", "notional": 0.0},
+        _ex("BUY", "CCC", 100.0),
+    ])]}
+    out = B._notable_events(recs, ["m"], "2026-08-01", "2026-08-31")
+    assert [t["action"] for t in out["m"]["top_trades_by_value"]] == ["BUY"]
+
+
+def test_live_august_forced_cover_appears_in_the_real_build():
+    """Regression against committed data, not a fixture: the 2026-08-03 Gemini
+    FORCED_POSITION_STOP cover must reach the August layer's stop_loss_triggers."""
+    recs = {"gemini": [json.loads(l) for l in
+                       (ROOT / "data" / "trades" / "gemini_2026-08.jsonl")
+                       .read_text(encoding="utf-8").splitlines() if l.strip()]}
+    out = B._notable_events(recs, ["gemini"], "2026-08-01", "2026-08-31")
+    sl = out["gemini"]["stop_loss_triggers"]
+    assert any(s["ticker"] == "META" and s["direction"] == "short"
+               and s["date"] == "2026-08-03" for s in sl), \
+        "the live forced short cover must be extracted"
+
+
+# ---------------------------------------------------------- swept siblings
+
+def test_oversized_alert_sees_shorts_and_covers():
+    settings = {"alerts": {"oversized_trade_pct": 0.15}, "models": {"m": {"enabled": True}}}
+    big = _rec("2026-08-03", [_ex("COVER", "INTC", 23366.0, "")])
+    orig = EV._read_today_trade_records
+    EV._read_today_trade_records = lambda key, d: [big]
+    try:
+        specs = EV.detect_oversized_trades(settings, "2026-08-03")
+    finally:
+        EV._read_today_trade_records = orig
+    assert len(specs) == 1, "a 23% COVER must raise the oversized-trade alert"
+    assert "INTC" in specs[0]["title"]
+
+
+def test_cost_per_trade_counts_all_directional_sides(tmp_path, monkeypatch):
+    """The trades_executed denominator must include SHORT/COVER, or
+    cost-per-trade is overstated once shorting is live."""
+    from src.analytics import performance as P
+
+    rec = {"date": "2026-08-03", "timestamp": "2026-08-03T14:00:00",
+           "model_key": "m", "api_success": True,
+           "input_tokens": 100, "output_tokens": 100,
+           "executions": [_ex("BUY", "AAA", 1.0), _ex("SELL", "BBB", 1.0),
+                          _ex("SHORT", "CCC", 1.0), _ex("COVER", "DDD", 1.0),
+                          {"executed": True, "side": "HOLD", "ticker": "EEE"},
+                          {"executed": False, "side": "SKIP", "ticker": "FFF"}]}
+    (tmp_path / "m_2026-08.jsonl").write_text(json.dumps(rec) + "\n", encoding="utf-8")
+    monkeypatch.setattr(P, "TRADES_DIR", tmp_path)
+
+    got = P.compute_api_cost_summary_window("m")["trades_executed"]
+    assert got == 4, f"expected all four directional sides counted, got {got}"

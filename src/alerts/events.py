@@ -45,6 +45,12 @@ logger = logging.getLogger("llmlab.alerts.events")
 
 EASTERN = ZoneInfo("America/New_York")
 
+# The four executor sides that move a position (HOLD and SKIP do not). Named so
+# no detector re-derives a long-only "BUY/SELL" filter — that literal is the
+# defect class behind the July 2026 SHORT/COVER render bug, the sign-blind ghost
+# detector, and the forced-short-cover extraction miss.
+_TRADE_SIDES = ("BUY", "SELL", "SHORT", "COVER")
+
 # Serializes the read-modify-write of state.json. The intraday pipeline runs
 # each model in its own thread and any of them can raise an alert, so without
 # this two concurrent dispatches could clobber each other's cap/dedup updates.
@@ -674,9 +680,14 @@ def detect_oversized_trades(settings: dict[str, Any], date_str: str) -> list[dic
             if pv <= 0:
                 continue
             for ex in rec.get("executions", []):
-                if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+                # Direction-aware: SHORT and COVER are orders of the same size
+                # class as BUY and SELL. Filtering to BUY/SELL meant an
+                # oversized short or cover never raised this alert — the same
+                # long-only assumption that hid a forced short cover from the
+                # monthly notable-events extractor.
+                if not ex.get("executed") or ex.get("side") not in _TRADE_SIDES:
                     continue
-                notional = float(ex.get("notional") or 0.0)
+                notional = abs(float(ex.get("notional") or 0.0))
                 frac = notional / pv
                 if frac <= threshold:
                     continue

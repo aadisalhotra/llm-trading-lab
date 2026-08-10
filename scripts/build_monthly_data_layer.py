@@ -758,6 +758,13 @@ def _err_type(msg):
     return "api_error"
 
 
+# The four executor sides that move a position. HOLD and SKIP do not.
+# Named once so the direction-aware filter has a single definition — the
+# long-only "BUY/SELL" literal is the defect class that produced the July 2026
+# daily-report render bug and this one.
+_TRADE_SIDES = ("BUY", "SELL", "SHORT", "COVER")
+
+
 def _notable_events(full_records, model_keys, win_start, win_end):
     """Objective per-model event extraction over the calendar month.
 
@@ -785,16 +792,32 @@ def _notable_events(full_records, model_keys, win_start, win_end):
             if not r.get("api_success"):
                 errors.append({"timestamp": r.get("timestamp"),
                                "type": _err_type(r.get("api_error"))})
-            # trades + stop-loss force-sells
+            # Trades + stop-loss forced closes.
+            # DIRECTION-AWARE: the executor emits four directional sides
+            # (BUY/SELL/SHORT/COVER; HOLD and SKIP move nothing). Filtering to
+            # BUY/SELL was a long-only assumption that went stale when shorting
+            # activated 2026-07-01, and it dropped every SHORT and COVER from
+            # BOTH the top-trades ranking and the stop-loss extraction below —
+            # including forced closes, which is how a short stop-out became
+            # invisible.
             for ex in (r.get("executions") or []):
-                if not ex.get("executed") or ex.get("side") not in ("BUY", "SELL"):
+                if not ex.get("executed") or ex.get("side") not in _TRADE_SIDES:
                     continue
+                side = ex.get("side")
                 notional = abs(float(ex.get("notional") or 0.0))
-                trades.append({"ticker": ex.get("ticker"), "action": ex.get("side"),
+                trades.append({"ticker": ex.get("ticker"), "action": side,
                                "value": _f(round(notional, 2)), "date": r.get("date")})
-                if str(ex.get("order_id", "")).startswith("FORCED"):
+                order_id = str(ex.get("order_id") or "")
+                if order_id.startswith("FORCED"):
+                    # A long stop (SELL) and a short stop (COVER) are different
+                    # events on different thresholds — stop_loss_position_pct vs
+                    # stop_loss_short_pct (src/portfolio/risk.py) — so the
+                    # direction is recorded rather than flattened.
                     stop_loss.append({"ticker": ex.get("ticker"), "date": r.get("date"),
-                                      "trigger": "position_stop_loss"})
+                                      "trigger": "position_stop_loss",
+                                      "side": side,
+                                      "direction": "short" if side == "COVER" else "long",
+                                      "order_id": order_id})
             # drawdown-halt trigger: portfolio_after.halted flips False -> True
             pa = r.get("portfolio_after") or {}
             halted_now = bool(pa.get("halted"))
