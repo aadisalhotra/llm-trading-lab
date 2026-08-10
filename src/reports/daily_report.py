@@ -274,30 +274,93 @@ def _daily_pnl(model_key: str) -> tuple[float | None, float | None]:
     return delta, pct
 
 
-def _previous_leaderboard(run_date: datetime) -> dict[str, int] | None:
-    """Find the most recent leaderboard snapshot strictly before run_date.
+def _complete_eod_dates(model_keys: list[str]) -> set[str]:
+    """Dates on which EVERY model in the cohort wrote an EOD snapshot.
 
-    Returns {model_key: rank} or None if no prior snapshot exists.
+    The EOD wrap is what makes a leaderboard snapshot a settled close. A date
+    missing from any model's performance log did not complete for the cohort,
+    whatever a same-named leaderboard file happens to contain.
+    """
+    per_model: list[set[str]] = []
+    for key in model_keys:
+        fp = PERFORMANCE_DIR / f"{key}.jsonl"
+        dates: set[str] = set()
+        if fp.exists():
+            with open(fp, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        d = json.loads(line).get("date")
+                    except json.JSONDecodeError:
+                        continue
+                    if d:
+                        dates.add(d)
+        per_model.append(dates)
+    return set.intersection(*per_model) if per_model else set()
+
+
+def _previous_leaderboard(run_date: datetime,
+                          model_keys: list[str] | None = None) -> dict[str, int] | None:
+    """Rank baseline from the most recent COMPLETE prior close, or None.
+
+    The predicate is "prior-dated AND a complete cohort-wide EOD snapshot", not
+    merely "prior-dated". A leaderboard file is written on every intraday tick,
+    so when a session halts mid-day the file for that date survives holding the
+    previous close's values — a real case, 2026-08-06, where the chain stopped
+    after 5 of 13 cycles and no model wrote an EOD row (ledger event
+    cycle_gap_2026_08_06).
+
+    Selecting on the filename alone was benign that once: the 08-06 file held
+    the 08-05 ranks and 08-05 was the true prior close, so the 08-07 arrows came
+    out right by content rather than by rule. It is not benign in general. A
+    halt LATER in a session — after some models have written updated rows and
+    others have not — leaves a genuinely mixed snapshot, part today and part
+    yesterday, which the old predicate would have propagated as "yesterday"
+    without complaint.
+
+    So candidates are walked newest-first and each is required to have a
+    complete EOD for the whole cohort; incomplete dates are skipped, not
+    trusted. Note this gates on the performance logs, NOT on the disclosure
+    marker that the 08-06 file carries — that marker is a one-off annotation on
+    one known-bad artifact, and a selector that depended on hand-annotation
+    would silently fail on the next unannotated halt.
+
+    Returns {model_key: rank}, or None when no complete prior close exists.
     """
     if not LEADERBOARD_DIR.exists():
         return None
+    if model_keys is None:
+        model_keys = list(load_settings().get("models", {}))
     today_str = run_date.strftime("%Y-%m-%d")
-    candidates = []
-    for fp in LEADERBOARD_DIR.glob("*.json"):
-        stem = fp.stem
-        if stem < today_str:
-            candidates.append((stem, fp))
+    candidates = sorted(
+        ((fp.stem, fp) for fp in LEADERBOARD_DIR.glob("*.json") if fp.stem < today_str),
+        reverse=True,
+    )
     if not candidates:
         return None
-    candidates.sort(reverse=True)
-    _, latest = candidates[0]
-    try:
-        with open(latest, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {row["model_key"]: row["rank"] for row in data}
-    except Exception as e:
-        logger.warning("Failed to read previous leaderboard %s: %s", latest, e)
-        return None
+
+    complete = _complete_eod_dates(model_keys)
+    for stem, fp in candidates:
+        if stem not in complete:
+            logger.info(
+                "Previous-leaderboard: skipping %s — no complete cohort EOD for that date "
+                "(incomplete session; walking back)", stem)
+            continue
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return {row["model_key"]: row["rank"] for row in data}
+        except Exception as e:
+            # A corrupt snapshot must not cost us arrow tracking when an older
+            # good one exists — keep walking rather than giving up here.
+            logger.warning("Failed to read previous leaderboard %s: %s — walking back", fp, e)
+            continue
+
+    logger.warning("Previous-leaderboard: no complete prior close found before %s; "
+                   "rank arrows will be omitted", today_str)
+    return None
 
 
 # ===========================================================================
@@ -1090,7 +1153,7 @@ def _build_leaderboard_table(
 ) -> str:
     settings = load_settings()
     leaderboard = build_leaderboard(model_keys, settings)
-    prev_ranks = _previous_leaderboard(run_date) or {}
+    prev_ranks = _previous_leaderboard(run_date, model_keys) or {}
     models_cfg = settings.get("models", {})
 
     # Common window = the most distinct trading dates any model has on the

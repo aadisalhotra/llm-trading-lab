@@ -160,7 +160,11 @@ Incident record: `scripts/phase_a_integrity_ledger.json` →
 
 ### Mid-month batch item 2 — `_previous_leaderboard()` must validate completeness
 
-**Logged 2026-08-10 from the same incident. Not fixed.**
+**Logged 2026-08-10 from the same incident. FIXED 2026-08-10** — the predicate
+now gates on a complete cohort EOD (`_complete_eod_dates()`), walking back when
+a date is incomplete. The published 2026-08-07 arrows are unchanged: the fix
+skips 08-06 and lands on 08-05, which is the same answer the old selector
+reached by content. Kept below as the record of what was wrong and why.
 
 `src/reports/daily_report.py::_previous_leaderboard()` selects the previous
 day's rank baseline by globbing `data/leaderboard/*.json`, keeping stems
