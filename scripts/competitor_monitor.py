@@ -979,6 +979,24 @@ def run(days: int = 7, max_results: int = 60, output_dir: str | None = None) -> 
     # The heartbeat goes to the log as well as the digest, so an empty week is
     # visible in CI output without opening the file.
     logger.info("%s", heartbeat_line(week_tag, generated_at, counts))
+
+    # Active alert on ESCALATE only. Deliberately not on the heartbeat and not
+    # on digest-tier rows: a channel that fires weekly stops being read.
+    escalations = [p for p in arxiv_papers if p.get("tier") == ESCALATE]
+    if escalations:
+        try:
+            from src.alerts.competitor_escalation import send_escalation_alert
+            send_escalation_alert(
+                [{"title": p.get("title"), "url": p["id"].replace("http://", "https://"),
+                  "venue": p.get("venue"), "date": p.get("published"),
+                  "triage_criteria": p.get("triage_criteria"),
+                  "threatened_rqs": p.get("threatened_rqs"),
+                  "assessment": p.get("assessment")} for p in escalations],
+                week_tag, generated_at)
+        except Exception:
+            # Never let the alert channel take down the scan: the digest and
+            # index are the durable record, the email is the fast path.
+            logger.exception("escalation alert failed — digest still written")
     logger.info("Competitor digest written: %s (arXiv=%d, suppressed=%d, SSRN=%d)",
                 out_path, len(arxiv_papers), len(suppressed), len(ssrn_results))
     return out_path
@@ -1027,7 +1045,18 @@ def main() -> int:
     parser.add_argument("--retro-triage", action="store_true",
                         help="Re-run the whole competitor_index.jsonl history through the "
                              "current three-tier criteria and print the result; writes nothing.")
+    parser.add_argument("--test-alert", action="store_true",
+                        help="Fire one synthetic ESCALATE alert to prove the channel works "
+                             "end to end. Writes no digest and no index rows.")
     args = parser.parse_args()
+
+    if args.test_alert:
+        from src.alerts.competitor_escalation import send_escalation_alert, test_payload
+        now = datetime.now(timezone.utc)
+        wk = iso_week_tag(now)
+        ok = send_escalation_alert(test_payload(wk), wk, now, is_test=True)
+        logger.info("test alert %s", "SENT" if ok else "NOT SENT (see log above)")
+        return 0 if ok else 1
 
     if args.retro_triage:
         res = retro_triage(output_dir=args.output_dir)

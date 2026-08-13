@@ -46,6 +46,12 @@ jobs:
           DAYS="${DAYS:-7}"
           echo "Scanning last ${DAYS} days"
           python -m scripts.competitor_monitor --days "${DAYS}" 2>&1 | tee scan.log
+        env:
+          # Escalation alerting. Recipient is a secret, never committed — the
+          # repo is public and settings.json is not a safe home for it.
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          COMPETITOR_ALERT_TO: ${{ secrets.COMPETITOR_ALERT_TO }}
 
       - name: Surface the heartbeat
         if: always()
