@@ -45,7 +45,26 @@ jobs:
           DAYS="${{ github.event.inputs.days }}"
           DAYS="${DAYS:-7}"
           echo "Scanning last ${DAYS} days"
-          python -m scripts.competitor_monitor --days "${DAYS}"
+          python -m scripts.competitor_monitor --days "${DAYS}" 2>&1 | tee scan.log
+
+      - name: Surface the heartbeat
+        if: always()
+        run: |
+          # The heartbeat must be visible without opening a file, including on
+          # empty weeks — that is the whole point of emitting it. Lands in the
+          # Actions run summary as well as the digest body.
+          HB="$(grep -o '\[heartbeat\].*' scan.log | tail -1 || true)"
+          if [ -z "$HB" ]; then
+            HB="[heartbeat] MISSING — the scan did not emit one; treat as a monitor failure."
+          fi
+          echo "## Competitor monitor" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$HB" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ESC="$(grep -o '[0-9]\+ escalations' scan.log | tail -1 | cut -d' ' -f1 || echo 0)"
+          if [ "${ESC:-0}" != "0" ]; then
+            echo "**${ESC} ESCALATION(S) — relay to the hub today.**" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Commit + push digest
         run: |

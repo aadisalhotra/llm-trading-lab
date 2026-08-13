@@ -237,3 +237,47 @@ pre-Phase-B list. Do not go live with real money without it.
 If the ledger is ever unreadable (corrupt JSON), the guard **fails open**
 (proceeds, so it can never silently halt trading) and fires a CRITICAL email
 *plus* a watchdog `/fail` ping — a loud SMS/push page, not a silent log line.
+
+---
+
+## Competitor paper monitor — delivery loop (permanent, ratified 2026-08-13)
+
+`scripts/competitor_monitor.py` runs every Monday 14:00 UTC
+(`.github/workflows/competitor_monitor.yml`) and writes
+`reports/competitor_digest_YYYY-WW.md` plus the queryable
+`reports/competitor_index.jsonl`.
+
+**The relay expectation is part of the monitor, not an afterthought.** Each
+weekly digest *and its heartbeat line* is surfaced to the Synthesis Hub through
+the PI relay — **including weeks with zero hits**. A monitor whose output
+reaches no reader is not a monitor; that is the exact defect diagnosed on
+2026-08-13, when the structured index turned out never to have been written by
+any scheduled run because the feature landed hours after that week's run.
+
+**Heartbeat format**, emitted to both the digest body and the CI log so an empty
+week is visible without opening a file:
+
+```
+[heartbeat] 2026-08-17T14:00:03Z — week of 2026-34: 0 escalations, 3 digest, 5 silent
+```
+
+**Escalation is same-day, not weekly.** An ESCALATE-tier hit means a paper may
+threaten a registered RQ; it goes to the hub when found, carrying title, link,
+venue, date, and a two-line overlap assessment naming the threatened RQ(s). The
+weekly digest and the silent log ride the normal Monday cadence.
+
+**Reading the tiers:**
+
+| Tier | What it means | Delivery |
+|---|---|---|
+| ESCALATE | Meets criterion (a)–(d) of the 2026-08-13 triage spec | Same day, to the hub |
+| Digest | Adjacent subject matter — single-model agents, simulated markets, sentiment, benchmarks | Weekly digest, one line each |
+| Silent | RL-only, crypto, human-subject, or query-matched but unclassifiable | Logged to the index only |
+
+**Retroactive triage:** `python -m scripts.competitor_monitor --retro-triage`
+re-runs the full history through the current criteria and writes nothing. It
+reads `competitor_index.jsonl` when present and falls back to parsing the digest
+markdown when it is not, reporting which source it used — weeks 22–33 predate
+the index and are only recoverable from markdown, where abstracts are truncated
+at ~600 characters. That truncation is a real limit on retroactive escalation
+and is reported with the results rather than hidden.
