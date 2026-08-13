@@ -7,10 +7,11 @@ question, prepare what the account holder needs to submit, report findings.
 **Explicitly out of scope:** adapter code, executor changes, pipeline changes. The
 broker migration remains undecided until the Sept 15 gate.
 
-**Status: CLEARED FOR SEND — application not yet submitted.** A blocking eligibility
-finding (below) shaped what gets submitted and by whom. The §5 relay packet is
-prepared, and the PI confirmed the §4 framing on 2026-08-12; it is cleared for the
-account holder to send. Awaiting the holder's send and IBKR's reply.
+**Status: SENT 2026-08-12 — awaiting IBKR's reply.** A blocking eligibility finding
+(below) shaped what was submitted and by whom. The §4 framing was confirmed
+2026-08-12; the account holder sent the §5 application to
+`apiintegration@interactivebrokers.com` the same day, in the hub's final form (§5).
+**Nothing outstanding on the send side** — all three inquiry clocks are running (§6).
 
 ---
 
@@ -137,6 +138,18 @@ F&F structure is later adopted, it is a new conversation with IBKR, opened separ
 
 ## 5. Relay packet — for the account holder
 
+> **SENT 2026-08-12** by the account holder to `apiintegration@interactivebrokers.com`.
+>
+> **The text below is the prepared packet, not a verbatim record of what was sent.**
+> The hub's final form differed in two respects: the **structure clause was removed**,
+> and **Q3 was rewritten in the first person**. Both changes narrow the framing further
+> in the direction §4 ruled — away from household/structure language and toward a
+> single individual describing his own account — so neither disturbs the §4 analysis.
+>
+> **Operations does not hold the verbatim sent text.** If the pre-registration needs to
+> quote the application as sent, the account holder's sent-mail copy is the source of
+> record; this section cannot serve that purpose.
+
 The account holder must send this; it references their accounts, and IBKR is being
 asked to grant programmatic trading access to them. Steps:
 
@@ -204,7 +217,7 @@ asked to grant programmatic trading access to them. Steps:
 |---|---|---|---|---|
 | **Alpaca** | **ANSWERED** | sent 2026-08-12, replied 2026-08-12 | PI | Multi-account structure, framework status, restriction scope. **Supersedes the #58291 reference, which was never sent.** Response summarized and corroborated in §6.1. |
 | **IBKR** — message centre | **SENT** — ticket **#T976605** | 2026-08-11 23:00 | Account holder | Five questions; covers gates (b), (c), (d), restriction contagion, and the F&F stand-up timeline. Detail in §6.2. |
-| **IBKR** — first-party OAuth email | **PENDING** — §4 framing confirmed, packet cleared; **the one outstanding send** | cleared 2026-08-12 | Account holder (pending) | First Party OAuth eligibility + timeline, per §5 |
+| **IBKR** — first-party OAuth email | **SENT** — to `apiintegration@interactivebrokers.com` | cleared 2026-08-12, sent 2026-08-12 | Account holder | First Party OAuth eligibility + timeline. Sent in the hub's final form — see §5 delta note. |
 
 ### 6.1 Alpaca response — content and corroboration
 

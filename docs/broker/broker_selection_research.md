@@ -145,5 +145,9 @@ F&F in one general-support message — routing risk assessed low on that channel
 mitigated by the separate first-party email; detail at
 `ibkr_oauth_application.md` §6.2.
 
-**IBKR — first-party OAuth eligibility email: PENDING**, account-holder sends, packet
-cleared 2026-08-12 and F&F-free as ruled. **The one outstanding send.**
+**IBKR — first-party OAuth eligibility email: SENT** 2026-08-12 by the account holder
+to `apiintegration@interactivebrokers.com`, in the hub's final form — structure clause
+removed, Q3 first-person — F&F-free as ruled. The repo holds the prepared packet, not
+the verbatim send (`ibkr_oauth_application.md` §5).
+
+**All three inquiry clocks are now running. Nothing outstanding on the send side.**
