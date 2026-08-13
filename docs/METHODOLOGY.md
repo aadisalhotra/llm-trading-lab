@@ -7,7 +7,9 @@ Given identical information, identical constraints, and identical execution infr
 
 **Identical inputs.** Every model receives the same market data, the same prompt content, the same portfolio constraints, and the same per-model portfolio state. The only differences across providers are API-format adjustments (message structure, system prompt handling).
 
-**Identical rules.** Max 50 positions, max 20% per name, no leverage, no shorting, no options. $100k paper / $1k live starting capital. 50-trade daily cap. Universe is 79 assets across 12 sectors (75 large-cap U.S. equities plus 4 commodity ETFs: GLD, SLV, USO, CPER).
+**Identical rules.** Max 50 positions, max 20% per name, no options. $100k paper / $1k live starting capital. 50-trade daily cap. Universe is 79 assets across 12 sectors (75 large-cap U.S. equities plus 4 commodity ETFs: GLD, SLV, USO, CPER).
+
+**Shorting and exposure limits.** Shorting was disabled through 2026-06-30 and enabled from 2026-07-01 — the v2 → v3 prompt boundary, applied to all six models at once (`regime_boundaries.shorting_activation` in `scripts/phase_a_integrity_ledger.json`). Under v3 the book is bounded at 100% long exposure, 20% gross short exposure, and a 120% gross ceiling (`config/settings.json` → `portfolio_rules.max_long_exposure_pct` 1.0, `max_gross_short_pct` 0.2, `max_gross_exposure_pct` 1.2). Long positions are never margin-financed (`allow_leverage: false`), but short proceeds add to gross exposure, so a book carrying shorts holds gross market exposure above its equity — up to 120%. That is bounded leverage, not the absence of leverage, and the earlier "no leverage" phrasing here overstated the constraint. The 20% short cap is enforced at fill, projected against decision-time equity, rather than maintained continuously between fills: a book filled just under the cap can cross it on an adverse mark with no order involved, which is a measurement artifact and not a breach.
 
 **Identical execution.** All trades route through the same `executor.py`. Paper mode prices off real market quotes; live mode submits real orders to Alpaca.
 
