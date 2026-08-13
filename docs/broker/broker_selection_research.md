@@ -124,8 +124,8 @@ IBKR's own documentation. Two variables remain open, both inquiry-bounded: **(a)
 work can start against today's account; **a negative answer does not foreclose the
 branch**, since the end state is the advisor class, not the individual class;
 **(b)** the F&F stand-up timeline — process and duration to establish the structure,
-unpriced by IBKR's public docs, question added to the account-holder's message-center
-inquiry 2026-08-12. Alpaca offers no retail path to six books at any capital level below
+unpriced by IBKR's public docs, **covered by the account-holder's message-centre
+inquiry, ticket #T976605, sent 2026-08-11 23:00** (§7). Alpaca offers no retail path to six books at any capital level below
 the entity floor. The 2026-09-15 decision therefore chooses between
 **IBKR-F&F-if-OAuth-clears** and **a redesign of the book structure itself**; both
 brokers require building and validating a live execution path from scratch.
@@ -135,6 +135,15 @@ brokers require building and validating a live execution path from scratch.
 **Alpaca:** PI inquiry sent 2026-08-12; AI reply same day; corroboration complete (§3);
 human confirmation of the one-account rule requested on-thread.
 
-**IBKR:** message-center inquiry (framework status + restriction aggregation) and
-first-party OAuth eligibility email — account-holder sends, packet cleared 2026-08-12,
-plus F&F conversion process/timeline (message-center, third question).
+**IBKR — message centre: SENT**, ticket **#T976605**, account holder, **2026-08-11
+23:00**. Five questions: OAuth route; F&F qualification + per-book API routing + Reg-T
+application level; restriction contagion (quoting *"across all associated margin
+accounts"*); framework implementation status; fractional long + short via API on this
+account type. Covers gates (b), (c), (d), the contagion question, and the F&F stand-up
+timeline in one ticket. *Framing exposure:* pairs an automated-trading application with
+F&F in one general-support message — routing risk assessed low on that channel,
+mitigated by the separate first-party email; detail at
+`ibkr_oauth_application.md` §6.2.
+
+**IBKR — first-party OAuth eligibility email: PENDING**, account-holder sends, packet
+cleared 2026-08-12 and F&F-free as ruled. **The one outstanding send.**

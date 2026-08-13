@@ -203,7 +203,8 @@ asked to grant programmatic trading access to them. Steps:
 | Broker | Status | Date | Sent by | Content |
 |---|---|---|---|---|
 | **Alpaca** | **ANSWERED** | sent 2026-08-12, replied 2026-08-12 | PI | Multi-account structure, framework status, restriction scope. **Supersedes the #58291 reference, which was never sent.** Response summarized and corroborated in §6.1. |
-| **IBKR** | **PENDING** — packet prepared, awaiting §4 confirmation then account-holder send | 2026-08-12 | Account holder (pending) | First Party OAuth eligibility + timeline, per §5 |
+| **IBKR** — message centre | **SENT** — ticket **#T976605** | 2026-08-11 23:00 | Account holder | Five questions; covers gates (b), (c), (d), restriction contagion, and the F&F stand-up timeline. Detail in §6.2. |
+| **IBKR** — first-party OAuth email | **PENDING** — §4 framing confirmed, packet cleared; **the one outstanding send** | cleared 2026-08-12 | Account holder (pending) | First Party OAuth eligibility + timeline, per §5 |
 
 ### 6.1 Alpaca response — content and corroboration
 
@@ -287,6 +288,41 @@ the six-book structure may not be reachable at either broker without either a ca
 increase of roughly 5x or a change in book structure. Claim 3 (IMD restrictions
 per-account, no contagion) was not independently corroborated — it was not nominated
 as load-bearing, and no public Alpaca page addresses cross-account IMD contagion.
+
+### 6.2 IBKR message-centre inquiry — ticket #T976605
+
+**Sent 2026-08-11 23:00 by the account holder.** A day earlier than this document
+originally logged, and **broader than specced** — five questions, not the three-question
+scope anticipated when the packet was drafted:
+
+1. The OAuth route.
+2. F&F qualification, per-book API routing, and the level at which Reg-T applies.
+3. Restriction contagion, quoting the framework language *"across all associated margin
+   accounts."*
+4. Framework implementation status.
+5. Fractional long **and** short via API on this account type.
+
+**Coverage:** gates (b), (c), and (d), plus the restriction-contagion question and the
+F&F stand-up timeline — all in the single ticket.
+
+This supersedes the plan to append an F&F timeline question to the message-centre
+thread: the question was already in the send, which went out the day before that
+instruction was issued. No further message-centre action is required.
+
+**Framing exposure — recorded honestly.** This inquiry pairs an automated-trading
+application with F&F in one message, sent through general support. That is the pairing
+§4 rules out for the OAuth application email, so the exposure is real and worth naming
+rather than leaving implicit. **Routing risk assessed low on this channel:** general
+support is not the OAuth onboarding queue and does not itself classify an application.
+The mitigation is structural — the first-party OAuth email (§5) remains a separate send
+on a separate channel, and stays F&F-free as ruled. If IBKR's reply indicates the
+inquiry was routed to onboarding or advisor services rather than answered in place,
+that changes the assessment and should be relayed before the §5 email goes out.
+
+> **Cross-reference.** §6.1's closing note — that the six-book structure "may not be
+> reachable at either broker" — predates the 2026-08-12 re-scope. It stands as to
+> Alpaca. For IBKR, see `broker_selection_research.md` §6: the F&F advisor structure is
+> the reachable venue, and Advisor Accounts appear on IBKR's OAuth 1.0a enumeration.
 
 ## 7. Sources
 
