@@ -72,3 +72,69 @@ enforcement lives in the dispatch process.
    `-m` must precede the `--`; anything after `--` is parsed as a pathspec,
    so `git commit -- <path> -m "msg"` fails confusingly. Prefer `-F` with a
    message file for multi-paragraph lane messages.
+
+6. **Integrating past cron ticks while another lane sits staged: merge, never
+   rebase, and restore the index by blob hash** (ratified 2026-08-13). The
+   intraday cron pushes a tick roughly every 30 minutes, touching `data/`
+   only, so a lane that stages and halts is almost always behind
+   `origin/main` by the time it lands. When another lane's work is staged in
+   the same index at that moment, both obvious integrations are unsafe:
+
+   - `git rebase` requires a clean tree, and `--autostash` restores with
+     `git stash apply` (no `--index`), which **flattens the other lane's
+     staged set into unstaged**. That is a rule-4 violation executed
+     automatically, with no diff to inspect.
+   - `git merge` **refuses outright on a dirty index even when no path
+     overlaps**: the ort strategy exits `Your local changes to the following
+     files would be overwritten by merge`, naming the staged files, though
+     the incoming commits never touch them.
+
+   Merge is the correct integration here — it never rewrites the other lane's
+   working-tree content — and it is the existing precedent (`7e81bdf4 Merge
+   origin/main (automated cron ticks) into Phase-A equity-curve re-anchor`).
+   The sequence:
+
+   ```
+   git commit -F <msgfile> -- <your paths>      # land your package first (rule 5)
+   git write-tree                               # recoverable snapshot of the index
+   git ls-files -s -- <other lane's paths>      # RECORD BLOB HASHES
+   git diff --name-only -- <other lane's paths> # MUST be empty
+   git reset                                    # unstage; worktree untouched
+   git merge origin/main -m "<attribution>"
+   git add <other lane's paths>                 # restore
+   git ls-files -s -- <other lane's paths>      # diff against the recorded hashes
+   ```
+
+   Step 4 is the safety precondition, not a formality: the transient unstage
+   is only reversible because the worktree already equals the index for those
+   paths. Status `M ` / `A ` with a clean second column proves it; anything
+   else means unstaging would lose content, and the lane stops.
+
+   Verify restoration by **blob hash, not `git diff --cached --stat`**.
+   Matching insertion counts are not identity — two different contents can
+   produce the same `--stat` line. Identical blob SHAs are proof.
+
+   Before pushing, confirm `git diff --stat origin/main..HEAD` names only your
+   own package's paths. A merge makes it easy to carry another lane's commits
+   without noticing, and that is the rule-2 boundary.
+
+   The transient unstage is acceptable only because a staged-and-halted lane
+   has no running process to observe it. Never do this while another
+   Operations lane is mid-flight — that is rule 1, and it still governs.
+
+7. **Two lanes must never need the same file.** Rule 3 sends parallel work to
+   separate worktrees, but a worktree does not resolve *same-file* contention
+   — it relocates it. When a lane's package requires editing a path another
+   lane already has staged (`scripts/phase_a_integrity_ledger.json` is the
+   recurring one, since every lane ledgers), the index cannot represent both
+   independently: `git add` produces a combined blob, and a pathspec commit on
+   that path then publishes the other lane's staged content under this lane's
+   sign-off — rule 2, violated silently. Staging into a contended file also
+   makes "the other lane's staged set is byte-identical" unverifiable by
+   construction, because that file *is* the other lane's staged set.
+
+   There is no in-index workaround. The resolutions are serialization (let the
+   holding lane land first, then ledger on top of it) or explicit quarantine
+   of the holding lane's change with attribution (`git stash push -u -m`),
+   which splits that lane's package and needs its owner's sign-off. Pick one
+   before editing, never after.
