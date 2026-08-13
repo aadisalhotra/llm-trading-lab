@@ -138,17 +138,15 @@ F&F structure is later adopted, it is a new conversation with IBKR, opened separ
 
 ## 5. Relay packet — for the account holder
 
-> **SENT 2026-08-12** by the account holder to `apiintegration@interactivebrokers.com`.
+> **SENT 2026-08-12 23:01 ET** by the account holder to
+> `apiintegration@interactivebrokers.com`.
 >
-> **The text below is the prepared packet, not a verbatim record of what was sent.**
-> The hub's final form differed in two respects: the **structure clause was removed**,
-> and **Q3 was rewritten in the first person**. Both changes narrow the framing further
-> in the direction §4 ruled — away from household/structure language and toward a
-> single individual describing his own account — so neither disturbs the §4 analysis.
+> **The text below is the prepared packet.** The verbatim as-sent body is now on the
+> record at **§5.1** — cite that, not this. This block is retained as the drafting
+> artifact, showing what Operations prepared before the hub's final edits.
 >
-> **Operations does not hold the verbatim sent text.** If the pre-registration needs to
-> quote the application as sent, the account holder's sent-mail copy is the source of
-> record; this section cannot serve that purpose.
+> *(Historical: this note previously recorded that Operations did not hold the verbatim
+> sent text. That limitation is closed as of the account holder's forward, 2026-08-12.)*
 
 The account holder must send this; it references their accounts, and IBKR is being
 asked to grant programmatic trading access to them. Steps:
@@ -210,6 +208,77 @@ asked to grant programmatic trading access to them. Steps:
 > [ACCOUNT HOLDER NAME]
 
 ---
+
+### 5.1 As-sent record — forwarded by account holder 2026-08-12
+
+**This is the artifact of record.** Sent 2026-08-12 23:01 ET (2026-08-13 03:01:36Z) by
+the account holder to `apiintegration@interactivebrokers.com`, subject *"First Party
+OAuth access request - individual account eligibility"*. Verified hub-side against the
+issued final form: structure clause removed, Q3 first-person, no material drift.
+
+**Two redactions, applied by Operations because this repo is public.** The body is
+otherwise verbatim.
+
+- **Account number → `U256#####`.** The live IBKR account identifier does not land in a
+  public repo. Full value is on file with the account holder.
+- **Signature → `[ACCOUNT HOLDER — name on file]`.** Same reasoning applied to the
+  holder's legal name, which the redaction instruction did not name but which pairs
+  with the account identifier. **Overrule if the name should appear.**
+
+---
+
+> Hello,
+>
+> I would like to request First-Party OAuth access to the Web API for my individual
+> account and to confirm whether my account type is eligible for it. Your documentation
+> lists Individual Accounts under the Client Portal Gateway but not under OAuth 1.0a or
+> OAuth 2.0, so I want to ask directly rather than assume.
+>
+> Answering the three questions from your registration page:
+>
+> **1. What do you intend to do with OAuth access?**
+> Automated daily order placement and portfolio reads for a non-commercial research
+> project running on my own account and my own capital. The project runs several large
+> language models as independent model portfolios in US equities and ETFs, at small
+> notional size, to study their decision-making. Orders are submitted by a scheduled job
+> on a hosted CI runner with no interactive browser session and no persistent host,
+> which is why the Client Portal Gateway is not workable for us, as it requires browser
+> login and API calls from the same machine. The required endpoints are limited to
+> account/positions/balances reads and equity order placement. This is not a commercial
+> product and is not offered to anyone outside the account.
+>
+> **2. Please list all accounts that will use the developed OAuth program.**
+> `U256#####`  *(redacted by Operations — full value on file with account holder)*
+>
+> **3. Will the client application be developed in-house or by a third-party developer?**
+> In-house developed and operated by me for my own use on my own account. There is no
+> external vendor, no distribution to other users, and no third-party platform involved.
+>
+> Two additional questions, if you are able to answer them:
+>
+> Is an individual account eligible for First Party OAuth?
+>
+> What is the typical timeline from this request to issued credentials? We have an
+> internal decision point in mid-September and are trying to understand whether that is
+> realistic.
+>
+> Thank you,
+> [ACCOUNT HOLDER — name on file]
+
+---
+
+**Delta against the §5 draft, for the record.** The "structure clause" removed was the
+follow-up *"If not, what account structure would be required?"*, which the draft had
+appended to the eligibility question. Q3's *"our household"* became *"me … my own
+account"*. Both edits execute §4's ruling — they keep structure language out of the
+application entirely.
+
+**Consequence worth tracking:** dropping that follow-up means IBKR is less likely to
+volunteer the advisor-class path unprompted, which is the path `broker_selection_research.md`
+§6 identifies as the actual end state. Coverage is preserved through the other channel —
+F&F qualification is question 2 of message-centre ticket #T976605 (§6.2) — so the
+question is asked, just not on this thread. If #T976605 goes unanswered on that point,
+the advisor-class question has no live ask and would need re-raising.
 
 ## 6. Inquiry log
 
@@ -328,9 +397,13 @@ application with F&F in one message, sent through general support. That is the p
 rather than leaving implicit. **Routing risk assessed low on this channel:** general
 support is not the OAuth onboarding queue and does not itself classify an application.
 The mitigation is structural — the first-party OAuth email (§5) remains a separate send
-on a separate channel, and stays F&F-free as ruled. If IBKR's reply indicates the
+on a separate channel, and stays F&F-free as ruled. **Re-pointed 2026-08-12:** this
+note previously asked that routing evidence be relayed *before* the §5 email went out.
+That window closed — §5 was sent 2026-08-12 23:01 ET, ahead of any reply on #T976605.
+The signal still matters, for a different purpose: if IBKR's reply indicates the
 inquiry was routed to onboarding or advisor services rather than answered in place,
-that changes the assessment and should be relayed before the §5 email goes out.
+**relay it on arrival as context for interpreting the OAuth reply** — it reveals how
+IBKR has classified this account, which shapes how a yes or no on §5 should be read.
 
 > **Cross-reference.** §6.1's closing note — that the six-book structure "may not be
 > reachable at either broker" — predates the 2026-08-12 re-scope. It stands as to
