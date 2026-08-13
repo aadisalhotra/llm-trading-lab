@@ -7,9 +7,10 @@ question, prepare what the account holder needs to submit, report findings.
 **Explicitly out of scope:** adapter code, executor changes, pipeline changes. The
 broker migration remains undecided until the Sept 15 gate.
 
-**Status: HALT — application NOT submitted.** A blocking eligibility finding (below)
-changes what should be submitted and by whom. Relay packet is prepared and ready
-in §5; it needs one decision from the PI before the account holder sends it.
+**Status: CLEARED FOR SEND — application not yet submitted.** A blocking eligibility
+finding (below) shaped what gets submitted and by whom. The §5 relay packet is
+prepared, and the PI confirmed the §4 framing on 2026-08-12; it is cleared for the
+account holder to send. Awaiting the holder's send and IBKR's reply.
 
 ---
 
@@ -123,19 +124,29 @@ describe a prospective F&F structure that does not yet exist; describing a struc
 that isn't real is both inaccurate and the fastest way to get routed into the
 third-party track. If F&F is later adopted, that is a new conversation with IBKR.
 
-**The one thing needed from the PI before send:** confirmation that the account is
-currently individual, own-capital-only, with no outside participants — i.e. that the
-§5 packet is factually accurate as written.
+**PI confirmation — received 2026-08-12.** The account is the **father's individual
+account, his own capital, no outside participants**, with current personal use winding
+down. The first-party framing in §5 is true as of today. The packet is cleared to send.
+
+**Ruled with it, and binding on the §5 text:** the email **must not mention the F&F
+structure, sub-accounts, or any family structure.** Those route the request into the
+advisor / third-party track and kill the Sept 15 timeline (§3 prices that track at
+8–14 weeks). The application describes **today's account, not the prospective
+structure** — three questions, individual-own-capital framing, nothing further. If the
+F&F structure is later adopted, it is a new conversation with IBKR, opened separately.
 
 ## 5. Relay packet — for the account holder
 
 The account holder must send this; it references their accounts, and IBKR is being
 asked to grant programmatic trading access to them. Steps:
 
-1. Confirm with the PI that §4's framing is accurate as of today.
+1. ~~Confirm with the PI that §4's framing is accurate as of today.~~ **Done —
+   confirmed 2026-08-12 (§4). Cleared to send.**
 2. Fill in the IBKR account number(s) at the marked field. **Do not** include the
    account password, security-device codes, or any other credential — IBKR does not
    ask for these and no legitimate request will.
+   **Do not add anything about the F&F structure, sub-accounts, or family
+   arrangements** — send the body below as written (§4).
 3. Send from the email address on the IBKR account (matching sender speeds
    identity verification).
 4. To: `apiintegration@interactivebrokers.com`
