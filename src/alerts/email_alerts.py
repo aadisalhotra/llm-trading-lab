@@ -7,8 +7,11 @@ daily digest) builds an HTML string and hands it here. The contract:
     so a flaky SMTP connection can never crash a trading tick.
   - Every attempt — success, failure, or skipped-for-missing-config — is
     written to /data/alerts/email_log.jsonl AND the standard pipeline log.
-  - Credentials come from the environment (GMAIL_ADDRESS / GMAIL_APP_PASSWORD),
-    recipients from config/settings.json ("alert_recipients"). If either the
+    Neither carries recipient addresses: both surfaces are public (the log
+    file is committed; CI job logs are readable by anyone), so they record a
+    count and a `recipients_fingerprint` instead. See that function.
+  - Credentials come from the environment (GMAIL_ADDRESS / GMAIL_APP_PASSWORD)
+    and so do recipients (ALERT_RECIPIENTS, comma-separated). If either the
     credentials or the recipient list is missing, the send is skipped (logged,
     not fatal) — the pipeline behaves exactly as it did before email wiring.
 
@@ -18,6 +21,7 @@ password). 2-Step Verification must be enabled on the account to mint one.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -43,23 +47,51 @@ FROM_NAME = "LLM Trading Lab"
 
 
 def get_recipients(settings: dict[str, Any] | None = None) -> list[str]:
-    """Recipient list from settings.json. Empty list disables email."""
-    if settings is None:
-        try:
-            settings = load_settings()
-        except Exception:
-            logger.exception("Could not load settings for alert recipients")
-            return []
-    recips = settings.get("alert_recipients") or []
+    """Recipient list from the ALERT_RECIPIENTS env var. Empty list disables email.
+
+    Comma-separated, secret-backed in CI. This deliberately does NOT read
+    settings.json and does NOT fall back to it: the repo is public, so a
+    committed recipient list publishes real addresses, and a silent fallback
+    would defeat the point of sourcing them from a secret. Same rule, and the
+    same reasoning, as competitor_escalation.get_escalation_recipients().
+
+    `settings` is accepted and ignored so the many existing call sites that
+    already have a settings dict in hand keep working unchanged; it is not a
+    source of recipients and must not become one again.
+    """
+    del settings  # accepted for call-site compatibility, never read — see docstring
+    raw = (os.getenv("ALERT_RECIPIENTS") or "").strip()
     # De-dupe while preserving order; drop blanks.
     seen: set[str] = set()
     out: list[str] = []
-    for r in recips:
-        r = (r or "").strip()
+    for r in raw.split(","):
+        r = r.strip()
         if r and r not in seen:
             seen.add(r)
             out.append(r)
     return out
+
+
+def recipients_fingerprint(recipients: list[str]) -> str:
+    """A stable, short tag for a recipient set — for logs, never the addresses.
+
+    /data/alerts/email_log.jsonl is committed to a public repo and the CI job
+    logs are public too, so neither may carry recipient addresses in plaintext.
+    They still need to answer the audit question the addresses used to answer:
+    "did this go to the set I expect, and when did that set change?" The
+    fingerprint answers exactly that and nothing more.
+
+    Deliberately NOT a security control, and it must not be described as one:
+    email addresses are low-entropy, so anyone who already has a candidate
+    address can confirm it against this digest. The threat it does address is
+    the real one here — publishing addresses in plaintext, in the current tree,
+    to anyone who reads the repo or a workflow log.
+
+    Order-sensitive by design: a reordered list is a changed configuration and
+    should show as one.
+    """
+    joined = ",".join((r or "").strip().lower() for r in recipients)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
 
 
 def _log_email(record: dict[str, Any]) -> None:
@@ -136,7 +168,8 @@ def send_email(
         "type": alert_type,
         "trigger": trigger,
         "subject": subject,
-        "recipients": recipients,
+        "recipient_count": len(recipients),
+        "recipients_fingerprint": recipients_fingerprint(recipients),
     }
 
     # --- Pre-flight: config gates that make this a no-op rather than a failure ---
@@ -145,7 +178,7 @@ def send_email(
         _log_email({**base_record, "status": "skipped", "reason": "alerts_disabled"})
         return False
     if not recipients:
-        logger.warning("No alert_recipients configured — skipping email: %s", subject)
+        logger.warning("ALERT_RECIPIENTS not set — skipping email: %s", subject)
         _log_email({**base_record, "status": "skipped", "reason": "no_recipients"})
         return False
     if not sender or not password:
@@ -172,7 +205,8 @@ def send_email(
                               context=context) as server:
             server.login(sender, password)
             server.sendmail(sender, recipients, msg.as_string())
-        logger.info("Email sent [%s] '%s' → %s", alert_type, subject, ", ".join(recipients))
+        logger.info("Email sent [%s] '%s' → %d recipient(s) [%s]", alert_type, subject,
+                    len(recipients), recipients_fingerprint(recipients))
         _log_email({**base_record, "status": "sent"})
         return True
     except Exception as e:  # noqa: BLE001 — a failed email must never crash the pipeline

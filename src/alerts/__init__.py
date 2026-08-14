@@ -10,7 +10,7 @@ dead-man's-switch so an independent monitor can catch decision-making absence
 (not just workflow failure). See heartbeat.py.
 """
 from .alerter import send_alert, send_daily_summary
-from .email_alerts import send_email, get_recipients
+from .email_alerts import send_email, get_recipients, recipients_fingerprint
 from .competitor_escalation import send_escalation_alert, get_escalation_recipients
 from .events import dispatch_event, run_eod_alert_sweep, scan_macro_events
 from .digest import build_digest, send_daily_digest
@@ -21,6 +21,7 @@ __all__ = [
     "send_daily_summary",
     "send_email",
     "get_recipients",
+    "recipients_fingerprint",
     "send_escalation_alert",
     "get_escalation_recipients",
     "dispatch_event",

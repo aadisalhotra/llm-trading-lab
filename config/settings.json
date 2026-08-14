@@ -59,10 +59,7 @@
       "deepseek":   8.00
     }
   },
-  "alert_recipients": [
-    "aadisalhotra@gmail.com",
-    "manishsalhotra@gmail.com"
-  ],
+  "alert_recipients_source": "env:ALERT_RECIPIENTS (comma-separated). Moved out of this file 2026-08-14 - the repo is public. Nothing reads a recipient list from settings.json; see src/alerts/email_alerts.get_recipients.",
   "alerts": {
     "enabled": true,
     "max_event_alerts_per_day": 10,

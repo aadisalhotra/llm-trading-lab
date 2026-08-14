@@ -55,7 +55,8 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.config_loader import force_utf8_console, load_env, load_settings  # noqa: E402
+from src.config_loader import force_utf8_console, load_env  # noqa: E402
+from src.alerts.email_alerts import get_recipients  # noqa: E402
 
 logger = logging.getLogger("llmlab.monitor.staleness")
 
@@ -296,22 +297,22 @@ def _build_alert(decision: dict) -> tuple[str, str, str]:
 def send_staleness_alert(decision: dict) -> bool:
     """Send the staleness alert via Gmail SMTP. Never raises; returns success.
 
-    Recipients come from config/settings.json ("alert_recipients"); credentials
-    from GMAIL_ADDRESS / GMAIL_APP_PASSWORD. Missing config makes this a logged
-    no-op, exactly like the pipeline's own send path.
+    Recipients come from ALERT_RECIPIENTS (comma-separated, secret-backed);
+    credentials from GMAIL_ADDRESS / GMAIL_APP_PASSWORD. Missing config makes
+    this a logged no-op, exactly like the pipeline's own send path.
+
+    The recipient list is read through src.alerts.email_alerts.get_recipients
+    rather than re-parsed here, so there is exactly one place that decides where
+    recipients come from. That module is stdlib-only, so it is safe to import
+    from this job, which runs no ``pip install`` (see the module docstring).
     """
     subject, html_body, text_body = _build_alert(decision)
-    try:
-        settings = load_settings()
-    except Exception:  # noqa: BLE001
-        settings = {}
-    recipients = [r.strip() for r in (settings.get("alert_recipients") or [])
-                  if r and r.strip()]
+    recipients = get_recipients()
     sender = (os.getenv("GMAIL_ADDRESS") or "").strip()
     password = (os.getenv("GMAIL_APP_PASSWORD") or "").replace(" ", "").strip()
 
     if not recipients:
-        logger.warning("No alert_recipients configured — staleness alert not sent")
+        logger.warning("ALERT_RECIPIENTS not set — staleness alert not sent")
         return False
     if not sender or not password:
         logger.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set — staleness alert not sent")
