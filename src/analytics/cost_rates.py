@@ -34,8 +34,8 @@ any date (they were entry errors, not stale prices):
   * deepseek-v4-pro:  carried $1.74/$3.48 ("post-promo standard"). The 75%-off
     launch rate $0.435/$0.87 was extended (~2026-05-01) and then made the
     PERMANENT list price (2026-05-22) — the standard rate never applied for a
-    single day. Peak/off-peak 2x pricing is ANNOUNCED but NOT in effect as of
-    2026-08-02 (no effective date published); do not model it until it ships.
+    single day. Peak/off-peak 2x pricing SHIPPED 2026-08-16T16:00Z and is now
+    modeled — see the deepseek-v4-pro / -flash entries below.
   * claude-sonnet-4-6: carried $3/$15 — confirmed CORRECT throughout.
 
 These mirror published list pricing (no negotiated discounts) so the
@@ -46,7 +46,19 @@ price, append a new period; never edit a past period (that falsifies history).
 
 Not modeled (all inert for lab traffic): cached-input discounts (adapters
 don't request caching and the logs carry no cached-token split), batch-tier
-discounts, and OpenAI's Priority tier.
+discounts, and OpenAI's Priority tier. DeepSeek's cache-hit rates ARE now
+transcribed into the 2026-08-16 entries as reference data — every lab call is
+still priced at the cache-miss rate, which is the conservative (upper-bound)
+side of that unknown.
+
+Time-of-day pricing is NOT resolved here. DeepSeek's 2026-08-16 schedule prices
+a call by the UTC clock, but this module's only time input is a calendar date,
+so the periods below carry the OFF-PEAK schedule in ``tiers`` and the full
+peak/off-peak transcription in ``schedule``. That is exact for every call the
+lab has ever logged (0 of 391 July+August DeepSeek calls fall in a peak window;
+all model-calling crons run 13:00-21:00 UTC Mon-Fri) and it is what a per-call
+classifier will read when one is built. Until then, a DeepSeek call made inside
+a peak window is priced at half its true cost — see the entry notes.
 
 Used by:
 - the five provider adapters to price each call at call time (no date arg →
@@ -72,6 +84,20 @@ from datetime import datetime, timezone
 #          prompt crosses the threshold, which is exactly what per-call tier
 #          selection by input_tokens reproduces.
 #   note:  provenance — where the rate/date comes from.
+#   schedule: (optional, DeepSeek 2026-08-16+) time-of-day pricing the date-only
+#          resolver cannot apply. See DEEPSEEK_PEAK_WINDOWS_UTC below.
+
+# DeepSeek's peak windows, effective 2026-08-16T16:00Z, as published:
+# 09:00-12:00 and 14:00-18:00 Beijing time = 01:00-04:00 and 06:00-10:00 UTC.
+# Half-open [start_hour, end_hour) in UTC. Peak rates are exactly 2x off-peak
+# on every column (cache-hit input, cache-miss input, output).
+#
+# This is the single source of truth for the windows. It is DATA ONLY — nothing
+# in this module classifies a call by timestamp yet; that is queued for the
+# cost-path batch along with a scheduling rule pinning repeated-call jobs
+# (RQ6 replays included) to off-peak windows.
+DEEPSEEK_PEAK_WINDOWS_UTC: tuple[tuple[int, int], ...] = ((1, 4), (6, 10))
+
 RATE_HISTORY: dict[str, list[dict]] = {
     # Anthropic — Sonnet 4.6 verified correct for the whole lab window.
     "claude-sonnet-4-6": [
@@ -190,23 +216,76 @@ RATE_HISTORY: dict[str, list[dict]] = {
     # $3.48 list). The discount was extended (~2026-05-01) and then made the
     # PERMANENT list price (2026-05-22) — $1.74/$3.48 never applied for a
     # single day. Cache-hit input ($0.003625) is not modeled (no cached-token
-    # split in the logs). Peak/off-peak 2x pricing (peak 09:00-12:00 and
-    # 14:00-18:00 Beijing = 01:00-04:00 / 06:00-10:00 UTC) is ANNOUNCED but
-    # NOT in effect as of 2026-08-02 — the lab session 13:30-21:00 UTC would
-    # be off-peak anyway; add a period only when the provider publishes an
-    # effective date.
+    # split in the logs).
+    #
+    # Period 2 (2026-08-16): the announced peak/off-peak schedule SHIPPED, at
+    # 16:00Z on 2026-08-16, together with an across-the-board rate rise. See
+    # the period note for the transcription and the effective-date semantics.
     "deepseek-v4-pro": [
         {
             "effective_from": "2026-04-24",
             "tiers": [{"max_input_tokens": None, "input": 0.435, "output": 0.87}],
             "note": "Launch rate made permanent 2026-05-22 (api-docs.deepseek.com/quick_start/pricing).",
         },
+        {
+            "effective_from": "2026-08-16",
+            "tiers": [{"max_input_tokens": None, "input": 0.66, "output": 1.98}],
+            "schedule": {
+                "basis": "off_peak",
+                "peak_windows_utc": DEEPSEEK_PEAK_WINDOWS_UTC,
+                "off_peak": {"cache_hit_input": 0.022, "cache_miss_input": 0.66, "output": 1.98},
+                "peak": {"cache_hit_input": 0.044, "cache_miss_input": 1.32, "output": 3.96},
+            },
+            "note": (
+                "Provider announcement 2026-08-14, effective 2026-08-16T16:00Z "
+                "(api-docs.deepseek.com/quick_start/pricing; announcement echoed by "
+                "Fortune/InfoWorld/Quartz 2026-08-13). Units verified against the "
+                "published docs: USD per 1M tokens, three columns (cache-hit input / "
+                "cache-miss input / output). Off-peak $0.022/$0.66/$1.98; peak exactly "
+                "2x at $0.044/$1.32/$3.96. `tiers` carries the OFF-PEAK cache-miss "
+                "rates, which is the schedule every deployed decision cycle bills at: "
+                "the lab's model-calling crons run 13:00-21:00 UTC Mon-Fri (observed "
+                "13:33-19:36) and 0 of 391 logged July+August DeepSeek calls fall in a "
+                "peak window. UNRESOLVED, deliberately: the resolver takes a date, not "
+                "a timestamp, so an ad-hoc or replay call made inside 01:00-04:00 or "
+                "06:00-10:00 UTC prices at HALF its true cost with no warning — pin "
+                "repeated-call jobs (RQ6 replays included) to off-peak until the "
+                "per-call classifier lands. Effective-date approximation: the switch is "
+                "mid-day 16:00Z, this table is date-granular, so a 2026-08-16 call "
+                "before 16:00Z would over-price; inert because 2026-08-16 is a Sunday "
+                "and no model-calling cron runs on weekends."
+            ),
+        },
     ],
+    # V4-Flash: lab traffic only in the Apr 24 - May 21 reasoner-alias drift
+    # window (the cell moved to v4-pro 2026-05-21), so period 2 prices no
+    # logged call today. Registered anyway — the boundary is real, and leaving
+    # a stale rate in the table is how four of the six 2026-08-02 entry errors
+    # survived as long as they did.
     "deepseek-v4-flash": [
         {
             "effective_from": "2026-04-24",
             "tiers": [{"max_input_tokens": None, "input": 0.14, "output": 0.28}],
-            "note": "Rate in force across the Apr 24 - May 21 reasoner-alias drift window; matches current list.",
+            "note": "Rate in force across the Apr 24 - May 21 reasoner-alias drift window (api-docs.deepseek.com/quick_start/pricing).",
+        },
+        {
+            "effective_from": "2026-08-16",
+            "tiers": [{"max_input_tokens": None, "input": 0.22, "output": 0.66}],
+            "schedule": {
+                "basis": "off_peak",
+                "peak_windows_utc": DEEPSEEK_PEAK_WINDOWS_UTC,
+                "off_peak": {"cache_hit_input": 0.007, "cache_miss_input": 0.22, "output": 0.66},
+                "peak": {"cache_hit_input": 0.014, "cache_miss_input": 0.44, "output": 1.32},
+            },
+            "note": (
+                "Same announcement and effective instant as deepseek-v4-pro "
+                "(2026-08-16T16:00Z). Off-peak $0.007/$0.22/$0.66; peak 2x at "
+                "$0.014/$0.44/$1.32, USD per 1M tokens. `tiers` carries the off-peak "
+                "cache-miss rates on the same basis and with the same unresolved "
+                "time-of-day caveat as the v4-pro entry. No lab traffic resolves "
+                "through this period (the deepseek cell has run v4-pro since "
+                "2026-05-21), so it is registration, not attribution."
+            ),
         },
     ],
 }

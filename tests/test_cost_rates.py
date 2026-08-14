@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.analytics.cost_rates import (  # noqa: E402
     COST_PER_MTOK,
+    DEEPSEEK_PEAK_WINDOWS_UTC,
     LEGACY_FLAT_TABLE_PRE_2026_08,
     RATE_HISTORY,
     backsolve_screening_input_tokens,
@@ -102,9 +103,10 @@ def test_grok_420_period_1_high_tier_is_marked_unverified():
     assert period_1["tiers"][1]["output"] == 12.00
 
 
-def test_deepseek_v4_pro_promo_rate_throughout():
+def test_deepseek_v4_pro_promo_rate_through_2026_08_15():
     # The 75%-off launch rate was made permanent; $1.74/$3.48 never applied.
-    for d in ("2026-04-24", "2026-06-01", "2026-07-31"):
+    # It held until the 2026-08-16 schedule change (below).
+    for d in ("2026-04-24", "2026-06-01", "2026-07-31", "2026-08-15"):
         assert rate_sum("deepseek-v4-pro", d) == 0.435 + 0.87
 
 
@@ -140,7 +142,15 @@ def test_default_date_is_today():
     # Call-time path (adapters pass no date) must price at current rates.
     assert compute_call_cost_usd("claude-sonnet-4-6", LAB_IN, LAB_OUT) is not None
     assert round(compute_call_cost_usd("claude-sonnet-4-6", LAB_IN, LAB_OUT) * 10, 6) == 18.00
-    assert round(compute_call_cost_usd("deepseek-v4-pro", LAB_IN, LAB_OUT) * 10, 6) == 1.305
+    # DeepSeek's rate changes on 2026-08-16, so asserting a literal here would
+    # turn this test into a time bomb. Assert the property instead: omitting
+    # on_date must equal passing today's UTC date explicitly.
+    from src.analytics.cost_rates import _today_utc
+
+    assert (
+        compute_call_cost_usd("deepseek-v4-pro", LAB_IN, LAB_OUT)
+        == compute_call_cost_usd("deepseek-v4-pro", LAB_IN, LAB_OUT, on_date=_today_utc())
+    )
 
 
 def test_cost_per_mtok_compat_view():
@@ -148,6 +158,125 @@ def test_cost_per_mtok_compat_view():
     assert COST_PER_MTOK["claude-sonnet-4-6"] == {"input": 3.00, "output": 15.00}
     assert COST_PER_MTOK["claude-opus-4-6"] == {"input": 5.00, "output": 25.00}
     assert COST_PER_MTOK["grok-4.20-0309-reasoning"] == {"input": 1.25, "output": 2.50}
+
+
+# --- DeepSeek 2026-08-16 peak/off-peak schedule ---------------------------
+#
+# Provider announcement 2026-08-14, effective 2026-08-16T16:00Z. Units verified
+# against api-docs.deepseek.com/quick_start/pricing: USD per 1M tokens, columns
+# cache-hit input / cache-miss input / output. These tests lock the exact
+# transcription, because a units slip here is the failure mode that put four of
+# the six pre-2026-08 rates in the table wrong.
+
+DS_ANNOUNCED = {
+    # model: {period: (cache_hit_input, cache_miss_input, output)}
+    "deepseek-v4-pro": {
+        "off_peak": (0.022, 0.66, 1.98),
+        "peak": (0.044, 1.32, 3.96),
+    },
+    "deepseek-v4-flash": {
+        "off_peak": (0.007, 0.22, 0.66),
+        "peak": (0.014, 0.44, 1.32),
+    },
+}
+
+
+def _new_period(model: str) -> dict:
+    return next(p for p in RATE_HISTORY[model] if p["effective_from"] == "2026-08-16")
+
+
+def test_deepseek_schedule_transcribed_exactly():
+    """Every announced number, all three columns, both models, both schedules."""
+    for model, expected in DS_ANNOUNCED.items():
+        sched = _new_period(model)["schedule"]
+        for period, (hit, miss, out) in expected.items():
+            assert sched[period]["cache_hit_input"] == hit, (model, period)
+            assert sched[period]["cache_miss_input"] == miss, (model, period)
+            assert sched[period]["output"] == out, (model, period)
+
+
+def test_deepseek_peak_is_exactly_double_off_peak():
+    """The announcement defines peak as 2x off-peak on every column."""
+    for model in DS_ANNOUNCED:
+        sched = _new_period(model)["schedule"]
+        for column in ("cache_hit_input", "cache_miss_input", "output"):
+            assert abs(sched["peak"][column] - 2 * sched["off_peak"][column]) < 1e-12, (
+                model,
+                column,
+            )
+
+
+def test_deepseek_lookup_tiers_are_the_off_peak_cache_miss_rates():
+    """`tiers` must stay consistent with the schedule it claims to carry.
+
+    The resolver is date-only, so it returns one schedule for every call. That
+    schedule is off-peak, and the input rate is cache-MISS (the lab logs carry
+    no cached-token split). This test is what catches a future edit that
+    updates one of the two representations and not the other.
+    """
+    for model in DS_ANNOUNCED:
+        period = _new_period(model)
+        sched = period["schedule"]
+        assert sched["basis"] == "off_peak"
+        assert len(period["tiers"]) == 1
+        tier = period["tiers"][0]
+        assert tier["max_input_tokens"] is None
+        assert tier["input"] == sched["off_peak"]["cache_miss_input"]
+        assert tier["output"] == sched["off_peak"]["output"]
+
+
+def test_deepseek_peak_windows_are_01_04_and_06_10_utc():
+    # 09:00-12:00 and 14:00-18:00 Beijing = 01:00-04:00 and 06:00-10:00 UTC.
+    assert DEEPSEEK_PEAK_WINDOWS_UTC == ((1, 4), (6, 10))
+    # Every window the published schedule names, and no others. The lab's
+    # decision cycles (13:00-21:00 UTC) must not intersect any of them.
+    lab_hours = set(range(13, 22))
+    peak_hours = {h for start, end in DEEPSEEK_PEAK_WINDOWS_UTC for h in range(start, end)}
+    assert lab_hours & peak_hours == set()
+
+
+def test_deepseek_v4_pro_boundary_at_2026_08_16():
+    # Last day of the old rate, first day of the new. 2026-08-16 is a Sunday
+    # and no model-calling cron runs on weekends, so the date-granular boundary
+    # never has to represent the mid-day 16:00Z switch for a real call.
+    assert rate_sum("deepseek-v4-pro", "2026-08-15") == 0.435 + 0.87
+    assert rate_sum("deepseek-v4-pro", "2026-08-16") == 0.66 + 1.98
+    assert rate_sum("deepseek-v4-pro", "2026-08-17") == 0.66 + 1.98
+
+
+def test_deepseek_v4_flash_boundary_at_2026_08_16():
+    # rate_sum() rounds to 6dp; round the expectation too so binary float
+    # noise (0.14 + 0.28 == 0.42000000000000004) isn't read as a rate error.
+    assert rate_sum("deepseek-v4-flash", "2026-05-20") == round(0.14 + 0.28, 6)
+    assert rate_sum("deepseek-v4-flash", "2026-08-15") == round(0.14 + 0.28, 6)
+    assert rate_sum("deepseek-v4-flash", "2026-08-16") == round(0.22 + 0.66, 6)
+
+
+def test_deepseek_history_stays_priced_at_the_old_rate():
+    """Appending a period must not reprice a single historical call.
+
+    The whole point of the dated table: July's costs are July's rates. A
+    regression that made the new period retroactive would silently inflate
+    every cost figure already published for April-August 15.
+    """
+    for d in ("2026-04-24", "2026-05-21", "2026-06-15", "2026-07-31", "2026-08-13"):
+        assert rate_sum("deepseek-v4-pro", d) == 0.435 + 0.87
+
+
+def test_deepseek_time_of_day_is_not_resolved_yet():
+    """A peak-window call is knowingly underpriced 2x — documented, not silent.
+
+    compute_call_cost_usd takes no timestamp, so it cannot distinguish a
+    02:00Z call from a 15:00Z one. Until the per-call classifier lands, the
+    entry note must say so in the table itself, where anyone reading a
+    DeepSeek cost figure will find it.
+    """
+    for model in DS_ANNOUNCED:
+        note = _new_period(model)["note"]
+        assert "peak" in note.lower()
+        assert "2026-08-16T16:00Z" in note
+    pro_note = _new_period("deepseek-v4-pro")["note"]
+    assert "HALF its true cost" in pro_note
 
 
 # --- rider 1: read-time repricing (2026-08-05) ---------------------------
