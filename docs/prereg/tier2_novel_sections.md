@@ -1,7 +1,8 @@
 # PRE-REGISTRATION — TIER 2 (Novel Sections)
 
-**Status:** landed verbatim as delivered by Research via the PI relay, 2026-08-13.
-No text was altered in landing. Claims verifiable today were checked against
+**Status:** landed verbatim as delivered by Research via the PI relay, 2026-08-13;
+second landing 2026-08-14 (Gate 4 — execution integrity; October-live ruling).
+No text was altered in either landing. Claims verifiable today were checked against
 committed sources before landing; the verification record is in this header.
 
 ---
@@ -45,6 +46,25 @@ Resolved at landing (not outstanding): the payload's instruction
 here.]"* — discharged in §3.9 below by quoting
 `operational_events["2026-08"][0].stabilization_sequence` verbatim.
 
+The 2026-08-14 landing adds **no** decision-gated markers — neither payload text
+carries a bracketed marker, so the mechanical count above is unchanged at 4.
+
+### Registered consequences (dated obligations, not decision-gated markers)
+
+These are counted separately and deliberately: they are settled rulings carrying
+dates, not open branches awaiting a decision. Nothing below clears at a marker.
+
+| # | Consequence | Section | Date |
+|---|---|---|---|
+| C1 | Venue cutover must be **landed by October 1** — the integration-path rule sets the deadline; a mid-October cutover fragments the final validation segment. If it cannot land by Oct 1, Phase B launches on the venue validated through October, and no validated live path by then is an escalation about the launch itself. | October-live ruling | 2026-10-01 |
+| C2 | The venue cutover **does not restart Gemini's validation clock** — the clock gates the model-call configuration (completeness, finish_reason, identity); the venue is downstream of decision generation. Execution-layer changes are gated by Gate 4's October demonstration, not by the model-call clock. | October-live ruling | standing |
+
+C2 governs the interaction between this ruling and
+`operational_events["2026-08"].gemini_sdk_migration_2026_08.phase_b_clock_spec`,
+whose October segment runs to `clock_end: "2026-10-31"` — i.e. the same October
+in which the cutover lands. The ruling resolves that overlap explicitly rather
+than leaving it to be discovered at gate time.
+
 **Not included and not owed in this file:** the RQ1 entry (never delivered
 inline; requested from Research separately) and the RQ2/RQ3/RQ4/RQ5 entries
 (blocked on rulings in flight).
@@ -69,8 +89,42 @@ Checked at landing. Every §3.9 figure clears.
 | §3.10 — preview build, no GA snapshot, alias-only identity | `docs/PRE_REGISTRATION.md:266, 275, 285` | PASS |
 
 **Citation rule observed:** the continuity-diagnostic *close-out* ledger entry is
-cited nowhere in this file — it does not exist. Citable and cited above:
-`continuity_diagnostic`, `stabilization_sequence`, and the Tier 1 document.
+cited nowhere in this file. At the 2026-08-13 landing it did not exist. It exists
+as of 2026-08-14 —
+`operational_events["2026-08"].gemini_continuity_diagnostic_close_out`, commit
+`002e4988` — and the rule still holds: neither 2026-08-14 payload text cites it.
+Citable and cited above: `continuity_diagnostic`, `stabilization_sequence`, and
+the Tier 1 document.
+
+### 2026-08-14 landing — cross-reference verification
+
+The two payload texts were checked against the committed gate definitions before
+landing. The committed numbering is in Tier 1 §T1.2, `tier1_novel_sections.md:56–60`,
+which enumerates the three-gate framework as an ordered list sourced from
+`scripts/phase_a_integrity_ledger.json` → `inclusion_gates.gates`
+`["completeness", "uncorrupted_book", "model_identity_stable"]`.
+
+| Payload cross-reference | Committed definition | Result |
+|---|---|---|
+| "a book-integrity event (**Gate 2**)" | §T1.2 ordered item **2** — *"**Uncorrupted book** — ledger `gate_definitions.uncorrupted_book`"* | **MATCH** |
+| "Gate 4 joins **Gates 1–3** for live-phase estimability" | §T1.2 items 1–3 — completeness / uncorrupted book / stable model identity; ledger `gates` array, same order | **MATCH** |
+| "Threshold: **≥0.80** per model-segment, uniform with the decision-completeness gate" | ledger `inclusion_gates.completeness_min: 0.8`; §T1.2 item 1 *"Decision completeness ≥ 0.80"* | **MATCH** |
+
+**Numbering caveat, registered not reconciled.** The committed sources name the
+gates (`completeness`, `uncorrupted_book`, `model_identity_stable`) and present
+them in a numbered list; they nowhere use the literal labels "Gate 1", "Gate 2",
+or "Gate 3". The payload's ordinal references resolve correctly against the
+committed *order*, which is identical in the ledger array and in §T1.2, but that
+order is the only thing binding them. A future reordering of either would break
+the citation silently. Flagged for Research; not altered here.
+
+**"Gate (d)" — not present.** Neither 2026-08-14 payload text contains the string
+"Gate (d)" or any "(d)" reference; there was accordingly nothing to verify. The
+label does occur in the committed corpus, at
+`docs/broker/broker_selection_research.md` — *"per-broker implementation must be
+confirmed in writing (gate d)"* and *"Covers gates (b), (c), (d)"* — but that is
+the broker-lane due-diligence namespace, unrelated to the inclusion gates.
+Recorded so the absence is a finding rather than an omission.
 
 ---
 
@@ -97,3 +151,7 @@ Cohort rule. [SEPTEMBER: freeze vs modified refresh per the framework — pin da
 RQ6 — operational reproducibility (deployed configuration). Characterization RQ, outside the BH-FDR family. Unit: the deployed configuration; every configuration is its own characterization. Metric: Δ_m, per-model run-to-run decision divergence across repeated calls at the deployed configuration. The pipeline sends no temperature parameter to any model, so temperature 0 is off-deployment for the whole cohort; per-model temperature behavior is a disclosed fact in the API-configuration table (honor / ignore / reject — the third class per the 5-family 400-error behavior), not a design basis. The configuration table registers at post-fix state [CITE-FILL: table].
 
 Registered cost basis (failed-but-billed ruling). The registered cost basis includes failed-but-billed spend; the inclusion is registered at the deposit, not restated mid-phase. Substantive ground: excluding failure costs systematically flatters unreliable models — failed calls were real spend incurred producing the decision stream, and a cost-per-decision that drops failed spend from the numerator makes the least reliable model look cheapest per decision. Basis: total billed inference spend (successful + failed) in the numerator; completed decisions in the denominator; failed-but-billed additionally broken out as its own disclosed line. Published Apr–Jul pilot totals stand as published under the three-total labeling ($821.04 logged-stale / $337.31 reconciliation / $329.79 summaries); the $7.53 is disclosed in reporting from August onward; the inclusive basis governs the paper and Phase B from the registration.
+
+Gate 4 — Execution integrity (live phase). For live-phase segments, each model-month's execution success rate is the fraction of decision cycles whose intended orders were (i) successfully submitted to the venue and (ii) resolved to a terminal, broker-reconciled state — filled, partially filled, or rejected by a legitimate market constraint (halt, liquidity, buying-power), with the book reconciled to broker-authoritative positions and cash. A cycle fails execution when orders cannot be submitted (venue/API/auth failure), order status is unresolved, or post-cycle reconciliation diverges from broker state; a reconciliation divergence is additionally a book-integrity event (Gate 2). Legitimate market rejections are execution-successful — the linkage worked; they are logged as execution-constraint events per the registered censoring principle. Threshold: ≥0.80 per model-segment, uniform with the decision-completeness gate. Relationship to the inclusion gates: Gate 4 joins Gates 1–3 for live-phase estimability; it is inapplicable to paper-phase segments (simulated fills; trivially 1.0) and is registered as live-phase-scoped. A segment failing only Gate 4 is classified decision-estimable (execution-impaired): decision-level estimands (RQ1 concordance, RQ6) remain estimable with disclosure, while outcome-dependent estimands (RQ2/RQ3 outcome legs, RQ5's realized paths, all performance figures) are non-estimable for the segment — decisions were observed; their portfolio consequences were not. Correlation disclosure: execution failures are typically venue-wide and simultaneous across all six books (a broker outage is one event, not six); per-model rates are registered but their cross-book correlation is disclosed, and any venue-wide failure day is an incident-handling event regardless of monthly rates. October obligation: the validation month must demonstrate the execution-success measurement itself — the metric computes, the reconciliation check runs, and a deliberately induced submission failure is correctly classified (a test of the gate, not just of the venue).
+
+October-live ruling. October validates the live configuration — specifically, the live execution path in the venue's broker-paper mode — and live capital begins November 1, never earlier. The execution path (venue, adapter, order lifecycle, reconciliation) is configuration and must be validated in October; real capital is the registered phase boundary and is not a validation variable. Broker paper mode on the actual venue exercises the true order lifecycle — submission, fills, rejections, reconciliation, the Gate 4 machinery — with zero capital at risk. The venue cutover is an integration-path change, and the integration-path rule sets its deadline: landed by October 1. A mid-October cutover would fragment the final validation segment and leave Phase B launching on a path validated for two weeks or less. So: cutover by Oct 1 → October validates refreshed cohort × frozen prompt × live venue path in paper mode → Nov 1 live capital. If the cutover cannot land by Oct 1, Phase B launches on the venue that was validated through October — and if no live path is validated by then, that is an escalation about the launch itself, not a thing October quietly absorbs. Clarification: the venue cutover does not restart Gemini's validation clock. The clock gates the model-call configuration (completeness, finish_reason, identity); the venue is downstream of decision generation. Execution-layer changes are gated by Gate 4's October demonstration, not by the model-call clock.
