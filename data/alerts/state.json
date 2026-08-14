@@ -36,13 +36,17 @@
   },
   "daily": {
     "date": "2026-08-14",
-    "sent_count": 2,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "ath:gemini",
+      "ath:grok",
+      "ath:deepseek",
+      "news:MA:42a09c185d"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -56,6 +60,34 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-08-14T17:03:53.721984+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-14T21:07:40.468505+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-08-14T21:07:42.488246+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "DeepSeek V4 Pro hit a new all-time high",
+        "timestamp": "2026-08-14T21:07:43.705965+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MA (held by 4)",
+        "timestamp": "2026-08-14T21:07:45.309200+00:00",
         "disposition": "sent"
       }
     ]
