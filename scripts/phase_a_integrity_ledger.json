@@ -258,6 +258,277 @@
         "consequence": "the 2026-08-06 decision-completeness denominator is 5 cycles, not 13, for every model — the August builder must use the logged denominator, not an assumed 13. Equity curves step 2026-08-05 -> 2026-08-07 with NO 2026-08-06 point in either data/performance or the dashboard equity_curves: an honest gap, never an interpolated or carried-forward value. The published daily-report series therefore has no Day 120 (2026-08-05 is Day 119, 2026-08-07 is Day 121; the day counter is calendar-derived and consumed 120). data/leaderboard/2026-08-06.json is retained as-is and is NOT an 2026-08-06 observation — its contents are the 2026-08-05 close under an 2026-08-06 filename; any consumer keying on the filename must treat it as such. Gemini-specific (Phase B validation clock): all 5 logged cycles were api_success, so the day is completeness 1.0 on a 5-cycle denominator and does not depress the segment; its only effect on the clock is to remove 8 cycles of denominator.",
         "published_surface_audit": "No published surface quoted 2026-08-05 values under an 2026-08-06 label. No daily report was generated; no digest was sent; the live dashboard (data/dashboard.json) carries a single current generated_at and rolled forward normally on 2026-08-07, so its exposure was transient-only during the 08-06 session. The one durable stale artifact is data/leaderboard/2026-08-06.json, which never self-corrected — 2026-08-07 wrote its own dated file and nothing rewrites a prior day's snapshot. Its only consumer is daily_report._previous_leaderboard(), which globs for the most recent snapshot strictly before the run date; the 2026-08-07 report therefore drew its rank arrows from the 08-06 file. Those arrows are CORRECT — the file holds the 08-05 ranks and 08-05 is the true prior close — but correct by coincidence of content, not by any chain-gap-aware rule: _previous_leaderboard() selects on filename and would have propagated a genuinely mixed mid-session state had the chain died later in a day, after some models had updated and others had not. Latent fragility, logged, not fixed here.",
         "evidence": "data/trades/{model}_2026-08.jsonl (5 records dated 2026-08-06 per model); data/intraday/{model}_2026-08-06.jsonl (5 rows vs 15 on 2026-08-07); data/performance/{model}.jsonl (no 2026-08-06 row, any model); absent reports/daily/2026-08-06.md; logs/alerts.jsonl; git log for data/leaderboard/2026-08-06.json (terminal write 9bbb169f @ 2026-08-06T15:38:24Z). Established during the Gemini Phase-B week-one readout, 2026-08-10, read-only against origin/main @ 79d113e5."
+      },
+
+      {
+        "id": "gemini_continuity_diagnostic_close_out",
+        "date": "2026-08-14",
+        "effective": null,
+        "type": "diagnostic_close_out",
+        "scope": "gemini",
+        "closes": "gemini_sdk_migration_2026_08.continuity_diagnostic",
+        "window": "2026-08-03T14:06:25.440972Z .. 2026-08-14T19:33:19.238389Z (CLOSED)",
+        "trading_days": 10,
+        "detail": "Close-out of the post-cutover continuity diagnostic opened by gemini_sdk_migration_2026_08. The diagnostic ran its full declared course -- the first two trading weeks after the google-generativeai -> google-genai cutover, checked daily -- and is closed here with every figure recomputed fresh over the now-closed window. The window's right edge is the final logged cohort-wide cycle of 2026-08-14 (13/13 cycles logged for all six models); no figure below is carried forward from the 2026-08-13 interim snapshot.",
+        "no_clock_credit": "This diagnostic yields NO Phase B clock credit. continuity_diagnostic.schedule reads verbatim: \"first two trading weeks post-cutover, checked daily (early-warning only, NO clock credit)\". Clock credit is decided only by phase_b_clock_spec, whose gates are evaluated per SEGMENT with no_averaging=true: the post-migration August segment (clock start .. 2026-08-31), September 2026, and October 2026. The 2026-08-03..08-14 window is a proper subset of the first of those segments and settles nothing about it; the August segment verdict is computed at 2026-08-31 over the full segment denominator, and the figures below must not be quoted as that verdict.",
+        "completeness": {
+          "records": 120,
+          "api_success": 114,
+          "completeness": 0.95,
+          "excluded_pre_clock": {
+            "records": 1,
+            "api_success": 0,
+            "record": "2026-08-03T13:41:57.902537Z -- api_success=false, finish_reason STOP, extra_data parse mode",
+            "note": "The clock-start day's cycle 1, before the clock-start timestamp. Outside the window by construction: the clock starts at the first logged post-migration SUCCESS, so an earlier same-day cycle cannot be inside it."
+          },
+          "records_without_timestamp": 0,
+          "denominator_note": "Logged cycles, never an assumed ticks-per-day. 2026-08-06 contributes 5 (cycle_gap_2026_08_06, chain-side, cohort-wide); 2026-08-03 contributes 12 of its 13 (the pre-clock cycle above); 2026-08-11 contributes 12 because 12 ran cohort-wide.",
+          "daily": {
+            "2026-08-03": {
+              "records": 12,
+              "api_success": 10,
+              "completeness": 0.8333
+            },
+            "2026-08-04": {
+              "records": 13,
+              "api_success": 13,
+              "completeness": 1.0
+            },
+            "2026-08-05": {
+              "records": 13,
+              "api_success": 11,
+              "completeness": 0.8462
+            },
+            "2026-08-06": {
+              "records": 5,
+              "api_success": 5,
+              "completeness": 1.0
+            },
+            "2026-08-07": {
+              "records": 13,
+              "api_success": 13,
+              "completeness": 1.0
+            },
+            "2026-08-10": {
+              "records": 13,
+              "api_success": 12,
+              "completeness": 0.9231
+            },
+            "2026-08-11": {
+              "records": 12,
+              "api_success": 12,
+              "completeness": 1.0
+            },
+            "2026-08-12": {
+              "records": 13,
+              "api_success": 13,
+              "completeness": 1.0
+            },
+            "2026-08-13": {
+              "records": 13,
+              "api_success": 13,
+              "completeness": 1.0
+            },
+            "2026-08-14": {
+              "records": 13,
+              "api_success": 12,
+              "completeness": 0.9231
+            }
+          }
+        },
+        "max_tokens": {
+          "count": 0,
+          "share_of_cycles": 0.0,
+          "note": "Zero MAX_TOKENS-classified failures across all 120 in-window cycles. The 16384 budget raise (2026-07-28) and the migration both hold: the budget gate's <=1% ceiling is met with the count itself at zero, not merely under the threshold."
+        },
+        "finish_reason_distribution": {
+          "STOP": 117,
+          "null": 3,
+          "note": "117 STOP = 114 successes + the 3 extra_data parse failures, which return a complete generation (STOP) that fails downstream JSON parsing. The 3 null entries are the transport-level failures (2x 503 UNAVAILABLE, 1x 429 RESOURCE_EXHAUSTED), which never reach a finish_reason. MAX_TOKENS absent entirely."
+        },
+        "identity": {
+          "in_window_decision_cycles": 120,
+          "paired_model_versions_echoes": 120,
+          "distinct_observed_versions": 1,
+          "observed_version": "gemini-3.1-pro-preview",
+          "model_id_configured_equals_returned": "120/120",
+          "transitions_detected": 0,
+          "note": "Every in-window decision cycle pairs to exactly one data/model_versions/gemini.jsonl observation. Pairing is by proximity, not by a timestamp cut: the clock-start cycle's echo is stamped 2026-08-03T14:06:25.436117Z, ~4.9ms BEFORE the decision record's own 14:06:25.440972Z stamp, so a naive 'echo >= clock_start' filter drops it and reads 119/120. Echo api_success mirrors the decision log exactly (114 true / 6 false). Identity gate: PASS over this window; the segment verdict remains 2026-08-31's."
+        },
+        "failure_composition": {
+          "total": 6,
+          "extra_data_parse": 3,
+          "http_503_unavailable": 2,
+          "http_429_resource_exhausted": 1,
+          "note": "Half of the in-window failures are provider-transport errors with no pre-cutover analogue in the baseline window (which showed 4 failures, all extra_data). They are not a model or SDK signal and are not the diagnostic's watched mode; recorded so the completeness figure is not read as six instances of the residual mode."
+        },
+        "residual_mode_rate": {
+          "mode": "extra_data trailing-brace parse failure (SDK-independent, model-side, budget-independent -- finish_reason STOP, not MAX_TOKENS)",
+          "baseline": {
+            "count": 4,
+            "records": 52,
+            "rate": 0.0769,
+            "window": "2026-07-28..2026-07-31 (legacy SDK at 16384, live)"
+          },
+          "window": {
+            "count": 3,
+            "records": 120,
+            "rate": 0.025
+          },
+          "direction": "DECREASE",
+          "change": "-5.19 percentage points (0.0769 -> 0.0250, a 67% relative reduction)",
+          "significance": "Fisher exact two-sided p = 0.2006 on [4 fail, 48 pass] vs [3 fail, 117 pass]. Not distinguishable from sampling noise at any conventional threshold.",
+          "divergence_trigger": "NOT TRIGGERED",
+          "divergence_trigger_basis": "continuity_diagnostic.known_residual_mode declares the signal as a RATE change, not mere presence, against a ~8-13% expectation. Two independent reasons no trigger fires. (1) Direction: the observed rate moved DOWN, and the diagnostic is degradation-facing -- its purpose is to catch a mode getting worse before gate time, not to flag a mode getting rarer. (2) Magnitude: at n=120 the decrease is not separable from noise (p=0.20), so even a direction-blind reading has nothing to escalate. Recorded rather than dismissed: 2.50% now sits BELOW the declared ~8-13% band, so that band is stale as a forward expectation and should be re-cut off the post-migration record when the August segment closes, not left at the legacy-SDK figure. The three occurrences carry an identical byte signature (\"Extra data: line 31 column 1\"), consistent with the same model-side mode rather than a new failure class."
+        },
+        "token_composition_attribution": {
+          "claim": "The -18.9% drop in mean visible output tokens per successful cycle is a TRADE-COMPOSITION effect, not an SDK, truncation, or model-capability effect. Stated as the finding the diagnostic closes on, because the raw mean alone reads as a regression and is not one.",
+          "headline": {
+            "baseline_mean_output_tokens_success": 852.3,
+            "baseline_n": 48,
+            "window_mean_output_tokens_success": 691.6,
+            "window_n": 114,
+            "delta": -160.7,
+            "delta_pct": -18.9
+          },
+          "mechanism": "zero-decision-cycle share shift",
+          "zero_decision_cycle_share": {
+            "baseline": 0.0833,
+            "window": 0.2807,
+            "delta_pp": 19.74,
+            "definition": "successful cycles whose accepted_decisions list is empty -- a live no-trade decision, not a failure"
+          },
+          "per_stratum_mean_output_tokens_success": {
+            "zero_decision": {
+              "baseline": 308.5,
+              "baseline_n": 4,
+              "window": 278.0,
+              "window_n": 32,
+              "delta": -30.5
+            },
+            "with_decision": {
+              "baseline": 901.7,
+              "baseline_n": 44,
+              "window": 853.0,
+              "window_n": 82,
+              "delta": -48.7
+            }
+          },
+          "tokens_per_accepted_decision": {
+            "baseline_gross": 312.3,
+            "window_gross": 350.4,
+            "baseline_within_decision_cycles": 335.6,
+            "window_within_decision_cycles": 344.2,
+            "direction": "INCREASE",
+            "note": "The discriminating statistic. Per unit of actual decision output the model emits MORE tokens post-cutover, not fewer -- gross 312.3 -> 350.4 (+12.2%), and +2.6% within decision-bearing cycles alone. A truncation or capability regression would move this number in the same direction as the headline mean. It moves opposite."
+          },
+          "decomposition": {
+            "counterfactual_baseline_strata_at_window_mix": 735.2,
+            "explained_by_composition": -117.1,
+            "composition_share_of_total_shift": 0.7287,
+            "within_stratum_residual": -43.6,
+            "method": "Hold the baseline's within-stratum means fixed and substitute the window's zero-decision mix: the baseline mean falls 852.3 -> 735.2 with no behavioral change assumed at all. That accounts for 72.9% of the observed -160.7. The remaining -43.6 (-5.1% of baseline) is within-stratum and is NOT attributed to the SDK here: it is small, it is present in both strata, and it runs against the tokens-per-accepted-decision direction, which is what a genuine output-side regression would not do."
+          },
+          "corroborating_evidence": {
+            "max_tokens": "0/120 -- truncation is affirmatively excluded, not merely unobserved.",
+            "thoughts_tokens": "populated on 114/114 in-window successes, mean 4206.2, against 0/48 populated in the baseline. This is the declared google-genai telemetry artifact (forced_sdk_differences.thoughts_token_count), and it confirms 100% of in-window successes ran the migrated path. It also means baseline-vs-window VISIBLE token comparisons are the only like-for-like comparison available; total generated tokens are not comparable across the boundary.",
+            "n_asymmetry": "The baseline zero-decision stratum is n=4, so the baseline per-stratum means are thin on that side. That is precisely why the decomposition re-mixes the BASELINE strata rather than the window's, and why the conclusion is corroborated independently by tokens-per-accepted-decision and by MAX_TOKENS=0."
+          },
+          "evidence_basis": "data/trades/gemini_2026-07.jsonl (baseline 2026-07-28..07-31) and data/trades/gemini_2026-08.jsonl (window), fields output_tokens, accepted_decisions, api_success, thoughts_tokens, api_finish_reason. All figures recomputed at close-out from the closed window."
+        },
+        "verdict": "Continuity diagnostic CLOSED, no divergence. Completeness 0.95 over 120 logged cycles, MAX_TOKENS 0, identity stable at one observed version across 120 paired echoes, residual parse mode decreased and not significantly, and the one figure that superficially diverged (mean output tokens, -18.9%) is attributed to trade composition with the mechanism identified and the opposite-signed control statistic recorded. No investigation is opened. Phase B clock credit is untouched by this entry -- see no_clock_credit.",
+        "evidence": "data/trades/gemini_2026-08.jsonl; data/trades/gemini_2026-07.jsonl; data/model_versions/gemini.jsonl; docs/Gemini-continuity-diagnostic-close-out.md (prose companion, every figure sourced from this entry)."
+      },
+
+      {
+        "id": "deepseek_pricing_2026_08_16",
+        "date": "2026-08-14",
+        "effective": null,
+        "effective_utc": "2026-08-16T16:00:00Z",
+        "type": "provider_pricing_change",
+        "scope": "deepseek",
+        "detail": "DeepSeek raised list pricing and shipped the previously-announced peak/off-peak schedule, both effective 2026-08-16T16:00Z, for deepseek-v4-pro and deepseek-v4-flash. Announced 2026-08-14 (api-docs.deepseek.com/quick_start/pricing; echoed by Fortune/InfoWorld/Quartz 2026-08-13). Registered in src/analytics/cost_rates.py as period 2 on both models.",
+        "effective_field_note": "`effective` is deliberately null and the instant is carried in `effective_utc`. The builder treats a single-model event's `effective` DATE as a decision-COMPLETENESS regime boundary and emits completeness_segmentation from it (build_monthly_data_layer._data_integrity). A pricing change is not a completeness boundary; populating `effective` would fabricate a data-quality regime point in August's layer that does not exist. Do not 'fix' this to a date.",
+        "rates_usd_per_1m_tokens": {
+          "columns": "cache_hit_input / cache_miss_input / output",
+          "deepseek-v4-pro": {
+            "previous": {
+              "effective_from": "2026-04-24",
+              "cache_miss_input": 0.435,
+              "output": 0.87
+            },
+            "off_peak": {
+              "cache_hit_input": 0.022,
+              "cache_miss_input": 0.66,
+              "output": 1.98
+            },
+            "peak": {
+              "cache_hit_input": 0.044,
+              "cache_miss_input": 1.32,
+              "output": 3.96
+            }
+          },
+          "deepseek-v4-flash": {
+            "previous": {
+              "effective_from": "2026-04-24",
+              "cache_miss_input": 0.14,
+              "output": 0.28
+            },
+            "off_peak": {
+              "cache_hit_input": 0.007,
+              "cache_miss_input": 0.22,
+              "output": 0.66
+            },
+            "peak": {
+              "cache_hit_input": 0.014,
+              "cache_miss_input": 0.44,
+              "output": 1.32
+            }
+          },
+          "peak_is_exactly_2x_off_peak": true
+        },
+        "peak_windows_utc": {
+          "windows": [
+            [
+              1,
+              4
+            ],
+            [
+              6,
+              10
+            ]
+          ],
+          "as_published": "09:00-12:00 and 14:00-18:00 Beijing time",
+          "convention": "half-open [start_hour, end_hour) in UTC",
+          "single_source_of_truth": "src/analytics/cost_rates.py DEEPSEEK_PEAK_WINDOWS_UTC"
+        },
+        "off_peak_verification": {
+          "logged_calls_in_peak_windows": 0,
+          "logged_calls_examined": 404,
+          "window_examined": "2026-07-01..2026-08-14 (all logged DeepSeek decision cycles)",
+          "observed_hour_histogram_utc": {
+            "13": 32,
+            "14": 64,
+            "15": 63,
+            "16": 61,
+            "17": 62,
+            "18": 60,
+            "19": 62
+          },
+          "margin": "The nearest peak window closes at 10:00Z; the earliest logged call is 13:33Z. A 3h33m margin, on weekdays only (Mon-Fri, 404/404).",
+          "recount_note": "The 10(a) dry-run recorded 0/391 through 2026-08-13 and src/analytics/cost_rates.py carries that as-of figure in two places. This is the same claim recounted at close-out with 2026-08-14's 13 cycles included: 0/404. The numerator is unchanged at zero; only the denominator moved. Fold 391 -> 404 into the next cost-path batch rather than editing a signed-off package."
+        },
+        "unresolved": "The rate resolver takes a DATE, not a timestamp, so it cannot classify a call by time of day. cost_rates.py therefore carries the OFF-PEAK schedule in `tiers` and the full peak/off-peak transcription in `schedule`. Exact for every call the lab has logged (see off_peak_verification) and for every deployed decision cycle going forward, since the model-calling crons run 13:00-21:00Z Mon-Fri. NOT exact for an ad-hoc or replay call made inside 01:00-04:00Z or 06:00-10:00Z: such a call prices at HALF its true cost with no warning. Until the per-call classifier lands, pin repeated-call jobs -- RQ6 replays included -- to off-peak windows.",
+        "effective_date_approximation": "The switch is mid-day (16:00Z) and the rate table is date-granular, so a 2026-08-16 call before 16:00Z would over-price. Inert: 2026-08-16 is a Sunday and no model-calling cron runs on weekends. The first traffic priced at the new rate is Monday 2026-08-17's opening cycle.",
+        "identity_watch_2026_08_17": {
+          "date": "2026-08-17",
+          "rationale": "A provider changing list price at a fixed instant is the same class of event as the 2026-04-24 alias repoint: the risk is that the floating alias deepseek-v4-pro is silently repointed at the pricing boundary. A price change is not itself a model change, and this watch exists to confirm that -- not to assume it.",
+          "check": "Verify src.model_versions.detect_version_transition ran clean against data/model_versions/deepseek.jsonl for the first post-16:00Z-Sunday traffic, i.e. no TRANSITION row appended on 2026-08-17.",
+          "expected": "observed_version stays deepseek-v4-pro on every 2026-08-17 cycle. Pre-boundary reference: 121/121 August observations through 2026-08-14 are deepseek-v4-pro with api_success=true on all 121, and the alias has been stable since the 2026-05-21 v4-flash -> v4-pro repoint (deepseek_midmonth_repoint).",
+          "if_it_fires": "A transition on 2026-08-17 makes the pricing boundary a MODEL boundary too, which is a monthly change-slot and RQ-boundary matter, not a cost matter. Escalate before the August monthly build; do not fold it into the rate table.",
+          "note": "detect_version_transition compares only api_success=true observations, so a failure->recovery cycle cannot produce a false positive; a clean run is therefore real evidence of identity stability, not an artifact of quiet logging."
+        },
+        "evidence": "src/analytics/cost_rates.py (RATE_HISTORY period 2 on both models, DEEPSEEK_PEAK_WINDOWS_UTC); tests/test_cost_rates.py; data/trades/deepseek_2026-07.jsonl and deepseek_2026-08.jsonl (off-peak verification); data/model_versions/deepseek.jsonl (identity watch)."
       }
     ]
   }
