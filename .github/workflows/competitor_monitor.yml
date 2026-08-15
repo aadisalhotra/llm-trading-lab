@@ -11,6 +11,11 @@ on:
         description: "Look-back window in days (use 365 for a first-run backfill)"
         required: false
         default: "7"
+      test_alert:
+        description: "Fire ONE synthetic ESCALATE alert instead of scanning (proves the channel end to end; writes no digest and no index rows)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -23,6 +28,24 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    # Dispatch inputs are bound to environment variables ONCE, here, and every
+    # step below reads the env var. They are never interpolated into a `run:`
+    # block with ${{ }}.
+    #
+    # This is not stylistic. `${{ }}` inside `run:` is substituted into the
+    # script TEXT before the shell parses it, so an input value containing shell
+    # metacharacters becomes executable code — the standard GitHub Actions
+    # script-injection sink. Binding to env makes the value data: the shell
+    # reads it from the environment and never parses it as script. Dispatching
+    # this workflow requires repo write access, so the practical exposure was
+    # low, but the sink was real and is closed here.
+    #
+    # `if:` conditions are a different context — expressions there are evaluated
+    # by the Actions expression engine, not a shell — but they read the same env
+    # vars anyway so there is one source of truth per input.
+    env:
+      INPUT_DAYS: ${{ github.event.inputs.days }}
+      INPUT_TEST_ALERT: ${{ github.event.inputs.test_alert }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,12 +75,23 @@ jobs:
           COMPETITOR_ALERT_TO: ${{ secrets.COMPETITOR_ALERT_TO }}
         run: python scripts/check_alerting_config.py --channel competitor
 
+      # Two modes. The scheduled run always scans; a dispatch with the
+      # test_alert toggle fires one synthetic ESCALATE alert instead, which is
+      # the only way to prove this channel end to end from Actions — a
+      # zero-hit scan proves nothing. The test path writes no digest and no
+      # index rows (scripts/competitor_monitor.py --test-alert).
       - name: Run competitor scan
         run: |
-          DAYS="${{ github.event.inputs.days }}"
-          DAYS="${DAYS:-7}"
-          echo "Scanning last ${DAYS} days"
-          python -m scripts.competitor_monitor --days "${DAYS}" 2>&1 | tee scan.log
+          # Inputs are read from the environment. Never template-interpolate a
+          # dispatch input into this script — see the job-level env comment.
+          if [ "$INPUT_TEST_ALERT" = "true" ]; then
+            echo "TEST ALERT mode — firing one synthetic escalation, no scan, no digest"
+            python -m scripts.competitor_monitor --test-alert 2>&1 | tee scan.log
+          else
+            DAYS="${INPUT_DAYS:-7}"
+            echo "Scanning last ${DAYS} days"
+            python -m scripts.competitor_monitor --days "$DAYS" 2>&1 | tee scan.log
+          fi
         env:
           # Escalation alerting. Recipient is a secret, never committed — the
           # repo is public and settings.json is not a safe home for it.
@@ -65,8 +99,11 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           COMPETITOR_ALERT_TO: ${{ secrets.COMPETITOR_ALERT_TO }}
 
+      # Skipped in test-alert mode: that path emits no heartbeat by design, and
+      # the "MISSING — treat as a monitor failure" fallback below would then
+      # report a fault that did not happen.
       - name: Surface the heartbeat
-        if: always()
+        if: always() && env.INPUT_TEST_ALERT != 'true'
         run: |
           # The heartbeat must be visible without opening a file, including on
           # empty weeks — that is the whole point of emitting it. Lands in the
@@ -84,7 +121,11 @@ jobs:
             echo "**${ESC} ESCALATION(S) — relay to the hub today.**" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # Belt and braces: --test-alert writes nothing, so the staged-diff check
+      # below would already exit clean. Skipping outright makes it impossible
+      # for a channel test to touch the repo at all.
       - name: Commit + push digest
+        if: env.INPUT_TEST_ALERT != 'true'
         run: |
           git config user.name "llm-trading-lab-bot"
           git config user.email "actions@github.com"
