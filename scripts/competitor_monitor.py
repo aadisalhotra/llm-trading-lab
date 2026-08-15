@@ -1038,6 +1038,14 @@ def _relay_footer() -> str:
 
 def main() -> int:
     configure_logging()
+
+    # Alerting preflight, STRICT here. A scan whose escalation channel cannot
+    # deliver has no reason to run: no trading is at stake, and a silent
+    # inability to escalate is exactly the defect this guards. Raises rather
+    # than warns, so the workflow goes red instead of green-with-a-warning.
+    from src.alerts.preflight import assert_configured, COMPETITOR
+    assert_configured(channels=(COMPETITOR,), strict=True)
+
     parser = argparse.ArgumentParser(description="Weekly arXiv/SSRN competitor scan")
     parser.add_argument("--days", type=int, default=7, help="Look-back window in days (default 7)")
     parser.add_argument("--max-results", type=int, default=60, help="Max arXiv results to pull")

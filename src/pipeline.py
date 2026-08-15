@@ -44,6 +44,8 @@ EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
 from .alerts import scan_macro_events, send_alert, send_daily_summary, send_heartbeat
+from .alerts import preflight
+from .alerts.preflight import assert_configured as alert_preflight
 from .analytics import build_leaderboard, compute_budget_status
 from .config_loader import (
     configure_logging,
@@ -467,6 +469,14 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 settings["mode"],
                 settings["phase"],
                 force, force_trade)
+
+    # Alerting preflight. NON-FATAL by design: a missing recipient list must
+    # never stop a trading tick — the experiment is the point and email is
+    # instrumentation. The loud, run-reddening signal lives in the workflow's
+    # own `alerting-preflight` job, which nothing needs, so it cannot break the
+    # run -> chain self-chain. This CRITICAL line is the second line of defence
+    # and the one that lands in the committed pipeline log.
+    alert_preflight(channels=(preflight.DAILY,), settings=settings, strict=False)
 
     # Market-hours guard. Only --force-trade bypasses this — bare --force
     # used to bypass it but that let weekend/holiday "force" runs execute

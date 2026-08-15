@@ -40,6 +40,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Preflight BEFORE the scan. Failing early is correct here: no trading is
+      # at stake, and a scan that cannot escalate is precisely the defect that
+      # went unnoticed on 2026-08-13/14 (wired code, absent secret, silent
+      # skip). The monitor's own main() asserts the same thing; this step makes
+      # the fault legible before a full arXiv pull runs.
+      - name: Verify the escalation channel can deliver
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          COMPETITOR_ALERT_TO: ${{ secrets.COMPETITOR_ALERT_TO }}
+        run: python scripts/check_alerting_config.py --channel competitor
+
       - name: Run competitor scan
         run: |
           DAYS="${{ github.event.inputs.days }}"
