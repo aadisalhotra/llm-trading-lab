@@ -73,12 +73,29 @@ jobs:
 
       - name: Resolve run mode
         id: mode
+        env:
+          # `force` is an UNCONSTRAINED string dispatch input interpolated into a
+          # run: block — the Actions script-injection sink. Bound to an env var so
+          # the shell reads it as data and never parses it as script.
+          #
+          # ASYMMETRY, deliberate: `mode` is left interpolated because it is
+          # `type: choice` and GitHub validates it against its options list
+          # (intraday | end-of-day) before the job starts, so it cannot carry
+          # arbitrary text. `github.event_name` and `github.event.schedule` are
+          # GitHub-controlled and likewise not attacker-settable. `force` was the
+          # only free-text sink in this workflow.
+          INPUT_FORCE: ${{ github.event.inputs.force }}
         run: |
           # The 21:00 UTC cron is the EOD wrap-up; everything else is intraday.
           # workflow_dispatch overrides via the `mode` input.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Normalized to a strict boolean rather than passed through: only the
+            # literal "true" enables force, anything else is false. This also
+            # keeps a multi-line input from writing extra lines into
+            # $GITHUB_OUTPUT, which a raw echo of an arbitrary string can do.
+            if [ "$INPUT_FORCE" = "true" ]; then FORCE=true; else FORCE=false; fi
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-            echo "force=${{ github.event.inputs.force }}" >> $GITHUB_OUTPUT
+            echo "force=$FORCE" >> $GITHUB_OUTPUT
           elif [ "${{ github.event.schedule }}" = "0 21 * * 1-5" ]; then
             echo "mode=end-of-day" >> $GITHUB_OUTPUT
             echo "force=false" >> $GITHUB_OUTPUT
