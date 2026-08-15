@@ -111,8 +111,22 @@ with live price checks as of 2026-08-11; §3's eligibility counts cover the full
 | 2–5 shares | 18 |
 | 6+ shares | 12 |
 
-This reproduces the effective-parity problem the 2026-08-05 ruling identified, at the
-higher capital level.
+Nominally each book gets the same $800 sleeve. Effectively it does not, because a
+sleeve is only expressible in whole shares: two names admit no short position at all
+and eleven admit exactly one size or none, so an identical nominal constraint yields
+materially different opportunity sets name by name `[VENUE, 2026-08-11]`.
+
+That is the **cap-equity defect class in a second dimension** — nominal equality
+producing effective inequality. The registered principle is scoped to the decision
+budget, not to capital. Ledger `operational_events["2026-07"].gemini_budget_equalization`,
+carried verbatim in Tier 1 §T1.4: *"constraint identity is defined at effective
+decision budget, per provider, not nominal parameter equality."* `[PRIMARY]`
+
+The parallel is structural, and it is drawn here as a parallel: **no ruling has
+extended cap equity from decision budget to position sizing**, and the granularity
+finding above rests on the venue evidence in this section, not on that registration.
+Whether the principle should be extended is a Research question, flagged and not
+assumed.
 
 ## 6. Structural conclusion (as of 2026-08-12)
 
