@@ -374,10 +374,18 @@ def verify(layer: dict, perf_before: dict) -> tuple[bool, list[str]]:
     req(layer["performance"].get("spy_benchmark", {}).get("sharpe") == rm["spy_benchmark"].get("descriptive_sharpe"),
         "SPY single-source: performance.spy_benchmark.sharpe != report_meta.spy_benchmark.descriptive_sharpe")
 
-    # Re-anchored Phase-A equity curve (Research ruling): the displayed curve
-    # anchors at the clean-window start and excludes the 4/9-4/22 launch/shakedown
-    # window, so this is False (was True pre-re-anchor). May-fact literal; the
+    # Re-anchored Phase-A equity curve: the displayed curve anchors at the
+    # clean-window start and excludes the 4/9-4/22 launch/shakedown window, so
+    # this is False (was True pre-re-anchor). May-fact literal; the
     # RQ-consistency cross-check below is untouched.
+    #
+    # Authority is the RECORDED INVARIANT, not an undated ruling. docs/REPORT_SCHEMA.md
+    # registers the field verbatim: "`false` — re-anchored curves never span the
+    # shakedown window. Retained as a standing invariant: a `true` value is a
+    # regression and halts the builder (`_self_validate`)." That halt is real —
+    # build_monthly_data_layer._self_validate raises "equity-curve re-anchor
+    # INVARIANT FAIL" on a true value — so the schema entry and the enforcing code
+    # are the two artifacts this check answers to.
     req(layer["charts"].get("equity_curve_carries_shakedown_fabrication") is False,
         "charts.equity_curve_carries_shakedown_fabrication must be False (re-anchored Phase-A curve)")
 
