@@ -175,7 +175,8 @@ def run_one_model(
         send_alert("WARN", f"Position stop on {model_key}",
                    f"Force-selling: {triggered}", {"model": model_key},
                    kind="position_stop", dedup_key=f"position_stop:{model_key}")
-        forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP")
+        forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP",
+                                                  run_date=session_date_str)
 
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
@@ -364,8 +365,11 @@ def run_one_model(
         trades_already_executed_today=portfolio.intraday.trades_executed_today,
     )
 
-    # Execute
-    exec_results = executor.execute_decisions(portfolio, accepted, prices)
+    # Execute. The run date drives T+1 settlement under the cash branch's
+    # settled-funds constraint; pass the pipeline's own date rather than letting
+    # the executor read a wall clock, so a replay settles deterministically.
+    exec_results = executor.execute_decisions(portfolio, accepted, prices,
+                                              run_date=session_date_str)
     all_exec = forced_results + exec_results
 
     # Portfolio stop check AFTER execution

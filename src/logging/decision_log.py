@@ -142,6 +142,13 @@ def log_decision_run(
                 "notional": e.notional,
                 "order_id": e.order_id,
                 "error": e.error,
+                # Venue-imposed execution constraint, when one shaped this
+                # result (e.g. UNSETTLED_FUNDS under the cash branch's T+1
+                # rule). Empty for ordinary fills, holds and skips. Blocked
+                # purchases carry executed=false, so they are already invisible
+                # to every behavioral reader; this field makes them countable
+                # as execution-constraint events for Gate 4.
+                "constraint": getattr(e, "constraint", ""),
                 "timestamp": e.timestamp,
                 "decision": e.decision,
                 # How many models (including this one) hold this ticker at

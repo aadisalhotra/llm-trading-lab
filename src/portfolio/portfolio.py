@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 
 from ..config_loader import STATE_DIR, load_settings
+from .settlement import SettlementLedger
 
 logger = logging.getLogger("llmlab.portfolio")
 
@@ -82,6 +83,17 @@ class Portfolio:
     inception_date: str = ""
     last_updated: str = ""
     intraday: IntradayState = field(default_factory=IntradayState)
+    # Unsettled sale proceeds (T+1). Empty and inert until the cash branch's
+    # settled-funds enforcement activates; see portfolio/settlement.py.
+    settlement: SettlementLedger = field(default_factory=SettlementLedger)
+
+    # ----- settled-cash helpers -----
+    def settled_cash(self) -> float:
+        """Deployable cash: total cash minus anything still unsettled."""
+        return self.settlement.settled_cash(self.cash)
+
+    def unsettled_cash(self) -> float:
+        return self.settlement.unsettled_total()
 
     # ----- intraday session helpers -----
     def reset_intraday_if_new_session(self, session_date: str) -> bool:
@@ -170,6 +182,12 @@ class Portfolio:
             "total_value": total,
             "cash": self.cash,
             "cash_pct": (self.cash / total) if total else 1.0,
+            # Settled/unsettled split. Zero unsettled for a book not running
+            # under the T+1 constraint, so pre-cash-branch snapshots are
+            # unchanged in substance: settled_cash == cash.
+            "settled_cash": self.settled_cash(),
+            "unsettled_cash": self.unsettled_cash(),
+            "settled_cash_pct": (self.settled_cash() / total) if total else 1.0,
             "holdings": holdings_out,
             "halted": self.halted,
             "inception_value": self.inception_value,
@@ -378,6 +396,10 @@ def load_portfolio(model_key: str) -> Portfolio:
         inception_date=data.get("inception_date", ""),
         last_updated=data.get("last_updated", ""),
         intraday=intraday,
+        # Absent from every state file written before the settled-funds build;
+        # an empty ledger means "all cash settled", which is exactly right for
+        # a book that has never run under the constraint.
+        settlement=SettlementLedger.from_list(data.get("unsettled_cash")),
     )
 
 
@@ -398,6 +420,7 @@ def save_portfolio(p: Portfolio) -> None:
             "first_run_at": p.intraday.first_run_at,
             "last_run_at": p.intraday.last_run_at,
         },
+        "unsettled_cash": p.settlement.to_list(),
     }
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(_state_path(p.model_key), "w", encoding="utf-8") as f:
