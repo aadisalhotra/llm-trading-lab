@@ -36,18 +36,34 @@
   },
   "daily": {
     "date": "2026-08-17",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:gemini",
+      "news:TMO:a22bd43804"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-17T13:34:00.272058+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-17T21:07:56.175336+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TMO (held by 4)",
+        "timestamp": "2026-08-17T21:07:57.653233+00:00",
         "disposition": "sent"
       }
     ]
