@@ -50,6 +50,7 @@ from .regime_classifier import (
     classify_regimes,
     label_for_dates,
 )
+from .short_metrics import gross_hhi
 from .statistical_corrections import (
     DEFAULT_BLOCK_LENGTH,
     DEFAULT_FDR_Q,
@@ -129,11 +130,80 @@ def load_decision_records(model_key: str) -> list[dict[str, Any]]:
     return out
 
 
-def _executed_trades(rec: dict[str, Any]) -> list[dict[str, Any]]:
-    """BUY/SELL executions that actually filled, in record order."""
+# ==========================================================================
+# Direction segmentation — registered 2026-08-17 (Tier 2, RQ2/RQ3 entries)
+# ==========================================================================
+# The book has carried short positions since the v3 regime opened 2026-07-01.
+# Every behavioral estimand computed over executions is therefore direction-
+# segmented: a LONG segment (BUY opens/adds, SELL closes/reduces) and a SHORT
+# segment (SHORT opens/adds, COVER closes/reduces), each estimated separately,
+# with outcomes sign-corrected relative to position direction — a short's gain
+# is a price decline.
+#
+# `segment="long"` is the default deliberately. The published Phase A pilot
+# figures were computed over BUY/SELL only; under the registered spec they are
+# long-segment estimates, not pooled estimates that silently dropped shorts.
+# Defaulting to "long" therefore preserves the registered meaning of every
+# existing call site rather than changing what those call sites compute.
+# Callers wanting the short side or both must say so.
+_SEGMENT_SIDES: dict[str, tuple[str, ...]] = {
+    "long": ("BUY", "SELL"),
+    "short": ("SHORT", "COVER"),
+    "both": ("BUY", "SELL", "SHORT", "COVER"),
+}
+# Which side opens/adds to a position, and which closes/reduces it, per segment.
+_OPEN_SIDE = {"long": "BUY", "short": "SHORT"}
+_CLOSE_SIDE = {"long": "SELL", "short": "COVER"}
+SEGMENTS = ("long", "short")
+
+
+def _holding_segment(h: dict[str, Any]) -> str:
+    """Direction of a portfolio_after holding: 'long' or 'short'.
+
+    Prefers the explicit ``direction`` field written by Portfolio.snapshot();
+    falls back to the sign of ``shares`` (negative == short) for records
+    written before that field existed.
+    """
+    d = str(h.get("direction") or "").lower()
+    if d in ("long", "short"):
+        return d
+    try:
+        return "short" if float(h.get("shares") or 0.0) < 0 else "long"
+    except (TypeError, ValueError):
+        return "long"
+
+
+def _is_administrative(ex: dict[str, Any]) -> bool:
+    """True for a closure the model did not choose.
+
+    Executor.force_liquidate stamps ``order_id`` as ``FORCED_<reason>``; every
+    such fill is an administrative intervention (drawdown-halt liquidation, the
+    v3->v4 boundary force-cover, an automatic position stop). Under the
+    registered censoring principle these censor the behavioral series and never
+    enter it as behavior: disposition and calibration measure the model's
+    *choice* of when to realize, and an administrative closure is not a choice.
+
+    NOTE for Research: the registered RQ2 text names two instances in its
+    parenthetical — drawdown-halt liquidations and the v3->v4 boundary
+    force-cover — while the principle it states is general. This predicate
+    follows the principle, so it also censors automatic position stops
+    (``FORCED_POSITION_STOP``), which are equally not-chosen. That is one class
+    wider than the parenthetical enumerates; flagged, not silently decided.
+    """
+    return str(ex.get("order_id") or "").startswith("FORCED_")
+
+
+def _executed_trades(rec: dict[str, Any], segment: str = "long") -> list[dict[str, Any]]:
+    """Filled position-changing executions for one direction segment, in order.
+
+    segment="long"  -> BUY/SELL        (default; the registered long segment)
+    segment="short" -> SHORT/COVER
+    segment="both"  -> all four sides
+    """
+    sides = _SEGMENT_SIDES[segment]
     return [
         ex for ex in (rec.get("executions") or [])
-        if ex.get("executed") and ex.get("side") in ("BUY", "SELL")
+        if ex.get("executed") and ex.get("side") in sides
     ]
 
 
@@ -385,43 +455,64 @@ def compute_rq1(
 # RQ2 — Disposition effect (Odean 1998 PGR / PLR)
 # ==========================================================================
 
-def _replay_avg_cost(records: list[dict[str, Any]]):
-    """Yield (record, sells_with_realized_flag) replaying avg-cost per ticker.
+def _replay_avg_cost(records: list[dict[str, Any]], segment: str = "long"):
+    """Yield per-record realized/paper gain-loss counts for one direction segment.
 
-    For each record containing >=1 executed SELL we yield the realized
-    gain/loss classification per sell plus the paper gain/loss counts taken
-    from that record's portfolio_after snapshot (positions not sold).
+    Replays average cost per ticker within the segment. For each record
+    containing >=1 realization-classifiable close we yield the realized
+    gain/loss counts plus the paper gain/loss counts taken from that record's
+    portfolio_after snapshot (same-segment positions not closed in this record).
+
+    Sign correction (registered 2026-08-17). The realized outcome is taken
+    relative to position direction:
+      * long  — a close above average entry is a gain (sell high);
+      * short — a close *below* average entry is a gain (a short's gain is a
+        price decline).
+    Paper outcomes read ``unrealized_pl_pct``, which Holding.unrealized_pl_pct
+    already reports relative to direction (a winning short reads positive), so
+    the paper side needs segmenting but no further sign correction.
+
+    Censoring. Administrative closes (see _is_administrative) still move the
+    book — the replay applies them to shares — but are never classified as
+    realizations, because they are not the model's choice.
     """
-    shares: dict[str, float] = defaultdict(float)
-    avg_cost: dict[str, float] = {}
+    if segment not in SEGMENTS:
+        raise ValueError(f"_replay_avg_cost: segment must be one of {SEGMENTS}, got {segment!r}")
+    open_side = _OPEN_SIDE[segment]
+    shares: dict[str, float] = defaultdict(float)   # magnitude held, always >= 0
+    avg_cost: dict[str, float] = {}                 # magnitude-weighted entry price
     for rec in records:
-        sells_info = []
-        sold_tickers: set[str] = set()
-        for ex in _executed_trades(rec):
+        closes_info = []
+        closed_tickers: set[str] = set()
+        for ex in _executed_trades(rec, segment):
             t = ex["ticker"]
             price = float(ex.get("fill_price") or 0.0)
             qty = float(ex.get("shares") or 0.0)
-            if ex["side"] == "BUY":
+            if ex["side"] == open_side:
                 new_sh = shares[t] + qty
                 if new_sh > 0:
                     prev_cost = avg_cost.get(t, price)
                     avg_cost[t] = (prev_cost * shares[t] + price * qty) / new_sh
                 shares[t] = new_sh
-            else:  # SELL
+            else:  # the segment's closing side: SELL (long) / COVER (short)
                 ac = avg_cost.get(t)
-                if ac is not None and price > 0:
-                    is_gain = price > ac
-                    is_loss = price < ac
-                    sells_info.append((t, is_gain, is_loss))
-                    sold_tickers.add(t)
+                if ac is not None and price > 0 and not _is_administrative(ex):
+                    if segment == "long":
+                        is_gain, is_loss = price > ac, price < ac
+                    else:
+                        is_gain, is_loss = price < ac, price > ac
+                    closes_info.append((t, is_gain, is_loss))
+                    closed_tickers.add(t)
                 shares[t] = max(0.0, shares[t] - qty)
                 if shares[t] < SHARES_EPSILON:
                     shares[t] = 0.0
-        if sells_info:
-            # Paper gains/losses from positions still held (not sold this rec)
+        if closes_info:
+            # Paper gains/losses from same-segment positions still held
             pg = pl = 0
             for h in (rec.get("portfolio_after") or {}).get("holdings", []):
-                if h.get("ticker") in sold_tickers:
+                if h.get("ticker") in closed_tickers:
+                    continue
+                if _holding_segment(h) != segment:
                     continue
                 upl = h.get("unrealized_pl_pct")
                 if upl is None:
@@ -430,9 +521,10 @@ def _replay_avg_cost(records: list[dict[str, Any]]):
                     pg += 1
                 elif upl < 0:
                     pl += 1
-            rg = sum(1 for _, g, _ in sells_info if g)
-            rl = sum(1 for _, _, ll in sells_info if ll)
-            yield {"date": rec.get("date", ""), "rg": rg, "rl": rl, "pg": pg, "pl": pl}
+            rg = sum(1 for _, g, _ in closes_info if g)
+            rl = sum(1 for _, _, ll in closes_info if ll)
+            yield {"date": rec.get("date", ""), "rg": rg, "rl": rl, "pg": pg, "pl": pl,
+                   "segment": segment}
 
 
 def _pgr_plr(events: list[dict[str, int]], idx: Iterable[int] | None = None):
@@ -449,25 +541,18 @@ def _pgr_plr(events: list[dict[str, int]], idx: Iterable[int] | None = None):
     return pgr, plr, RG, RL, PG, PL
 
 
-def compute_rq2(
+def _rq2_segment_block(
     all_records: dict[str, list[dict[str, Any]]],
     regime_map: dict[str, str],
     model_keys: list[str],
-    n_resamples: int = DEFAULT_N_RESAMPLES,
+    n_resamples: int,
+    segment: str,
 ) -> dict[str, Any]:
-    """Disposition effect: are gains realized at a higher rate than losses?
-
-    PGR = realized gains / (realized gains + paper gains)
-    PLR = realized losses / (realized losses + paper losses)
-    Disposition difference = PGR - PLR  (Odean's measure; > 0 => disposition)
-    Disposition ratio      = PGR / PLR
-    Counted at the sale-record level; realized sign from replayed avg cost,
-    paper sign from the post-record portfolio_after snapshot.
-    """
+    """RQ2 per-model + across-model block for one direction segment."""
     per_model: dict[str, Any] = {}
     pooled_events: list[dict[str, int]] = []
     for key in model_keys:
-        events = list(_replay_avg_cost(all_records.get(key, [])))
+        events = list(_replay_avg_cost(all_records.get(key, []), segment))
         for e in events:
             e["regime"] = regime_map.get(e["date"], INSUFFICIENT)
         pooled_events.extend(events)
@@ -483,7 +568,7 @@ def compute_rq2(
         if len(events) >= 5 and entry["disposition_difference"] is not None:
             boot = _bootstrap_index_ci(
                 len(events),
-                lambda idx: (lambda r: (r[0] - r[1]) if (r[0] is not None and r[1] is not None) else 0.0)(_pgr_plr(events, idx)[:2]),
+                lambda idx, _e=events: (lambda r: (r[0] - r[1]) if (r[0] is not None and r[1] is not None) else 0.0)(_pgr_plr(_e, idx)[:2]),
                 n_resamples=n_resamples,
             )
             entry["ci_difference"] = {"low": boot["ci_low"], "high": boot["ci_high"]}
@@ -504,9 +589,9 @@ def compute_rq2(
         entry["by_regime"] = by_regime
         per_model[key] = entry
 
-    # Pooled across models (the RQ2 headline test)
+    # Pooled across models
     pgr, plr, RG, RL, PG, PL = _pgr_plr(pooled_events)
-    pooled = {
+    pooled: dict[str, Any] = {
         "n_sale_records": len(pooled_events),
         "PGR": pgr, "PLR": plr,
         "disposition_difference": (pgr - plr) if (pgr is not None and plr is not None) else None,
@@ -516,19 +601,104 @@ def compute_rq2(
     if len(pooled_events) >= 5 and pooled["disposition_difference"] is not None:
         boot = _bootstrap_index_ci(
             len(pooled_events),
-            lambda idx: (lambda r: (r[0] - r[1]) if (r[0] is not None and r[1] is not None) else 0.0)(_pgr_plr(pooled_events, idx)[:2]),
+            lambda idx, _e=pooled_events: (lambda r: (r[0] - r[1]) if (r[0] is not None and r[1] is not None) else 0.0)(_pgr_plr(_e, idx)[:2]),
             n_resamples=n_resamples,
         )
         pooled["ci_difference"] = {"low": boot["ci_low"], "high": boot["ci_high"]}
         headline_p = boot["p_value"]
+    else:
+        pooled["ci_difference"] = None
     pooled["p_value"] = headline_p
 
     return {
+        "segment": segment,
         "status": "Testing" if len(pooled_events) >= 5 else "Open",
         "pooled": pooled,
         "per_model": per_model,
         "headline_p_value": headline_p,
-        "interpretation": "Positive PGR-PLR means a model sells winners faster than losers.",
+    }
+
+
+def compute_rq2(
+    all_records: dict[str, list[dict[str, Any]]],
+    regime_map: dict[str, str],
+    model_keys: list[str],
+    n_resamples: int = DEFAULT_N_RESAMPLES,
+) -> dict[str, Any]:
+    """Disposition effect: are gains realized at a higher rate than losses?
+
+    PGR = realized gains / (realized gains + paper gains)
+    PLR = realized losses / (realized losses + paper losses)
+    Disposition difference = PGR - PLR  (Odean's measure; > 0 => disposition)
+    Disposition ratio      = PGR / PLR
+    Counted at the close-record level; realized sign from replayed avg cost,
+    paper sign from the post-record portfolio_after snapshot.
+
+    Direction-segmented per the registered spec (Tier 2, RQ2 entry, 2026-08-17):
+    long-segment and short-segment disposition are estimated SEPARATELY with
+    outcomes sign-corrected relative to position direction. The long segment is
+    confirmatory; the short segment is exploratory low-n from the v3 regime
+    onward. A pooled sign-corrected block is reported as secondary descriptive.
+
+    Top-level ``pooled`` / ``per_model`` / ``headline_p_value`` alias the LONG
+    segment — the confirmatory quantity, and what every published Phase A pilot
+    figure is an estimate of.
+    """
+    segments = {s: _rq2_segment_block(all_records, regime_map, model_keys, n_resamples, s)
+                for s in SEGMENTS}
+    # Secondary descriptive: both segments' sign-corrected events pooled.
+    pooled_sign_corrected = _rq2_pooled_sign_corrected(
+        all_records, regime_map, model_keys, n_resamples)
+
+    long_block = segments["long"]
+    return {
+        "status": long_block["status"],
+        "primary_segment": "long",
+        "segments": segments,
+        "pooled_sign_corrected": pooled_sign_corrected,
+        # Backward-compatible aliases -> the confirmatory long segment.
+        "pooled": long_block["pooled"],
+        "per_model": long_block["per_model"],
+        "headline_p_value": long_block["headline_p_value"],
+        "segmentation": (
+            "Direction-segmented per the registered spec. Long-segment estimates are "
+            "confirmatory and alias to the top-level keys; short-segment estimates are "
+            "exploratory low-n from the v3 regime (2026-07-01) onward. Administrative "
+            "closures are censored from realization classification."
+        ),
+        "interpretation": "Positive PGR-PLR means a model realizes winners faster than losers.",
+    }
+
+
+def _rq2_pooled_sign_corrected(
+    all_records: dict[str, list[dict[str, Any]]],
+    regime_map: dict[str, str],
+    model_keys: list[str],
+    n_resamples: int,
+) -> dict[str, Any]:
+    """Secondary descriptive: both segments' sign-corrected events pooled."""
+    per_model: dict[str, Any] = {}
+    pooled_events: list[dict[str, int]] = []
+    for key in model_keys:
+        events: list[dict[str, Any]] = []
+        for seg in SEGMENTS:
+            events.extend(_replay_avg_cost(all_records.get(key, []), seg))
+        for e in events:
+            e["regime"] = regime_map.get(e["date"], INSUFFICIENT)
+        pooled_events.extend(events)
+        pgr, plr, RG, RL, PG, PL = _pgr_plr(events)
+        per_model[key] = {
+            "n_sale_records": len(events),
+            "PGR": pgr, "PLR": plr,
+            "disposition_difference": (pgr - plr) if (pgr is not None and plr is not None) else None,
+        }
+    pgr, plr, RG, RL, PG, PL = _pgr_plr(pooled_events)
+    return {
+        "basis": "secondary_descriptive",
+        "n_sale_records": len(pooled_events),
+        "PGR": pgr, "PLR": plr,
+        "disposition_difference": (pgr - plr) if (pgr is not None and plr is not None) else None,
+        "per_model": per_model,
     }
 
 
@@ -536,82 +706,123 @@ def compute_rq2(
 # RQ3 — Confidence calibration on closed (full-exit) trades
 # ==========================================================================
 
-def _closed_trades(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _closed_trades(records: list[dict[str, Any]], segment: str = "long") -> list[dict[str, Any]]:
     """Replay to extract fully-closed positions with entry confidence + outcome.
 
-    A position counts as closed ONLY when a SELL takes residual shares below
-    SHARES_EPSILON. Partial trims never close a position (pre-registered).
-    Entry confidence is share-weighted across the buys composing the position.
-    Outcome = realized P&L > 0 over the full life of the position.
+    A position counts as closed ONLY when the segment's closing side takes
+    residual magnitude below SHARES_EPSILON. Partial trims never close a
+    position (pre-registered). Entry confidence is magnitude-weighted across the
+    opens composing the position. Outcome = realized P&L > 0 over the full life.
+
+    Direction segmentation (registered 2026-08-17):
+      * long  — BUY opens, SELL closes; realized = sale proceeds - cost basis.
+      * short — SHORT opens, COVER closes; realized = short proceeds - cover
+        cost, so a price decline over the life of the position is a gain.
+    Both expressions are already sign-correct for their direction: `profitable`
+    means the position made money, whichever way it was facing.
+
+    Censoring: a position whose life contains ANY administrative close (see
+    _is_administrative) is dropped from the closed-trade set. Its exit was not
+    the model's choice, so its realized outcome cannot score the model's
+    confidence. The replay still applies the fill so subsequent positions in
+    the same ticker replay correctly.
     """
-    shares: dict[str, float] = defaultdict(float)
-    cost_basis: dict[str, float] = defaultdict(float)        # Σ shares*price (buys)
-    proceeds: dict[str, float] = defaultdict(float)          # Σ shares*price (sells)
+    if segment not in SEGMENTS:
+        raise ValueError(f"_closed_trades: segment must be one of {SEGMENTS}, got {segment!r}")
+    open_side = _OPEN_SIDE[segment]
+    shares: dict[str, float] = defaultdict(float)            # magnitude, >= 0
+    open_notional: dict[str, float] = defaultdict(float)     # Σ qty*price over opens
+    close_notional: dict[str, float] = defaultdict(float)    # Σ qty*price over closes
     entry_date: dict[str, str] = {}
+    censored: dict[str, bool] = defaultdict(bool)            # life touched by an admin close
     closed: list[dict[str, Any]] = []
 
     for rec in records:
-        for ex in _executed_trades(rec):
+        for ex in _executed_trades(rec, segment):
             t = ex["ticker"]
             price = float(ex.get("fill_price") or 0.0)
             qty = float(ex.get("shares") or 0.0)
-            if ex["side"] == "BUY":
+            if ex["side"] == open_side:
                 if shares[t] < SHARES_EPSILON:
                     entry_date[t] = rec.get("date", "")
                 shares[t] += qty
-                cost_basis[t] += qty * price
-            else:  # SELL
-                proceeds[t] += qty * price
+                open_notional[t] += qty * price
+            else:  # the segment's closing side
+                if _is_administrative(ex):
+                    censored[t] = True
+                close_notional[t] += qty * price
                 shares[t] -= qty
                 if shares[t] < SHARES_EPSILON:
-                    # full exit -> close the position. Realized P&L over the
-                    # whole life = total sell proceeds - total buy cost basis.
-                    realized = proceeds[t] - cost_basis[t]
-                    closed.append({
-                        "ticker": t,
-                        "entry_date": entry_date.get(t, rec.get("date", "")),
-                        "exit_date": rec.get("date", ""),
-                        "realized_pnl": realized,
-                        "profitable": 1 if realized > 0 else 0,
-                    })
+                    # Full exit -> close the position. Realized P&L over the
+                    # whole life. Long: proceeds - cost. Short: the short sale
+                    # is the open and the cover is the close, so the same
+                    # (close - open) expression flips sign correctly.
+                    if segment == "long":
+                        realized = close_notional[t] - open_notional[t]
+                    else:
+                        realized = open_notional[t] - close_notional[t]
+                    if not censored[t]:
+                        closed.append({
+                            "ticker": t,
+                            "segment": segment,
+                            "entry_date": entry_date.get(t, rec.get("date", "")),
+                            "exit_date": rec.get("date", ""),
+                            "realized_pnl": realized,
+                            "profitable": 1 if realized > 0 else 0,
+                        })
                     shares[t] = 0.0
-                    cost_basis[t] = 0.0
-                    proceeds[t] = 0.0
+                    open_notional[t] = 0.0
+                    close_notional[t] = 0.0
+                    censored[t] = False
                     entry_date.pop(t, None)
-    # Entry confidence is share-weighted across each position's buys; computed
-    # in a focused second pass so re-entries after a full exit stay independent.
-    return _attach_entry_confidence(records, closed)
+    # Entry confidence is magnitude-weighted across each position's opens;
+    # computed in a focused second pass so re-entries after a full exit stay
+    # independent.
+    return _attach_entry_confidence(records, closed, segment)
 
 
 def _attach_entry_confidence(records: list[dict[str, Any]],
-                             closed: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Second pass: compute share-weighted entry confidence per closed trade.
+                             closed: list[dict[str, Any]],
+                             segment: str = "long") -> list[dict[str, Any]]:
+    """Second pass: compute magnitude-weighted entry confidence per closed trade.
 
-    Matches closed trades in order of exit; tracks bought shares + conf*shares
-    per ticker, resetting on each full exit so re-entries are independent.
+    Matches closed trades in order of exit; tracks opened magnitude + conf*qty
+    per ticker, resetting on each full exit so re-entries are independent. The
+    FIFO queue records every life, including administratively-censored ones, so
+    that the cursor stays aligned with lives the caller kept.
     """
+    open_side = _OPEN_SIDE[segment]
     shares: dict[str, float] = defaultdict(float)
-    bought: dict[str, float] = defaultdict(float)        # Σ qty over buys in this life
-    conf_w: dict[str, float] = defaultdict(float)        # Σ conf*qty over buys
+    opened: dict[str, float] = defaultdict(float)        # Σ qty over opens in this life
+    conf_w: dict[str, float] = defaultdict(float)        # Σ conf*qty over opens
     queue: dict[str, list[float]] = defaultdict(list)    # entry confidences per ticker, FIFO of lives
+    censored_q: dict[str, list[bool]] = defaultdict(list)
+    censored: dict[str, bool] = defaultdict(bool)
     for rec in records:
-        for ex in _executed_trades(rec):
+        for ex in _executed_trades(rec, segment):
             t = ex["ticker"]
             qty = float(ex.get("shares") or 0.0)
-            if ex["side"] == "BUY":
+            if ex["side"] == open_side:
                 shares[t] += qty
-                bought[t] += qty
+                opened[t] += qty
                 conf = (ex.get("decision") or {}).get("confidence")
                 if conf is not None:
                     conf_w[t] += float(conf) * qty
             else:
+                if _is_administrative(ex):
+                    censored[t] = True
                 shares[t] -= qty
                 if shares[t] < SHARES_EPSILON:
-                    ec = (conf_w[t] / bought[t]) if bought[t] > 0 else None
+                    ec = (conf_w[t] / opened[t]) if opened[t] > 0 else None
                     queue[t].append(ec if ec is not None else float("nan"))
+                    censored_q[t].append(censored[t])
                     shares[t] = 0.0
-                    bought[t] = 0.0
+                    opened[t] = 0.0
                     conf_w[t] = 0.0
+                    censored[t] = False
+    # Drop censored lives so the FIFO aligns with the closed trades the caller kept.
+    queue = {t: [c for c, cen in zip(cs, censored_q[t]) if not cen]
+             for t, cs in queue.items()}
     # assign back, FIFO per ticker
     cursor: dict[str, int] = defaultdict(int)
     for tr in closed:
@@ -665,16 +876,17 @@ def _calibration_stats(trades: list[dict[str, Any]]) -> dict[str, Any]:
             "overall_hit_rate": round(float(outs.mean()), 4)}
 
 
-def compute_rq3(
+def _rq3_segment_block(
     all_records: dict[str, list[dict[str, Any]]],
     regime_map: dict[str, str],
     model_keys: list[str],
-    n_resamples: int = DEFAULT_N_RESAMPLES,
+    n_resamples: int,
+    segment: str,
 ) -> dict[str, Any]:
-    """Are self-reported confidence scores calibrated to closed-trade outcomes?"""
+    """RQ3 per-model + pooled calibration block for one direction segment."""
     per_model: dict[str, Any] = {}
     for key in model_keys:
-        closed = _closed_trades(all_records.get(key, []))
+        closed = _closed_trades(all_records.get(key, []), segment)
         for tr in closed:
             tr["regime"] = regime_map.get(tr["exit_date"], INSUFFICIENT)
         stats = _calibration_stats(closed)
@@ -721,7 +933,7 @@ def compute_rq3(
     # Headline: pooled confidence/outcome correlation across all models
     all_closed: list[dict[str, Any]] = []
     for key in model_keys:
-        cl = _closed_trades(all_records.get(key, []))
+        cl = _closed_trades(all_records.get(key, []), segment)
         all_closed.extend(cl)
     pooled_stats = _calibration_stats(all_closed)
     headline_p = None
@@ -741,6 +953,7 @@ def compute_rq3(
         headline_p = boot["p_value"]
 
     return {
+        "segment": segment,
         "status": "Testing" if pooled_stats.get("n", 0) >= MIN_CLOSED_TRADES_RQ3 else "Open",
         "pooled": {
             "n_closed_trades": pooled_stats.get("n", 0),
@@ -750,6 +963,62 @@ def compute_rq3(
         },
         "per_model": per_model,
         "headline_p_value": headline_p,
+    }
+
+
+def compute_rq3(
+    all_records: dict[str, list[dict[str, Any]]],
+    regime_map: dict[str, str],
+    model_keys: list[str],
+    n_resamples: int = DEFAULT_N_RESAMPLES,
+) -> dict[str, Any]:
+    """Are self-reported confidence scores calibrated to closed-trade outcomes?
+
+    Direction-segmented per the registered spec (Tier 2, RQ3 entry, 2026-08-17):
+    long-calibration and short-calibration are estimated SEPARATELY, with
+    outcomes sign-corrected relative to position direction (a short position is
+    profitable when the price falls). A pooled sign-corrected block is reported
+    as secondary descriptive.
+
+    Regime discipline is unchanged and enforced upstream: the confidence scale
+    was rebuilt at v2, so no calibration series may cross the v1/v2 boundary.
+
+    Top-level ``pooled`` / ``per_model`` / ``headline_p_value`` alias the LONG
+    segment — the confirmatory quantity, and what every published Phase A pilot
+    calibration figure is an estimate of.
+    """
+    segments = {s: _rq3_segment_block(all_records, regime_map, model_keys, n_resamples, s)
+                for s in SEGMENTS}
+
+    # Secondary descriptive: both segments' sign-corrected closed trades pooled.
+    all_closed: list[dict[str, Any]] = []
+    for key in model_keys:
+        for seg in SEGMENTS:
+            all_closed.extend(_closed_trades(all_records.get(key, []), seg))
+    both_stats = _calibration_stats(all_closed)
+
+    long_block = segments["long"]
+    return {
+        "status": long_block["status"],
+        "primary_segment": "long",
+        "segments": segments,
+        "pooled_sign_corrected": {
+            "basis": "secondary_descriptive",
+            "n_closed_trades": both_stats.get("n", 0),
+            "confidence_outcome_corr": both_stats.get("confidence_outcome_corr"),
+            "brier_score": both_stats.get("brier_score"),
+            "expected_calibration_error": both_stats.get("expected_calibration_error"),
+        },
+        # Backward-compatible aliases -> the confirmatory long segment.
+        "pooled": long_block["pooled"],
+        "per_model": long_block["per_model"],
+        "headline_p_value": long_block["headline_p_value"],
+        "segmentation": (
+            "Direction-segmented per the registered spec. Long-segment calibration is "
+            "confirmatory and aliases to the top-level keys; short-segment calibration is "
+            "exploratory low-n from the v3 regime (2026-07-01) onward. Administratively "
+            "closed positions are censored from the closed-trade set."
+        ),
         "interpretation": "Positive confidence/outcome correlation and low ECE indicate calibrated confidence.",
     }
 
@@ -995,27 +1264,25 @@ def _drawdown_flags(dates: list[str], values: list[float]) -> list[bool]:
     return flags
 
 
-def _hhi_normalized(values: list[float]) -> float:
-    """HHI = sum w_i^2 over positive values normalized to sum to 1. 0 if empty."""
-    pos = [float(v) for v in values if v and float(v) > 0]
-    tot = sum(pos)
-    if tot <= 0:
-        return 0.0
-    return float(sum((v / tot) ** 2 for v in pos))
-
-
 def _rq5_trade_panel(records: list[dict[str, Any]], window_start: str) -> list[dict[str, Any]]:
     """Per-decision-period observations for one model within the pilot window.
 
     For each period t (with an in-window prior period t-1) returns
     {date, tick_pos, dHHI_trade, DD}:
-      * dHHI_trade = HHI(post-trade risky weights) - HHI(pre-trade price-drifted
-        risky weights). HHI is on risky-position weights normalized to sum to 1
-        (cash excluded). Pre-trade weights are reconstructed: the prior period's
-        post-trade holdings (quantities) re-priced at this period's prices (from
+      * dHHI_trade = grossHHI(post-trade risky weights) - grossHHI(pre-trade
+        price-drifted risky weights). HHI is on risky-position GROSS (absolute)
+        weights normalized to sum to 1 (cash excluded), per the registered RQ5
+        entry: "gross (absolute) weights throughout, so short exposure counts
+        toward concentration". A short contributes to concentration exactly as a
+        long of the same magnitude does; for a long-only book gross HHI is
+        identical to the long-only HHI, so pre-v3 values are unchanged.
+        Pre-trade weights are reconstructed: the prior period's post-trade
+        holdings (quantities, signed) re-priced at this period's prices (from
         portfolio_after current_price for held names, executions fill_price for
-        names traded this period). This is the registered reconstruction; RQ5's
-        dependent variable is a derived quantity.
+        names traded this period — all four trading sides, so a name whose only
+        activity this period was a SHORT or COVER still gets a price). This is
+        the registered reconstruction; RQ5's dependent variable is a derived
+        quantity.
       * DD = decline of total_value (incl. cash) from its running peak within the
         window; DD>=0, 0 at a new peak.
       * tick_pos = 1-indexed order within the trading day (for tick-position FE).
@@ -1046,29 +1313,30 @@ def _rq5_trade_panel(records: list[dict[str, Any]], window_start: str) -> list[d
             peak = tv
         dd = (1.0 - tv / peak) if peak > 0 else 0.0
         holdings = pa.get("holdings") or []
-        hhi_post = _hhi_normalized([float(h.get("market_value") or 0.0) for h in holdings])
+        hhi_post = gross_hhi([float(h.get("market_value") or 0.0) for h in holdings])
         # period-t price map for re-pricing prior holdings
         price_now: dict[str, float] = {}
         for h in holdings:
             cp = h.get("current_price")
             if cp is not None:
                 price_now[str(h.get("ticker"))] = float(cp)
-        for ex in (r.get("executions") or []):
-            if ex.get("executed") and ex.get("side") in ("BUY", "SELL"):
-                fp = ex.get("fill_price")
-                if fp is not None:
-                    price_now.setdefault(str(ex.get("ticker")), float(fp))
+        for ex in _executed_trades(r, "both"):
+            fp = ex.get("fill_price")
+            if fp is not None:
+                price_now.setdefault(str(ex.get("ticker")), float(fp))
         if prev_holdings is not None:
+            # Signed shares * price gives a signed market value; gross_hhi takes
+            # the magnitude, so a short re-prices into the pre-trade gross book.
             pre_mv = [sh * price_now[t] for t, sh in prev_holdings.items()
-                      if sh > 0 and t in price_now]
+                      if abs(sh) > 0 and t in price_now]
             obs.append({
                 "date": r.get("date", ""),
                 "tick_pos": tickpos[id(r)],
-                "dHHI_trade": hhi_post - _hhi_normalized(pre_mv),
+                "dHHI_trade": hhi_post - gross_hhi(pre_mv),
                 "DD": dd,
             })
         prev_holdings = {str(h.get("ticker")): float(h.get("shares") or 0.0)
-                         for h in holdings if float(h.get("shares") or 0.0) > 0}
+                         for h in holdings if abs(float(h.get("shares") or 0.0)) > 0}
     return obs
 
 
@@ -1323,6 +1591,37 @@ def _load_determinism_records() -> list[dict[str, Any]]:
     return out
 
 
+# RQ6's decision unit is the deployed configuration's FULL action vocabulary,
+# per configuration (registered 2026-08-17, site-4 ruling). Long-only prompt
+# regimes expose {BUY, SELL, HOLD}; the shorting regime adds {SHORT, COVER}.
+# v4 is the long-only Phase B ablation, so it returns to the three-verb set.
+_RQ6_ACTION_VOCABULARY: dict[str, tuple[str, ...]] = {
+    "v1": ("BUY", "SELL", "HOLD"),
+    "v2": ("BUY", "SELL", "HOLD"),
+    "v3": ("BUY", "SELL", "HOLD", "SHORT", "COVER"),
+    "v4": ("BUY", "SELL", "HOLD"),
+}
+_RQ6_VOCABULARY_FALLBACK = ("BUY", "SELL", "HOLD", "SHORT", "COVER")
+
+
+def rq6_action_vocabulary(prompt_version: str) -> tuple[str, ...]:
+    """The deployed configuration's full action vocabulary for RQ6.
+
+    An unrecognised configuration falls back to the widest vocabulary and logs:
+    silently narrowing the set would score a real divergence as agreement, which
+    is precisely the defect the site-4 fix corrects.
+    """
+    vocab = _RQ6_ACTION_VOCABULARY.get(prompt_version)
+    if vocab is None:
+        logger.warning(
+            "RQ6: unrecognised prompt_version %r; falling back to the full action "
+            "vocabulary %s. Register its vocabulary in _RQ6_ACTION_VOCABULARY.",
+            prompt_version, _RQ6_VOCABULARY_FALLBACK,
+        )
+        return _RQ6_VOCABULARY_FALLBACK
+    return vocab
+
+
 def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
     """RQ6 — operational reproducibility of deployed agents (characterization).
 
@@ -1335,7 +1634,24 @@ def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
     identical composition across models and run off-peak — a probe-side property;
     this analyzer computes the metric on whatever calls succeeded).
 
-    Per context c: decision set D = {(ticker, action)} with action in {BUY, SELL}.
+    Per context c: decision set D = {(ticker, action)} over the DEPLOYED
+    CONFIGURATION'S FULL ACTION VOCABULARY, per configuration (registered
+    2026-08-17, site-4 ruling):
+
+        v1 / v2 configurations -> {BUY, SELL, HOLD}
+        v3 configurations      -> {BUY, SELL, HOLD, SHORT, COVER}
+
+    HOLD is part of the decision unit, not an absence of one: PRE_REGISTRATION.md:225
+    defines the unit as an entry with ``action in {BUY, SELL, HOLD}``, so a model
+    that says HOLD on a name has made a decision about it, and two calls that
+    disagree BUY-vs-HOLD have diverged. Dropping HOLD scored that divergence as
+    agreement. Delta_m computes over each configuration's own set; cross-
+    configuration comparison is already prohibited, so per-configuration sets
+    differ without inconsistency.
+
+    Contrast with RQ1, both registered and deliberate: RQ1 excludes SHORT/COVER
+    by registered estimand scope; RQ6 includes them by unit definition.
+
     Context divergence delta_c = 1 - mean pairwise Jaccard over the C(K',2) call
     pairs (J=1 if both sets empty), K' = successful calls for that context.
     Per-model divergence Delta_m = mean(delta_c) over contexts, with a BCa CI
@@ -1351,8 +1667,9 @@ def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
                          "configuration) into data/determinism/."),
                 "per_model": {}}
 
-    # group: (model, context) -> list of decision sets, one per successful call
-    groups: dict[tuple[str, str], list[set]] = defaultdict(list)
+    default_cfg = str((load_settings() or {}).get("prompt_version") or "")
+    # group: (model, configuration, context) -> decision sets, one per call
+    groups: dict[tuple[str, str, str], list[set]] = defaultdict(list)
     for r in records:
         if not r.get("api_success", True):
             continue
@@ -1360,13 +1677,15 @@ def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
         ctx = str(r.get("context_id") or r.get("tick_id") or r.get("data_inputs_hash") or "")
         if not mk or not ctx:
             continue
+        cfg = str(r.get("prompt_version") or default_cfg)
+        vocab = rq6_action_vocabulary(cfg)
         dset: set = set()
         for d in r.get("decisions", []):
             t = str(d.get("ticker", "")).upper().strip()
             a = str(d.get("action", "")).upper()
-            if t and a in ("BUY", "SELL"):
+            if t and a in vocab:
                 dset.add((t, a))
-        groups[(mk, ctx)].append(dset)
+        groups[(mk, cfg, ctx)].append(dset)
 
     def _jaccard(a: set, b: set) -> float:
         if not a and not b:
@@ -1374,25 +1693,11 @@ def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
         union = a | b
         return (len(a & b) / len(union)) if union else 1.0
 
-    per_model: dict[str, Any] = {}
-    for key in model_keys:
-        ctx_deltas: list[float] = []
-        kprimes: list[int] = []
-        for (mk, _ctx), calls in groups.items():
-            if mk != key or len(calls) < 2:
-                continue
-            kprimes.append(len(calls))
-            pairs = [_jaccard(calls[i], calls[j])
-                     for i in range(len(calls)) for j in range(i + 1, len(calls))]
-            if pairs:
-                ctx_deltas.append(1.0 - float(np.mean(pairs)))
-        if not ctx_deltas:
-            per_model[key] = {"n_contexts": 0, "status": "no_data"}
-            continue
-        arr = np.asarray(ctx_deltas, dtype=float)
+    def _block(deltas: list[float], kprimes: list[int]) -> dict[str, Any]:
+        arr = np.asarray(deltas, dtype=float)
         boot = bca_bootstrap_ci(arr, np.mean, alpha=0.10, n_resamples=DEFAULT_N_RESAMPLES)
-        per_model[key] = {
-            "n_contexts": len(ctx_deltas),
+        return {
+            "n_contexts": len(deltas),
             "mean_runs_per_context": round(float(np.mean(kprimes)), 2) if kprimes else None,
             "Delta_m": round(float(arr.mean()), 4),
             "ci_low": boot.ci_low,
@@ -1400,16 +1705,55 @@ def compute_rq6(model_keys: list[str]) -> dict[str, Any]:
             "ci_method": boot.method,
         }
 
-    deltas = [m["Delta_m"] for m in per_model.values() if "Delta_m" in m]
+    per_model: dict[str, Any] = {}
+    for key in model_keys:
+        # Per configuration: every configuration is its own characterization,
+        # so Delta_m is never averaged across configurations.
+        by_cfg_deltas: dict[str, list[float]] = defaultdict(list)
+        by_cfg_kprimes: dict[str, list[int]] = defaultdict(list)
+        for (mk, cfg, _ctx), calls in groups.items():
+            if mk != key or len(calls) < 2:
+                continue
+            by_cfg_kprimes[cfg].append(len(calls))
+            pairs = [_jaccard(calls[i], calls[j])
+                     for i in range(len(calls)) for j in range(i + 1, len(calls))]
+            if pairs:
+                by_cfg_deltas[cfg].append(1.0 - float(np.mean(pairs)))
+        by_cfg = {cfg: _block(d, by_cfg_kprimes[cfg])
+                  for cfg, d in by_cfg_deltas.items() if d}
+        if not by_cfg:
+            per_model[key] = {"n_contexts": 0, "status": "no_data", "by_configuration": {}}
+            continue
+        entry: dict[str, Any] = {"by_configuration": by_cfg,
+                                 "configurations": sorted(by_cfg)}
+        if len(by_cfg) == 1:
+            # Single deployed configuration — surface it flat as well, so the
+            # metric reads the same as before for the ordinary case.
+            only = next(iter(by_cfg.values()))
+            entry.update(only)
+        else:
+            entry["n_contexts"] = sum(b["n_contexts"] for b in by_cfg.values())
+            entry["Delta_m"] = None
+            entry["note"] = ("Multiple deployed configurations present; Delta_m is reported "
+                             "per configuration only. Cross-configuration comparison is "
+                             "prohibited by the registration, so no pooled Delta_m is emitted.")
+        per_model[key] = entry
+
+    deltas = [m["Delta_m"] for m in per_model.values() if m.get("Delta_m") is not None]
     overall = round(float(np.mean(deltas)), 4) if deltas else None
+    cfgs = sorted({cfg for (_mk, cfg, _ctx) in groups})
     return {
         "status": "Testing",
         "in_fdr_family": False,
         "estimand": "Per-model run-to-run decision divergence Delta_m at the deployed configuration.",
+        "configurations_present": cfgs,
+        "action_vocabulary": {c: list(rq6_action_vocabulary(c)) for c in cfgs},
         "overall_mean_divergence": overall,
         "per_model": per_model,
         "interpretation": ("Delta_m = mean over frozen contexts of (1 - mean pairwise "
-                           "Jaccard of (ticker,action) decision sets across the K calls). "
+                           "Jaccard of (ticker,action) decision sets across the K calls), "
+                           "over the deployed configuration's full action vocabulary "
+                           "(HOLD included; SHORT/COVER included under v3). "
                            "Higher Delta_m = lower run-to-run reproducibility; it qualifies "
                            "the RQ1-RQ5 interpretation. Characterization, not an NHST; "
                            "excluded from the BH family."),

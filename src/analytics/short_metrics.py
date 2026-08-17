@@ -174,9 +174,12 @@ def short_utilization(records: list[dict[str, Any]], short_cap_pct: float = 0.20
 def gross_hhi(values: list[float]) -> float:
     """HHI on GROSS (absolute) weights normalized to sum to 1. 0 if empty.
 
-    Unlike the long-only `_hhi_normalized`, this takes |value| of every leg, so
-    a short position contributes to concentration exactly as a long of the same
-    size does. For a long-only book it is identical to the long-only HHI.
+    Unlike a long-only HHI (which drops non-positive legs), this takes |value|
+    of every leg, so a short position contributes to concentration exactly as a
+    long of the same size does. For a long-only book it is identical to the
+    long-only HHI, so pre-shorting values are unchanged. This is RQ5's registered
+    concentration measure as of the 2026-08-17 gross-weight specification; the
+    superseded long-only helper was removed from research_metrics.py at that fix.
     """
     mags = [abs(float(v)) for v in values if v and float(v) != 0.0]
     tot = sum(mags)
