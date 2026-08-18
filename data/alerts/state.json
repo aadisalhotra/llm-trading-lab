@@ -2,7 +2,8 @@
   "milestones_fired": {
     "claude": [
       5,
-      10
+      10,
+      15
     ],
     "gpt": [
       5,
@@ -15,7 +16,8 @@
       10,
       15,
       20,
-      25
+      25,
+      30
     ],
     "grok": [
       5,
@@ -36,13 +38,19 @@
   },
   "daily": {
     "date": "2026-08-18",
-    "sent_count": 2,
+    "sent_count": 8,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "ath:claude",
+      "ath:gemini",
+      "ath:deepseek",
+      "milestone:claude:15",
+      "milestone:gemini:30",
+      "news:TMO:a22bd43804"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -56,6 +64,48 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-18T17:02:45.219433+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-08-18T21:10:10.133345+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-08-18T21:10:11.047701+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "DeepSeek V4 Pro hit a new all-time high",
+        "timestamp": "2026-08-18T21:10:11.706651+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 crossed +15%",
+        "timestamp": "2026-08-18T21:10:12.543683+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro crossed +30%",
+        "timestamp": "2026-08-18T21:10:13.118927+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TMO (held by 4)",
+        "timestamp": "2026-08-18T21:10:13.808152+00:00",
         "disposition": "sent"
       }
     ]
