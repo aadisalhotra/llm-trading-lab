@@ -26,6 +26,11 @@
     "stop_loss_short_pct": 0.10,
     "halt_on_stop_loss": true
   },
+  "tick_spacing": {
+    "_note": "Minimum minutes between cohort decision ticks. Implements the registered ~30-minute cadence; it is not a change to it. Measured against the last COMPLETED decision in the committed logs, so a backup run filling a genuine gap still runs. `enabled: false` reverts to pre-guard behaviour without a code change.",
+    "enabled": true,
+    "min_minutes": 20
+  },
   "models": {
     "claude":      {"provider": "anthropic", "model": "claude-sonnet-4-6", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "Claude Sonnet 4.6", "_pin_status": "UNPINNED: Anthropic echoes the alias unchanged; current dated snapshot id unconfirmed. Resolve manually before pinning (a wrong id silently changes the running model)."},
     "gpt":         {"provider": "openai",    "model": "gpt-5.4-2026-03-05", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "GPT-5.4"},

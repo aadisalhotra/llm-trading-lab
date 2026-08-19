@@ -35,7 +35,7 @@ import logging
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -74,6 +74,8 @@ from .logging import (
     read_last_action_per_ticker,
     detect_memory_hit,
     boundary_parts,
+    check_spacing,
+    record_skip,
     load_ledger,
     is_boundary_handled,
     mark_boundary_handled,
@@ -530,6 +532,36 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         elif is_boundary_handled(_ledger, b_day, b_slot):
             logger.info("Boundary %s %s already handled — skipping duplicate tick "
                         "(no models prompted, no trades)", b_day, b_slot)
+            return 0
+
+    # --- Minimum-spacing guard (intraday only) -------------------------------
+    # The boundary guard above keys on the :00/:30 slot, so it cannot see a
+    # duplicate that lands in a DIFFERENT slot minutes later — 10:59 and 11:01
+    # are two boundaries and two minutes apart. This one keys on elapsed time
+    # since the cohort actually last decided.
+    #
+    # Reachable since the intraday checkout moved to the branch tip: a run
+    # queued behind another tick used to trade a stale book and lose its commit
+    # to a rebase conflict, so its duplicate never landed. It lands correctly
+    # now, and can land minutes after the tick it queued behind.
+    #
+    # A backup run filling a GENUINE gap must still run — that is the whole
+    # point of the backup cron, and 2026-08-17's 62-minute cohort-wide hole is
+    # the case it exists for. The reference is therefore the last COMPLETED
+    # decision in the committed logs, not the schedule.
+    #
+    # Fails open, like the ledger above: check_spacing() swallows read errors
+    # and returns skip=False, so an unreadable log trades rather than halting.
+    if not is_eod and not force_trade:
+        verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
+        if verdict.skip:
+            logger.info(
+                "Spacing guard: last cohort decision %s was %.1f min ago "
+                "(minimum %d) — skipping tick (no models prompted, no trades)",
+                verdict.last_decision.isoformat(), verdict.gap_minutes,
+                verdict.min_minutes,
+            )
+            record_skip(verdict, run_date.astimezone(timezone.utc))
             return 0
 
     # Pull market data — intraday 30m bars by default, daily fallback at EOD
