@@ -363,19 +363,28 @@ def _correlation_matrix(may_records, model_keys, min_shared=3):
 # event attribution by sale-date / exit-date in the window)
 # ==========================================================================
 
-def _rq2_month(full_records, model_keys, win_start, win_end, n_resamples):
-    """Disposition (PGR-PLR) over sale records DATED in the window.
+def _rq2_month(full_records, model_keys, win_start, win_end, n_resamples, segment):
+    """Disposition (PGR-PLR) over sale records DATED in the window, one segment.
 
     Full-history avg-cost replay (_replay_avg_cost) for correct realized sign;
     events filtered to the window; pooled + per-model via the canonical _pgr_plr
-    and _bootstrap_index_ci (exactly compute_rq2's internal pipeline)."""
+    and _bootstrap_index_ci (exactly compute_rq2's internal pipeline).
+
+    ``segment`` is REQUIRED and has no default, deliberately. _replay_avg_cost
+    gained a ``segment`` parameter in 6998c10d with a "long" default; this call
+    site passed no segment, so its meaning changed from "long realized leg over a
+    direction-blind paper leg" to "long segment" with no diff in this file and no
+    signal at build time. That silent coupling produced the published July 2026
+    hybrid figure (-0.1031 vs the clean -0.1073). Requiring the argument makes any
+    future change to the helper's default a TypeError here rather than a quiet
+    change of published meaning. See docs/RQ2-paper-leg-contamination.md."""
     def _inwin(d):
         return bool(d) and win_start <= d <= win_end
 
     per_model = {}
     pooled = []
     for key in model_keys:
-        ev = [e for e in _replay_avg_cost(full_records.get(key, [])) if _inwin(e["date"])]
+        ev = [e for e in _replay_avg_cost(full_records.get(key, []), segment) if _inwin(e["date"])]
         pooled.extend(ev)
         pgr, plr, RG, RL, PG, PL = _pgr_plr(ev)
         entry = {
@@ -412,23 +421,31 @@ def _rq2_month(full_records, model_keys, win_start, win_end, n_resamples):
             n_resamples=n_resamples)
         pooled_block["ci_difference"] = {"low": _f(boot["ci_low"]), "high": _f(boot["ci_high"])}
         pooled_block["p_value"] = _f(boot["p_value"])
-    return {"pooled": pooled_block, "per_model": per_model}
+    return {"segment": segment, "pooled": pooled_block, "per_model": per_model}
 
 
-def _rq3_month(full_records, model_keys, win_start, win_end, n_resamples):
+def _rq3_month(full_records, model_keys, win_start, win_end, n_resamples, segment):
     """Confidence calibration over trades CLOSED (full exit) in the window.
 
     Full-history replay (_closed_trades) for correct entry confidence / cost
     basis; trades filtered to exit_date in window; calibration via the canonical
     _calibration_stats; correlation CI via _bootstrap_index_ci (compute_rq3's
-    pipeline)."""
+    pipeline).
+
+    ``segment`` is REQUIRED and has no default, for the reason given on
+    _rq2_month. RQ3 suffered no numerical contamination from the silent default
+    — a closed trade is built entirely from one segment's own open/close
+    vocabulary, so shorts were absent rather than mixed in, and the
+    direction-segmented recomputation reproduces the published values to 15
+    significant figures — but the call site carried the identical latent
+    coupling and is closed the same way."""
     def _inwin(d):
         return bool(d) and win_start <= d <= win_end
 
     per_model = {}
     pooled = []
     for key in model_keys:
-        closed = [t for t in _closed_trades(full_records.get(key, [])) if _inwin(t.get("exit_date", ""))]
+        closed = [t for t in _closed_trades(full_records.get(key, []), segment) if _inwin(t.get("exit_date", ""))]
         pooled.extend(closed)
         stats = _calibration_stats(closed)
         n = stats.get("n", 0)
@@ -485,7 +502,7 @@ def _rq3_month(full_records, model_keys, win_start, win_end, n_resamples):
         boot = _bootstrap_index_ci(len(usable), _corr, n_resamples=n_resamples)
         pooled_block["corr_ci"] = {"low": _f(boot["ci_low"]), "high": _f(boot["ci_high"])}
         pooled_block["p_value"] = _f(boot["p_value"])
-    return {"pooled": pooled_block, "per_model": per_model}
+    return {"segment": segment, "pooled": pooled_block, "per_model": per_model}
 
 
 # ==========================================================================
@@ -1836,6 +1853,18 @@ def _schema_validate(layer):
             "data_integrity.completeness_segmentation missing (populate-or-empty)")
         req({"open_at_month_end", "last_short_activity_date"} <= set(sa),
             "short_activity.open_at_month_end / last_short_activity_date missing")
+        # Direction labelling on the canonical RQ2/RQ3 blocks (2026-08-19).
+        # Populate-or-null from the shorting-activation month onward: an
+        # unlabelled pooled figure in a month that could contain shorts is the
+        # defect this gate exists to prevent.
+        for rq in ("RQ2", "RQ3"):
+            req(pe.get(rq, {}).get("segment") == "long",
+                f"{rq}.segment must be labelled 'long' from the v3 regime onward")
+            req("segment_note" in pe.get(rq, {}), f"{rq}.segment_note missing")
+            ss = pe.get(rq, {}).get("short_segment")
+            req(isinstance(ss, dict) and ss.get("segment") == "short",
+                f"{rq}.short_segment missing/malformed (populate-or-null)")
+            req("per_model" in (ss or {}), f"{rq}.short_segment.per_model missing")
         pvs = rm.get("prompt_version_stamps")
         req(isinstance(pvs, dict) and {"records", "counts"} <= set(pvs),
             "report_meta.prompt_version_stamps missing/malformed")
@@ -2145,9 +2174,21 @@ def build(month: str) -> dict:
     logger.info("RQ1 (calendar-month, permutation null + bootstrap CI)...")
     rq1 = compute_rq1(may_records, regime_map, model_keys,
                       n_permutations=500, n_resamples=DEFAULT_N_RESAMPLES)
-    logger.info("RQ2/RQ3 (full replay, month-attributed)...")
-    rq2 = _rq2_month(full_records, model_keys, win_start, win_end, DEFAULT_N_RESAMPLES)
-    rq3 = _rq3_month(full_records, model_keys, win_start, win_end, DEFAULT_N_RESAMPLES)
+    logger.info("RQ2/RQ3 (full replay, month-attributed, long segment)...")
+    rq2 = _rq2_month(full_records, model_keys, win_start, win_end, DEFAULT_N_RESAMPLES, "long")
+    rq3 = _rq3_month(full_records, model_keys, win_start, win_end, DEFAULT_N_RESAMPLES, "long")
+    # Short segment computes alongside the long one from the shorting-activation
+    # month onward. Month-gated (> 2026-06) so May and June reproduce byte-for-
+    # byte: reproduce-May's structural diff reports any key present in a rebuild
+    # but absent from the committed layer as ONLY_CANDIDATE, so an ungated
+    # addition would red the frozen reference. Same discipline as short_activity.
+    rq2_short = rq3_short = None
+    if month > "2026-06":
+        logger.info("RQ2/RQ3 (full replay, month-attributed, short segment)...")
+        rq2_short = _rq2_month(full_records, model_keys, win_start, win_end,
+                               DEFAULT_N_RESAMPLES, "short")
+        rq3_short = _rq3_month(full_records, model_keys, win_start, win_end,
+                               DEFAULT_N_RESAMPLES, "short")
     logger.info("RQ4 (accumulating factor regression)...")
     rq4 = compute_rq4({}, model_keys)
     # Diagnose RQ4 blocking cause (factor-publication lag vs aligned-day count).
@@ -2368,6 +2409,60 @@ def build(month: str) -> dict:
     if month > "2026-06":
         rq_update["direction_segmentation"] = _direction_segmentation(
             full_records, model_keys, win_start, win_end)
+
+        # Direction labels + the canonical short segment (hub DISPATCH 2 item (1),
+        # 2026-08-19). Two different things live here and must not be conflated:
+        #
+        #   direction_segmentation  - the compact exploratory block above, built
+        #       from short_metrics.closed_trades_by_direction, a self-contained
+        #       replay that is explicitly NOT the canonical RQ2/RQ3 pipeline.
+        #   RQ2/RQ3 .segment + .short_segment  - the canonical estimators
+        #       (_rq2_month/_rq3_month) run once per direction: same helpers,
+        #       same bootstrap, same windowing as the long headline figures.
+        #
+        # The label is the point. From 2026-07-01 the unlabelled pooled keys are
+        # long-segment estimates, and nothing in the block previously said so - a
+        # reader had no way to tell a long-segment figure from a whole-book one.
+        _pe = rq_update["point_estimates"]
+        _pe["RQ2"]["segment"] = rq2["segment"]
+        _pe["RQ3"]["segment"] = rq3["segment"]
+        _pe["RQ2"]["segment_note"] = (
+            "Long-segment estimate: realized AND paper legs are both restricted to long "
+            "positions. Figures published before the 6998c10d fix carried a long realized "
+            "leg over a direction-blind paper leg - the July 2026 hybrid. See "
+            "docs/RQ2-paper-leg-contamination.md.")
+        _pe["RQ3"]["segment_note"] = (
+            "Long-segment estimate: closed trades are built from BUY/SELL only. Short "
+            "closes appear in short_segment and are never pooled into these keys. No "
+            "numerical correction applies to RQ3 - shorts were absent, not mixed in.")
+        _pe["RQ2"]["short_segment"] = {
+            "title": "Disposition effect - short segment (exploratory, low-n)",
+            "segment": rq2_short["segment"],
+            "pooled_disposition_difference": rq2_short["pooled"]["disposition_difference"],
+            "pooled_PGR": rq2_short["pooled"]["PGR"],
+            "pooled_PLR": rq2_short["pooled"]["PLR"],
+            "pooled_ci_90": rq2_short["pooled"]["ci_difference"],
+            "pooled_p_value": rq2_short["pooled"]["p_value"],
+            "n_sale_records": rq2_short["pooled"]["n_sale_records"],
+            "per_model": rq2_short["per_model"],
+            "canonical_definition_ref": "compute_rq2 helpers (_replay_avg_cost/_pgr_plr), segment='short'",
+            "pilot_tag": "Phase A pilot / exploratory - short segment low-n, v3 regime onward",
+        }
+        _pe["RQ3"]["short_segment"] = {
+            "title": "Confidence calibration - short segment (exploratory, low-n)",
+            "segment": rq3_short["segment"],
+            "pooled_confidence_outcome_corr": rq3_short["pooled"]["confidence_outcome_corr"],
+            "pooled_ece": rq3_short["pooled"]["expected_calibration_error"],
+            "pooled_brier": rq3_short["pooled"]["brier_score"],
+            "pooled_hit_rate": rq3_short["pooled"]["overall_hit_rate"],
+            "pooled_ci_90": rq3_short["pooled"]["corr_ci"],
+            "pooled_p_value": rq3_short["pooled"]["p_value"],
+            "n_closed_trades": rq3_short["pooled"]["n_closed_trades"],
+            "calibration_curve": rq3_short["pooled"]["calibration_curve"],
+            "per_model": rq3_short["per_model"],
+            "canonical_definition_ref": "compute_rq3 helpers (_closed_trades/_calibration_stats), segment='short'",
+            "pilot_tag": "Phase A pilot / exploratory - short segment low-n, v3 regime onward",
+        }
 
     # ====================================================================
     # report_meta
