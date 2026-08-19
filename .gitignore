@@ -31,11 +31,21 @@ logs/*.log
 .cache/
 data/cache/
 
-# Regenerable research caches + analysis outputs (paper track).
+# Research caches + analysis outputs (paper track).
 # data/pre_registration/v1.json is a tracked deliverable and is NOT ignored.
-data/factors/
+# data/factors/ff_factors_daily.json is a COMMITTED FIXTURE and is NOT ignored:
+# the Ken French upstream file grows every month, so a checkout without it would
+# silently publish a different RQ4 block. See load_ff_factors().
+data/factors/*
+!data/factors/ff_factors_daily.json
 data/regimes/
 data/research/
 
-# Monthly data-layer back-fill safety artifacts (local pre-write backups, regenerable)
+# Monthly data-layer back-fill safety artifacts (local pre-write snapshots).
+# NOT regenerable, despite what this line claimed until 2026-08-19: each file is
+# a snapshot of state *before* a one-time historical backfill, and there is no
+# path back to it from current data. The 2026-05 snapshot is a committed fixture
+# — tests/test_reproduce_may_data_layer.py overlays authored content from it
+# that the builder deliberately suppresses.
 reports/monthly/*/data_layer.pre_backfill.json
+!reports/monthly/2026-05/data_layer.pre_backfill.json
