@@ -88,6 +88,16 @@ enforcement lives in the dispatch process.
      overlaps**: the ort strategy exits `Your local changes to the following
      files would be overwritten by merge`, naming the staged files, though
      the incoming commits never touch them.
+   - **A path-scoped stash is not a path-scoped index restore** (learned
+     2026-08-19). `git stash push -- <path>` scopes the *worktree* save to that
+     path, but the stash commit records the **whole index**. `git stash pop
+     --index` therefore tries to restore every other lane's staged files and
+     exits `already exists in index` / `patch does not apply`, naming paths you
+     never stashed. It fails *safely* — the stash entry is kept and nothing is
+     lost — but the restore must be done with a path-scoped guard patch
+     (`git diff --cached -- <path>` saved before, `git apply` after), not with
+     `pop --index`. Same family as the `--autostash` trap above: both promise an
+     index restore and deliver something wider.
 
    Merge is the correct integration here — it never rewrites the other lane's
    working-tree content — and it is the existing precedent (`7e81bdf4 Merge
@@ -109,6 +119,18 @@ enforcement lives in the dispatch process.
    is only reversible because the worktree already equals the index for those
    paths. Status `M ` / `A ` with a clean second column proves it; anything
    else means unstaging would lose content, and the lane stops.
+
+   **Blob identity holds only while your lane does not commit to that path.**
+   (Learned 2026-08-19.) When a lane quarantines another lane's hunk, commits
+   its *own* change to the same file, and then restores, the restored blob is
+   necessarily different — it is the legitimate composition of both changes.
+   `scripts/build_monthly_data_layer.py` moved `2ab259f1` → `c6708922` exactly
+   this way, with the v4 lane's staged content untouched. On such a path the
+   invariant is **delta-identity**: the restored `git diff --cached -- <path>`
+   must have added/removed lines byte-identical to the guard patch taken before
+   the quarantine. A checkpoint that re-verifies that path against the *old*
+   blob hash will read a false failure. Blob identity remains the right proof
+   for any contended path this lane did **not** commit to.
 
    Verify restoration by **blob hash, not `git diff --cached --stat`**.
    Matching insertion counts are not identity — two different contents can

@@ -529,6 +529,145 @@
           "note": "detect_version_transition compares only api_success=true observations, so a failure->recovery cycle cannot produce a false positive; a clean run is therefore real evidence of identity stability, not an artifact of quiet logging."
         },
         "evidence": "src/analytics/cost_rates.py (RATE_HISTORY period 2 on both models, DEEPSEEK_PEAK_WINDOWS_UTC); tests/test_cost_rates.py; data/trades/deepseek_2026-07.jsonl and deepseek_2026-08.jsonl (off-peak verification); data/model_versions/deepseek.jsonl (identity watch)."
+      },
+      {
+        "id": "rq2_paper_leg_site2_output_version",
+        "date": "2026-08-19",
+        "type": "output_version",
+        "scope": "all_six_models (materialised in gemini + deepseek only)",
+        "detail": "RQ2 site-2 fix. The disposition estimator scoped its two legs differently: the realized leg counted long realizations only (a side effect of the long-only BUY/SELL vocabulary), while the paper leg read every open holding from the portfolio_after snapshot regardless of direction. Short positions therefore sat in the denominator of a measure whose numerator could never contain them. unrealized_pl_pct already reports relative to direction, so the contamination was direction-corrected and sign-invisible.",
+        "fix_commit": "6998c10d",
+        "output_version": {
+          "affected_output": "reports/monthly/2026-07/data_layer.json -> methodology_data_integrity_rq.rq_update.point_estimates.RQ2.pooled_disposition_difference",
+          "superseded_value": -0.10308579739847612,
+          "superseded_label": "pre-fix-code output: long realized leg over a direction-blind paper leg",
+          "corrected_value": -0.10730611196712891,
+          "corrected_label": "clean long-segment estimate under the registered direction-segmented spec",
+          "delta": -0.00422031456865279,
+          "relative": "4.09%",
+          "n_sale_records": 547,
+          "realized_legs_unchanged": {
+            "RG": 313,
+            "RL": 345
+          },
+          "paper_leg_change": {
+            "PG": {
+              "from": 6805,
+              "to": 6767,
+              "removed": 38,
+              "share": "0.56%"
+            },
+            "PL": {
+              "from": 2001,
+              "to": 1932,
+              "removed": 69,
+              "share": "3.45%"
+            }
+          },
+          "bias_direction": "toward zero -- the short book sat disproportionately in the paper-loss bucket, diluting PLR ~6x more than PGR, so the published figure understated the cohort's anti-disposition",
+          "conclusions_preserved": "sign negative before and after; rank order across the six books unchanged; the corrected point estimate falls inside the published 90% CI [-0.11666, -0.08891], p=0.0. Construct-validity and labelling correction, not a results correction.",
+          "per_model_movement": {
+            "claude": 0.0,
+            "gpt": 0.0,
+            "grok": 0.0,
+            "claude_opus": 0.0,
+            "gemini": -0.0187538,
+            "deepseek": -0.0073942
+          },
+          "per_model_note": "Four of six books are byte-identical -- they ran no July shorts. The pooled shift is carried entirely by gemini and deepseek, so the same defect would bias a different month by a different amount in a direction that cannot be signed in advance.",
+          "new_exploratory_output": {
+            "segment": "short",
+            "PGR": 0.4444,
+            "PLR": 0.4783,
+            "disposition_difference": -0.0338,
+            "RG": 8,
+            "RL": 22,
+            "note": "first-time measurement, low-n, v3 regime onward -- not a correction"
+          }
+        },
+        "erratum_reference": "CORRECTIONS.md -> '2026-08-19 -- July 2026 consolidated corrections record', Item 2",
+        "technical_anchor": "docs/RQ2-paper-leg-contamination.md",
+        "consequence": "Discharges the ledger half of Tier 2 marker 9. The registered RQ2 scope-and-correction text cites this entry jointly with the corrections record.",
+        "rq3_non_correction": "RQ3 took no numerical damage from the same site: a closed trade is built from one segment's own open/close vocabulary, so shorts were absent rather than mixed in. The direction-segmented recomputation reproduces the published 0.19357739190316292 on n=236 exactly (15 significant figures). Recorded as a non-correction, not omitted.",
+        "evidence": "tests/test_builder_segment_explicit.py (11 tests pinning both segments and the registered figures); docs/RQ2-paper-leg-contamination.md"
+      },
+      {
+        "id": "rq5_gross_weight_site3",
+        "date": "2026-08-19",
+        "type": "output_version",
+        "scope": "all_six_models",
+        "detail": "RQ5 site-3 fix. Concentration response to drawdown is computed on GROSS (absolute) portfolio weights, so short exposure counts toward concentration rather than netting against long exposure. dHHI_trade is post-trade gross-weight HHI minus pre-trade price-drifted gross-weight HHI.",
+        "fix_commit": "6998c10d",
+        "consequence": "Discharges the ledger half of Tier 2 marker 11 (the site-3 fix ledger entry). The registered RQ5 estimand cites this entry alongside docs/RQ5-RQ6-specification.md.",
+        "evidence": "src/analytics/short_metrics.py (gross_hhi_from_snapshot); tests/test_direction_segmented_rq.py"
+      },
+      {
+        "id": "settled_funds_enforcement_rule7_owed",
+        "date": "2026-08-19",
+        "type": "rule7_deferred_ledger_entry",
+        "scope": "all_six_models",
+        "detail": "Ledger entry owed by c6d77c72 (per-book settled-cash ledger with T+1 settlement and purchase capping) and deferred at the time because scripts/phase_a_integrity_ledger.json was staged by the v4 prompt lane and project rule 7 forbids two lanes staging one path. Recorded now in the quarantine window that rule 7's second resolution authorises.",
+        "code_commit": "c6d77c72",
+        "gating": "Binds only on the settings flag AND 2026-09-16. Stops remain ungated -- a blocked purchase is censored via executed=false and enters no behavioural outcome metric, but a stop must never be blocked.",
+        "consequence": "The cash-branch execution constraint registered in Tier 2 has its implementation entry. Free-riding is structurally unreachable because the cap is enforced pre-submission.",
+        "evidence": "src/portfolio/settlement.py; tests/test_settled_funds.py"
+      },
+      {
+        "id": "direction_segmented_rq_rule7_owed",
+        "date": "2026-08-19",
+        "type": "rule7_deferred_ledger_entry",
+        "scope": "all_six_models",
+        "detail": "Ledger entry owed by 6998c10d (direction-segmented RQ2/RQ3, gross-weight RQ5, full-vocabulary RQ6) and deferred for the same rule-7 contention. The commit carried sites 2, 3 and 4; sites 2 and 3 have their own output-version entries above, and site 4 is RQ6's decision set widening to each configuration's full action vocabulary.",
+        "code_commit": "6998c10d",
+        "site_4": "RQ6's decision set is the deployed configuration's full action vocabulary per configuration -- {BUY, SELL, HOLD} under v1/v2, {BUY, SELL, HOLD, SHORT, COVER} under v3. Cross-configuration comparison is already prohibited, so per-configuration sets differ without inconsistency.",
+        "consequence": "Closes the deferred-entry debt for the analytics landing.",
+        "evidence": "tests/test_direction_segmented_rq.py"
+      },
+      {
+        "id": "cycle_gap_2026_08_17",
+        "date": "2026-08-17",
+        "type": "scheduler",
+        "scope": "all_six_models",
+        "detail": "62-minute cohort-wide gap, 14:33 -> 15:35. One decision cycle lost for all six books.",
+        "root_cause": "Two interacting causes. The intraday workflow checked out the triggering event's SHA rather than the branch tip, so a queued run could read a stale book; and the concurrency group was configured to queue rather than cancel, so runs accumulated behind a slow tick instead of superseding it.",
+        "consequence": "Per-day cycle denominators are reduced by one for all six books on 2026-08-17. Cohort-wide and simultaneous, so it does not differentiate models -- it is a denominator fact, not a completeness signal about any book.",
+        "fix_commit": "6052b914",
+        "guard": "5d25de5a",
+        "evidence": ".github/workflows/intraday.yml; tests/test_intraday_checkout_freshness.py"
+      },
+      {
+        "id": "builder_segment_explicit_fix",
+        "date": "2026-08-19",
+        "type": "reproducibility_fix",
+        "scope": "monthly data layer (all months from 2026-07 onward)",
+        "detail": "scripts/build_monthly_data_layer.py called _replay_avg_cost and _closed_trades positionally with no segment. Those helpers gained a segment parameter defaulting to 'long' in 6998c10d, so the published monthly RQ2 block silently changed meaning when that commit landed -- with no diff in the builder and no build-time signal. The August cycle would otherwise have published long-segment values under keys carrying no direction label.",
+        "fix_commit": "b6e836d5",
+        "fix": "segment is now a REQUIRED positional argument of _rq2_month and _rq3_month, so a future change to the helper default is a TypeError rather than a quiet change of a published number. The canonical short segment computes alongside the long one. RQ2/RQ3 blocks carry segment, segment_note and short_segment. New keys are month-gated (> 2026-06) so May and June reproduce byte-for-byte, and _self_validate enforces them populate-or-null from the v3 regime onward.",
+        "verification": "reproduce-May stays EXACT MATCH; full suite 340 passed; 11 new regression tests pin the guard and every registered July figure in both directions.",
+        "mechanism_findings": {
+          "delta_identity_supersedes_blob_identity": "scripts/build_monthly_data_layer.py's staged blob moved 2ab259f1 -> c6708922 by legitimate composition: this lane's committed fix plus the v4 prompt lane's restored hunk. The v4 lane's staged CONTENT is unchanged and was proven so by byte-comparison of the added lines. Any future checkpoint that verifies this path by blob hash against 2ab259f1 will read a false failure. The invariant for a contended path that has been quarantined and restored is DELTA-identity, not blob-identity.",
+          "path_scoped_stash_is_not_a_path_scoped_index_restore": "git stash push -- <path> scopes the worktree save to that path but records the WHOLE index in the stash commit. git stash pop --index therefore attempts to restore every other lane's staged files and fails with 'already exists in index'. It fails safely -- the stash is kept and nothing is lost -- but the restore must be done with a path-scoped guard patch (git apply) instead. This sits beside the existing rule-6 finding that rebase --autostash restores without --index and flattens another lane's staged set."
+        },
+        "rule7_handling": "Landed on a contended path under hub cross-lane authority. Recoverability was proven BEFORE the quarantine (HEAD content + guard patch reproduces the v4 lane's staged blob exactly), the hunk was stashed with attribution naming the v4 prompt lane as owner, and it was restored and proven byte-identical immediately after the commit.",
+        "evidence": "docs/RQ2-paper-leg-contamination.md section 7; tests/test_builder_segment_explicit.py"
+      },
+      {
+        "id": "helper_segment_sweep",
+        "date": "2026-08-19",
+        "type": "reproducibility_fix",
+        "scope": "monthly data layer + operator tooling",
+        "detail": "Companion sweep to the builder fix. Every remaining _executed_trades / _closed_trades / _replay_avg_cost call site now names its segment explicitly, so no call inherits the helpers' 'long' default invisibly.",
+        "fix_commit": "a6f75169",
+        "sites": [
+          "scripts/build_monthly_data_layer.py:528, :542 -- _executed_trades (trade_count, buy/sell counts, executed_notional_total, reversal_flip_rate, trades_per_active_day -> published in profiles[].evidence_metrics)",
+          "scripts/build_monthly_data_layer.py:553 -- _closed_trades (n_closed_trades, avg/median_hold_days, same_day_exits -> published)",
+          "scripts/build_monthly_data_layer.py:2142 -- _executed_trades (trade_count)",
+          "scripts/behavioral_summary.py:151, :166, :211 -- _executed_trades; :220 -- _closed_trades (operator-run, writes nothing without --output)"
+        ],
+        "behaviourally_null": "Verified three ways: the default is pinned to 'long' by tests/test_direction_segmented_rq.py:77, so each edit is an identity substitution; reproduce-May stays EXACT MATCH; full suite 340 passed.",
+        "not_a_semantics_ruling": "These metrics count long-side trades only, dropping SHORT and COVER entirely. That is a UNIFORM exclusion, not the mixed numerator/denominator defect RQ2 had, so no figure is contaminated. Whether trade_count, hold-days and the flip rate SHOULD include short activity from 2026-07-01 is an open Research question about metric definitions. This sweep does not decide it and moves no value.",
+        "consequence": "Closes the silent-coupling defect class ahead of Phase B.",
+        "evidence": "commit a6f75169"
       }
     ]
   }
