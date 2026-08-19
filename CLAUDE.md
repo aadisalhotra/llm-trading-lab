@@ -160,3 +160,37 @@ enforcement lives in the dispatch process.
    of the holding lane's change with attribution (`git stash push -u -m`),
    which splits that lane's package and needs its owner's sign-off. Pick one
    before editing, never after.
+
+8. **The integrity ledger is never edited by parse-and-reserialize** (ratified
+   2026-08-19). `scripts/phase_a_integrity_ledger.json` must be modified by
+   **surgical text insertion**, never by `json.load` → mutate → `json.dumps`.
+
+   A round-trip is not faithful to that file. Measured on the 2026-08-19 C
+   window, `json.dumps(d, indent=2)` produced **255 spurious diff lines** before
+   a single real change was added: it strips the blank lines that separate
+   sections, renormalizes `0.80` to `0.8`, expands inline arrays like
+   `["completeness", "uncorrupted_book", …]` onto one line each, and rewrites
+   the file's CRLF endings as LF.
+
+   That is not cosmetic. The ledger is the file rule 7 names as the recurring
+   contended path, so a reserialize buries the real entries in unrelated
+   churn, destroys the holding lane's ability to verify its own hunk, and makes
+   "exactly the expected added key paths" unprovable. The C window's diff was
+   **139 insertions, 0 deletions** because it was a text insert.
+
+   **Three proofs run before the write, every time:**
+
+   1. **Reparse** — the new text is valid JSON.
+   2. **Deep-equal outside the insertion** — parse the new text, remove the
+      appended elements, and assert it equals the original parse. This is what
+      catches an accidental edit elsewhere in the structure.
+   3. **Literal byte-prefix survival** — the original bytes up to the insertion
+      point must still be a literal prefix of the new content.
+
+   Locate the insertion point by asserting the file's exact tail (for the
+   2026-08 window: `"\r\n    ]\r\n  }\r\n}\r\n"`) and refuse to guess if it does
+   not match. Write bytes, not text, so the line endings survive.
+
+   This sits beside rule 6's `--autostash` warning and the two findings landed
+   with it: a path-scoped stash is not a path-scoped index restore, and blob
+   identity holds only while your lane does not commit to the contended path.
