@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import re
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -1031,6 +1032,31 @@ FACTORS_DIR = DATA_DIR / "factors"
 _FF5_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
 _MOM_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip"
 
+# Live refetch from the Ken French Data Library is EXPLICIT OPT-IN only. The
+# committed cache (data/factors/ff_factors_daily.json) is the single source of
+# truth for RQ4, because the upstream file grows every month: a machine that
+# silently refetched would publish a different RQ4 block — different
+# factor_data_last_date, different n_aligned_factor_days, different
+# blocking_reason string — from the same code and the same trade logs.
+# Set this to a truthy value only when deliberately refreshing the cache.
+_FF_LIVE_FETCH_ENV = "LLM_LAB_FF_LIVE_FETCH"
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+class FactorCacheMissing(RuntimeError):
+    """The committed FF factor cache is unreadable and live fetch was not opted in.
+
+    Raised rather than returning ``None`` on purpose: a ``None`` return is
+    indistinguishable from a genuine upstream outage, and RQ4 renders that as a
+    published ``status: "Open"`` block. Failing loud is what keeps a cacheless
+    machine from quietly publishing a divergent record.
+    """
+
+
+def _live_fetch_opted_in() -> bool:
+    """True when the operator explicitly authorized a live Ken French fetch."""
+    return os.environ.get(_FF_LIVE_FETCH_ENV, "").strip().lower() in _TRUTHY
+
 
 def _download_ff_csv(url: str) -> list[str] | None:
     """Download a Ken French daily-factor zip and return its CSV lines."""
@@ -1074,9 +1100,29 @@ def _parse_ff_daily(lines: list[str], col_names: list[str]) -> dict[str, dict[st
     return out
 
 
-def load_ff_factors(use_cache: bool = True) -> dict[str, dict[str, float]] | None:
-    """Return {date: {Mkt-RF, SMB, HML, RMW, CMA, RF, MOM}} or None if unavailable."""
-    FACTORS_DIR.mkdir(parents=True, exist_ok=True)
+def load_ff_factors(
+    use_cache: bool = True,
+    allow_live_fetch: bool | None = None,
+) -> dict[str, dict[str, float]] | None:
+    """Return {date: {Mkt-RF, SMB, HML, RMW, CMA, RF, MOM}} from the committed cache.
+
+    The cache at ``data/factors/ff_factors_daily.json`` is a committed fixture,
+    not a scratch file. Reading it is the default and only implicit path.
+
+    ``allow_live_fetch`` gates every network path (including ``use_cache=False``,
+    which by definition means "go to the network"). ``None`` — the default —
+    defers to the ``LLM_LAB_FF_LIVE_FETCH`` environment variable, which is unset
+    in CI and in production. When live fetch is not authorized and the cache
+    cannot be read, this raises ``FactorCacheMissing`` instead of returning
+    ``None``, so the monthly builder and the reproduce-May gate die loudly
+    rather than publishing an RQ4 block computed off different factor data.
+
+    Returns ``None`` only for a genuine upstream failure during an *authorized*
+    live fetch — the one case that really is "factor data unavailable".
+    """
+    if allow_live_fetch is None:
+        allow_live_fetch = _live_fetch_opted_in()
+
     cache = FACTORS_DIR / "ff_factors_daily.json"
     if use_cache and cache.exists():
         try:
@@ -1084,9 +1130,31 @@ def load_ff_factors(use_cache: bool = True) -> dict[str, dict[str, float]] | Non
                 data = json.load(f)
             if data:
                 return data
+            cache_problem = "cache file parsed but is empty"
         except Exception:
-            logger.exception("Failed reading FF factor cache; refetching")
+            logger.exception("Failed reading FF factor cache at %s", cache)
+            cache_problem = "cache file exists but could not be parsed"
+    elif use_cache:
+        cache_problem = "cache file does not exist"
+    else:
+        cache_problem = "cache read was explicitly bypassed (use_cache=False)"
 
+    if not allow_live_fetch:
+        raise FactorCacheMissing(
+            f"Fama-French factor cache unusable ({cache_problem}): {cache}. "
+            "This file is a committed fixture; a live refetch would silently "
+            "change RQ4 output, so it is not attempted by default. Restore the "
+            "committed cache, or set "
+            f"{_FF_LIVE_FETCH_ENV}=1 to authorize a live fetch from the Ken "
+            "French Data Library and deliberately refresh it."
+        )
+
+    logger.warning(
+        "Live Ken French fetch authorized via %s — RQ4 output will reflect "
+        "upstream data as published today, not the committed cache.",
+        _FF_LIVE_FETCH_ENV,
+    )
+    FACTORS_DIR.mkdir(parents=True, exist_ok=True)
     ff5_lines = _download_ff_csv(_FF5_URL)
     mom_lines = _download_ff_csv(_MOM_URL)
     if not ff5_lines:
