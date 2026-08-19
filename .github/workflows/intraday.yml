@@ -59,6 +59,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Tip of main at job start — NOT the pinned event SHA. The
+          # concurrency group below QUEUES overlapping ticks instead of
+          # cancelling them, so a run can wait ~30 minutes for the tick ahead
+          # of it to finish and push. Checking out `github.sha` would then hand
+          # the pipeline a book that predates those trades: it decides against
+          # stale holdings, and its commit collides with the winner on every
+          # path it writes (dashboard, all six state files, the leaderboard,
+          # the jsonl appends). That conflict is DETERMINISTIC, so the
+          # rebase-and-retry loop in "Commit + push updated data" cannot clear
+          # it — it spends all five attempts and the tick is discarded.
+          #
+          # Discarding is the correct outcome once a tick is stale: landing its
+          # state would erase the executed fills the winning tick recorded. The
+          # defect is upstream — the tick must not run stale at all, which is
+          # what this ref does. Worked example: 2026-08-17 14:34Z was created
+          # 2s before the tick ahead of it pushed, ran 27 minutes later against
+          # the pre-tick book, and lost the run to a conflict on every file.
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
