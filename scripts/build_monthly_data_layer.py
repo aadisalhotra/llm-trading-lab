@@ -524,8 +524,15 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
         active_days = len({r["date"] for r in win if r.get("date")})
         n_buys = n_sells = 0
         notional = 0.0
+        # Every _executed_trades / _closed_trades call in this file names its
+        # segment explicitly. The helpers default to "long", so an unnamed call
+        # inherits whatever that default becomes — the coupling that produced the
+        # July 2026 RQ2 hybrid (docs/RQ2-paper-leg-contamination.md). Passing
+        # "long" here is behaviourally null today and is not a ruling on whether
+        # these metrics SHOULD stay long-only; that is a Research question about
+        # metric definitions, untouched by this change.
         for r in win:
-            for ex in _executed_trades(r):
+            for ex in _executed_trades(r, "long"):
                 if ex["side"] == "BUY":
                     n_buys += 1
                 else:
@@ -539,7 +546,7 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
         flips = pairs = 0
         for r in recs:
             d = r.get("date", "")
-            for ex in _executed_trades(r):
+            for ex in _executed_trades(r, "long"):
                 t, side = ex["ticker"], ex["side"]
                 if t in last_side and _inwin(d):
                     pairs += 1
@@ -550,7 +557,7 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
 
         # holding period: trades closed (full exit) in window, full replay for
         # correct entry date.
-        closed_win = [t for t in _closed_trades(recs) if _inwin(t.get("exit_date", ""))]
+        closed_win = [t for t in _closed_trades(recs, "long") if _inwin(t.get("exit_date", ""))]
         holds = []
         same_day = 0
         for t in closed_win:
@@ -2124,7 +2131,7 @@ def build(month: str) -> dict:
             "max_drawdown": mdd_may,
             "volatility": _ann_vol(may_daily),
             "sharpe": _descriptive_sharpe(may_daily, risk_free_rate),  # rf pinned in report_meta
-            "trade_count": sum(len(_executed_trades(r)) for r in may_records[key]),
+            "trade_count": sum(len(_executed_trades(r, "long")) for r in may_records[key]),
             "win_rate": _f(float(np.mean([1.0 if x > 0 else 0.0 for x in may_daily]))) if may_daily else None,
             "turnover": None,   # filled from behavioral evidence below
             "avg_hold_days": None,  # filled from behavioral evidence below

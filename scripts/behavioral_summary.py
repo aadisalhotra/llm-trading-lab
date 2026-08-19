@@ -146,9 +146,17 @@ def flip_rate(records: list[dict], w: Window):
     last_side: dict[str, str] = {}
     pairs = 0
     flips = 0
+    # Segment is named explicitly at every _executed_trades / _closed_trades call
+    # in this file. Both helpers default to "long", so an unnamed call silently
+    # inherits whatever that default becomes — the coupling that produced the
+    # July 2026 RQ2 hybrid in the monthly builder
+    # (docs/RQ2-paper-leg-contamination.md). This tool is operator-run and writes
+    # nothing without --output, but it drifts the same way, and its numbers are
+    # quoted in review. Passing "long" is behaviourally null today; whether these
+    # metrics should stay long-only is a Research question, not decided here.
     for rec in records:  # load_decision_records returns chronological order
         d = rec.get("date", "")
-        for ex in _executed_trades(rec):
+        for ex in _executed_trades(rec, "long"):
             t = ex["ticker"]
             side = ex["side"]
             if t in last_side and in_window(d, w):
@@ -163,7 +171,7 @@ def conf_distribution(window_records: list[dict]) -> Counter:
     """Counter of decision.confidence over executed BUY/SELL trades in the window."""
     c: Counter = Counter()
     for rec in window_records:
-        for ex in _executed_trades(rec):
+        for ex in _executed_trades(rec, "long"):
             conf = (ex.get("decision") or {}).get("confidence")
             if conf is not None:
                 c[int(conf)] += 1
@@ -208,7 +216,7 @@ def compute_window(model_keys: list[str], w: Window) -> WindowResult:
         window_recs = [r for r in recs if in_window(r.get("date", ""), w)]
         active_days = len({r["date"] for r in window_recs if r.get("date")})
 
-        n_trades = sum(len(_executed_trades(r)) for r in window_recs)
+        n_trades = sum(len(_executed_trades(r, "long")) for r in window_recs)
         tpd = (n_trades / active_days) if active_days else None
 
         cdist = conf_distribution(window_recs)
@@ -217,7 +225,7 @@ def compute_window(model_keys: list[str], w: Window) -> WindowResult:
 
         cavg, cmin, cmax, n_cash = cash_stats(k, w)
 
-        closed = _closed_trades(recs)
+        closed = _closed_trades(recs, "long")
         win_closed = [t for t in closed if in_window(t.get("exit_date", ""), w)]
         pooled_closed.extend(win_closed)
 
