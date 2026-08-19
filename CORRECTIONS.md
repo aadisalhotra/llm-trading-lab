@@ -158,3 +158,181 @@ Two consequences worth stating plainly:
   from April onward were rendered with the old rates and are not patched. That
   surface is non-reproducible by design; this register is the disclosure
   instrument for it.
+
+---
+
+## 2026-08-19 — July 2026 consolidated corrections record
+
+**Scope.** One record for every correction touching the July 2026 reporting
+cycle. Two items are corrections; a third is recorded here explicitly as a
+**non-correction**, so that its absence from the register is a stated finding
+rather than an omission.
+
+**A scoping note, because the dispatch that ordered this record named three July
+items.** The SPY-anchor erratum is **not** one of them — it is a **May 2026**
+correction, published 2026-07-03 (`4c9c5e93`), and it appears below only as the
+convention July rev. 2 followed. See *Cross-references*. A separate, still-open
+SPY matter (the `canonical_spy_return` retroactive drift) is likewise not a July
+correction and is recorded there for the same reason.
+
+---
+
+### Item 1 — Notable-decisions extractor omitted short-side executions
+
+**Published as July 2026 rev. 2**, 2026-08-13 (`ea9bf1ea`); erratum landed
+2026-08-10 in `cf8c0488` as `corrections.notable_events_long_only_extractor`.
+
+**Mechanism.** The notable-decisions extractor filtered executions on a
+`BUY`/`SELL` literal. That predicate was written when the universe of executed
+sides *was* BUY and SELL; when shorting activated 2026-07-01 it silently became a
+long-only filter, dropping every `SHORT` and `COVER` across 74 short-side
+executions from July 1 until correction. The panel header encoded the defect in
+its own title — *"LARGEST LONG-LEG EXECUTIONS"* — which is why the rev. 1
+disclosure read as a design statement rather than a bug.
+
+**Corrected figures.** Two entries enter at #2, displacing two others; two demote
+#2 → #3:
+
+| Model | Entering at #2 | Displacing |
+|---|---|---|
+| Gemini | COVER PG **$16,505.28** (7/30) | SELL SLB $13,020.15 |
+| DeepSeek | COVER QCOM **$9,412.04** (7/9) | SELL GLD $7,903.32 |
+
+All twelve reported entries reconcile to the cent. The panel header is corrected
+to "TOP TRADES BY VALUE", and the rev. 1 "long-leg only by extractor design"
+disclosure is **quoted and repudiated** rather than silently dropped.
+
+**What it did not touch.** No returns, metrics, gates, or RQ inputs. Leaderboard
+unmoved (Gemini 12.62/+7.58, DeepSeek 3.57/−1.47); page count unchanged at five.
+Rev. 1 is preserved on disk unchanged, not replaced.
+
+**Defect class.** Member of the long-only BUY/SELL filter class — the same class
+as Item 2, and as the 2026-07-01 daily-report render bug. The rule ratified from
+this item: express tripwires in **rendered** form, and validate them against a
+known-positive control.
+
+---
+
+### Item 2 — RQ2 July pooled disposition figure is a hybrid, not a long-segment estimate
+
+**Not previously published as a correction.** Affected figure:
+`reports/monthly/2026-07/data_layer.json` →
+`methodology_data_integrity_rq.rq_update.point_estimates.RQ2.pooled_disposition_difference`.
+Technical anchor: **`docs/RQ2-paper-leg-contamination.md`**, carrying the full
+reproduction, the per-model decomposition, and the builder hazard.
+
+**Mechanism.** The estimator's two legs were scoped differently. The realized leg
+(numerator) counted long realizations only — a side effect of the same long-only
+BUY/SELL vocabulary as Item 1. The paper leg (denominator) read every open
+holding from the `portfolio_after` snapshot **regardless of direction**, so short
+positions sat in the denominator of a measure whose numerator could never contain
+them. Because `unrealized_pl_pct` already reports relative to direction, the
+contamination was **direction-corrected and therefore sign-invisible**: nothing
+looked wrong.
+
+**Both values, published together.**
+
+| | Value | What it is |
+|---|---|---|
+| **−0.1031** | `-0.10308579739847612` | **Pre-fix-code output** — a long realized leg over a direction-blind paper leg. The figure in the published July layer. |
+| **−0.1073** | `-0.10730611196712891` | **Clean long-segment estimate** under the registered direction-segmented spec. Supersedes the above. |
+
+Delta **−0.0042** (`-0.00422031456865279`), **4.09% relative**.
+
+**Sign and conclusions are preserved, stated in the same breath as the
+correction.** PGR − PLR is negative before and after — losses realized at a
+higher rate than gains, the reverse of the classic disposition effect. Rank order
+across the six books is unchanged. The published 90% interval is
+[−0.11666, −0.08891] at p = 0.0, and the clean estimate **falls inside it**. No
+inferential conclusion drawn from the July figure is disturbed.
+
+This is a construct-validity and labelling correction, not a results correction —
+which is exactly why it is registered rather than absorbed. The published number
+sat inside its own interval while estimating a quantity nobody registered.
+
+**Decomposition.** Realized legs identical (RG 313, RL 345); event count identical
+(n = 547). Only the denominators move:
+
+| Denominator | Pre-fix | Clean | Removed | Share of leg |
+|---|---|---|---|---|
+| Paper gains PG | 6805 | 6767 | 38 | 0.56% |
+| Paper losses PL | 2001 | 1932 | 69 | **3.45%** |
+
+The contamination is **asymmetric by roughly six to one** — July's short book sat
+disproportionately in the paper-*loss* bucket, diluting PLR far more than PGR, so
+the bias ran **toward zero**. The correction makes the cohort's anti-disposition
+slightly stronger, not weaker.
+
+**Four of six books are byte-identical** across the correction: claude, gpt, grok
+and claude_opus ran no July shorts. The entire pooled shift is carried by Gemini
+(−0.0187538) and DeepSeek (−0.0073942). The bias is therefore a function of
+*which books shorted*, so the same defect would bias a different month by a
+different amount, in a direction that cannot be signed in advance.
+
+**New exploratory output, not a correction.** The July short segment — PGR 0.4444,
+PLR 0.4783, difference −0.0338, RG 8, RL 22 — is a first-time measurement,
+low-n, v3 regime onward.
+
+**Fixed at source.** `6998c10d` corrected the estimator; `b6e836d5` closed the
+builder call site that had silently inherited the change; `a6f75169` named the
+segment at every remaining call site.
+
+---
+
+### Item 3 — RQ3 July calibration figure: **not a correction**
+
+Recorded deliberately. A reader comparing RQ2 and RQ3 will ask whether the same
+defect touched RQ3. It did not, and the register should answer that rather than
+leave it inferable from silence.
+
+The direction-segmented recomputation reproduces the published July value
+**exactly**:
+
+```
+published   0.19357739190316292    n_closed_trades = 236
+recomputed  0.19357739190316292    n_closed_trades = 236
+```
+
+Agreement to **15 significant figures**, on an identical trade count. The
+registration change is a **relabeling with no numerical correction**.
+
+**Why RQ3 was structurally immune.** Contamination requires a denominator built
+from the portfolio snapshot. RQ2 has one; RQ3 has none — it is a per-closed-trade
+correlation, and a closed trade is constructed entirely from one segment's own
+open/close vocabulary. Pre-fix, `_closed_trades` walked BUY/SELL only, which *is*
+the long segment. Shorts were therefore **absent** from RQ3, and absence from a
+per-trade estimator is exclusion, not bias.
+
+The July short segment holds **26** separately-closed trades RQ3 never counted
+(correlation −0.2037 — the anti-calibration observation). They were not
+contaminating anything; they were not yet in scope.
+
+*Provenance note:* the published RQ3 pooled figure already carries
+`"status": "superseded_six_model_pool"` and `"reported": false`, superseded by the
+per-model GPT/Grok primary. Its exactness is a provenance fact, not a live
+headline.
+
+---
+
+### Cross-references — two SPY items, neither a July correction
+
+- **May 2026 SPY-anchor erratum** (`4c9c5e93`, published 2026-07-03). SPY
+  since-inception return corrected **11.26% → 11.18%**, and the six derived model
+  alphas re-stated; cause was an ambiguous inception anchor, now ledger-pinned at
+  **680.40**. It appears here only because July rev. 2 followed its dashboard
+  erratum-note convention. It is a May correction and belongs to the May cycle.
+- **`canonical_spy_return` retroactive drift** — the upstream cumulative SPY
+  return for a *fixed* window was revised **10.32% → 9.69%** after publication.
+  This is a data-source drift, **not a correction this project issued**, and no
+  July figure moves because of it: the monthly builder is insulated by a frozen
+  `spy_benchmark.cumulative_return_since_inception` in `report_meta` (July:
+  `0.09792769325690731`). Open for Research; recorded so that the absence of a
+  July SPY correction is a finding rather than a gap.
+
+### Where this record is cited
+
+The Tier 2 pre-registration RQ2 entry cites this record jointly with the site-2
+output-version ledger entry (marker 9); the RQ3 entry cites it as the
+recomputation record (marker 14). The August methods note **cites this record and
+does not restate it** — a methods note is not the disclosure instrument for a
+superseded published figure.
