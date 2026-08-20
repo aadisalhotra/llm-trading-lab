@@ -39,9 +39,10 @@
   },
   "daily": {
     "date": "2026-08-20",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "api_failure:grok"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -51,6 +52,13 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-20T13:32:51.474194+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model grok failed",
+        "timestamp": "2026-08-20T18:06:00.874223+00:00",
         "disposition": "sent"
       }
     ]
