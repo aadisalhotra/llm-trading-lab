@@ -39,18 +39,74 @@
   },
   "daily": {
     "date": "2026-08-21",
-    "sent_count": 1,
+    "sent_count": 8,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:claude",
+      "ath:grok",
+      "ath:deepseek",
+      "news:LLY:43b76ad053",
+      "news:TMO:a22bd43804",
+      "news:ABT:29c5a54311",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-21T13:32:35.678705+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-08-21T21:07:10.402039+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Grok 4.20 (Reasoning) hit a new all-time high",
+        "timestamp": "2026-08-21T21:07:11.084415+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "DeepSeek V4 Pro hit a new all-time high",
+        "timestamp": "2026-08-21T21:07:11.626414+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-08-21T21:07:12.321304+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TMO (held by 4)",
+        "timestamp": "2026-08-21T21:07:12.962414+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on ABT (held by 5)",
+        "timestamp": "2026-08-21T21:07:13.532791+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-08-21T21:07:15.282498+00:00",
         "disposition": "sent"
       }
     ]
