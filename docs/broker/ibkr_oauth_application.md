@@ -13,6 +13,13 @@ broker migration remains undecided until the Sept 15 gate.
 `apiintegration@interactivebrokers.com` the same day, in the hub's final form (§5).
 **Nothing outstanding on the send side** — all three inquiry clocks are running (§6).
 
+**Update 2026-08-24 — first-party OAuth credentials are live and verified.** A
+consumer key, access token, and key material exist and completed the
+live-session-token exchange against `api.ibkr.com` (§3, *Activation check*). The
+capability this application was chartered to obtain is therefore in hand. This
+records the technical state only — it does not by itself resolve the §4 eligibility
+question or the Sept 15 gate decision, and §6's inquiry clocks are unaffected.
+
 ---
 
 ## 1. Headline finding
@@ -88,6 +95,66 @@ CI-compatible IBKR route, exactly as the hub reasoned.
   registered consumer key is not valid until after midnight in the applicable region;
   using it earlier returns `401 Invalid Consumer`. Budget one extra day between
   approval and first green CI run.
+
+### Activation check — endpoint of record and the 2026-08-24 result
+
+**Endpoint of record — `POST https://api.ibkr.com/v1/api/oauth/live_session_token`.**
+Note the `/v1/api` prefix. The bare `/oauth/live_session_token` form returns **404**.
+
+**The error traces to IBKR, not to any internal relay.** D-5 — John C.'s 2026-08-19
+OAuth onboarding mail — documents the flow's first call as
+`POST https://api.ibkr.com/oauth/live_session_token`, unprefixed, while every other
+line in the same list carries `/v1/api`. An internal dispatch reproduced it faithfully
+from there. Both IBKR reference samples linked in that same mail use the prefixed form,
+so the defect is in IBKR's prose, not its code. It matters because it fails quietly: a
+404 never reaches OAuth consumer validation, so it cannot distinguish a pending key
+from a bad URL, and a naive "non-200 means not activated" reading reports a confident
+falsehood. Cite the correction at every site that cites D-5's flow.
+
+**Result — ACTIVATED, verified 2026-08-24T22:42Z.** The consumer key — 9 characters,
+registered through the self-service portal **2026-08-21** against the F-account —
+completed the OAuth 1.0a live-session-token exchange: `HTTP 200` carrying
+`diffie_hellman_response`, `live_session_token_signature`, and
+`live_session_token_expiration` = `1787697716421` (2026-08-25T22:41:56Z — a 24-hour
+token). The Diffie-Hellman shared secret and the HMAC-SHA1 derivation both completed,
+so this is a cryptographically valid exchange and not merely a 200. Realm is
+`limited_poa`; `test_realm` applies only to the generic `TESTCONS` paper key. The check
+stopped at the session-token request — no brokerage session was initialised and no
+other endpoint was called.
+
+Registered Friday 2026-08-21, usable Monday 2026-08-24: **one business day**, inside
+the 1–2 business days D-5 states. This closes the post-approval gotcha above for this
+key — the `401 Invalid Consumer` activation clock has elapsed.
+
+The key itself is deliberately not recorded here. It is an account-identifying
+credential and this repository is public; see the D-5/D-6 redaction note in
+`broker_confirmations_2026-08.md`.
+
+**What the three-run cost bought — validate credentials structurally, not by
+presence.** The two runs before this one failed against a credential that was *set*
+but wrong: `IBKR_ACCESS_TOKEN_SECRET` had been populated from the wrong field of the
+source file. A presence-only preflight passed it, the request was signed and sent,
+and the server returned an opaque auth fault indistinguishable from a pending
+registration — so the failure was uninformative twice over. The diagnosis that broke
+the loop was arithmetic, not a retry: an RSA-2048 ciphertext is 256 bytes, which is
+344 base64 characters, and the value in the environment was nothing like that width.
+The preflight now asserts that class of fact locally, before any request:
+
+| Check | What it catches |
+|---|---|
+| base64 decodes at all | wrong field entirely |
+| decoded width **exactly** the RSA modulus (256 B for RSA-2048) | wrong field vs. truncation — an RSA ciphertext is never short |
+| decrypts to a **32-byte** plaintext | wrong encryption key |
+| signature and encryption keys PEM-parse as RSA ≥ 2048 | malformed or swapped key material |
+| DH prime ≥ 2048 bits | weak or wrong dhparam |
+
+**Do not treat "PKCS#1 v1.5 decrypt did not raise" as proof of key ownership.**
+OpenSSL 3.2+ (3.5.6 in this environment) applies *implicit rejection*: on bad padding
+it returns a pseudo-random plaintext rather than erroring, to blunt Bleichenbacher
+padding oracles. Measured 2026-08-24, ciphertexts encrypted under a foreign key
+decrypted "successfully" to 89 and 221 bytes on two of three trials and raised only
+on the third. The **plaintext-width** assertion is what actually carries the signal:
+with it in place, 25 of 25 foreign-key ciphertexts were rejected.
 
 ### Third Party OAuth — dead for Sept 15, do not pursue
 - **Submit to:** `api-solutions@interactivebrokers.com`

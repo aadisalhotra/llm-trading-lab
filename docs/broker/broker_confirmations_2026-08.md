@@ -4,9 +4,9 @@ Primary correspondence record for the Phase B venue decision · landed 2026-08-1
 cited by the Phase B capital-structure ruling, the forced-change contingency
 (venue-regulatory trigger), and the 2026-09-15 branch decision
 
-**Purpose.** Four dated, written broker statements received 2026-08-17 — two from
-Interactive Brokers, two from Alpaca — held as a citable record with stable item
-identifiers. These are the "dated, in-writing broker confirmations" the forced-change
+**Purpose.** Six dated, written broker statements — four received 2026-08-17 (two
+from Interactive Brokers, two from Alpaca) and two from IBKR API Integration on
+2026-08-19 — held as a citable record with stable item identifiers. These are the "dated, in-writing broker confirmations" the forced-change
 contingency's venue-regulatory trigger requires. This file is the record; the
 structural argument built on it lives in `broker_selection_research.md`.
 
@@ -29,8 +29,9 @@ file's ①–④ must not be read against any other dispatch's numbering.
 ## How to cite
 
 **Cite the item, never the date alone.** Two distinct IBKR messages and two distinct
-Alpaca messages share 2026-08-17, so a bare date citation is ambiguous and
-uncheckable. Every pre-registration, ledger, or research citation names the item id.
+Alpaca messages share 2026-08-17, and two distinct IBKR API Integration messages share
+2026-08-19, so a bare date citation is ambiguous and uncheckable. Every
+pre-registration, ledger, or research citation names the item id.
 
 | Item | Venue | Subject |
 |---|---|---|
@@ -38,8 +39,11 @@ uncheckable. Every pre-registration, ledger, or research citation names the item
 | **D-2** | IBKR Client Services | Rule 4210 status — migration state, legacy PDT application |
 | **D-3** | Alpaca Support (Andy) | Account structure and Rule 4210 implementation |
 | **D-4** | Alpaca Support (Andy) | Broker API scoping and fractional trading on cash accounts |
+| **D-5** | IBKR API Integration (John C.) | OAuth 1.0a onboarding — self-service portal, consumer-key activation delay, session flow, fractional timeline |
+| **D-6** | IBKR API Integration (John C.) | OAuth 1.0a vs 2.0 election, fractional base statement, paper-account provisioning |
 
-Ratified by ruling ① of the **Payload 4 ruling set** (hub, 2026-08-19).
+Ratified by ruling ① of the **Payload 4 ruling set** (hub, 2026-08-19). D-5 and D-6
+were added 2026-08-24 by the activation lane, under the same citation discipline.
 
 ## Verification tags
 
@@ -57,12 +61,30 @@ fabrication note below.
 
 ## Redaction
 
-**None applied**, per ruling ④ of the **Payload 4 ruling set** (hub, 2026-08-19). No
-account numbers and no personal email
-addresses appear in this correspondence. `api-solutions@interactivebrokers.com` is a
+**D-1 through D-4 — none applied**, per ruling ④ of the **Payload 4 ruling set**
+(hub, 2026-08-19). No account numbers and no personal email
+addresses appear in that correspondence. `api-solutions@interactivebrokers.com` is a
 corporate alias, not a personal address. "Keelan B" and "Andy" are support
 representatives acting in corporate capacity; first name plus venue plus date is the
 provenance that keeps the citation checkable, and is retained for that reason.
+
+**D-5 and D-6 — applied, and the departure is deliberate.** Unlike D-1–D-4, this
+correspondence carries account numbers, the account holder's and the technical
+operator's personal email addresses and full names, and it lands in a repository that
+is public. Redaction follows the convention already in force across `docs/broker/`,
+which refers throughout to "the account holder" and carries no account numbers:
+
+| Redacted | Rendered as |
+|---|---|
+| F-account and U-account numbers | `FXXXXX315` / `UXXXXX255` — IBKR's own masking, taken from its own subject line |
+| Personal email addresses | omitted; corporate aliases (`apiintegration@`, `api-solutions@`) retained |
+| Account holder / technical operator names | "the account holder", "the technical operator" |
+| The registered 9-character consumer key | omitted here and from `scripts/ibkr_lst_check.py` |
+
+"John C." is retained on the same corporate-capacity basis as "Keelan B" and "Andy".
+**No quoted broker statement is altered by this redaction** — every substitution falls
+in surrounding context or in the account holder's own quoted questions, never inside a
+broker's words.
 
 ---
 
@@ -246,6 +268,102 @@ Verbatim, as relayed:
    This corroborates the cash branch's long-only character at the venue level, which is
    what T2.4 registers as *"v4 (cash/long-only branch)"* and what the v4 shorting
    ablation implements. The design property and the venue constraint agree.
+
+---
+
+## D-5 — IBKR API Integration (John C.), 2026-08-19 — OAuth 1.0a onboarding `[SUPPORT]`
+
+**Provenance.** Email, `apiintegration@interactivebrokers.com` → the account holder,
+**2026-08-19 21:05:18Z**, subject *"FXXXXX315 / IBKR Web API Integration / OAuth 1.0a
+follow-up"*. Four attachments: the browser OAuth web demo, its source, and two "How to
+use the Web Demo" text files — one for TESTCONS, one for a custom consumer key.
+Retrieved from the account holder's mailbox 2026-08-24. Human-authored and signed
+"John C., IBKR API Integration" — the same representative who gave the 2026-08-14
+F-account eligibility answer that `ibkr_oauth_application.md` §1 relies on.
+
+**Registration procedure — the OAuth self-service portal.** John C. supplied the portal
+link (`https://ndcdyn.interactivebrokers.com/sso/Login?action=OAUTH&RL=1&ip2loc=US`)
+and an eight-step sequence: log in with the username to be used for Web API sessions
+(live or paper); tick *"Enable OAuth Access"*; choose a 9-character consumer key;
+generate the encryption and signature key pairs with OpenSSL; upload both public keys;
+generate and upload a Diffie-Hellman prime; *"Choose 'Generate Token' which should
+return an Access Token & Access Token Secret (please make note of these, along with the
+Diffie-Hellman prime)"*; then save the key.
+
+**Activation delay — the `Invalid Consumer` clock, in writing.**
+
+> "When registering a new Consumer Key via the Self-Service Portal, you will generally
+> need to wait 1-2 business days for that Consumer Key to become usable [you will
+> receive an Invalid Consumer (401) error, until then]."
+
+The square brackets are **IBKR's own**, not a relay insertion. This is the primary
+source for the post-approval gotcha in `ibkr_oauth_application.md` §3, and it is what
+makes a literal `Invalid Consumer` body — and only that body — a "still pending"
+verdict. The lab's own key bore it out: registered 2026-08-21 (a Friday), activated and
+verified 2026-08-24, the next business day.
+
+**Interim testing path.** *"the TESTCONS (test Consumer Key) may be used with a paper
+trading account, or CP Gateway may be used (instead) for testing the Trading Web API in
+either live/paper mode."*
+
+**Session flow as documented — and the endpoint error inside it.** John C. gave the
+ordered flow: live session token → `POST /v1/api/iserver/auth/ssodh/init` (*"Avoid
+calling this endpoint multiple times same-day, unless necessary"*) → sleep 3–5 seconds
+→ `GET /v1/api/iserver/accounts` → any other endpoints → `POST /v1/api/tickle` every
+minute to keep the brokerage session alive → `POST /v1/api/logout` to close it.
+
+> ⚠ **The first line of that flow is wrong as written, and must be cited with this
+> correction.** D-5 gives it as `POST https://api.ibkr.com/oauth/live_session_token`,
+> without the `/v1/api` prefix that every other line in the same list carries. That
+> path returns **404**. The working endpoint is
+> `https://api.ibkr.com/v1/api/oauth/live_session_token`, verified live 2026-08-24
+> (HTTP 200, valid Diffie-Hellman/HMAC derivation). Both IBKR reference samples John C.
+> links in the same message use the prefixed form, so the error is in the prose, not in
+> IBKR's code. The failure mode is quiet: a 404 is not evidence about activation state,
+> so the wrong path yields a confidently wrong verdict rather than an obvious error.
+
+**Fractional shares — no Web API path, and no timeline.** Asked directly whether
+fractional support was planned and against what timeline, John C. answered:
+
+> "Correct I apologize for Fractional Share orders not aware of any immediate plans to
+> expand Fractional Share trading to all TWS API or Web API clients."
+
+Reproduced verbatim, run-on included; it answers the two numbered follow-ups sent after
+D-6. Read with D-6's *"at this time Fractional Share trading via Web API is not directly
+supported"*, this closes both halves of the fractional question — unavailable now, and
+no announced plan to add it. That is the written basis the position-sizing architecture
+decision required, and it corroborates D-1 from a second representative and channel.
+
+**What D-5 does not settle.** It does not resolve the account-linkage blocker (*"Master
+and client account segments do not match"*), which John C. routed to Advisor Services on
+a separate thread, open as of this file's date. It also says nothing about Rule 4210 or
+PDT; for those, D-2 remains the IBKR statement of record.
+
+---
+
+## D-6 — IBKR API Integration (John C.), 2026-08-19 — next steps and fractional `[SUPPORT]`
+
+**Provenance.** Email, same sender and thread, **2026-08-19 17:49:46Z** — roughly three
+and a quarter hours before D-5. Recorded as its own item for two reasons: D-5's
+fractional sentence is a direct reply to the questions this message prompted and is hard
+to parse without it, and this file's citation rule forbids a bare date citation where two
+messages share one date.
+
+**The 1.0a / 2.0 election.** John C. offered both paths. OAuth 1.0a: *"we can send you a
+link to IBKR's OAuth self-service portal (including sample materials in
+Python/JavaScript), which you can use to register new Consumer Keys for Trading Web API
+access as needed (in both paper & production)."* OAuth 2.0: *"Client ID registration is
+handled on IBKR's backend."* The lab elected 1.0a, and self-registration across both
+paper and production is the reason.
+
+**Fractional — the base statement.** *"at this time Fractional Share trading via Web API
+is not directly supported. Instead, IBKR platforms such as Client Portal / TWS / TWS
+Basket Trader etc. could be used for Fractional Order placement."*
+
+**Paper-account provisioning.** Log in to the F-account → Settings → Paper Trading
+Account → note the paper username and password → *"allow 1-3 business days for the paper
+account to be created."* This is a **different clock** from D-5's 1–2 business day
+consumer-key activation; the two run independently and must not be conflated.
 
 ---
 
