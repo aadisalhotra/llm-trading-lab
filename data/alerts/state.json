@@ -39,18 +39,42 @@
   },
   "daily": {
     "date": "2026-08-26",
-    "sent_count": 1,
+    "sent_count": 4,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:MA:a28f9ae013",
+      "news:TMO:293d919821",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-08-26T13:32:43.416665+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MA (held by 4)",
+        "timestamp": "2026-08-26T21:08:10.779677+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TMO (held by 5)",
+        "timestamp": "2026-08-26T21:08:12.189042+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-08-26T21:08:15.782669+00:00",
         "disposition": "sent"
       }
     ]
