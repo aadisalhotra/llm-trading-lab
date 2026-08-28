@@ -39,10 +39,11 @@
   },
   "daily": {
     "date": "2026-08-28",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:grok"
+      "api_failure:grok",
+      "api_failure:deepseek"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -59,6 +60,13 @@
         "severity": "WARN",
         "title": "Model grok failed",
         "timestamp": "2026-08-28T14:02:40.746918+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model deepseek failed",
+        "timestamp": "2026-08-28T17:32:43.618247+00:00",
         "disposition": "sent"
       }
     ]
