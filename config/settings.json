@@ -1,4 +1,5 @@
 {
+  "_mode_note": "Three execution modes. 'paper' is the in-process simulator that has run Phase A since April and contacts no venue. 'broker_paper' runs the REAL order lifecycle against Alpaca's paper endpoint -- this is what the registered October validation month runs. 'live' is the same path against the live endpoint from Nov 1. The endpoint and credential pair are derived from this value IN CODE and are never read from ALPACA_BASE_URL; see src/execution/broker.py.",
   "mode": "paper",
   "phase": "Phase A - Paper Trading",
   "experiment_start_date": "2026-04-09",
@@ -6,8 +7,16 @@
   "phase_a_end_date": "2026-10-31",
   "phase_b_start_date": "2026-11-01",
   "starting_capital": {
+    "_note": "Per-book starting capital, by execution mode. Read ONLY through config_loader.starting_capital(), which raises PendingCapitalError for any mode listed in _pending_confirmation. The previous live figure of 1000 was stale against the registered structure and has been removed rather than left to seed six books silently. Both broker_paper and live stay pending until the hub confirms the per-book number; October must not incept before then.",
+    "_pending_confirmation": ["broker_paper", "live"],
     "paper": 100000,
-    "live": 1000
+    "broker_paper": null,
+    "live": null
+  },
+  "execution": {
+    "_note": "Live order-lifecycle parameters. fill_deadline_seconds is the registered fill-time cap (2026-08-29 ruling): an order still unfilled at the deadline has its remainder cancelled and its partial fill stands, logged as an UNFILLED_AT_DEADLINE execution-constraint event, which is execution-SUCCESSFUL and separately a disclosed per-model descriptor. Frozen with the configuration on Oct 1; tunable only before then.",
+    "fill_deadline_seconds": 300,
+    "poll_interval_seconds": 2.0
   },
   "portfolio_rules": {
     "max_positions": 50,

@@ -379,8 +379,30 @@ def run_one_model(
         send_alert("CRITICAL", f"Portfolio stop hit: {model_key}",
                    "Liquidating to cash and halting model", {"model": model_key},
                    kind="portfolio_halt", dedup_key=f"portfolio_halt:{model_key}")
-        portfolio.liquidate_all(prices)
+        # Routed through the executor so the halt reaches the venue. Calling
+        # Portfolio.liquidate_all directly flattened the book without placing
+        # a single order, which in a broker mode leaves every position open
+        # behind a book showing all cash.
+        halt_results = executor.liquidate_all(portfolio, prices,
+                                              run_date=session_date_str)
+        all_exec = all_exec + halt_results
         portfolio.halted = True
+
+    # Any stop — position-level or portfolio-level — that did not close at the
+    # venue leaves live exposure with its safety disabled. This is the loudest
+    # condition the system can report, and it must never be inferred from a
+    # quiet log line.
+    unprotected = [e for e in all_exec if getattr(e, "stop_unprotected", False)]
+    if unprotected:
+        send_alert(
+            "CRITICAL", f"STOP UNPROTECTED: {model_key}",
+            "A risk stop did not close at the venue. The position is still "
+            "open and the book correctly does not show it as closed.",
+            {"model": model_key,
+             "tickers": ", ".join(sorted({e.ticker for e in unprotected})),
+             "detail": "; ".join(f"{e.ticker}: {e.error or e.constraint}"
+                                 for e in unprotected)[:500]},
+            kind="stop_unprotected", dedup_key=f"stop_unprotected:{model_key}")
 
     # Update intraday counters with this run's trade count. Shorts and covers
     # are trades too and count toward the daily cap.

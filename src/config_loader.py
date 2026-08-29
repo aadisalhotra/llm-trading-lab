@@ -75,6 +75,41 @@ def load_settings() -> dict[str, Any]:
         return json.load(f)
 
 
+class PendingCapitalError(RuntimeError):
+    """A book's starting capital has not been confirmed for this mode.
+
+    Deliberately fatal. The alternative — a silent fallback to some default —
+    is the failure class that produced the builder's hard-coded regime labels:
+    a stale default that reads as a real value and is only caught by someone
+    noticing the number is wrong. October's validation books must size at the
+    scale Phase B actually runs, so an unconfirmed figure has to stop the run
+    rather than quietly seed six books at the wrong capital.
+    """
+
+
+def starting_capital(settings: dict[str, Any] | None = None,
+                     mode: str | None = None) -> float:
+    """Per-book starting capital for `mode`, or raise if it is unconfirmed.
+
+    Every consumer of `starting_capital` routes through here so the
+    pending-confirmation guard cannot be bypassed by one call site that still
+    does its own `.get(mode, 100_000.0)`.
+    """
+    settings = settings if settings is not None else load_settings()
+    mode = mode or settings.get("mode", "paper")
+    caps = settings.get("starting_capital", {}) or {}
+    pending = set(caps.get("_pending_confirmation") or [])
+    value = caps.get(mode)
+    if mode in pending or value is None:
+        raise PendingCapitalError(
+            f"starting_capital for mode {mode!r} is PENDING CAPITAL CONFIRMATION. "
+            f"The registered per-book figure has not been confirmed by the PI, "
+            f"and books must not incept at an unconfirmed scale. Set "
+            f"config/settings.json -> starting_capital.{mode} and remove {mode!r} "
+            f"from _pending_confirmation once the hub confirms the number.")
+    return float(value)
+
+
 def load_universe() -> dict[str, Any]:
     with open(CONFIG_DIR / "universe.json", "r", encoding="utf-8") as f:
         return json.load(f)

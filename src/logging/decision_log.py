@@ -149,6 +149,16 @@ def log_decision_run(
                 # to every behavioral reader; this field makes them countable
                 # as execution-constraint events for Gate 4.
                 "constraint": getattr(e, "constraint", ""),
+                # Broker-authoritative order record; null in the simulator.
+                # This is the tagged-order set G-EXEC computes over and the
+                # per-book side of the two-level reconciliation, so it is
+                # persisted from the first broker order rather than
+                # retrofitted later.
+                "broker_order": getattr(e, "broker_order", None),
+                # A risk stop that did not close at the venue. Recorded on the
+                # execution itself so the condition is visible in the committed
+                # record and not only in an alert that may not have been read.
+                "stop_unprotected": bool(getattr(e, "stop_unprotected", False)),
                 "timestamp": e.timestamp,
                 "decision": e.decision,
                 # How many models (including this one) hold this ticker at

@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..config_loader import STATE_DIR, load_settings
+from ..config_loader import STATE_DIR, load_settings, starting_capital
 from .settlement import SettlementLedger
 
 logger = logging.getLogger("llmlab.portfolio")
@@ -86,6 +86,16 @@ class Portfolio:
     # Unsettled sale proceeds (T+1). Empty and inert until the cash branch's
     # settled-funds enforcement activates; see portfolio/settlement.py.
     settlement: SettlementLedger = field(default_factory=SettlementLedger)
+
+    # The execution mode this book was incepted under. Registered ruling
+    # (2026-08-29): both phase boundaries re-incept fresh and nothing carries —
+    # Oct 1 validation books incept in broker-paper at registered capital, Nov 1
+    # confirmatory books incept from broker-authoritative funded reality with no
+    # positions, no P&L and no state from Phase A or October. A carried state
+    # file would silently defeat that, so the epoch is stamped here and checked
+    # on every load. Empty means "written before this field existed", which is
+    # the Phase A simulator era.
+    inception_epoch: str = ""
 
     # ----- settled-cash helpers -----
     def settled_cash(self) -> float:
@@ -311,6 +321,21 @@ class Portfolio:
         return ghosts
 
     def liquidate_all(self, prices: dict[str, float]) -> None:
+        """Flatten the book in memory. BOOK-ONLY — places no orders.
+
+        Use `Executor.liquidate_all` for a risk halt. This method reaches no
+        venue, so in a broker mode it produces a book showing all cash while
+        every position stays open at the broker — a halt that reports success
+        without closing anything. That was the live defect until P0, and the
+        guard below stops it being reintroduced by a future caller rather than
+        relying on this docstring being read.
+        """
+        if load_settings().get("mode", "paper") != "paper":
+            raise RuntimeError(
+                "Portfolio.liquidate_all places no orders and must not be used "
+                "to halt a book in a broker mode — the positions would stay "
+                "open at the venue. Use Executor.liquidate_all, which confirms "
+                "terminal fills before the book moves.")
         for ticker in list(self.holdings.keys()):
             h = self.holdings[ticker]
             price = prices.get(ticker, h.avg_cost)
@@ -333,10 +358,13 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
     date the state file happens to be created. This keeps the inception
     pinned to the configured Phase A start even if the pipeline runs earlier
     for build/test purposes.
+
+    Capital comes from the guarded lookup, so a mode whose per-book figure has
+    not been confirmed raises instead of seeding six books at a stale default.
     """
     settings = load_settings()
     mode = mode or settings["mode"]
-    capital = float(settings["starting_capital"][mode])
+    capital = starting_capital(settings, mode)
     today = datetime.utcnow().strftime("%Y-%m-%d")
     inception_date = settings.get("experiment_start_date", today)
     p = Portfolio(
@@ -347,9 +375,36 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
         inception_value=capital,
         inception_date=inception_date,
         last_updated=today,
+        inception_epoch=mode,
     )
     save_portfolio(p)
     return p
+
+
+class InceptionEpochError(RuntimeError):
+    """A state file from a different execution mode was found on disk.
+
+    Registered ruling (2026-08-29): the Oct 1 and Nov 1 boundaries both
+    re-incept fresh and nothing carries across them. The failure this guards is
+    silent, not loud — a leftover Phase A state file loads perfectly well and
+    the run continues with a $100,000 paper book quietly standing in for a
+    freshly funded one. Archiving is deliberately a human step: deleting book
+    state is not something a pipeline should do on its own initiative.
+    """
+
+
+def _assert_epoch(model_key: str, path: Path, data: dict[str, Any]) -> None:
+    settings = load_settings()
+    current = settings.get("mode", "paper")
+    stored = data.get("inception_epoch") or "paper"
+    if stored == current:
+        return
+    raise InceptionEpochError(
+        f"State file {path.name} was incepted under mode {stored!r} but the "
+        f"pipeline is running in mode {current!r}. Books do not carry across a "
+        f"phase boundary: archive data/state read-only and let the run incept "
+        f"fresh at the registered capital for {current!r}. Refusing to load "
+        f"{model_key}'s {stored!r} book into a {current!r} run.")
 
 
 def load_portfolio(model_key: str) -> Portfolio:
@@ -368,6 +423,7 @@ def load_portfolio(model_key: str) -> Portfolio:
         return init_portfolio(model_key)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    _assert_epoch(model_key, path, data)
     stored_key = data.get("model_key")
     if stored_key and stored_key != model_key:
         logger.warning(
@@ -400,6 +456,7 @@ def load_portfolio(model_key: str) -> Portfolio:
         # an empty ledger means "all cash settled", which is exactly right for
         # a book that has never run under the constraint.
         settlement=SettlementLedger.from_list(data.get("unsettled_cash")),
+        inception_epoch=data.get("inception_epoch") or "paper",
     )
 
 
@@ -421,6 +478,9 @@ def save_portfolio(p: Portfolio) -> None:
             "last_run_at": p.intraday.last_run_at,
         },
         "unsettled_cash": p.settlement.to_list(),
+        # Stamped so a book cannot silently survive a phase boundary; see
+        # InceptionEpochError.
+        "inception_epoch": p.inception_epoch or load_settings().get("mode", "paper"),
     }
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(_state_path(p.model_key), "w", encoding="utf-8") as f:

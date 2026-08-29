@@ -32,6 +32,7 @@ from ..analytics import (
     compute_spy_benchmark_metrics,
 )
 from ..config_loader import (
+    starting_capital as _starting_capital_guarded,
     INTRADAY_DIR,
     LEADERBOARD_DIR,
     NEWS_CACHE_DIR,
@@ -1204,9 +1205,7 @@ def _build_leaderboard_table(
     # at the bottom. Renders in the same column shape as the model rows but
     # marked with a "BENCH" cohort tag and italicized name to visually
     # separate it from the competing entries.
-    starting_capital = float(settings.get("starting_capital", {}).get(
-        settings.get("mode", "paper"), 100_000.0
-    ))
+    starting_capital = _starting_capital_guarded(settings)
     spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital, settings=settings)
     if spy_metrics is not None:
         rows.append([

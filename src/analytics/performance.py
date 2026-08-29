@@ -15,7 +15,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..config_loader import PERFORMANCE_DIR, TRADES_DIR, load_settings
+from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, load_settings,
+                             starting_capital as _starting_capital_guarded)
 
 
 def load_performance_history(model_key: str) -> pd.DataFrame:
@@ -58,10 +59,12 @@ _UNSET = object()  # sentinel so compute_metrics can tell "compute SPY" from "SP
 
 def _starting_capital(settings: dict[str, Any] | None = None) -> float:
     """Initial deployed capital per model from config — the clean anchor for
-    cumulative return. Mode-aware (paper vs live)."""
-    settings = settings or load_settings()
-    caps = settings.get("starting_capital", {}) or {}
-    return float(caps.get(settings.get("mode", "paper"), 100_000.0))
+    cumulative return. Mode-aware across simulator / broker-paper / live.
+
+    Delegates to the central guard so an unconfirmed figure raises here too
+    rather than silently anchoring returns to a stale default.
+    """
+    return _starting_capital_guarded(settings or load_settings())
 
 
 def _experiment_inception(settings: dict[str, Any] | None = None) -> str | None:

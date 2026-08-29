@@ -22,6 +22,7 @@ from ..analytics import (
     load_performance_history,
 )
 from ..config_loader import (
+    starting_capital as _starting_capital_guarded,
     DATA_DIR,
     INTRADAY_DIR,
     LEADERBOARD_DIR,
@@ -1120,9 +1121,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     # very bottom of the leaderboard. The "benchmark" cohort tag tells the
     # frontend to render it with neutral gray styling and pin it below
     # all model rows regardless of sort.
-    starting_capital = float(settings.get("starting_capital", {}).get(
-        settings.get("mode", "paper"), 100_000.0
-    ))
+    starting_capital = _starting_capital_guarded(settings)
     spy_metrics = compute_spy_benchmark_metrics(starting_capital=starting_capital)
     if spy_metrics is not None:
         spy_metrics["rank"] = len(leaderboard) + 1   # nominal — frontend pins to bottom anyway
@@ -1151,9 +1150,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
     # the full history). All benchmark prices are identical since the
     # pipeline fetches one SPY price per tick, so we just need the longest.
     spy_curve: list[dict[str, Any]] = []
-    spy_start_capital = float(settings.get("starting_capital", {}).get(
-        settings.get("mode", "paper"), 100_000.0
-    ))
+    spy_start_capital = _starting_capital_guarded(settings)
     # Anchor the SPY buy-and-hold curve on the ONE canonical, deterministic SPY
     # series (pre-inception rows dropped, one row per date, inception anchor
     # pinned in the Phase-A ledger) — the same series the leaderboard SPY row and

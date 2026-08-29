@@ -54,7 +54,12 @@ def _executor(*, enforce=True, activation=ACTIVE, mode="paper"):
         "settlement_days": 1,
     }}
     ex.mode = mode
-    ex._alpaca_client = None
+    # Simulator: no venue. The settled-funds constraint is pipeline-level and
+    # binds identically with or without a broker attached — these tests are
+    # about the gate, not the venue.
+    ex.broker = None
+    ex.cycle_id = "20260916T1400Z"
+    ex._order_seq = {}
     return ex
 
 

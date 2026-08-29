@@ -33,6 +33,7 @@ from ..analytics import (
     load_performance_history,
 )
 from ..config_loader import (
+    starting_capital as _starting_capital_guarded,
     MONTHLY_REPORTS_DIR,
     TRADES_DIR,
     load_settings,
@@ -485,9 +486,7 @@ def _section_cohort_comparison(
 
     headers = ["Cohort", "Model", "Month Return", "Month API Cost", "Net Month P&L (approx)"]
     rows: list[list[str]] = []
-    starting_capital = float(settings.get("starting_capital", {}).get(
-        settings.get("mode", "paper"), 100_000.0
-    ))
+    starting_capital = _starting_capital_guarded(settings)
     for r in sorted(rows_data, key=lambda x: (x["cohort"], -(x["month_return"] or 0))):
         cohort_label = "EXP" if r["cohort"] == "expansion" else "core"
         # Net month $ P&L = month_return × starting_capital − month_cost
@@ -529,9 +528,7 @@ def _section_cost_analysis(
     featured comparison.
     """
     start, end = _month_bounds(month)
-    starting_capital = float(settings.get("starting_capital", {}).get(
-        settings.get("mode", "paper"), 100_000.0
-    ))
+    starting_capital = _starting_capital_guarded(settings)
 
     rows_data: list[dict[str, Any]] = []
     for key in model_keys:
