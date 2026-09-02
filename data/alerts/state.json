@@ -39,10 +39,20 @@
   },
   "daily": {
     "date": "2026-09-02",
-    "sent_count": 0,
-    "dedup_keys": [],
+    "sent_count": 1,
+    "dedup_keys": [
+      "macro_event:Geopolitical shock"
+    ],
     "overflow": [],
     "digest_sent": true,
-    "fired_log": []
+    "fired_log": [
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-09-02T22:35:07.639614+00:00",
+        "disposition": "sent"
+      }
+    ]
   }
 }
