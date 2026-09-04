@@ -39,13 +39,15 @@
   },
   "daily": {
     "date": "2026-09-04",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Severe economic data",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:NVDA:935d6d3f63",
+      "news:MA:0b44ec5a2f"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +61,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-09-04T14:03:01.343495+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on NVDA (held by 6)",
+        "timestamp": "2026-09-04T21:07:24.238365+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MA (held by 4)",
+        "timestamp": "2026-09-04T21:07:25.231895+00:00",
         "disposition": "sent"
       }
     ]
