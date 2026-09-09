@@ -39,13 +39,14 @@
   },
   "daily": {
     "date": "2026-09-09",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:deepseek"
+      "api_failure:deepseek",
+      "news:CAT:95ae8e221b"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +60,13 @@
         "severity": "WARN",
         "title": "Model deepseek failed",
         "timestamp": "2026-09-09T18:34:12.814344+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on CAT (held by 4)",
+        "timestamp": "2026-09-09T21:07:22.037044+00:00",
         "disposition": "sent"
       }
     ]
