@@ -213,7 +213,9 @@ Run 2026-09-10T01:13Z–01:20Z against `deepseek-v4-pro`, ~2h45m before the
 boundary, because the next production call falls *after* it. Out-of-repo, wrote
 nothing to `data/`, made no decision-log or version-log entry.
 3 samples, 2 successes + 1 connect timeout, then 1 replacement sample.
-Artefacts: `C:/Users/Aadi/tmp/deepseek_v41_preboundary/`.
+Raw responses and the probe script are held off-repo on the operator machine
+(deliberately — the probe is not lab telemetry and must not be mistaken for it);
+the values below are the whole of what it established.
 
 | | sample 1 | sample 3 | replacement |
 |---|---|---|---|
