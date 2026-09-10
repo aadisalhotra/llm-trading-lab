@@ -70,4 +70,34 @@ class OpenAIAdapter(BaseAdapter):
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
+
+        # --- retention audit 2026-09-09 -------------------------------------
+        # Everything below was already on the response and was being dropped.
+        # `model` is only an alias echo, so it cannot see a provider swapping
+        # the model behind a constant string — the failure mode the DeepSeek
+        # 2026-09-10 substitution made concrete. Fields are diagnostics: read
+        # defensively, degrade to None, never raise. The decision itself has
+        # already parsed by the time we get here.
+        choices = list(getattr(response, "choices", None) or [])
+        first = choices[0] if choices else None
+        # Build identifier. Moves when OpenAI changes backend configuration,
+        # independently of the model string.
+        metadata["system_fingerprint"] = getattr(response, "system_fingerprint", None)
+        metadata["finish_reason"] = getattr(first, "finish_reason", None) if first else None
+        # Priority/Flex tiers bill differently and cost_rates.py does not model
+        # them; logging the tier is what makes that assumption checkable.
+        metadata["service_tier"] = getattr(response, "service_tier", None)
+
+        cdet = getattr(usage, "completion_tokens_details", None) if usage else None
+        pdet = getattr(usage, "prompt_tokens_details", None) if usage else None
+        # Reasoning tokens bill inside completion_tokens, the same semantics as
+        # Gemini's thoughts_token_count, so they land on the same log field.
+        metadata["thoughts_tokens"] = getattr(cdet, "reasoning_tokens", None) if cdet else None
+        # Prompt-cache split. cost_rates.py prices every call at the full input
+        # rate; this is what would let that conservatism be measured.
+        cached = getattr(pdet, "cached_tokens", None) if pdet else None
+        metadata["cache_hit_tokens"] = cached
+        metadata["cache_miss_tokens"] = (
+            max(0, in_tok - int(cached)) if cached is not None else None
+        )
         return text, returned_id, metadata

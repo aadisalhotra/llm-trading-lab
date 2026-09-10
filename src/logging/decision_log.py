@@ -105,8 +105,29 @@ def log_decision_run(
         "api_system_fingerprint": md.get("system_fingerprint"),
         # Prompt-cache split. cost_rates.py prices every call at the cache-MISS
         # rate; these make that conservatism measurable rather than assumed.
+        # Note the two accounting conventions: OpenAI/xAI/Gemini report an
+        # input count INCLUSIVE of cached tokens (so miss = input - hit),
+        # Anthropic reports it EXCLUSIVE (so miss = input). Each adapter
+        # resolves that locally and stores the same two meanings here.
         "cache_hit_tokens": md.get("cache_hit_tokens"),
         "cache_miss_tokens": md.get("cache_miss_tokens"),
+        # Anthropic only — cache WRITES bill at a premium, cache reads at a
+        # discount, and cost_rates.py models neither.
+        "cache_creation_tokens": md.get("cache_creation_tokens"),
+        # Cohort-wide retention audit 2026-09-09. Every field below was already
+        # on the wire and was being discarded by one or more adapters.
+        # Free-text companion to api_finish_reason: Anthropic's stop_sequence,
+        # Gemini's finish_message. The enum says a stop happened; this says why.
+        "api_finish_detail": md.get("finish_detail"),
+        # Gemini PROMPT-level block. A blocked prompt returns no candidates at
+        # all, so api_finish_reason stays null and the run otherwise looks like
+        # an unexplained empty response. Kept separate from api_finish_reason
+        # so the Phase B MAX_TOKENS gate keeps counting exactly what it counts.
+        "api_block_reason": md.get("block_reason"),
+        # OpenAI/Anthropic service tier. Priority and Flex bill differently and
+        # cost_rates.py models neither, so this is what makes the "standard
+        # tier" assumption behind every cost figure checkable.
+        "api_service_tier": md.get("service_tier"),
         # Raw model text, persisted ONLY when the call failed to parse —
         # July's 113 Gemini failures were unautopsiable because this was
         # discarded. Char-capped as a safety bound (observed failures are

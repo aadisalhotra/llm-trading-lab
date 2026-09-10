@@ -73,4 +73,36 @@ class AnthropicAdapter(BaseAdapter):
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
+
+        # --- retention audit 2026-09-09 -------------------------------------
+        # Anthropic exposes NO build fingerprint and NO reasoning-token counter
+        # (extended thinking arrives as `thinking` content blocks, which this
+        # adapter does not request), so `model` is the only identity signal for
+        # the two Claude cells and there is nothing better to capture. That is
+        # a real, disclosable asymmetry against the other four providers, not
+        # an omission here. What IS available and was being dropped:
+        #
+        #   stop_reason  — the finish reason. `max_tokens` vs `end_turn`
+        #                  distinguishes a truncated decision from a complete
+        #                  one, which is exactly the forensics the July Gemini
+        #                  completeness investigation lacked. Under a 4096-token
+        #                  cap that is a live risk, not a theoretical one.
+        #   cache_read / cache_creation — Anthropic bills cache reads at a
+        #                  discount and cache writes at a premium, and
+        #                  cost_rates.py models neither.
+        #
+        # Diagnostics: read defensively, degrade to None, never raise.
+        metadata["finish_reason"] = getattr(response, "stop_reason", None)
+        # Which stop sequence ended it, when stop_reason == "stop_sequence".
+        metadata["finish_detail"] = getattr(response, "stop_sequence", None)
+        metadata["service_tier"] = getattr(usage, "service_tier", None) if usage else None
+        # Anthropic reports input_tokens EXCLUSIVE of cached reads, so the miss
+        # count is input_tokens itself rather than a subtraction — do not copy
+        # the OpenAI-shaped arithmetic here.
+        cache_read = getattr(usage, "cache_read_input_tokens", None) if usage else None
+        metadata["cache_hit_tokens"] = cache_read
+        metadata["cache_miss_tokens"] = in_tok if cache_read is not None else None
+        metadata["cache_creation_tokens"] = (
+            getattr(usage, "cache_creation_input_tokens", None) if usage else None
+        )
         return text, returned_id, metadata

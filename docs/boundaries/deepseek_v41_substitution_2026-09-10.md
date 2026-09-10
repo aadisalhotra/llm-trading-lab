@@ -321,6 +321,16 @@ re-runs green and untouched.
 deployed. The first post-boundary call is ≈2026-09-10T13:33Z. Every cycle it
 misses is a cycle whose fingerprint is unrecoverable.
 
+**Cohort-wide follow-up.** The same question was then put to the other four
+adapters — see `docs/adapter_field_retention_audit_2026-09.md`. OpenAI and xAI
+were dropping the identical four fields; Gemini was dropping the cache split
+and the prompt-level block reason; Anthropic was dropping its finish reason and
+cache counters. The load-bearing finding there: **Anthropic exposes no build
+fingerprint and no reasoning-token counter at all**, so for the two Claude
+cells `model` remains the only identity signal and a string-stable substitution
+would be undetectable in the way this one nearly was. That is a limitation to
+disclose, not one this lab can close.
+
 ---
 
 ## 5. Open items

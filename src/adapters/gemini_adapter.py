@@ -123,4 +123,34 @@ class GeminiAdapter(BaseAdapter):
             thoughts = int(getattr(usage, "thoughts_token_count", 0) or 0)
             if thoughts:
                 metadata["thoughts_tokens"] = thoughts
+
+        # --- retention audit 2026-09-09 -------------------------------------
+        # Gemini exposes no build fingerprint; model_version above is the
+        # identity signal and is already captured. Three diagnostics were still
+        # being dropped, all of them the kind that made July's 113 Gemini
+        # failures unautopsiable:
+        #
+        #   finish_message  — the free-text companion to finish_reason. When a
+        #                     candidate stops for a reason the enum flattens,
+        #                     this is the only place the detail exists.
+        #   block_reason    — PROMPT-level, and the sharpest gap of the three:
+        #                     a blocked prompt returns NO candidates at all, so
+        #                     the finish_reason branch above never fires and the
+        #                     run currently looks like an empty response with no
+        #                     stated cause. Deliberately NOT folded into
+        #                     finish_reason: the Phase B MAX_TOKENS gate reads
+        #                     that field, and synthesising values into a series
+        #                     a live gate consumes would change what it counts.
+        #   cached_content_token_count — cache split; cost_rates.py prices
+        #                     every call at the full input rate.
+        fm = getattr(candidates[0], "finish_message", None) if candidates else None
+        metadata["finish_detail"] = fm
+        feedback = getattr(response, "prompt_feedback", None)
+        br = getattr(feedback, "block_reason", None) if feedback else None
+        metadata["block_reason"] = getattr(br, "name", str(br)) if br is not None else None
+        cached = getattr(usage, "cached_content_token_count", None) if usage else None
+        metadata["cache_hit_tokens"] = cached
+        metadata["cache_miss_tokens"] = (
+            max(0, in_tok - int(cached)) if cached is not None else None
+        )
         return text, returned_id, metadata

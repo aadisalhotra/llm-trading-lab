@@ -71,4 +71,24 @@ class XAIAdapter(BaseAdapter):
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
+
+        # --- retention audit 2026-09-09 -------------------------------------
+        # xAI follows the OpenAI chat-completions response schema, so the same
+        # four fields the DeepSeek and OpenAI adapters were dropping are here
+        # too. `model` is only an alias echo and cannot see a swap of the model
+        # behind a constant string. Diagnostics: read defensively, degrade to
+        # None, never raise.
+        choice = (data.get("choices") or [{}])[0] or {}
+        metadata["system_fingerprint"] = data.get("system_fingerprint")
+        metadata["finish_reason"] = choice.get("finish_reason")
+        # grok-4.20-*-reasoning bills its reasoning trace inside
+        # completion_tokens, the same semantics as Gemini's thoughts_token_count.
+        cdet = usage.get("completion_tokens_details") or {}
+        pdet = usage.get("prompt_tokens_details") or {}
+        metadata["thoughts_tokens"] = cdet.get("reasoning_tokens")
+        cached = pdet.get("cached_tokens")
+        metadata["cache_hit_tokens"] = cached
+        metadata["cache_miss_tokens"] = (
+            max(0, in_tok - int(cached)) if cached is not None else None
+        )
         return text, returned_id, metadata
