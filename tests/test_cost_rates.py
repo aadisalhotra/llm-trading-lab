@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.analytics.cost_rates import (  # noqa: E402
     COST_PER_MTOK,
+    DEEPSEEK_PEAK_WEEKDAYS,
     DEEPSEEK_PEAK_WINDOWS_UTC,
     LEGACY_FLAT_TABLE_PRE_2026_08,
     RATE_HISTORY,
@@ -233,6 +234,18 @@ def test_deepseek_peak_windows_are_01_04_and_06_10_utc():
     lab_hours = set(range(13, 22))
     peak_hours = {h for start, end in DEEPSEEK_PEAK_WINDOWS_UTC for h in range(start, end)}
     assert lab_hours & peak_hours == set()
+
+
+def test_deepseek_peak_applies_monday_to_friday_only():
+    # "Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through
+    # Friday (all other hours are off-peak)" — api-docs.deepseek.com pricing,
+    # re-read 2026-09-10T01:07Z. The 2026-08-16 transcription kept the hours
+    # and dropped the days, leaving the registered window WIDER than the
+    # published one; a per-call classifier reading hours alone would price a
+    # weekend 02:00Z call at 2x. Monday=0, matching datetime.weekday().
+    assert DEEPSEEK_PEAK_WEEKDAYS == (0, 1, 2, 3, 4)
+    assert 5 not in DEEPSEEK_PEAK_WEEKDAYS  # Saturday
+    assert 6 not in DEEPSEEK_PEAK_WEEKDAYS  # Sunday
 
 
 def test_deepseek_v4_pro_boundary_at_2026_08_16():

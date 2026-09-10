@@ -96,6 +96,17 @@ def log_decision_run(
         # a truncated response explainable from the log alone.
         "api_finish_reason": md.get("finish_reason"),
         "thoughts_tokens": md.get("thoughts_tokens"),
+        # Provider-substitution telemetry (added 2026-09-09, DeepSeek today).
+        # model_id_returned is only the alias echo, so it cannot see a provider
+        # swapping the model BEHIND a constant alias — the 2026-09-10T04:00Z
+        # V4-Pro -> V4.1-Flash forced substitution is exactly that case. The
+        # build fingerprint can: it is set by the provider, not by us, and
+        # unlike cost-per-call it does not depend on our own rate table.
+        "api_system_fingerprint": md.get("system_fingerprint"),
+        # Prompt-cache split. cost_rates.py prices every call at the cache-MISS
+        # rate; these make that conservatism measurable rather than assumed.
+        "cache_hit_tokens": md.get("cache_hit_tokens"),
+        "cache_miss_tokens": md.get("cache_miss_tokens"),
         # Raw model text, persisted ONLY when the call failed to parse —
         # July's 113 Gemini failures were unautopsiable because this was
         # discarded. Char-capped as a safety bound (observed failures are

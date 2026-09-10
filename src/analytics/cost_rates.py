@@ -98,6 +98,62 @@ from datetime import datetime, timezone
 # (RQ6 replays included) to off-peak windows.
 DEEPSEEK_PEAK_WINDOWS_UTC: tuple[tuple[int, int], ...] = ((1, 4), (6, 10))
 
+# Peak pricing applies on WEEKDAYS ONLY. The provider's published wording is
+# "Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday
+# (all other hours are off-peak)" (api-docs.deepseek.com/quick_start/pricing,
+# re-read 2026-09-10T01:07Z). The 2026-08-16 transcription above captured the
+# hours but dropped the day-of-week qualifier, so the windows as originally
+# registered are WIDER than the published schedule: they would classify a
+# Saturday 02:00Z call as peak, at 2x, when the provider prices it off-peak.
+#
+# Inert today for the same reason the hour windows are — nothing classifies a
+# call by timestamp — but this constant is the thing a future per-call
+# classifier will read, and an over-wide peak window over-prices. Monday=0,
+# matching datetime.weekday().
+DEEPSEEK_PEAK_WEEKDAYS: tuple[int, ...] = (0, 1, 2, 3, 4)
+
+# ===== NOT REGISTERED: V4.1-Flash forced substitution, 2026-09-10T04:00Z =====
+# DeepSeek announced (2026-09-09) that until V4.1 Pro ships, every
+# `deepseek-v4-pro` request routes to V4.1 Flash and bills at Flash rates. The
+# model string on the wire does not change. Reported new off-peak rates:
+# $0.003 cache-hit / $0.15 cache-miss / $0.60 output, peak exactly 2x.
+#
+# DELIBERATELY NOT ADDED as a rate period. Verified 2026-09-10T01:07Z, ~3 hours
+# before the stated boundary:
+#   * api-docs.deepseek.com/quick_start/pricing still lists the 2026-08-16
+#     rates and three models, none of them a 4.1;
+#   * /updates (change log) ends at the 2026-08-21 Vision-Exp entry;
+#   * the news index carries no 4.1 entry.
+# The figures reach us only through press: one outlet quotes USD
+# $0.003/$0.15/$0.60 sourced to "a September 9 customer email" it states it
+# could not independently retrieve; another quotes CNY Y0.02/Y1/Y4 and gives no
+# hour at all. USD == CNY / 6.667 exactly, which is what a press-side FX
+# conversion looks like, not a published USD list price — and DeepSeek's own
+# USD list has always been quoted directly (e.g. $0.22/$0.66), not converted.
+# The two sources also disagree on the effective hour (04:00Z vs unspecified).
+#
+# That is the situation hub ruling 2026-08-05 governs: old rate until a new
+# rate is attested (the grok-4.20 cut-date precedent, where a supplied date was
+# contradicted by the archive). Registering an unattested CUT would understate
+# our own cost; holding overstates it, which is the correct direction for a
+# cost claim.
+#
+# KNOWN CONSEQUENCE, so it is not discovered as a surprise: from the first
+# post-boundary call (~2026-09-10T13:33Z) until this is attested and landed,
+# `deepseek-v4-pro` traffic prices at $0.66/$1.98 while the provider bills
+# ~$0.15/$0.60 — roughly a 3.6x overstatement of DeepSeek spend, about
+# +$0.18/trading day against the 2026-08-16..09-09 baseline. Costs are repriced
+# at READ time from stored tokens (performance.reprice_record_usd), so landing
+# the period later corrects the whole interval retroactively; nothing is lost
+# by waiting.
+#
+# COROLLARY — do not treat cost-per-call as substitution evidence. Our cost is
+# modelled from this table, not read from provider billing, so registering the
+# new rate would make the cost drop appear by construction. The independent
+# signals are the provider's own invoice and the response telemetry captured by
+# the adapters (system_fingerprint above all).
+# ============================================================================
+
 RATE_HISTORY: dict[str, list[dict]] = {
     # Anthropic — Sonnet 4.6 verified correct for the whole lab window.
     "claude-sonnet-4-6": [

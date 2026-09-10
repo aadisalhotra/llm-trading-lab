@@ -74,6 +74,8 @@ class DeepSeekAdapter(BaseAdapter):
             # not just "400 Bad Request" with no detail.
             raise RuntimeError(f"DeepSeek API {r.status_code}: {r.text[:500]}")
         data = r.json()
+        # Indexed, not .get() — a response missing this path is malformed, and
+        # the resulting KeyError is what feeds BaseAdapter's parse-level retry.
         text = data["choices"][0]["message"]["content"]
         returned_id = data.get("model", self.model)
 
@@ -86,4 +88,37 @@ class DeepSeekAdapter(BaseAdapter):
             "output_tokens": out_tok,
             "cost_usd": cost,
         }
+
+        # --- provider-substitution telemetry (added 2026-09-09) -------------
+        # `returned_id` is only the alias echo, so detect_version_transition is
+        # blind to a swap of the model BEHIND a constant alias — which is
+        # exactly what the 2026-09-10T04:00Z V4-Pro -> V4.1-Flash forced
+        # substitution is. Everything below was already on the wire and was
+        # being discarded; a 2026-09-10T01:13Z pre-boundary probe confirmed all
+        # four fields are populated on a live deepseek-v4-pro response.
+        #
+        # Read defensively (the fields are not contractual) — a missing one
+        # must degrade to None, never raise, because these are diagnostics and
+        # the decision itself already parsed.
+        choice = (data.get("choices") or [{}])[0] or {}
+        # The build identifier. Constant a307abda487cd1b463329ccb945ce396 across
+        # the pre-boundary probe; a change here is the sharpest evidence of a
+        # model swap under an unchanged alias, and unlike cost it does not
+        # depend on our own rate table.
+        metadata["system_fingerprint"] = data.get("system_fingerprint")
+        # STOP vs a length cutoff — same role the Gemini adapter's finish_reason
+        # plays for the completeness gates.
+        metadata["finish_reason"] = choice.get("finish_reason")
+        # Reasoning-trace tokens. Billed inside completion_tokens and counted
+        # against max_tokens, the same semantics as Gemini's thoughts_tokens,
+        # so it lands on the existing log field. ~84-86% of completion tokens
+        # on the pre-boundary probe — a reasoning-tier change should move it.
+        details = usage.get("completion_tokens_details") or {}
+        metadata["thoughts_tokens"] = details.get("reasoning_tokens")
+        # Prompt-cache split. cost_rates.py prices every call at the cache-MISS
+        # rate (the conservative upper bound); logging the split is what will
+        # eventually let that assumption be measured instead of assumed.
+        metadata["cache_hit_tokens"] = usage.get("prompt_cache_hit_tokens")
+        metadata["cache_miss_tokens"] = usage.get("prompt_cache_miss_tokens")
+
         return text, returned_id, metadata
