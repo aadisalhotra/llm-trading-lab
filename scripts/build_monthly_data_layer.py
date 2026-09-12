@@ -509,11 +509,15 @@ def _rq3_month(full_records, model_keys, win_start, win_end, n_resamples, segmen
 # Behavioral evidence metrics (calendar month) via canonical helpers
 # ==========================================================================
 
-def _behavioral_evidence(full_records, model_keys, win_start, win_end):
+def _behavioral_evidence(full_records, model_keys, win_start, win_end, segment):
     """Per-model May behavioral evidence: trade activity, reversal/flip rate,
     holding period, and the four RQ5 daily descriptive metrics averaged over the
     month (HHI/concentration, turnover, avg position size, cash). All via the
-    canonical research_metrics helpers."""
+    canonical research_metrics helpers.
+
+    `segment` is REQUIRED and has no default: it selects the direction sides
+    the activity metrics count ("long" = BUY/SELL, "both" = all four). The
+    caller month-gates it; see the note there."""
     def _inwin(d):
         return bool(d) and win_start <= d <= win_end
 
@@ -527,12 +531,15 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
         # Every _executed_trades / _closed_trades call in this file names its
         # segment explicitly. The helpers default to "long", so an unnamed call
         # inherits whatever that default becomes — the coupling that produced the
-        # July 2026 RQ2 hybrid (docs/RQ2-paper-leg-contamination.md). Passing
-        # "long" here is behaviourally null today and is not a ruling on whether
-        # these metrics SHOULD stay long-only; that is a Research question about
-        # metric definitions, untouched by this change.
+        # July 2026 RQ2 hybrid (docs/RQ2-paper-leg-contamination.md), which is
+        # why `segment` is a required parameter here rather than a defaulted one.
+        #
+        # That Research question is now answered: the 2026-09-05 ruling makes
+        # these activity metrics SHORT/COVER-inclusive from the v3/shorting
+        # regime (2026-07-01) forward. The caller month-gates the segment, so
+        # May and June still compute long-only and reproduce byte-for-byte.
         for r in win:
-            for ex in _executed_trades(r, "long"):
+            for ex in _executed_trades(r, segment):
                 if ex["side"] == "BUY":
                     n_buys += 1
                 else:
@@ -546,7 +553,7 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
         flips = pairs = 0
         for r in recs:
             d = r.get("date", "")
-            for ex in _executed_trades(r, "long"):
+            for ex in _executed_trades(r, segment):
                 t, side = ex["ticker"], ex["side"]
                 if t in last_side and _inwin(d):
                     pairs += 1
@@ -557,7 +564,14 @@ def _behavioral_evidence(full_records, model_keys, win_start, win_end):
 
         # holding period: trades closed (full exit) in window, full replay for
         # correct entry date.
-        closed_win = [t for t in _closed_trades(recs, "long") if _inwin(t.get("exit_date", ""))]
+        # _closed_trades replays ONE direction at a time — SEGMENTS is
+        # ("long", "short") and there is no "both" — because a short round
+        # trip opens on SHORT, closes on COVER, and needs its own residual
+        # share accounting. Inclusive semantics here is therefore the UNION of
+        # two independent replays, not one merged replay.
+        closed_segs = ("long",) if segment == "long" else ("long", "short")
+        closed_win = [t for seg in closed_segs for t in _closed_trades(recs, seg)
+                      if _inwin(t.get("exit_date", ""))]
         holds = []
         same_day = 0
         for t in closed_win:
@@ -2169,7 +2183,12 @@ def build(month: str) -> dict:
     # ====================================================================
     # Behavioral evidence (fills perf turnover / hold, feeds profiles)
     # ====================================================================
-    evidence = _behavioral_evidence(full_records, model_keys, win_start, win_end)
+    # SHORT/COVER-inclusive from the v3/shorting regime (2026-07-01) forward,
+    # per the Research ruling of 2026-09-05. Month-gated on the same boundary
+    # every other shorting-aware block in this file uses, so May and June
+    # reproduce byte-for-byte. Named at the call site, never defaulted.
+    evidence = _behavioral_evidence(full_records, model_keys, win_start, win_end,
+                                    "both" if month > "2026-06" else "long")
     for key in model_keys:
         if perf.get(key) is not None:
             perf[key]["turnover"] = evidence[key]["mean_daily_turnover"]
