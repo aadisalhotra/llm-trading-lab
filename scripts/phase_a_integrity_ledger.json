@@ -669,6 +669,64 @@
         "consequence": "Closes the silent-coupling defect class ahead of Phase B.",
         "evidence": "commit a6f75169"
       }
+    ],
+    "2026-09": [
+      {
+        "id": "activity_metrics_short_inclusive",
+        "date": "2026-09-11",
+        "type": "output_version",
+        "scope": "monthly data layer -- profiles[].evidence_metrics (trade_count, buy/sell counts, executed_notional_total, trades_per_active_day, reversal_flip_rate, n_closed_trades, avg/median_hold_days, same_day_exits)",
+        "ruling": "Research 2026-09-05: these activity metrics are SHORT/COVER-inclusive from the v3/shorting regime (2026-07-01) forward.",
+        "supersedes": "operational_events.2026-08.helper_segment_sweep.not_a_semantics_ruling, which recorded this as an open Research question about metric definitions and explicitly declined to decide it. This entry decides it; that entry is not edited.",
+        "fix_commit": "ff029fbc",
+        "sites": [
+          "scripts/build_monthly_data_layer.py:542 -- _executed_trades (trade_count, buy/sell counts, executed_notional_total, trades_per_active_day)",
+          "scripts/build_monthly_data_layer.py:556 -- _executed_trades (reversal_flip_rate)",
+          "scripts/build_monthly_data_layer.py:573 -- _closed_trades (n_closed_trades, avg/median_hold_days, same_day_exits)",
+          "scripts/build_monthly_data_layer.py:2205 -- the caller, which month-gates the segment on month > '2026-06'"
+        ],
+        "deliberately_not_changed": [
+          "scripts/build_monthly_data_layer.py:2156 -- the May trade_count. Pre-shorting, so behaviourally null, and it protects the reproduce-May EXACT MATCH gate.",
+          "scripts/build_monthly_data_layer.py:2212-2213 -- the registered RQ2/RQ3 estimands, which follow their own registration and stay long-only."
+        ],
+        "segment_is_required_not_defaulted": "_behavioral_evidence takes `segment` as a required positional with no default. The July 2026 RQ2 hybrid arose from an unnamed call silently inheriting the helpers' 'long' default (docs/RQ2-paper-leg-contamination.md); a required parameter cannot be inherited by accident.",
+        "closed_trades_union": "_closed_trades takes no 'both' -- research_metrics.SEGMENTS is ('long','short') -- because a short round trip opens on SHORT, closes on COVER, and carries its own residual-share accounting. Inclusive semantics there is the UNION of two independent replays, not one merged replay. This is a structural property of the helper, not a choice made here.",
+        "verification": {
+          "method": "Computed against stated thresholds before the change landed, not by inspection.",
+          "gemini_trade_count": {
+            "2026-07": "+30.5%",
+            "2026-08": "+29.4%",
+            "2026-09": "+26.9%"
+          },
+          "deepseek_trade_count": {
+            "2026-07": "+6.2%",
+            "2026-08": "+0.0%"
+          },
+          "august_byte_exact_books": [
+            "gpt",
+            "grok",
+            "claude",
+            "claude_opus",
+            "deepseek"
+          ],
+          "deepseek_asymmetry": "DeepSeek's twelve short-side executions are all July, which is why it moves in July and is byte-exact in August.",
+          "reproduce_may_gate": "Safe on two independent counts: the month gate computes May and June long-only, AND both months are behaviourally null under 'both' because no model has short activity before 2026-07-01.",
+          "suite": "435 passed"
+        },
+        "evidence": "commit ff029fbc"
+      },
+      {
+        "id": "deepseek_peak_weekdays_transcription",
+        "date": "2026-09-11",
+        "type": "transcription_correction",
+        "scope": "src/analytics/cost_rates.py -- DEEPSEEK_PEAK_WINDOWS_UTC",
+        "detail": "The 2026-08-16 transcription of DeepSeek's peak/off-peak schedule captured the hours (01:00-04:00 and 06:00-10:00 UTC) and dropped the 'Monday through Friday' qualifier, leaving the in-module constant -- declared there as the single source of truth for the windows -- WIDER than the published schedule. A future per-call classifier reading hours alone would price a Saturday 02:00Z call at the 2x peak rate.",
+        "fix": "DEEPSEEK_PEAK_WEEKDAYS = (0, 1, 2, 3, 4) added alongside the hours constant; pinned by tests/test_cost_rates.py:246-247.",
+        "fix_commit": "1a5fee77",
+        "provenance": "OUR transcription omission, not a provider change. The Monday-through-Friday qualifier is on DeepSeek's published pricing page today, describing the same August schedule; re-verified on the page 2026-09-11.",
+        "effect_on_figures": "None, past or present. Nothing in the cost path classifies a call by timestamp -- compute_call_cost_usd's only time input is a calendar date -- so no published cost figure was computed with the wider window. The correction is prospective: it makes the constant safe for the per-call time-of-day resolver that does not yet exist.",
+        "evidence": "commit 1a5fee77; tests/test_cost_rates.py"
+      }
     ]
   }
 }
