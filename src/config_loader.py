@@ -113,16 +113,19 @@ def starting_capital(settings: dict[str, Any] | None = None,
 class PendingCohortError(RuntimeError):
     """The live cohort's composition has not been confirmed.
 
-    Sibling of `PendingCapitalError`, and fatal for the same reason. The hub
-    ruling of 2026-09-11 fixed the live cohort at FIVE books but did not name
-    them, and five is not derivable from tracked content: `config/settings.json`
-    enables six models, and the registered account structure in
-    `docs/prereg/tier2_novel_sections.md` is a six-book structure throughout
-    (T2.6, the Phase B cohort rule, is still `[SEPTEMBER]` and unwritten).
+    Sibling of `PendingCapitalError`, and fatal for the same reason.
 
-    Defaulting to "the five core-cohort books" would be an invented
-    registration decision that reads as a confirmed one — the same failure
-    shape as the builder's hard-coded regime labels. So it raises.
+    History, because it is the argument for keeping this guard rather than
+    retiring it now that a cohort is named. The 2026-09-11 ruling fixed the
+    live cohort at FIVE books without naming them, and five was not derivable
+    from tracked content: `config/settings.json` enables six models and the
+    registered account structure in `docs/prereg/tier2_novel_sections.md` is a
+    six-book structure throughout. The obvious derivation — "the five
+    core-cohort books" — would have been WRONG: the 2026-09-14 ruling excludes
+    `deepseek` and funds `claude_opus`, which is the expansion book. An
+    invented default would have read as a confirmed registration decision and
+    been wrong on the merits, which is exactly the failure shape this raises
+    to prevent.
     """
 
 
@@ -170,11 +173,11 @@ def live_cohort_keys(settings: dict[str, Any] | None = None) -> list[str]:
     if not keys:
         raise PendingCohortError(
             "capital_structure.live_cohort_keys is PENDING COHORT CONFIRMATION. "
-            "The 2026-09-11 hub ruling set the live cohort at "
-            f"{live_cohort_book_count(settings)} books but did not name them, and the "
-            "repository registers a six-book structure. Name them in "
-            "config/settings.json -> capital_structure.live_cohort_keys once the "
-            "Phase B cohort rule (prereg T2.6) is signed off.")
+            f"The registered book count is {live_cohort_book_count(settings)}, but the "
+            "books are not named, and the composition is not derivable from the "
+            "`cohort` tags in settings.json -- the ruled Phase B cohort is not the "
+            "core cohort. Name them in config/settings.json -> "
+            "capital_structure.live_cohort_keys.")
     keys = list(keys)
     expected = live_cohort_book_count(settings)
     if len(keys) != expected:

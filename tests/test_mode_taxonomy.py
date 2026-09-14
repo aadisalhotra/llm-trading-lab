@@ -195,23 +195,55 @@ def test_reserve_master_is_additional_and_outside_the_base():
     assert registered_capital_base(moved, "live") == base
 
 
-def test_the_live_cohort_composition_is_pending_and_fatal():
-    """Five books are registered; WHICH five was never named, so it raises.
+def test_the_live_cohort_composition_is_the_hub_ruled_five():
+    """Hub ruling 2026-09-14: DeepSeek is excluded, the other five fund.
 
-    settings.json enables six models and the prereg registers a six-book
-    account structure, so the composition cannot be derived. Defaulting to any
-    five of the six would be an invented registration decision.
+    This replaces the assertion that the composition was pending. Two
+    properties are worth pinning beyond the list itself.
+
+    It is NOT the core cohort. The core/expansion split would keep deepseek and
+    drop claude_opus; the ruling does the opposite. That is the whole reason
+    deriving this from `cohort` tags was refused rather than guessed -- the
+    obvious derivation would have produced the wrong five.
+
+    And it is subject to ratification at the 2026-09-17 methodology review, so
+    a reversal must stay a one-line amendment: the registered capital base is
+    computed from the count, never from a hardcoded total, which the base
+    assertion here re-proves against the named list.
     """
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
-    assert settings["capital_structure"]["live_cohort_keys"] is None
+    assert live_cohort_keys(settings) == [
+        "claude", "claude_opus", "gpt", "gemini", "grok"]
+    assert "deepseek" not in live_cohort_keys(settings)
+
+    core = {k for k, v in settings["models"].items()
+            if v.get("cohort", "core") == "core"}
+    assert set(live_cohort_keys(settings)) != core, \
+        "the ruled cohort is not the core cohort -- do not re-derive it from tags"
+
+    assert len(live_cohort_keys(settings)) == live_cohort_book_count(settings)
+    assert registered_capital_base(settings, "live") == 10_000.0
+
+
+def test_a_null_composition_still_raises():
+    """The guard is not retired by the ruling -- only satisfied by it.
+
+    Pinned against synthetic settings so that naming one cohort cannot disarm
+    the check for a later phase that has not named its own.
+    """
+    settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
+    pending = json.loads(json.dumps(settings))
+    pending["capital_structure"]["live_cohort_keys"] = None
     with pytest.raises(PendingCohortError, match="PENDING COHORT CONFIRMATION"):
-        live_cohort_keys(settings)
+        live_cohort_keys(pending)
 
 
 def test_a_named_cohort_must_agree_with_the_registered_count():
+    """Count and composition must agree -- the base is computed from the count."""
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
     named = json.loads(json.dumps(settings))
     keys = list(named["models"])
+    assert len(keys) == 6, "six books are configured; five fund"
     named["capital_structure"]["live_cohort_keys"] = keys  # all six
     with pytest.raises(PendingCohortError, match="names 6 books"):
         live_cohort_keys(named)
