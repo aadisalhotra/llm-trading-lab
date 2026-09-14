@@ -8,7 +8,11 @@ Three ratified requirements are enforced here rather than documented:
     from the mode in code and never from `ALPACA_BASE_URL`, so a stale secret
     cannot point a paper run at production.
   * Per-book starting capital for an unconfirmed mode must stop the run, not
-    fall back to a default. October must not incept at the wrong scale.
+    fall back to a default. October must not incept at the wrong scale. The
+    Phase B figures landed 2026-09-14 ($2,000/book x five books = a $10,000
+    registered base, plus a $500 master reserve that is ADDITIONAL and never a
+    return denominator); the guard mechanism is still pinned against synthetic
+    settings so confirming one value cannot disarm it for the others.
   * Neither phase boundary carries book state. A leftover state file is the
     silent way that ruling gets defeated, so loading one is a hard error.
 """
@@ -23,7 +27,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import config_loader
-from src.config_loader import PendingCapitalError, starting_capital
+from src.config_loader import (
+    PendingCapitalError,
+    PendingCohortError,
+    live_cohort_book_count,
+    live_cohort_keys,
+    registered_capital_base,
+    reserve_master,
+    starting_capital,
+)
 from src.execution.broker import (
     BROKER_MODES,
     MODE_BROKER_PAPER,
@@ -131,18 +143,85 @@ def test_simulator_capital_still_resolves():
     assert starting_capital(settings, "paper") == 100_000.0
 
 
-def test_pending_modes_raise_rather_than_defaulting():
+def test_the_live_path_modes_are_confirmed_at_the_phase_b_figure():
+    """Hub ruling 2026-09-11: BOOK_CAPITAL_PHASE_B = $2,000 per book.
+
+    This replaces the guard assertion that used to live here. Until 2026-09-14
+    both live-path modes were null and this test asserted they raised; the
+    parameters have now landed, so what must be pinned is the confirmed value
+    and the fact that the two live-path modes agree. They have to agree because
+    October validates the live configuration in the venue's broker-paper mode —
+    a broker-paper book sized differently from its November self would be
+    validating something other than what runs.
+    """
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
-    for mode in ("broker_paper", "live"):
-        with pytest.raises(PendingCapitalError, match="PENDING CAPITAL CONFIRMATION"):
-            starting_capital(settings, mode)
+    assert starting_capital(settings, "broker_paper") == 2000.0
+    assert starting_capital(settings, "live") == 2000.0
+    assert settings["starting_capital"]["_pending_confirmation"] == []
 
 
 def test_the_stale_1000_dollar_live_figure_is_gone():
+    """The $1,000 figure that predated the venue analysis must not come back."""
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
-    assert settings["starting_capital"].get("live") is None
-    assert set(settings["starting_capital"]["_pending_confirmation"]) == {
-        "broker_paper", "live"}
+    assert settings["starting_capital"]["live"] != 1000
+    assert settings["starting_capital"]["broker_paper"] != 1000
+
+
+# --------------------------------------------------------------------------
+# Phase B capital structure (hub ruling 2026-09-11)
+# --------------------------------------------------------------------------
+def test_registered_capital_base_is_five_books_times_two_thousand():
+    settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
+    assert live_cohort_book_count(settings) == 5
+    assert registered_capital_base(settings, "live") == 10_000.0
+    assert registered_capital_base(settings, "broker_paper") == 10_000.0
+
+
+def test_reserve_master_is_additional_and_outside_the_base():
+    """The load-bearing invariant: $500 is ADDITIONAL, never in a denominator.
+
+    A return computed on $10,500 would be wrong. The structural guarantee is
+    that `registered_capital_base` does not read the reserve at all — proven
+    here by moving the reserve and observing the base does not budge.
+    """
+    settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
+    assert reserve_master(settings) == 500.0
+    base = registered_capital_base(settings, "live")
+    assert base == 10_000.0
+    assert base + reserve_master(settings) == 10_500.0  # committed exposure
+
+    moved = json.loads(json.dumps(settings))
+    moved["capital_structure"]["reserve_master_usd"] = 99_999
+    assert registered_capital_base(moved, "live") == base
+
+
+def test_the_live_cohort_composition_is_pending_and_fatal():
+    """Five books are registered; WHICH five was never named, so it raises.
+
+    settings.json enables six models and the prereg registers a six-book
+    account structure, so the composition cannot be derived. Defaulting to any
+    five of the six would be an invented registration decision.
+    """
+    settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
+    assert settings["capital_structure"]["live_cohort_keys"] is None
+    with pytest.raises(PendingCohortError, match="PENDING COHORT CONFIRMATION"):
+        live_cohort_keys(settings)
+
+
+def test_a_named_cohort_must_agree_with_the_registered_count():
+    settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
+    named = json.loads(json.dumps(settings))
+    keys = list(named["models"])
+    named["capital_structure"]["live_cohort_keys"] = keys  # all six
+    with pytest.raises(PendingCohortError, match="names 6 books"):
+        live_cohort_keys(named)
+
+    named["capital_structure"]["live_cohort_keys"] = keys[:5]
+    assert live_cohort_keys(named) == keys[:5]
+
+    named["capital_structure"]["live_cohort_keys"] = keys[:4] + ["not_a_model"]
+    with pytest.raises(PendingCohortError, match="unknown model keys"):
+        live_cohort_keys(named)
 
 
 def test_confirming_a_value_clears_the_guard():

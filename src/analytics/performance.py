@@ -302,7 +302,7 @@ def compute_metrics(
 
 
 def compute_spy_benchmark_metrics(
-    starting_capital: float = 100_000.0,
+    starting_capital: float,
     settings: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Synthesize a SPY buy-and-hold portfolio from the canonical SPY series.
@@ -329,6 +329,11 @@ def compute_spy_benchmark_metrics(
     base_price = bench[0]
     if base_price <= 0:
         return None
+    # Required argument, deliberately: this anchor was a `= 100_000.0` default
+    # until the Phase B capital parameters landed. A default here silently
+    # anchors the benchmark row to the paper book's scale under any other
+    # mode, which is the stale-default failure class `PendingCapitalError`
+    # exists to stop. Every caller passes config_loader.starting_capital().
     shares = starting_capital / base_price
     values = bench * shares  # synthetic equity curve, anchored to deployed capital
 

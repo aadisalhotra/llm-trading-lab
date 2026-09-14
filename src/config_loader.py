@@ -110,6 +110,96 @@ def starting_capital(settings: dict[str, Any] | None = None,
     return float(value)
 
 
+class PendingCohortError(RuntimeError):
+    """The live cohort's composition has not been confirmed.
+
+    Sibling of `PendingCapitalError`, and fatal for the same reason. The hub
+    ruling of 2026-09-11 fixed the live cohort at FIVE books but did not name
+    them, and five is not derivable from tracked content: `config/settings.json`
+    enables six models, and the registered account structure in
+    `docs/prereg/tier2_novel_sections.md` is a six-book structure throughout
+    (T2.6, the Phase B cohort rule, is still `[SEPTEMBER]` and unwritten).
+
+    Defaulting to "the five core-cohort books" would be an invented
+    registration decision that reads as a confirmed one — the same failure
+    shape as the builder's hard-coded regime labels. So it raises.
+    """
+
+
+def reserve_master(settings: dict[str, Any] | None = None) -> float:
+    """Master-level USD reserve, held for fees and settlement rounding.
+
+    **This is ADDITIONAL to the registered capital base and must never enter a
+    return denominator.** Five books x $2,000 is the registered base of
+    $10,000; the $500 reserve brings committed exposure to $10,500, and a
+    return computed on $10,500 would be wrong. `registered_capital_base()`
+    deliberately does not call this function — that omission is the invariant,
+    not an oversight.
+    """
+    settings = settings if settings is not None else load_settings()
+    structure = settings.get("capital_structure", {}) or {}
+    return float(structure.get("reserve_master_usd", 0.0))
+
+
+def live_cohort_book_count(settings: dict[str, Any] | None = None) -> int:
+    """Number of books funded in the live cohort (hub ruling 2026-09-11: five).
+
+    The count is confirmed; the composition is not — see `live_cohort_keys`.
+    """
+    settings = settings if settings is not None else load_settings()
+    structure = settings.get("capital_structure", {}) or {}
+    count = structure.get("live_cohort_book_count")
+    if count is None:
+        raise PendingCohortError(
+            "capital_structure.live_cohort_book_count is not set; the registered "
+            "capital base cannot be computed without it.")
+    return int(count)
+
+
+def live_cohort_keys(settings: dict[str, Any] | None = None) -> list[str]:
+    """The model keys funded in the live cohort, or raise if unconfirmed.
+
+    Raises `PendingCohortError` while `capital_structure.live_cohort_keys` is
+    null, and also if a named list disagrees with the registered count — a
+    composition that does not match the number the capital base was computed
+    from is a reconciliation failure, not a rounding detail.
+    """
+    settings = settings if settings is not None else load_settings()
+    structure = settings.get("capital_structure", {}) or {}
+    keys = structure.get("live_cohort_keys")
+    if not keys:
+        raise PendingCohortError(
+            "capital_structure.live_cohort_keys is PENDING COHORT CONFIRMATION. "
+            "The 2026-09-11 hub ruling set the live cohort at "
+            f"{live_cohort_book_count(settings)} books but did not name them, and the "
+            "repository registers a six-book structure. Name them in "
+            "config/settings.json -> capital_structure.live_cohort_keys once the "
+            "Phase B cohort rule (prereg T2.6) is signed off.")
+    keys = list(keys)
+    expected = live_cohort_book_count(settings)
+    if len(keys) != expected:
+        raise PendingCohortError(
+            f"capital_structure.live_cohort_keys names {len(keys)} books but "
+            f"live_cohort_book_count is {expected}; the registered capital base is "
+            "computed from the count, so the two must agree.")
+    unknown = [k for k in keys if k not in (settings.get("models") or {})]
+    if unknown:
+        raise PendingCohortError(
+            f"capital_structure.live_cohort_keys names unknown model keys: {unknown}")
+    return keys
+
+
+def registered_capital_base(settings: dict[str, Any] | None = None,
+                            mode: str | None = None) -> float:
+    """Total registered capital for `mode` — the ONLY valid return denominator.
+
+    `live_cohort_book_count` x `starting_capital(mode)`. For Phase B live that
+    is 5 x $2,000 = $10,000. `reserve_master()` is excluded by construction.
+    """
+    settings = settings if settings is not None else load_settings()
+    return live_cohort_book_count(settings) * starting_capital(settings, mode)
+
+
 def load_universe() -> dict[str, Any]:
     with open(CONFIG_DIR / "universe.json", "r", encoding="utf-8") as f:
         return json.load(f)

@@ -468,7 +468,8 @@ def _section_cohort_comparison(
             "month_cost": cost["cost_usd"],
         })
 
-    spy = compute_spy_benchmark_metrics()
+    spy = compute_spy_benchmark_metrics(
+        starting_capital=_starting_capital_guarded(settings), settings=settings)
     spy_month_return = None
     if spy:
         # Approximate the SPY month return — slice the SPY synthetic curve to

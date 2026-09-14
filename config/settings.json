@@ -7,11 +7,19 @@
   "phase_a_end_date": "2026-10-31",
   "phase_b_start_date": "2026-11-01",
   "starting_capital": {
-    "_note": "Per-book starting capital, by execution mode. Read ONLY through config_loader.starting_capital(), which raises PendingCapitalError for any mode listed in _pending_confirmation. The previous live figure of 1000 was stale against the registered structure and has been removed rather than left to seed six books silently. Both broker_paper and live stay pending until the hub confirms the per-book number; October must not incept before then.",
-    "_pending_confirmation": ["broker_paper", "live"],
+    "_note": "Per-book starting capital, by execution mode. Read ONLY through config_loader.starting_capital(), which raises PendingCapitalError for any mode listed in _pending_confirmation. broker_paper and live were CONFIRMED by the hub on 2026-09-11 at 2000 USD per book (BOOK_CAPITAL_PHASE_B) and _pending_confirmation is now empty. The two live-path modes carry the same figure deliberately: October validates the live configuration in the venue's broker-paper mode, so a broker-paper book that sized differently from its November self would not be validating the configuration that runs.",
+    "_pending_confirmation": [],
     "paper": 100000,
-    "broker_paper": null,
-    "live": null
+    "broker_paper": 2000,
+    "live": 2000
+  },
+  "capital_structure": {
+    "_note": "Phase B registered capital structure (hub ruling 2026-09-11). The registered capital BASE is live_cohort_book_count x starting_capital[mode] -- five books x $2,000 = $10,000 -- and it is the only denominator any return may be computed on. Read through config_loader.registered_capital_base(); do not re-derive it at a call site.",
+    "reserve_master_usd": 500,
+    "_reserve_master_note": "ADDITIONAL to the registered base, not carved out of it. It sits at master level for fees and settlement rounding, bringing total committed exposure to $10,500. It is OUTSIDE the registered capital base and NEVER enters a return denominator -- a return computed on $10,500 would be wrong. config_loader.reserve_master() is deliberately the only reader, and registered_capital_base() deliberately does not call it.",
+    "live_cohort_book_count": 5,
+    "live_cohort_keys": null,
+    "_live_cohort_keys_note": "UNRESOLVED -- the hub ruling of 2026-09-11 fixed the live cohort at FIVE books but did not name them, and five cannot be derived from tracked content: config/settings.json enables SIX models and docs/prereg/tier2_novel_sections.md registers a SIX-book account structure throughout (T2.6, the Phase B cohort rule, is still marked [SEPTEMBER] and unwritten). Operations will not invent the composition. Null here is deliberate and fatal: config_loader.live_cohort_keys() raises PendingCohortError rather than defaulting to any five of the six, on the same doctrine as PendingCapitalError. Nothing on the paper path calls it, so this is inert until the composition is signed off."
   },
   "execution": {
     "_note": "Live order-lifecycle parameters. fill_deadline_seconds is the registered fill-time cap (2026-08-29 ruling): an order still unfilled at the deadline has its remainder cancelled and its partial fill stands, logged as an UNFILLED_AT_DEADLINE execution-constraint event, which is execution-SUCCESSFUL and separately a disclosed per-model descriptor. Frozen with the configuration on Oct 1; tunable only before then.",

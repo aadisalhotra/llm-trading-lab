@@ -38,6 +38,28 @@ The **$2,000 margin minimum** (4210(b)(4)) is a separate, pre-existing rule and 
 applies to margin-enabled accounts `[PRIMARY]`. The Reg-T/FINRA **$2,000 equity floor
 for short selling** is regulatory, not broker policy `[PRIMARY]`.
 
+> **Recomputed 2026-09-14 — the per-book figure now equals this floor exactly, and
+> that is a coincidence, not a constraint.** `BOOK_CAPITAL_PHASE_B` was ratified at
+> **$2,000 per book** (hub 2026-09-11). Neither $2,000 threshold above binds a book at
+> that level, for three independent reasons, and the coincidence of the numbers must
+> not be allowed to suggest otherwise:
+>
+> 1. **A book is not an account.** The registered cash-branch structure is *six
+>    software-segregated books on one Alpaca account* (`docs/prereg/tier2_novel_sections.md`,
+>    "Phase B account structure — cash branch"). Both rules are account-level tests.
+>    The account carries the full registered base plus the reserve — **$10,500** — which
+>    clears both thresholds by 5.25x. The per-book $2,000 is a pipeline-enforced
+>    partition, invisible to FINRA's test.
+> 2. **The cash branch has no margin minimum.** 4210(b)(4) applies to margin-enabled
+>    accounts; a cash account is out of scope entirely.
+> 3. **The short-selling floor is moot under the Phase B prompt.** Phase B is long-only
+>    (v4), and `portfolio_rules.shorting_enabled` is false from the 2026-09-01 boundary,
+>    so no book sells short at any equity level.
+>
+> The live trap would be the inverse reading — treating $2,000/book as *satisfying* a
+> per-book regulatory floor. It satisfies nothing per-book; the account-level balance
+> is what the rules test, and it is the figure to cite.
+
 ## 3. Alpaca (incumbent paper venue)
 
 **Fractional shorts: prohibited.** *"We do not support short sales in fractional

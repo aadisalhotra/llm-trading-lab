@@ -432,6 +432,26 @@ current sizing, and it would additionally reclassify the lab's market-data statu
 Broker API partnership route carries a formal partnership agreement and ongoing
 compliance obligations, which is heavier still.
 
+> **Recomputed 2026-09-14 against the ratified capital parameters.** The "$1K per
+> model across six books — $6K total" sizing above is preserved as written: it is what
+> was on the table when this section was researched, and the finding it supports was
+> reached against it. The registered figures are now `BOOK_CAPITAL_PHASE_B` = **$2,000
+> per book across five books = a $10,000 registered base**, plus `RESERVE_MASTER`
+> **$500 (additional, outside the base)** — **$10,500 committed exposure** (hub ruling
+> 2026-09-11; landed in `config/settings.json` → `starting_capital` /
+> `capital_structure`). Two of this section's numbers move and one does not:
+>
+> * **The conclusion does not move.** $10,500 of committed exposure is still far below
+>   Alpaca's **$30,000** business-account minimum, so the entity route remains
+>   capital-infeasible. The finding is strengthened, not reversed.
+> * **"a capital increase of roughly 5x" is stale.** That multiple was $30,000 / $6,000.
+>   Against the registered $10,000 base the gap is **3.0x**; against $10,500 of
+>   committed exposure, **2.9x**. Cite 3x, not 5x.
+> * **Do not restate the gap on $10,500.** The $500 reserve is outside the registered
+>   capital base and never enters a return denominator; it appears here only because
+>   an account *minimum* is a balance test, not a performance denominator. Any
+>   return-side figure uses $10,000.
+
 **This is a decision input for the Sept 15 gate, not a lane decision.** Flagging only:
 the six-book structure may not be reachable at either broker without either a capital
 increase of roughly 5x or a change in book structure. Claim 3 (IMD restrictions
