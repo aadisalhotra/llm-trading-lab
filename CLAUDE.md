@@ -161,6 +161,52 @@ enforcement lives in the dispatch process.
    which splits that lane's package and needs its owner's sign-off. Pick one
    before editing, never after.
 
+   **CRLF branch: on a file that is LF in the object store and CRLF in the
+   worktree, quarantine by byte splice, not by `git apply`** (ratified
+   2026-09-14). `scripts/phase_a_integrity_ledger.json` is exactly this file,
+   so this is the branch the recurring contended path actually takes. The
+   obvious quarantine — save `git diff --cached -- <path>` as a guard patch,
+   restore, edit, commit, `git apply` the guard patch back — **fails on the
+   replay**: `git diff` emits the patch in the object store's LF form, and
+   `git apply` then cannot match a single context line against a CRLF worktree
+   file. It fails safely (nothing is written), but it fails, and it fails after
+   the commit has already landed, which is the worst moment to be improvising.
+
+   The byte splice has no such failure mode, and it is exactly reversible:
+
+   ```
+   A = worktree bytes                       # == the other lane's staged content
+   git diff --cached -- <path> > guard.patch   # keep it; it is the PROOF, not the restore
+   git diff --name-only -- <path>           # MUST be empty (rule 6 step 4)
+   git restore --source=HEAD --staged --worktree -- <path>
+   B = worktree bytes                       # HEAD's checkout form
+   # prove the other lane's delta is one contiguous insertion, and capture it:
+   #   pre = len(common prefix of A,B); suf = len(common suffix)
+   #   ins = A[pre : len(A)-suf]; assert A == B[:pre] + ins + B[pre:]
+   <make this lane's edit>                  # rule 8 if it is the ledger
+   git add <path> ; git commit -F <msgfile> -- <path>
+   C = worktree bytes ; assert C[:pre] == B[:pre]   # the splice point survived
+   write C[:pre] + ins + C[pre:] ; git add <path>
+   ```
+
+   Capture the hunk as **raw bytes plus an offset**, not as lines: the splice
+   point is mid-line in the general case, so a line-split of the raw hunk
+   yields fragments that will not match anything and will fail a naive
+   verifier for the wrong reason.
+
+   **Prove the restore by diffing added LINES against the guard patch**, which
+   is what the guard patch is for once it is no longer the restore mechanism:
+
+   ```
+   git diff --cached -- <path> | grep '^+' | grep -v '^+++'   # must equal
+   grep '^+' guard.patch       | grep -v '^+++'               # byte for byte
+   ```
+
+   and assert zero deletions. This is the delta-identity check rule 6 requires
+   on a path this lane committed to; the blob hash necessarily moves and is not
+   the proof. Worked instance: ledger `99a409a4` → `85b1bd3c`, 17 lines
+   byte-identical, 0 deletions, the other five v4-lane blobs untouched.
+
 8. **The integrity ledger is never edited by parse-and-reserialize** (ratified
    2026-08-19). `scripts/phase_a_integrity_ledger.json` must be modified by
    **surgical text insertion**, never by `json.load` → mutate → `json.dumps`.
@@ -194,3 +240,38 @@ enforcement lives in the dispatch process.
    This sits beside rule 6's `--autostash` warning and the two findings landed
    with it: a path-scoped stash is not a path-scoped index restore, and blob
    identity holds only while your lane does not commit to the contended path.
+
+9. **Verify an instrument against the system, never against its own success
+   report** (ratified 2026-09-14). An instrument that reports success while
+   measuring nothing is the most expensive failure this lab has, because it
+   costs a whole cycle and leaves no error behind. Two instances, one week
+   apart, in different tools:
+
+   * **Task Scheduler.** `New-ScheduledTaskSettingsSet` takes
+     `-AllowStartIfOnBatteries` and `-DontStopIfGoingOnBatteries` — **switches,
+     in the affirmative**. The negated forms (`-DisallowStartIfOnBatteries`,
+     `-StopIfGoingOnBatteries`) are not parameters at all; passing them makes
+     the cmdlet return `$null`, `Register-ScheduledTask` then fails on a null
+     `-Settings` — and a trailing `Write-Output "REGISTERED"` still prints, so
+     the script reports success and **no task exists**. Set
+     `StartWhenAvailable` as a property on the returned settings object. Then
+     verify with `Get-ScheduledTask` / `Get-ScheduledTaskInfo` and read back
+     every setting that matters: `StartBoundary`, `NextRunTime`, `LogonType`,
+     `ExecutionTimeLimit`, `StartWhenAvailable`, both battery flags.
+
+   * **The tripwire estimator.** A baseline stated as "mean ± sd" without
+     naming its estimator is not a specification. The same window gave
+     56.16 ± 3.29 (daily-mean) and 56.26 ± 7.67 (per-call); scoring a day mean
+     against the per-call sd understates z by ≈2.3× and raises no error
+     anywhere. Registered in the ledger as
+     `behavioral_tripwire_must_name_its_estimator`.
+
+   Same class in both: the instrument's own output said "fine". The rule is to
+   ask the system, not the instrument — `Get-ScheduledTask`, not the script's
+   echo; the named estimator, not the number that happened to be in scope.
+
+   The scheduling corollary that came with the first instance:
+   **`StartWhenAvailable` is a hazard, not a safety net, for a
+   market-hours job.** A missed 09:35 start firing at an arbitrary later hour
+   produces a market-closed abort that reads like a result. Better that it does
+   not fire at all.
