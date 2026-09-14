@@ -726,6 +726,206 @@
         "provenance": "OUR transcription omission, not a provider change. The Monday-through-Friday qualifier is on DeepSeek's published pricing page today, describing the same August schedule; re-verified on the page 2026-09-11.",
         "effect_on_figures": "None, past or present. Nothing in the cost path classifies a call by timestamp -- compute_call_cost_usd's only time input is a calendar date -- so no published cost figure was computed with the wider window. The correction is prospective: it makes the constant safe for the per-call time-of-day resolver that does not yet exist.",
         "evidence": "commit 1a5fee77; tests/test_cost_rates.py"
+      },
+      {
+        "id": "phase_b_capital_parameters",
+        "date": "2026-09-14",
+        "type": "capital_registration",
+        "ruling": "Hub 2026-09-11. BOOK_CAPITAL_PHASE_B = $2,000 per book; live cohort five books; registered capital base 5 x $2,000 = $10,000; RESERVE_MASTER = $500, ADDITIONAL to the base and never in a return denominator; committed exposure $10,500. The remainder of the account (~$14,500) is outside the experiment entirely.",
+        "fix_commit": "c693b91d",
+        "parameters": {
+          "book_capital_phase_b_usd": 2000,
+          "live_cohort_book_count": 5,
+          "registered_capital_base_usd": 10000,
+          "reserve_master_usd": 500,
+          "committed_exposure_usd": 10500,
+          "config_paths": [
+            "config/settings.json -> starting_capital.broker_paper",
+            "config/settings.json -> starting_capital.live",
+            "config/settings.json -> capital_structure.reserve_master_usd",
+            "config/settings.json -> capital_structure.live_cohort_book_count"
+          ]
+        },
+        "reserve_is_outside_the_base": "The load-bearing part of the ruling. A return computed on $10,500 would be wrong. The exclusion is enforced structurally rather than documentarily: config_loader.registered_capital_base() does not call reserve_master(), and tests/test_mode_taxonomy.py::test_reserve_master_is_additional_and_outside_the_base proves it by moving the reserve to $99,999 and asserting the base does not move. Measured size of the error the ruling forbids: August cohort spend divided by $10,500 reads 0.9135% against 0.9591% on the registered base, understated by 0.0457pp.",
+        "pending_capital_error_cleared": "starting_capital._pending_confirmation is now empty and both live-path modes resolve at 2000. The two modes carry the same figure deliberately -- the registered October-live ruling validates the live configuration in the venue's broker-paper mode, so a broker-paper book sized differently from its November self would not be validating the configuration that runs. The guard mechanism itself is unchanged and is still pinned against synthetic settings, so confirming one mode cannot disarm it for another.",
+        "cohort_composition_UNRESOLVED": {
+          "status": "OPEN -- the count is registered, the composition is not",
+          "detail": "The ruling fixed the live cohort at FIVE books but did not name them, and five is not derivable from tracked content: config/settings.json enables SIX models, and docs/prereg/tier2_novel_sections.md registers a SIX-book account structure throughout (six software-segregated books on one Alpaca cash account, six-book independence, full six-book load in October). Prereg T2.6, the Phase B cohort rule, is still marked [SEPTEMBER] and unwritten.",
+          "handling": "config/settings.json -> capital_structure.live_cohort_keys is null and config_loader.live_cohort_keys() raises PendingCohortError, on the same doctrine as PendingCapitalError: an invented composition would read as a confirmed registration decision. Nothing on the paper path calls it, so this is inert until sign-off. A named list that disagrees with live_cohort_book_count also raises -- the base is computed from the count, so the two must agree.",
+          "operations_will_not_invent_it": "Same refusal, and the same hub agreement, that re-sequenced this dispatch in the first place (parameters -> recompute -> registration). A registration entry cannot cite measurements the code has not made possible; equally, it cannot name books a ruling did not name."
+        },
+        "recompute": {
+          "basis": "Repriced at read time from stored tokens via performance.reprice_record_usd over the committed data/trades logs. The stored cost_usd field is never summed. The only working-tree change to src/analytics/cost_rates.py at the time of measurement was a docstring edit belonging to the adapter-field-retention lane; no rate value was affected.",
+          "capital_ratio": "paper $100,000 : $4,000 = 25:1 -> paper $100,000 : $2,000 = 50:1. Per-book x0.50; per-book API-cost drag x50 against the paper book. The $4,000 level is the one the IBKR whole-share quantization analysis showed FAIL; Alpaca's fractional shares are what make $2,000 viable at all.",
+          "breakeven_definition": "The monthly return a book must earn to cover its own API cost = month API cost / book capital.",
+          "breakeven_monthly_pct_at_2000": {
+            "2026-07": {
+              "claude": 1.3744,
+              "gpt": 0.8515,
+              "gemini": 0.381,
+              "grok": 0.2777,
+              "deepseek": 0.1616,
+              "claude_opus": 2.1366
+            },
+            "2026-08": {
+              "claude": 1.2345,
+              "gpt": 0.7598,
+              "gemini": 0.5703,
+              "grok": 0.2363,
+              "deepseek": 0.1992,
+              "claude_opus": 1.7956
+            }
+          },
+          "breakeven_monthly_pct_at_4000_for_comparison": {
+            "2026-07": {
+              "claude": 0.6872,
+              "gpt": 0.4258,
+              "gemini": 0.1905,
+              "grok": 0.1388,
+              "deepseek": 0.0808,
+              "claude_opus": 1.0683
+            },
+            "2026-08": {
+              "claude": 0.6172,
+              "gpt": 0.3799,
+              "gemini": 0.2851,
+              "grok": 0.1182,
+              "deepseek": 0.0996,
+              "claude_opus": 0.8978
+            }
+          },
+          "breakeven_annualized_pct_at_2000_august": {
+            "claude": 15.862,
+            "gpt": 9.508,
+            "gemini": 7.0619,
+            "grok": 2.8731,
+            "deepseek": 2.4169,
+            "claude_opus": 23.8079
+          },
+          "cohort_on_the_registered_base": {
+            "2026-07": {
+              "all_six_enabled_usd": 103.6571,
+              "pct_of_base_monthly": 1.0366,
+              "pct_annualized": 13.1731,
+              "five_core_books_usd": 60.9249,
+              "five_core_pct_monthly": 0.6092
+            },
+            "2026-08": {
+              "all_six_enabled_usd": 95.9129,
+              "pct_of_base_monthly": 0.9591,
+              "pct_annualized": 12.1365,
+              "five_core_books_usd": 60.0008,
+              "five_core_pct_monthly": 0.6
+            },
+            "note": "The five-core-book subtotals are CONDITIONAL and are recorded as arithmetic, not as a cohort decision -- they assume the five are the core-cohort books, which is exactly what cohort_composition_UNRESOLVED declines to assert. The all-six figures are what the lab actually spends today."
+          }
+        },
+        "sizing_sites": {
+          "changed": [
+            "src/analytics/performance.py -- compute_spy_benchmark_metrics's `starting_capital: float = 100_000.0` default removed; the argument is now required. A default there silently anchors the benchmark row to the paper book's scale under any other mode.",
+            "src/reports/monthly_report.py -- the one bare caller now passes the guarded parameter (and `settings`, which it had also omitted)."
+          ],
+          "already_guarded": [
+            "src/portfolio/portfolio.py:init_portfolio",
+            "src/dashboard/build_data.py",
+            "src/reports/daily_report.py",
+            "src/analytics/performance.py:_starting_capital"
+          ],
+          "deliberately_left_literal": "scripts/build_monthly_data_layer.py INCEPTION_CAPITAL = 100_000.0 and scripts/defab_clean_window.py SEED = 100_000.0. Both are Phase A historical anchors -- INCEPTION_CAPITAL sits on the line after INCEPTION_DATE = '2026-04-09' -- not sizing sites. Re-pointing either at a Phase B parameter would falsify Phase A."
+        },
+        "reg_t_notes_recomputed": {
+          "docs/broker/ibkr_oauth_application.md": "The '$1K per model across six books, $6K total, against a $30,000 floor' sizing is preserved as written (it is what was on the table when the section was researched) and carries a dated recompute block. The CONCLUSION does not move: $10,500 of committed exposure is still far below Alpaca's $30,000 business-account minimum, so the entity route remains capital-infeasible -- strengthened, not reversed. The MULTIPLE is stale: $30,000/$6,000 = 5x becomes 3.0x on the $10,000 registered base (2.9x on committed exposure). Cite 3x, not 5x. The $10,500 figure appears there only because an account minimum is a balance test, not a performance denominator.",
+          "docs/broker/broker_selection_research.md": "The per-book figure now equals the $2,000 Reg-T / Rule 4210(b)(4) threshold EXACTLY, and that is a coincidence, not a constraint. Three independent reasons, recorded so the inverse reading cannot take hold: (1) a book is not an account -- the registered cash-branch structure is software-segregated books on ONE account, and both $2,000 rules are account-level tests which the account's $10,500 clears by 5.25x; (2) the cash branch has no margin minimum at all, 4210(b)(4) being margin-account scoped; (3) the short-selling equity floor is moot under long-only v4 with shorting_enabled false. The live trap is reading $2,000/book as SATISFYING a per-book regulatory floor. It satisfies nothing per-book."
+        },
+        "tests": "439 passed. tests/test_mode_taxonomy.py's two config-facing guard tests were rewritten (not deleted): the pending-mode assertion became a confirmed-value assertion, and five new tests pin the base arithmetic, the reserve's structural exclusion, the pending cohort composition, and count/composition agreement.",
+        "sequence_note": "Parameters, then recompute, then registration -- the hub's own correction to the original dispatch, which asked for this entry first and would have required citing values that did not exist in tracked content. Generalizable: when a dispatch asks for the entry before the code that makes its measurements possible, the dispatch is impossible, not the entry."
+      },
+      {
+        "id": "deepseek_v41_substitution_premise_false",
+        "date": "2026-09-14",
+        "type": "boundary_record_correction",
+        "supersedes": "The entry queued at docs/boundaries/deepseek_v41_substitution_2026-09-10.md section 5.3, which was drafted as 'substitution, then reversal'. That draft is factually wrong and is not what landed. It was never written to this file -- rule 7 held it out until this quarantine window, which is the only reason the wrong text never entered the record.",
+        "corrects_prior_finding": "docs/boundaries/deepseek_v41_substitution_2026-09-10.md (pushed on origin/main at fccc454e), whose title, section 1 scope row, section 1 'known consequence' paragraph, section 3 framing and section 5.5 cohort-parity item are all wrong for the lab's cell. Corrected IN PLACE -- the capture is not deleted and no original sentence is removed; each wrong claim keeps its text and gains a dated correction block beneath it, so the record of what was believed on 2026-09-10 survives beside what was established on 2026-09-11.",
+        "net_state_changes_to_the_deepseek_cell": 0,
+        "what_actually_happened": [
+          "2026-09-09 -- press reports, unattested on any DeepSeek-controlled channel, that deepseek-v4-pro routes to V4.1 Flash and bills at Flash rates. The rate was HELD under hub ruling 2026-08-05 (old rate until a new rate is attested).",
+          "2026-09-10 -- V4.1 Flash ships. DeepSeek's change log, entry dated 2026-09-10: 'for compatibility, the model names deepseek-v4-flash and deepseek-v4-flash-vision-exp are temporarily routed to V4.1 Flash.' deepseek-v4-pro is NOT in that list. The lab calls deepseek-v4-pro. The press conflated the two model families.",
+          "2026-09-11 -- DeepSeek withdraws a planned 2026-09-14 retirement of V4 Pro: 'In response to user demand, we have decided to continue providing API services for DeepSeek V4 Pro after September 14, 2026, with the billing method remaining unchanged.' The real event was a RETIREMENT and its reversal, not a substitution."
+        ],
+        "no_substitution_asserted": "This entry asserts no substitution of the lab's cell, on any date. The v4-pro leg carries exactly the presumed-but-unobserved internal transitions it carried before; 2026-09-10 did not add one. persistent_model_status.deepseek is unchanged (exploratory_only / model_identity_stable / phase_a) and regime_boundaries is untouched -- there is no boundary to register.",
+        "telemetry_confirming_no_change": {
+          "system_fingerprint": "a307abda487cd1b463329ccb945ce396 on 26/26 post-boundary calls (2026-09-10 and 2026-09-11), identical to the pre-boundary Pro probe. Signal 1, 'decisive if it moves'. It did not move.",
+          "input_tokens": "8438.6 (window B baseline) -> 8420.9 -> 8427.7. No tokenizer shift.",
+          "api_finish_reason": "stop on 26/26.",
+          "cache_hit_tokens": "Exactly 2688 on all 26 calls -- a fixed cached system-prompt prefix. Constant, so no per-call signal, but a cheap prompt/tokenizer integrity check. It will move by construction when the v4 prompt lane lands; that is expected and is not a signal.",
+          "value": "Three independent signals agreeing with the provider channel are why 'no substitution' is a statement from our own instruments rather than from taking the change log's word for it. The instrumentation built for the capture was worth building even though the event it was aimed at did not occur."
+        },
+        "rate": {
+          "action": "NONE. The held period was right and is now attested.",
+          "attested": "The pricing page publishes deepseek-v4-pro at $0.022 cache-hit / $0.66 cache-miss / $1.98 output per 1M tokens -- byte-for-byte the registered 2026-08-16 period. The $0.003/$0.15/$0.60 figures the press attached to deepseek-v4-pro are real prices; they belong to the new deepseek-flash tier.",
+          "consequence_struck": "The capture's 'known consequence' -- a ~3.6x overstatement, ~+$0.18/trading day from 2026-09-10T13:33Z until attestation -- NEVER OCCURRED. There was no divergence from provider billing at any point, and no interval to correct retroactively.",
+          "ruling_vindicated_in_the_opposite_direction": "Hub ruling 2026-08-05 was feared to be costing us an overstatement. Had we instead registered the claimed cut, we would have UNDERSTATED DeepSeek cost by ~3.6x from 2026-09-10 onward, on traffic whose price never moved. Understating our own cost is the error direction the ruling exists to prevent."
+        },
+        "research_disclosure_replacing_the_void_cohort_parity_item": "The capture's section 5.5 cohort-parity worry is VOID -- the cell never left the Pro tier. What replaces it is live and worse: V4 Pro was scheduled for retirement on 2026-09-14 and was kept alive 'in response to user demand'. A provider has already tried once to sunset the model beneath one of the lab's six cells, and the reprieve is discretionary and undated. That is a standing continuity risk to a 1.5-year study and belongs in the disclosure for the 2026-09-17 methodology review.",
+        "evidence": "docs/boundaries/deepseek_v41_substitution_2026-09-10.md (as corrected in this commit); DeepSeek change log entry 2026-09-10 and pricing page, both verified 2026-09-11; data/trades/deepseek_2026-09.jsonl."
+      },
+      {
+        "id": "behavioral_tripwire_requires_a_cross_model_control_arm",
+        "date": "2026-09-14",
+        "type": "registration_item",
+        "scope": "Any behavioral or telemetry tripwire used to detect a provider-side change in one model cell.",
+        "rule": "A single cell's excursion against its own baseline is not evidence of a provider-specific event unless the sibling cells are scored on the same day against their own baselines and are flat. The control arm is part of the instrument, not a follow-up check: an uncontrolled single-cell reading may be reported as 'flag for investigation' but never as attribution.",
+        "origin": "Output tok/sec (signal 3 in the DeepSeek V4.1 capture, chosen precisely because it is a rate and therefore composition-robust) read +3.37 sd on 2026-09-10 -- rank 1 of 18 days, above the prior maximum, broad rather than outlier-driven (10 of 13 calls above the window-B per-call p90). It was presented as a composition-robust signal moving hard in the direction a Pro->Flash route predicts. It was not DeepSeek evidence at all.",
+        "what_the_control_showed": {
+          "method": "Same-day z for every cell against its own window-B baseline (2026-08-16..2026-09-09).",
+          "2026-09-09": {
+            "deepseek": -1.53,
+            "gpt": 1.3,
+            "grok": 0.01,
+            "gemini": 0.45,
+            "claude": -1.25,
+            "claude_opus": 2.56
+          },
+          "2026-09-10": {
+            "deepseek": 3.37,
+            "gpt": 0.86,
+            "grok": 4.22,
+            "gemini": -0.22,
+            "claude": -0.22,
+            "claude_opus": 1.11
+          },
+          "2026-09-11": {
+            "deepseek": -1.73,
+            "gpt": 1.4,
+            "grok": 1.96,
+            "gemini": 1.13,
+            "claude": 0.02,
+            "claude_opus": 1.49
+          },
+          "reading": "grok moved FURTHER than deepseek (+4.22) on the same day with no xAI event, and 2026-09-10 is the only day in the 19-day record with two cells past |z| > 2. A provider-specific cause cannot move two providers. The excursion was shared-cause -- host, network path, or scheduler."
+        },
+        "second_disqualifier_independent_of_the_control": "The excursion vanished within one day (2026-09-11: -1.73 sd) WHILE the substitution was still believed to be in force. A one-day transient is disqualifying on its own for an instrument meant to mark a persistent route change.",
+        "confounds_ruled_out_by_inspection_not_assumption": "src/adapters/base.py, which owns the time.perf_counter() region, is in neither adapter commit (1a5fee77, d6f3d6e9); both are pure additive .get() reads inside _call_api with 0 deletions; the output_tokens assignment is untouched in both; added work inside the timed region can only make latency larger, not smaller; all calls ran 13:34-19:34Z, off-peak on every published schedule.",
+        "consequence": "Output tok/sec is withdrawn as a substitution tripwire. system_fingerprint is promoted to primary -- it is the signal that held. Any future behavioral tripwire carries its control arm in the same read.",
+        "related": "The Gemini Phase-B week-one finding ('stratify before concluding') is the composition-side version of the same failure. This is the provider-side version: stratifying is not enough when the confound is shared across providers."
+      },
+      {
+        "id": "behavioral_tripwire_must_name_its_estimator",
+        "date": "2026-09-14",
+        "type": "registration_item",
+        "scope": "Any registered tripwire, threshold or gate stated as a mean and an sd.",
+        "rule": "A tripwire must name the estimator its baseline is computed from -- per-call or per-day, and over what unit of aggregation. A baseline stated as 'mean +/- sd' without that label is not a specification: the same window yields materially different sds depending on the unit, and a reader scoring a new observation against the wrong one gets a wrong z with no error raised anywhere.",
+        "measured_size_of_the_hazard": {
+          "window": "2026-08-16..2026-09-09, 17 trading days, DeepSeek output tok/sec",
+          "daily_mean_statistic": "56.16 +/- 3.29 (sd across 17 day means)",
+          "per_call_statistic": "56.26 +/- 7.67 (sd across 207 calls) -- the figure tabulated in the capture's section 2.2",
+          "same_quantity": false,
+          "effect": "Scoring a DAY MEAN against the PER-CALL sd understates z by ~2.3x. The 2026-09-10 observation reads +1.43 instead of +3.37 depending only on which sd is used.",
+          "neither_is_wrong": "Section 2.2 is not in error -- it reports a different quantity. The defect is that nothing in the document said which quantity the tripwire used, so both figures were in circulation as 'the baseline'."
+        },
+        "consequence": "Every baseline recorded for tripwire use states its estimator and aggregation unit alongside the mean and sd. Where both quantities are useful, both are tabulated and labelled, and the one the threshold is defined against is named explicitly.",
+        "note": "This item is independent of the control-arm item registered alongside it. The control arm addresses whether an excursion is attributable; this addresses whether the excursion's magnitude was computed correctly in the first place. Both defects were present in the same reading, and either alone would have been enough to invalidate it.",
+        "evidence": "docs/boundaries/deepseek_v41_substitution_2026-09-10.md section 2.2 and its section 3 correction block; data/trades/deepseek_2026-0[89].jsonl."
       }
     ]
   }

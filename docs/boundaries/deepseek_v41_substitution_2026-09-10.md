@@ -1,6 +1,42 @@
 # DeepSeek V4-Pro → V4.1-Flash forced substitution — pre-boundary capture
 
-**Boundary:** 2026-09-10T04:00:00Z (claimed; see §1 on attestation)
+> # ⚠ CORRECTED IN PLACE — 2026-09-11. THE PREMISE OF THIS DOCUMENT IS FALSE.
+>
+> **`deepseek-v4-pro` was never routed to V4.1 Flash.** DeepSeek's own change
+> log, entry dated 2026-09-10 and verified on 2026-09-11 — the channel that was
+> still silent at the 01:07Z check recorded in §1 — says verbatim:
+>
+> > "for compatibility, the model names `deepseek-v4-flash` and
+> > `deepseek-v4-flash-vision-exp` are temporarily routed to V4.1 Flash."
+>
+> **`deepseek-v4-pro` is not in that list, and the lab calls `deepseek-v4-pro`.**
+> The press reports this capture was built on conflated the two model families.
+> The capture recorded those reports as unattested, which is why holding the rate
+> was the right call — but the title's claim, the §1 scope row, the §1 "known
+> consequence" paragraph and §3's framing are all wrong for our cell, and each is
+> corrected in place below.
+>
+> **The real event was a retirement, and then its reversal.** The same channels
+> carry: *"In response to user demand, we have decided to continue providing API
+> services for DeepSeek V4 Pro after September 14, 2026, with the billing method
+> remaining unchanged."* V4 Pro was days from being sunset. What was reversed was
+> a **retirement of our model**, not a substitution of it. That is a standing
+> continuity risk for a 1.5-year study and belongs in the Research disclosure.
+>
+> **Net state changes to the lab's DeepSeek cell: zero.** No model change, no
+> rate change, no version-boundary transition. The v4-pro leg still carries
+> exactly the presumed-but-unobserved internal transitions it carried before;
+> 2026-09-10 is not another one.
+>
+> **This document is not deleted, and the capture below is not struck.** The
+> negative result *is* the finding: three independent telemetry signals
+> (§2.5/§3 — fingerprint, tokenizer, finish reason) let us say "no substitution"
+> from our own instruments rather than by taking the change log's word for it.
+> The methodology held; the premise it was pointed at did not. Ledger:
+> `operational_events.2026-09.deepseek_v41_substitution_premise_false`.
+
+**Boundary:** 2026-09-10T04:00:00Z (claimed; see §1 on attestation — **and see
+the correction above: no boundary applied to `deepseek-v4-pro`**)
 **Capture frozen at:** 2026-09-10T01:07Z–01:20Z (≈3 hours before the boundary)
 **Data source:** `origin/main` @ `bbb1d886`, decision logs `data/trades/deepseek_2026-*.jsonl`
 **Last pre-boundary production call:** 2026-09-09T19:34:22Z
@@ -9,6 +45,13 @@
 DeepSeek announced on 2026-09-09 that until V4.1 Pro ships, every
 `deepseek-v4-pro` request routes to V4.1 Flash and bills at Flash rates. **The
 model string on the wire does not change.**
+
+> **CORRECTED 2026-09-11.** "every `deepseek-v4-pro` request" was the press's
+> claim, not DeepSeek's. The routing applied to `deepseek-v4-flash` and
+> `deepseek-v4-flash-vision-exp` only. The rest of this section stands as
+> written: it is the record of what was checkable at 01:07Z, and its ruling —
+> hold the rate until attested — is what kept the error out of our cost
+> figures.
 
 This is the third DeepSeek identity event in the lab's life and the first with
 advance notice. The 2026-07-20 GA swap became a *disclosed gap* in the
@@ -72,6 +115,20 @@ traffic prices at $0.66/$1.98 while the provider bills ≈$0.15/$0.60 — roughl
 baseline below. Costs are repriced at *read* time from stored tokens
 (`performance.reprice_record_usd`), so landing the period later corrects the
 whole interval retroactively. **Nothing is lost by waiting.**
+
+> **STRUCK 2026-09-11 — this consequence never occurred.** The pricing page now
+> attests `deepseek-v4-pro` at **$0.022 / $0.66 / $1.98** — byte-for-byte our
+> registered 2026-08-16 period. The $0.003/$0.15/$0.60 figures are real prices;
+> they belong to the new `deepseek-flash` tier, not to our model. There was no
+> divergence between our model and the provider's billing at any point, so there
+> is no overstatement, no $0.18/trading day, and no interval to correct
+> retroactively.
+>
+> **The 2026-08-05 ruling is vindicated, in the opposite direction from the one
+> feared.** Had we registered the claimed cut we would have **understated**
+> DeepSeek cost by ≈3.6× from 09-10 onward, on traffic whose price never moved.
+> Open item §5.2 (read the provider invoice) is now a confirmation step, not a
+> detection step.
 
 ### One thing that *was* attested, and was wrong in our table
 
@@ -254,6 +311,49 @@ the one field the provider has told us will hold still.
 
 This is the same mechanism that made 2026-07-20 invisible.
 
+> **CORRECTED 2026-09-11 — the limitation is real; the event it was aimed at was
+> not.** Everything in this subsection about `detect_version_transition` holds:
+> it compares the alias echo and cannot fire on a route change beneath a stable
+> string. That is a permanent, disclosable limitation. What is withdrawn is the
+> premise that it *failed to fire on a real 2026-09-10 substitution* — there was
+> nothing to fire on. The detector's silence on 09-10 was correct.
+>
+> **The signals below were then run in anger, and they are why we can say so.**
+> `system_fingerprint` `a307abda…ce396` on **26/26** post-boundary calls (09-10
+> and 09-11), `input_tokens` flat (8438.6 → 8420.9 → 8427.7, no tokenizer shift),
+> `api_finish_reason` `stop` 26/26. Three independent signals, all reading "no
+> change", in agreement with the provider channel.
+>
+> **Signal 3 (output tok/sec) produced a false positive and is withdrawn as a
+> tripwire.** 2026-09-10 read **+3.37 sd** against the daily-mean baseline —
+> rank 1 of 18, above the prior maximum, broad rather than outlier-driven — and
+> it was **not DeepSeek evidence**. It vanished within one day (09-11:
+> −1.73 sd) *while the substitution was still believed to be in force*, and the
+> cross-model control settles it: **grok moved +4.22 sd the same day with no xAI
+> event**, and 09-10 is the only day in the 19-day record with two cells past
+> |z| > 2. A provider-specific cause cannot move two providers; the excursion was
+> shared-cause — host, network path, or scheduler. Confounds were ruled out by
+> inspection rather than assumption: `src/adapters/base.py` (which owns the
+> `perf_counter` region) is in neither adapter commit, both are pure additive
+> `.get()` reads with 0 deletions, the `output_tokens` assignment is untouched in
+> both, and all calls ran 13:34–19:34Z, off-peak on every published schedule.
+>
+> Two registration items come out of this and are carried in the same ledger
+> window: **a behavioral tripwire requires a cross-model control arm**, and **a
+> tripwire must name its estimator**. On the second — the daily-mean statistic
+> (56.16 ± 3.29, sd across 17 day-means) and §2.2's per-call statistic
+> (56.26 ± 7.67) are different quantities over the same window, and scoring a day
+> mean against the per-call sd understates z by ≈2.3× (+1.43 instead of +3.37).
+> Nothing in §2.2 is wrong; nothing in this document said which quantity the
+> tripwire used. Promote `system_fingerprint` to primary — it is the signal that
+> held.
+>
+> One addition to the signal table: `cache_hit_tokens` is **exactly 2688 on all
+> 26 calls**, a fixed cached system-prompt prefix. Constant, so it carries no
+> per-call signal, but a prompt-handling or tokenizer change would move it — a
+> cheap integrity check. It will move by construction when the v4 prompt lane
+> lands, which is expected and is not a signal.
+
 ### The correction to the 2026-07-27 finding
 
 The V4-GA record concluded "no fingerprint/metadata captured anywhere, so the
@@ -358,3 +458,20 @@ disclose, not one this lab can close.
    route to a Flash tier is that decision being reversed by the provider. Whether
    the cell stays, moves, or is disclosed as tier-changed is a Research question,
    not an Operations one.
+
+   > **VOID 2026-09-11.** The cell never left the Pro tier, so there is no parity
+   > question to answer. **What replaces it is worse, and it is live:** V4 Pro
+   > was scheduled for retirement on 2026-09-14 and was kept alive "in response
+   > to user demand." A provider has already tried once to sunset the model
+   > under one of the lab's six cells, and the reprieve is discretionary and
+   > undated. That is a standing continuity risk to a 1.5-year study, and it
+   > belongs in the Research disclosure for the 2026-09-17 methodology review.
+
+6. **Open items 1 and 2 are closed by the correction banner.** The rate needs no
+   action — the held period is now attested on DeepSeek's own pricing page. The
+   invoice read is confirmation, not detection. Item 3 (ledger) landed
+   2026-09-14 in the quarantine window, restated: see
+   `operational_events.2026-09.deepseek_v41_substitution_premise_false`. Item 4
+   (Research disclosure) stands as written — the count of
+   presumed-but-unobserved transitions on the v4-pro leg is unchanged, because
+   2026-09-10 did not add one.
