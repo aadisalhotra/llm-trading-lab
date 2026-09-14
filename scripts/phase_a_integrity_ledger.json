@@ -926,6 +926,31 @@
         "consequence": "Every baseline recorded for tripwire use states its estimator and aggregation unit alongside the mean and sd. Where both quantities are useful, both are tabulated and labelled, and the one the threshold is defined against is named explicitly.",
         "note": "This item is independent of the control-arm item registered alongside it. The control arm addresses whether an excursion is attributable; this addresses whether the excursion's magnitude was computed correctly in the first place. Both defects were present in the same reading, and either alone would have been enough to invalidate it.",
         "evidence": "docs/boundaries/deepseek_v41_substitution_2026-09-10.md section 2.2 and its section 3 correction block; data/trades/deepseek_2026-0[89].jsonl."
+      },
+      {
+        "id": "live_cohort_composition_ruled",
+        "date": "2026-09-14",
+        "type": "capital_registration",
+        "ruling": "Hub 2026-09-14. The Phase B live cohort is [claude, claude_opus, gpt, gemini, grok]. DeepSeek is excluded per the exploratory-only determination. This resolves the composition that phase_b_capital_parameters recorded as UNRESOLVED -- that entry registered the COUNT (five) and refused to name the books.",
+        "fix_commit": "506382ba",
+        "amends": "operational_events.2026-09.phase_b_capital_parameters.cohort_composition_UNRESOLVED. That entry is not edited; this one supplies what it withheld.",
+        "config_path": "config/settings.json -> capital_structure.live_cohort_keys",
+        "ratification_status": {
+          "state": "HUB-RULED, NOT YET RATIFIED",
+          "ratifies_at": "Rossi methodology review, 2026-09-17",
+          "reversal_cost": "One line. Amend capital_structure.live_cohort_keys and, if the count changes, live_cohort_book_count. Nothing else moves: registered_capital_base() is computed from the count at read time and no total is stored anywhere, so the base follows automatically and there is no second site to chase. This property is deliberate and is what makes landing an unratified ruling safe.",
+          "why_land_it_before_ratification": "PendingCohortError is fatal by design, and leaving it armed past the ruling would block any work that needs to size the live cohort. Landing it with the ratification status recorded costs a one-line amendment if reversed; leaving it pending costs the blocked work."
+        },
+        "pending_cohort_error_cleared": "config_loader.live_cohort_keys() no longer raises. The guard is satisfied, not retired: a null composition still raises, a named list that disagrees with live_cohort_book_count still raises, and an unknown model key still raises. All three are pinned by tests/test_mode_taxonomy.py.",
+        "not_a_derived_value": "The composition is NOT the core cohort, and this is the load-bearing point. The core/expansion split in settings.json gives five core books (claude, gpt, gemini, grok, deepseek) and one expansion book (claude_opus) -- arithmetically exactly five, and WRONG: the ruling excludes deepseek and funds claude_opus, the opposite assignment on both cells. Operations refused to derive the composition when phase_b_capital_parameters landed, and the obvious derivation would have been wrong on the merits while reading as a confirmed registration decision. tests/test_mode_taxonomy.py::test_the_live_cohort_composition_is_the_hub_ruled_five asserts the ruled set differs from the core cohort, so it cannot be silently re-derived from the cohort tags later.",
+        "observation_for_ratification": {
+          "status": "RECORDED, not a challenge to the ruling",
+          "detail": "The determination the exclusion rests on is at persistent_model_status.deepseek: {status: exploratory_only, failed_gate: model_identity_stable, scope: phase_a}. Its scope field reads phase_a. Carrying a Phase-A-scoped determination into a Phase B funding decision is a reasonable reading and may be the intended one, but it is a reading rather than something the record states outright, and it is the kind of question a methodology review asks. Recorded so the answer is prepared rather than improvised on 2026-09-17.",
+          "the_apparent_asymmetry_resolves": "Two books that are non_estimable for Phase A -- claude and claude_opus -- ARE funded, which looks inconsistent with excluding deepseek on a Phase-A determination. It is not. Their failed gate is uncorrupted_book, from the launch-window corruption, and a freshly incepted Phase B book cannot inherit the corruption of a book that no longer exists. DeepSeek's failed gate is model_identity_stable, which is a property of the provider's behaviour rather than of a book, and that does carry forward. The 2026-09-10/11 episode is the current evidence for it: the provider scheduled V4 Pro for retirement on 2026-09-14 and withdrew it, on an alias the transition detector structurally cannot fire on. See deepseek_v41_substitution_premise_false.",
+          "prior_transitions_on_the_leg": "The deepseek-v4-pro leg spans 2026-05-22 to present carrying presumed-but-unobserved internal transitions -- the 2026-07-20 GA swap is the documented one, and it produced no detector event at all, which is the disclosed gap in the version-boundary record. That is the substance of the identity-stability gate failure. The 2026-09-10 event is NOT among them; see deepseek_v41_substitution_premise_false."
+        },
+        "capital_unchanged": "The registered base stays $10,000 (5 x $2,000) and RESERVE_MASTER stays $500 ADDITIONAL, outside the base and out of every return denominator. Naming the books changes no figure in phase_b_capital_parameters.recompute -- the per-book breakeven figures there are per-book and composition-independent, and the cohort lines already labelled their five-book subtotals CONDITIONAL. Those subtotals were computed on the CORE five and are therefore NOT the ruled cohort's spend; the ruled cohort's August spend is claude 24.6895 + claude_opus 35.9121 + gpt 15.1953 + gemini 11.4053 + grok 4.7265 = $91.9287, i.e. 0.9193%/month on the $10,000 base (11.6066%/yr), against the $60.0008 / 0.6000% figure the conditional core-five line carried. The conditional label did its job: the number it named is not the one that governs.",
+        "tests": "440 passed."
       }
     ]
   }
