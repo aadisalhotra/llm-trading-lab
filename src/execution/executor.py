@@ -51,13 +51,9 @@ CONSTRAINT_UNSETTLED_FUNDS_CAPPED = "UNSETTLED_FUNDS_CAPPED"  # filled, but smal
 # sizing can produce sub-$1 orders that whole-share sizing never could, so this
 # is caught before submission rather than collected as a venue rejection.
 #
-# UNREGISTERED CLASSIFICATION (2026-08-29). Treated here as an
-# execution-constraint event — a legitimate venue limit, therefore
-# G-EXEC-successful — by analogy with the registered settled-funds block. That
-# reading is Operations', accepted by the hub and routed to Research; it is NOT
-# yet registered text. Until the registration lands, any G-EXEC figure that
-# depends on this code's classification carries that caveat. Delete this notice
-# when the Tier 2 text lands, and not before.
+# Registered 2026-09-15 (docs/prereg/tier2_novel_sections.md, "Below-venue-
+# minimum execution constraint"): a legitimate venue limit, therefore
+# G-EXEC-successful, by the same reasoning as the settled-funds block.
 CONSTRAINT_BELOW_VENUE_MINIMUM = "BELOW_VENUE_MINIMUM"
 
 # Registered 2026-08-29: an order still unfilled at the 5-minute fill deadline
@@ -70,8 +66,14 @@ CONSTRAINT_UNFILLED_AT_DEADLINE = "UNFILLED_AT_DEADLINE"
 # the venue rejects a SELL on a symbol while any BUY on it is open (HTTP 403,
 # verified 2026-08-29; ~7.7% of Phase A trading cycles contain the condition).
 # This is an artifact of OUR account structure, not a market constraint, so it
-# is deliberately NOT filed with legitimate rejections. Its Gate 4 class is an
-# open hub/Research question; resolution (cross-book submission ordering) is P1.
+# is deliberately NOT filed with legitimate rejections. The 2026-09-15 RTH
+# probe confirmed the block clears on a terminal FILLED (not just CANCELLED),
+# validating the P1 barrier's release condition; the barrier itself (cross-book
+# submission ordering, P1) is registered but not yet built, so this constant
+# still marks the un-mediated, un-registered-as-legitimate collision. Once the
+# barrier ships, a residual post-barrier rejection is a distinct, separately
+# registered class — see WASH_REJECT_POST_BARRIER in
+# docs/prereg/tier2_novel_sections.md's amended Gate 4 text.
 CONSTRAINT_WASH_TRADE_BLOCK = "WASH_TRADE_BLOCK"
 
 
