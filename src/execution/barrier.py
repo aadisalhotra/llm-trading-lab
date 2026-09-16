@@ -176,7 +176,14 @@ class CycleBarrier:
         gate = self.gate_for(book, ticker, action)
         if gate is None:
             return
-        if not gate.wait(timeout=self._release_timeout):
+        released = gate.wait(timeout=self._release_timeout)
+        if released:
+            # Observability seam for integration probes: proves, from the
+            # log timeline alone, that the held order's submission followed
+            # the winner's terminal state rather than racing it.
+            logger.info("CycleBarrier: releasing %s %s %s -- contender reached "
+                        "terminal state", book, action, ticker)
+        else:
             logger.warning(
                 "CycleBarrier: releasing %s %s %s after %.0fs without the "
                 "contending order reaching terminal state -- proceeding; a "
@@ -189,6 +196,11 @@ class CycleBarrier:
         iff (book, ticker, action) is the ticker's registered winner."""
         if self._winners.get(ticker) != (book, action):
             return
+        gates = [(held_book, held_action) for (t_ticker, held_book, held_action)
+                in self._gates if t_ticker == ticker]
+        if gates:
+            logger.info("CycleBarrier: %s %s %s is terminal -- releasing %s",
+                        book, action, ticker, gates)
         for (t_ticker, _held_book, _held_action), gate in self._gates.items():
             if t_ticker == ticker:
                 gate.set()
