@@ -20,6 +20,7 @@ path, a book that flattened while the venue position stayed open.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -27,6 +28,7 @@ from typing import Any
 from ..config_loader import load_settings
 from ..portfolio import Portfolio
 from ..portfolio.settlement import settlement_days, settlement_enforcement_active
+from .barrier import CycleBarrier, Intent
 from .broker import (
     BROKER_MODES,
     MIN_ORDER_NOTIONAL,
@@ -66,15 +68,25 @@ CONSTRAINT_UNFILLED_AT_DEADLINE = "UNFILLED_AT_DEADLINE"
 # the venue rejects a SELL on a symbol while any BUY on it is open (HTTP 403,
 # verified 2026-08-29; ~7.7% of Phase A trading cycles contain the condition).
 # This is an artifact of OUR account structure, not a market constraint, so it
-# is deliberately NOT filed with legitimate rejections. The 2026-09-15 RTH
-# probe confirmed the block clears on a terminal FILLED (not just CANCELLED),
-# validating the P1 barrier's release condition; the barrier itself (cross-book
-# submission ordering, P1) is registered but not yet built, so this constant
-# still marks the un-mediated, un-registered-as-legitimate collision. Once the
-# barrier ships, a residual post-barrier rejection is a distinct, separately
-# registered class — see WASH_REJECT_POST_BARRIER in
-# docs/prereg/tier2_novel_sections.md's amended Gate 4 text.
+# is deliberately NOT filed with legitimate rejections. This is what the P1
+# barrier (below, and .barrier.CycleBarrier) exists to serialize away; a
+# rejection still classified under THIS constant means the barrier either
+# wasn't running (paper/no-barrier caller) or did not identify the order as
+# contended (e.g. a stale open order from outside this cycle).
 CONSTRAINT_WASH_TRADE_BLOCK = "WASH_TRADE_BLOCK"
+
+# Registered 2026-09-15 (docs/prereg/tier2_novel_sections.md, Gate 4 amended):
+# a wash-trade rejection on an order the P1 barrier DID gate (held pending its
+# contender's terminal state) and STILL got rejected once released. This is
+# G-EXEC-successful under Gate 4 — expectation ~=0; a nonzero rate is a
+# barrier-implementation signal, not a routine venue collision.
+CONSTRAINT_WASH_REJECT_POST_BARRIER = "WASH_REJECT_POST_BARRIER"
+
+# Broker-side mapping (verified against the actual submission calls below,
+# not assumed): BUY and COVER both submit as a broker "buy"; SELL and SHORT
+# both submit as a broker "sell". This is also the wash-trade contention
+# grouping the P1 barrier keys on — see .barrier.BUY_SIDE_ACTIONS.
+_BROKER_SIDE = {"BUY": "buy", "COVER": "buy", "SELL": "sell", "SHORT": "sell"}
 
 
 @dataclass
@@ -116,6 +128,24 @@ class _Placement:
     def moved(self) -> bool:
         """Whether anything filled. The book moves iff this is True."""
         return self.filled_qty > 0 and self.fill_price > 0
+
+
+@dataclass
+class _SizedOrder:
+    """A decision sized into a concrete order, not yet submitted.
+
+    Broker-mode-only intermediate shape (P1): `execute_decisions` sizes every
+    decision in the batch first (so the settled-cash reservation accumulator
+    can run across them) and only then submits, so no order is placed before
+    every book has registered its intents with the cycle barrier.
+    """
+    decision: dict[str, Any]
+    action: str            # BUY / SELL / SHORT / COVER
+    ticker: str
+    shares: float
+    price: float            # reference price the size was computed against
+    broker_side: str        # "buy" / "sell"
+    constraint: str = ""    # pre-submission constraint, e.g. UNSETTLED_FUNDS_CAPPED
 
 
 class Executor:
@@ -261,10 +291,24 @@ class Executor:
         decisions: list[dict[str, Any]],
         prices: dict[str, float],
         run_date: str | None = None,
+        barrier: CycleBarrier | None = None,
     ) -> list[ExecutionResult]:
+        """Execute one book's decisions for the cycle.
+
+        `barrier` is the P1 cross-book submission barrier (see .barrier),
+        shared by reference across every book's thread for this cycle. It is
+        used only in broker modes — the simulator has no venue to collide on,
+        so paper-mode behavior below is byte-for-byte unchanged from before
+        P1 (same loop, same `_execute_one`, no reservation accounting, no
+        barrier registration), which is deliberate: Phase A's reproducibility
+        depends on the simulator path never changing shape.
+        """
         # Mature settled proceeds before anything is priced against them, so a
         # cycle never blocks a purchase on funds that settled this morning.
         self.advance_settlement(portfolio, run_date)
+        if self.broker_enabled:
+            return self._execute_decisions_via_broker(portfolio, decisions, prices,
+                                                       run_date, barrier)
         results: list[ExecutionResult] = []
         for d in decisions:
             try:
@@ -278,6 +322,363 @@ class Executor:
                 )
             results.append(r)
         return results
+
+    # ----- broker-mode execution (P1: submit-all-then-poll-all, barrier-gated) -----
+
+    def _execute_decisions_via_broker(
+        self,
+        portfolio: Portfolio,
+        decisions: list[dict[str, Any]],
+        prices: dict[str, float],
+        run_date: str | None,
+        barrier: CycleBarrier | None,
+    ) -> list[ExecutionResult]:
+        """Size every decision first (reservation-aware), THEN submit all of
+        this book's orders concurrently and poll them all to terminal,
+        instead of the simulator's submit-one-wait-confirm-then-size-the-next
+        loop. Replaces the P0 broker path's per-decision `_execute_one` call
+        for broker modes only; the simulator path above is untouched.
+        """
+        # Indexed by ORIGINAL decision position throughout, so the final
+        # return preserves that order regardless of which decisions needed a
+        # venue order and which resolved immediately (HOLD/SKIP/no-op).
+        slots: list[ExecutionResult | None] = [None] * len(decisions)
+        sized: list[tuple[int, _SizedOrder]] = []
+        # Settled-cash reservation accumulator (P1 ratified constraint #2):
+        # concurrent submission means no earlier order in this batch has
+        # necessarily filled yet, so sizing the Nth BUY/COVER against
+        # `portfolio.cash`/`settled_cash()` alone would let every one of this
+        # book's own buys in the same cycle draw on the SAME unspent cash.
+        # `reserved` is running-summed here (single-threaded — one book's own
+        # decisions are still sized in order) and never applied twice: it is
+        # subtracted from spendable at sizing time only, never touches
+        # `portfolio.cash` itself, which still moves only on a confirmed fill.
+        reserved = 0.0
+        for idx, d in enumerate(decisions):
+            try:
+                outcome = self._size_for_broker(portfolio, d, prices, run_date, reserved)
+            except Exception as e:
+                logger.exception("Sizing failed for %s: %s", d, e)
+                slots[idx] = ExecutionResult(
+                    decision=d, executed=False, side="SKIP",
+                    ticker=d.get("ticker", ""), shares=0, fill_price=0, notional=0,
+                    error=str(e))
+                continue
+            if isinstance(outcome, ExecutionResult):
+                slots[idx] = outcome
+                continue
+            sized.append((idx, outcome))
+            if outcome.broker_side == "buy":
+                # BUY and COVER are the cash-consuming sides; reserve both,
+                # per the registered rule, even though COVER's own sizing
+                # (below) is not itself cash-gated — matching pre-P1 behavior.
+                reserved += outcome.shares * outcome.price
+
+        if sized:
+            for idx, result in self._submit_and_poll(portfolio, sized, run_date, barrier):
+                slots[idx] = result
+        elif barrier is not None:
+            # Nothing to submit this cycle, but the other books still need
+            # this book's (empty) registration to complete the rendezvous.
+            barrier.register(portfolio.model_key, [])
+        return slots
+
+    def _size_for_broker(
+        self,
+        portfolio: Portfolio,
+        decision: dict[str, Any],
+        prices: dict[str, float],
+        run_date: str | None,
+        reserved: float,
+    ) -> ExecutionResult | _SizedOrder:
+        """Same sizing math as `_execute_one`, minus the submission call, plus
+        the reservation offset on BUY's spendable-cash cap. Kept as a separate
+        method (not shared with `_execute_one`) so the simulator's sizing path
+        is provably untouched by the reservation accounting added here.
+        """
+        action = decision["action"]
+        ticker = decision["ticker"]
+
+        if action == "HOLD":
+            return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                   ticker=ticker, shares=0, fill_price=0, notional=0,
+                                   order_id="HOLD")
+
+        price = prices.get(ticker)
+        if price is None or price <= 0:
+            return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                   ticker=ticker, shares=0, fill_price=0, notional=0,
+                                   error="No price available")
+
+        target_weight = float(decision.get("target_weight", 0))
+        total_value = portfolio.total_value(prices)
+
+        if action == "BUY":
+            target_notional = total_value * target_weight
+            current_notional = portfolio.holdings[ticker].market_value(price) if ticker in portfolio.holdings else 0
+            delta_notional = target_notional - current_notional
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_AT_TARGET")
+            spendable = self._spendable_cash(portfolio, run_date) - reserved
+            constrained_by_settlement = spendable < min(delta_notional, portfolio.cash - reserved)
+            delta_notional = min(delta_notional, max(spendable, 0.0))
+            if delta_notional < price:
+                if constrained_by_settlement and portfolio.cash - reserved >= price:
+                    logger.info(
+                        "[%s] BUY %s blocked: settled cash %.2f (reserved %.2f) < price %.2f",
+                        portfolio.model_key, ticker, spendable, reserved, price)
+                    return ExecutionResult(
+                        decision=decision, executed=False, side="SKIP",
+                        ticker=ticker, shares=0, fill_price=price, notional=0,
+                        order_id="EXEC_CONSTRAINT_UNSETTLED_FUNDS",
+                        constraint=CONSTRAINT_UNSETTLED_FUNDS,
+                        error=(f"Blocked at submission: purchase requires settled funds; "
+                               f"settled {spendable:.2f} after reservations, "
+                               f"unsettled {portfolio.unsettled_cash():.2f}"),
+                    )
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Insufficient cash for meaningful position")
+            shares = int(delta_notional / price * 10000) / 10000
+            if shares <= 0:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Computed share quantity rounded to zero")
+            return _SizedOrder(decision=decision, action="BUY", ticker=ticker,
+                               shares=shares, price=price, broker_side="buy",
+                               constraint=(CONSTRAINT_UNSETTLED_FUNDS_CAPPED
+                                           if constrained_by_settlement else ""))
+
+        if action == "SELL":
+            if ticker not in portfolio.holdings:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Not held")
+            h = portfolio.holdings[ticker]
+            current_notional = h.market_value(price)
+            target_notional = total_value * target_weight
+            delta_notional = current_notional - target_notional
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_BELOW_TARGET")
+            shares = min(int(delta_notional / price * 10000) / 10000, h.shares)
+            return _SizedOrder(decision=decision, action="SELL", ticker=ticker,
+                               shares=shares, price=price, broker_side="sell")
+
+        if action == "SHORT":
+            if ticker in portfolio.holdings and not portfolio.holdings[ticker].is_short:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Held long — cannot short; SELL first")
+            target_notional = total_value * target_weight
+            current_short = -portfolio.holdings[ticker].market_value(price) if ticker in portfolio.holdings else 0.0
+            delta_notional = target_notional - current_short
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_AT_SHORT_TARGET")
+            shares = int(delta_notional / price * 10000) / 10000
+            if shares <= 0:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Computed short quantity rounded to zero")
+            return _SizedOrder(decision=decision, action="SHORT", ticker=ticker,
+                               shares=shares, price=price, broker_side="sell")
+
+        if action == "COVER":
+            if ticker not in portfolio.holdings or not portfolio.holdings[ticker].is_short:
+                return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       error="Not held short")
+            h = portfolio.holdings[ticker]
+            current_short = -h.market_value(price)
+            target_notional = total_value * target_weight
+            delta_notional = current_short - target_notional
+            if delta_notional <= 0:
+                return ExecutionResult(decision=decision, executed=True, side="HOLD",
+                                       ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       order_id="ALREADY_BELOW_SHORT_TARGET")
+            shares = min(int(delta_notional / price * 10000) / 10000, abs(h.shares))
+            return _SizedOrder(decision=decision, action="COVER", ticker=ticker,
+                               shares=shares, price=price, broker_side="buy")
+
+        return ExecutionResult(decision=decision, executed=False, side="SKIP",
+                               ticker=ticker, shares=0, fill_price=price, notional=0,
+                               error=f"Unknown action: {action}")
+
+    def _submit_and_poll(
+        self,
+        portfolio: Portfolio,
+        sized: list[tuple[int, _SizedOrder]],
+        run_date: str | None,
+        barrier: CycleBarrier | None,
+    ) -> list[tuple[int, ExecutionResult]]:
+        """Rule 2's sequencing (sell-side ids assigned before buy-side),
+        then every order runs its own (wait-if-held -> submit -> poll ->
+        release-if-winner) lifecycle in its own thread, so one held order
+        never blocks an unrelated, uncontended order from this same book.
+        Returns (original_decision_index, result) pairs — caller places them
+        back into decision order.
+        """
+        book = portfolio.model_key
+        if barrier is not None:
+            barrier.register(book, [Intent(book=book, ticker=s.ticker, action=s.action)
+                                    for _, s in sized])
+
+        # Sell-side ids before buy-side ids — deterministic and auditable,
+        # independent of whichever order's HTTP call actually lands first.
+        # Returned results carry their original decision index regardless;
+        # only client_order_id ASSIGNMENT follows the sells-first sequence.
+        n = len(sized)
+        id_order = sorted(range(n),
+                          key=lambda i: (1 if sized[i][1].broker_side == "buy" else 0, i))
+        client_order_ids: list[str] = [""] * n
+        for i in id_order:
+            client_order_ids[i] = self._next_order_id(book)
+
+        def _run(s: _SizedOrder, client_order_id: str) -> _Placement:
+            if barrier is not None:
+                barrier.wait_to_submit(book, s.ticker, s.action)
+            try:
+                placement = self._submit_one(book, s, client_order_id, barrier)
+            finally:
+                # Release anything held on this ticker regardless of outcome
+                # (filled, cancelled, or rejected at submission) — a rejected
+                # order never became open at the venue either, so a held
+                # contender must not wait out the full release timeout for it.
+                if barrier is not None:
+                    barrier.notify_terminal(book, s.ticker, s.action)
+            return placement
+
+        placements: dict[int, _Placement] = {}
+        with ThreadPoolExecutor(max_workers=max(1, n),
+                                thread_name_prefix=f"order-{book}") as pool:
+            futures = {pool.submit(_run, sized[i][1], client_order_ids[i]): i
+                      for i in range(n)}
+            for fut in as_completed(futures):
+                placements[futures[fut]] = fut.result()
+
+        return [(sized[i][0], self._apply_placement(portfolio, sized[i][1], placements[i], run_date))
+                for i in range(n)]
+
+    def _submit_one(
+        self, book: str, s: _SizedOrder, client_order_id: str,
+        barrier: CycleBarrier | None,
+    ) -> _Placement:
+        """Submit one order and resolve it to a terminal broker-confirmed
+        state. Split out of `_run` so `notify_terminal` fires from a single
+        `finally` regardless of which branch below returns."""
+        notional = abs(s.shares * s.price)
+        if notional < MIN_ORDER_NOTIONAL:
+            logger.info("[%s] %s %s skipped: notional %.2f below the venue "
+                        "minimum of %.2f", book, s.action, s.ticker, notional,
+                        MIN_ORDER_NOTIONAL)
+            return _Placement(
+                constraint=CONSTRAINT_BELOW_VENUE_MINIMUM,
+                error=(f"Order notional {notional:.2f} is below the venue "
+                       f"minimum of {MIN_ORDER_NOTIONAL:.2f}"))
+        was_gated = barrier is not None and barrier.gate_for(book, s.ticker, s.action) is not None
+        try:
+            order = self.broker.submit_market_order(
+                ticker=s.ticker, shares=s.shares, side=s.broker_side,
+                client_order_id=client_order_id)
+        except BrokerAPIError as e:
+            return self._classify_rejection(book, s, client_order_id, e, was_gated)
+        try:
+            order, hit_deadline = self.broker.await_terminal(order)
+        except BrokerAPIError as e:
+            return self._classify_rejection(book, s, client_order_id, e, was_gated)
+        placement = _Placement(filled_qty=order.filled_qty, fill_price=order.filled_avg_price,
+                               order_id=order.client_order_id, order=order)
+        if hit_deadline and order.filled_qty < order.requested_qty:
+            placement.constraint = CONSTRAINT_UNFILLED_AT_DEADLINE
+        if not placement.moved:
+            placement.error = placement.error or (
+                f"No fill: terminal status {order.status!r} "
+                f"(filled {order.filled_qty:g} of {order.requested_qty:g})")
+        return placement
+
+    def _classify_rejection(
+        self, book: str, s: _SizedOrder, client_order_id: str,
+        e: BrokerAPIError, was_gated: bool,
+    ) -> _Placement:
+        if e.is_wash_trade:
+            if was_gated:
+                # The barrier held this order and released it only once its
+                # contender was terminal, and the venue still rejected it —
+                # the registered ~=0-expectation case, not the routine
+                # un-mediated collision.
+                logger.error(
+                    "[%s] %s %s REJECTED as a wash trade AFTER the P1 barrier "
+                    "released it — barrier-implementation signal, not a "
+                    "routine collision.", book, s.action, s.ticker)
+                return _Placement(order_id=client_order_id,
+                                  constraint=CONSTRAINT_WASH_REJECT_POST_BARRIER,
+                                  error=f"Post-barrier wash-trade rejection: {e}")
+            logger.error(
+                "[%s] %s %s REJECTED as a wash trade — another book holds "
+                "an open opposite-side order on this symbol. This is the "
+                "un-mediated account-structure collision.", book, s.action, s.ticker)
+            return _Placement(order_id=client_order_id,
+                              constraint=CONSTRAINT_WASH_TRADE_BLOCK,
+                              error=f"Wash-trade rejection: {e}")
+        if e.is_below_minimum:
+            return _Placement(order_id=client_order_id,
+                              constraint=CONSTRAINT_BELOW_VENUE_MINIMUM,
+                              error=str(e))
+        logger.error("[%s] %s %s submission failed: %s", book, s.action, s.ticker, e)
+        return _Placement(order_id=client_order_id, error=str(e))
+
+    def _apply_placement(
+        self, portfolio: Portfolio, s: _SizedOrder, placement: _Placement,
+        run_date: str | None,
+    ) -> ExecutionResult:
+        """Mutate the book from a terminal broker placement. Same mutation
+        calls as `_do_buy`/`_do_sell`/`_do_short`/`_do_cover` (kept separate
+        from those methods rather than shared, since they also carry the
+        simulator's non-broker branch that this path must never touch).
+        """
+        if not placement.moved:
+            logger.info("[%s] %s not executed: %s", s.action, s.ticker,
+                        placement.error or "no fill")
+            return ExecutionResult(
+                decision=s.decision, executed=False, side="SKIP", ticker=s.ticker,
+                shares=0, fill_price=0, notional=0, order_id=placement.order_id,
+                error=placement.error, constraint=placement.constraint,
+                broker_order=placement.order.to_dict() if placement.order else None,
+            )
+
+        shares, price = placement.filled_qty, placement.fill_price
+        constraint = s.constraint or placement.constraint
+        broker_order = placement.order.to_dict() if placement.order else None
+
+        if s.action == "BUY":
+            portfolio.buy(s.ticker, shares, price)
+            if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
+                logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
+                            portfolio.model_key, s.ticker, shares)
+        elif s.action == "SELL":
+            proceeds = portfolio.sell(s.ticker, shares, price)
+            self._record_proceeds(portfolio, proceeds, run_date)
+            swept = portfolio.sweep_ghost_positions()
+            if swept:
+                logger.info("Swept ghost positions after %s sell: %s", s.ticker, swept)
+        elif s.action == "SHORT":
+            proceeds = portfolio.short(s.ticker, shares, price)
+            self._record_proceeds(portfolio, proceeds, run_date)
+        elif s.action == "COVER":
+            portfolio.cover(s.ticker, shares, price)
+            swept = portfolio.sweep_ghost_positions()
+            if swept:
+                logger.info("Swept ghost positions after %s cover: %s", s.ticker, swept)
+
+        return ExecutionResult(decision=s.decision, executed=True, side=s.action,
+                               ticker=s.ticker, shares=shares, fill_price=price,
+                               notional=shares * price, order_id=placement.order_id,
+                               constraint=constraint, broker_order=broker_order)
 
     def force_liquidate(
         self,

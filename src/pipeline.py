@@ -89,7 +89,8 @@ from .portfolio import (
     save_portfolio,
     validate_decisions,
 )
-from .execution import Executor
+from .execution import CycleBarrier, Executor
+from .execution.barrier import rotation_tick
 from .prompt_builder import (
     build_prompts,
     build_screening_prompt,
@@ -156,6 +157,7 @@ def run_one_model(
     sentiment_data: dict[str, float] | None = None,
     news_hash: str = "",
     ticker_order: list[dict[str, Any]] | None = None,
+    barrier: CycleBarrier | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -371,7 +373,8 @@ def run_one_model(
     # settled-funds constraint; pass the pipeline's own date rather than letting
     # the executor read a wall clock, so a replay settles deterministically.
     exec_results = executor.execute_decisions(portfolio, accepted, prices,
-                                              run_date=session_date_str)
+                                              run_date=session_date_str,
+                                              barrier=barrier)
     all_exec = forced_results + exec_results
 
     # Portfolio stop check AFTER execution
@@ -664,6 +667,23 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         if not cfg.get("enabled", True):
             logger.info("[%s] disabled — skipping", mk)
 
+    # P1 cross-book submission barrier (docs/prereg/tier2_novel_sections.md,
+    # "Cross-book submission barrier"). One instance per cycle, shared by
+    # reference across every model's thread below. Only meaningful in broker
+    # modes — the simulator has no venue to collide on, and Executor skips
+    # barrier registration entirely when `barrier` is None, so paper-mode
+    # cycles are unaffected (no extra thread-coordination overhead, no
+    # behavior change).
+    barrier: CycleBarrier | None = None
+    if executor.broker_enabled:
+        exec_cfg = executor.settings.get("execution") or {}
+        barrier = CycleBarrier(
+            expected_books={mk for mk, _ in enabled_models},
+            t=rotation_tick(run_date),
+            registration_timeout=float(exec_cfg.get("barrier_registration_timeout_seconds", 300.0)),
+            release_timeout=float(exec_cfg.get("barrier_release_timeout_seconds", 120.0)),
+        )
+
     def _run_model_threadsafe(model_key: str, cfg: dict) -> dict:
         t0 = time.monotonic()
         try:
@@ -674,6 +694,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 sentiment_data=sentiment_data,
                 news_hash=news_hash,
                 ticker_order=ticker_order,
+                barrier=barrier,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
