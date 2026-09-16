@@ -24,7 +24,10 @@
   "execution": {
     "_note": "Live order-lifecycle parameters. fill_deadline_seconds is the registered fill-time cap (2026-08-29 ruling): an order still unfilled at the deadline has its remainder cancelled and its partial fill stands, logged as an UNFILLED_AT_DEADLINE execution-constraint event, which is execution-SUCCESSFUL and separately a disclosed per-model descriptor. Frozen with the configuration on Oct 1; tunable only before then.",
     "fill_deadline_seconds": 300,
-    "poll_interval_seconds": 2.0
+    "poll_interval_seconds": 2.0,
+    "_barrier_timeout_note": "P1 cross-book submission barrier (src/execution/barrier.CycleBarrier), added 2026-09-15. registration_timeout bounds how long a book's execute_decisions call waits for every other enabled book to also register its intents before the cycle's contended-symbol plan builds without it; release_timeout bounds how long a held (losing) order waits for its contender's terminal state before proceeding anyway. Both fail open (log + proceed), never deadlock. Explicit here rather than left on the code default so the Oct 1 freeze covers them like the other two.",
+    "barrier_registration_timeout_seconds": 300.0,
+    "barrier_release_timeout_seconds": 120.0
   },
   "portfolio_rules": {
     "max_positions": 50,

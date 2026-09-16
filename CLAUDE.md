@@ -275,3 +275,18 @@ enforcement lives in the dispatch process.
    market-hours job.** A missed 09:35 start firing at an arbitrary later hour
    produces a market-closed abort that reads like a result. Better that it does
    not fire at all.
+
+10. **A landing that restates a fact already present elsewhere in the
+    document must verify the two agree** (ratified 2026-09-15). The
+    2026-09-15 wash-trade/barrier landing stated the same fact twice — the
+    SELL/SHORT vs BUY/COVER broker-side grouping — once in Gate 4's barrier-
+    mechanism Scope rule, once in the submission-order-parity sentence two
+    paragraphs later. The two disagreed: Scope had it right, parity had it
+    backwards. Nothing caught this at landing because neither statement was
+    checked against the other, only against intuition — it surfaced only
+    because the barrier's actual code was written against the grouping
+    verified from `_do_short`/`_do_cover`'s real broker-side submissions, and
+    the doc then had to be corrected to match the code, not the other way
+    round. A restatement is not free — it is a second chance to disagree with
+    yourself, and it verifies nothing unless it is diffed against the first
+    statement before it lands.
