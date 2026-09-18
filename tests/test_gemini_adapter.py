@@ -22,6 +22,7 @@ import pytest
 
 from google.genai import types as genai_types
 
+from src.adapters.base import API_CALL_TIMEOUT_SECONDS
 from src.adapters.gemini_adapter import GeminiAdapter
 
 MODEL = "gemini-3.1-pro-preview"
@@ -80,17 +81,25 @@ def stub_client(monkeypatch):
 
 def test_request_carries_only_the_three_intended_fields(stub_client):
     """Wire semantics: system_instruction + JSON mime + max_output_tokens=16384,
-    and nothing else — no sampling params, no thinking_config (provider-default
-    reasoning). None-valued config fields are omitted from the request."""
+    and nothing else generation-affecting — no sampling params, no
+    thinking_config (provider-default reasoning). None-valued config fields
+    are omitted from the request. http_options is a fourth, deliberate field
+    (Hub registration, 2026-09-17): a client-transport deadline, not a
+    generation parameter, so it is asserted separately below rather than
+    folded into the "only three" generation-field claim."""
     adapter = GeminiAdapter(MODEL)
     adapter._call_api("SYS", "USER")
     cfg = stub_client.captured["config"]
     sent = cfg.model_dump(exclude_none=True)
-    assert set(sent) == {"system_instruction", "response_mime_type", "max_output_tokens"}
+    assert set(sent) == {
+        "system_instruction", "response_mime_type", "max_output_tokens",
+        "http_options",
+    }
     assert sent["max_output_tokens"] == 16384
     assert sent["response_mime_type"] == "application/json"
     assert cfg.thinking_config is None
     assert cfg.temperature is None
+    assert cfg.http_options.timeout == API_CALL_TIMEOUT_SECONDS * 1000
     assert stub_client.captured["model"] == MODEL
 
 

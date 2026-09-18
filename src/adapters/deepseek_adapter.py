@@ -14,7 +14,7 @@ from typing import Any
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
 
 logger = logging.getLogger("llmlab.adapter.deepseek")
 
@@ -68,7 +68,10 @@ class DeepSeekAdapter(BaseAdapter):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        r = requests.post(self.BASE_URL, json=payload, headers=headers, timeout=120)
+        # Raised from 120s to the shared cross-adapter constant (Hub
+        # registration, 2026-09-17) -- see base.py for the reasoning.
+        r = requests.post(self.BASE_URL, json=payload, headers=headers,
+                          timeout=API_CALL_TIMEOUT_SECONDS)
         if not r.ok:
             # Surface the response body so the decision log captures the actual error,
             # not just "400 Bad Request" with no detail.

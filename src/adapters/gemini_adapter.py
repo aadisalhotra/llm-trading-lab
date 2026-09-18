@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
 
 
 class GeminiAdapter(BaseAdapter):
@@ -48,6 +48,15 @@ class GeminiAdapter(BaseAdapter):
             # stays at the provider default (RQ6 config row) — thinking_level
             # is deliberately NOT set.
             temperature=self.temperature,
+            # Client-side deadline (Hub registration, 2026-09-17). Without
+            # this the call was bounded only by an undocumented SDK/transport
+            # default that empirically sits at 600s and fails with no usage
+            # metadata at all -- a stall, not a slow generation. HttpOptions
+            # takes milliseconds; API_CALL_TIMEOUT_SECONDS is the shared
+            # cross-adapter constant in seconds.
+            http_options=genai_types.HttpOptions(
+                timeout=API_CALL_TIMEOUT_SECONDS * 1000,
+            ),
         )
 
         # Gemini takes one user turn whose parts are the chart images first,

@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
 
 
 class AnthropicAdapter(BaseAdapter):
@@ -25,7 +25,7 @@ class AnthropicAdapter(BaseAdapter):
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=API_CALL_TIMEOUT_SECONDS)
 
         # Build content blocks. If images are present, send them BEFORE the
         # text so the model has chart context loaded when it reads the

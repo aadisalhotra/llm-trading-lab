@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
 
 
 class OpenAIAdapter(BaseAdapter):
@@ -25,7 +25,7 @@ class OpenAIAdapter(BaseAdapter):
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
 
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=api_key, timeout=API_CALL_TIMEOUT_SECONDS)
 
         # Build user content. With images, content becomes a list of typed
         # blocks (text + image_url). Without images, we keep the simple

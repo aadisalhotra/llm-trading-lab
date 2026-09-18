@@ -20,6 +20,34 @@ logger = logging.getLogger("llmlab.adapter")
 _RETRY_DELAY_SECONDS = 15
 _MAX_ATTEMPTS = 2
 
+# Per-call client-side deadline (Hub registration, 2026-09-17), applied by
+# every adapter's _call_api to its own SDK/request call -- covers both the
+# screening call (generate_raw) and the trading decision (generate_decision)
+# for free, since both funnel through the same per-provider _call_api.
+#
+# Before this, only xAI and DeepSeek had ANY client-side timeout (120s, at
+# the requests() layer); Anthropic, OpenAI, and Gemini had none, leaving the
+# call bounded only by an undocumented provider/transport default. For
+# Gemini that default is 600s and is NOT organic generation time: of 152
+# Gemini calls >=590s in the committed trade logs, 151 returned zero usage
+# metadata and api_error strings identify a hard "Timeout of 600.0s
+# exceeded" / "504 Deadline Exceeded" -- a stalled call, not a slow one.
+#
+# 300s is chosen, not the tighter 120s xAI/DeepSeek already used, because
+# the highest LEGITIMATE (api_success=True) call latency observed across
+# all six models in the current stable baseline (Aug-Sep 2026) is 214.1s
+# (Gemini) -- 120s would already be clipping real, completing calls.
+# 300s clears that with ~40% headroom, halves the undocumented Gemini
+# default so a stall is caught in 5 minutes instead of 10, and reuses the
+# value already registered as DEFAULT_FILL_DEADLINE_SECONDS in
+# src/execution/broker.py rather than introducing a second unrelated
+# constant for "how long is too long to wait."
+#
+# _call_api raising on timeout is NOT retried (the docstring above already
+# excludes HTTP/network errors from the retry path), so worst case per call
+# is a single 300s stall, not 300s x _MAX_ATTEMPTS.
+API_CALL_TIMEOUT_SECONDS = 300
+
 
 def repair_json(text: str) -> str:
     """Best-effort fix for common JSON defects in LLM output.

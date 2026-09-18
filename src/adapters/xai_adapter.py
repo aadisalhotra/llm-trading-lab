@@ -8,7 +8,7 @@ from typing import Any
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
 
 
 class XAIAdapter(BaseAdapter):
@@ -55,7 +55,12 @@ class XAIAdapter(BaseAdapter):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        r = requests.post(self.BASE_URL, json=payload, headers=headers, timeout=120)
+        # Raised from 120s (Hub registration, 2026-09-17) -- four of grok's
+        # own historical failures are an exact "read timeout=120" ceiling,
+        # including a same-day 2026-09-17 occurrence, i.e. this was already
+        # clipping real in-flight calls, not just a defensive bound.
+        r = requests.post(self.BASE_URL, json=payload, headers=headers,
+                          timeout=API_CALL_TIMEOUT_SECONDS)
         if not r.ok:
             raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
