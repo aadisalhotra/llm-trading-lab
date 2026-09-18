@@ -158,6 +158,7 @@ def run_one_model(
     news_hash: str = "",
     ticker_order: list[dict[str, Any]] | None = None,
     barrier: CycleBarrier | None = None,
+    fetch_started_at: datetime | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -226,6 +227,7 @@ def run_one_model(
     screening_raw = ""
     shortlisted: list[str] = []
     screening_metadata: dict[str, Any] = {}
+    _scr_latency: float | None = None
     try:
         screening_raw, _scr_latency, screening_metadata = adapter.generate_raw(
             screening_sys, screening_user,
@@ -340,6 +342,8 @@ def run_one_model(
             screening_shortlist=shortlisted,
             screening_metadata=screening_metadata,
             memory_hit=memory_hit,
+            fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
+            screening_latency_seconds=_scr_latency,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -429,6 +433,8 @@ def run_one_model(
         screening_shortlist=shortlisted,
         screening_metadata=screening_metadata,
         memory_hit=memory_hit,
+        fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
+        screening_latency_seconds=_scr_latency,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])
@@ -596,6 +602,12 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # Pull market data — intraday 30m bars by default, daily fallback at EOD
     # so the closing prices match what the daily analytics expect.
     symbols = universe_symbols() + [settings["benchmark_ticker"]]
+    # Latency instrumentation (Hub registration, 2026-09-17): stamped
+    # immediately before the shared fetch call, so it is the earliest point
+    # in the tick from which fetch->decision is reconstructable. One fetch
+    # serves every model this tick, so this single timestamp is shared by
+    # all of them in the decision log.
+    fetch_started_at = datetime.now(timezone.utc)
     if is_eod:
         logger.info("Fetching daily close data for %d symbols", len(symbols))
         market_data = fetch_universe_data(symbols=symbols)
@@ -695,6 +707,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 news_hash=news_hash,
                 ticker_order=ticker_order,
                 barrier=barrier,
+                fetch_started_at=fetch_started_at,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)

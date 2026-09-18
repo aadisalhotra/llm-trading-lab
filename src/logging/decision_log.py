@@ -58,6 +58,8 @@ def log_decision_run(
     screening_shortlist: list[str] | None = None,
     screening_metadata: dict[str, Any] | None = None,
     memory_hit: bool = False,
+    fetch_started_at: str = "",
+    screening_latency_seconds: float | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,6 +70,14 @@ def log_decision_run(
     record = {
         "date": run_date.strftime("%Y-%m-%d"),
         "timestamp": datetime.utcnow().isoformat(),
+        # Latency instrumentation (Hub registration, 2026-09-17): the single
+        # per-tick market-data fetch that this decision saw, and the
+        # screening call's own duration — both previously computed upstream
+        # but never persisted, so fetch->decision and full-tick timing
+        # couldn't be reconstructed after the fact. Log-shape only; neither
+        # field is read by any control-flow path.
+        "fetch_started_at": fetch_started_at,
+        "screening_latency_seconds": screening_latency_seconds,
         "model_key": model_key,
         "model_id_configured": decision_result.model_id_configured,
         "model_id_returned": decision_result.model_id_returned,
