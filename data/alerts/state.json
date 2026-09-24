@@ -39,13 +39,15 @@
   },
   "daily": {
     "date": "2026-09-24",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "news:SLB:12d049cacc",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +61,20 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-09-24T15:33:13.500246+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on SLB (held by 6)",
+        "timestamp": "2026-09-24T21:07:51.277777+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-09-24T21:07:55.362771+00:00",
         "disposition": "sent"
       }
     ]
