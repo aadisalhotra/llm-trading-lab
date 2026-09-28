@@ -39,13 +39,15 @@
   },
   "daily": {
     "date": "2026-09-28",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Systemic event",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:ABBV:f32eef5f35",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +61,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-09-28T16:03:13.977544+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABBV (held by 6)",
+        "timestamp": "2026-09-28T21:07:40.941377+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-09-28T21:07:44.174955+00:00",
         "disposition": "sent"
       }
     ]
