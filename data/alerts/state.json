@@ -39,13 +39,15 @@
   },
   "daily": {
     "date": "2026-09-30",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "api_failure:grok"
+      "api_failure:grok",
+      "news:ISRG:510a4c9520",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +61,20 @@
         "severity": "WARN",
         "title": "Model grok failed",
         "timestamp": "2026-09-30T15:33:47.983554+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ISRG (held by 6)",
+        "timestamp": "2026-09-30T21:08:18.678155+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-09-30T21:08:22.082835+00:00",
         "disposition": "sent"
       }
     ]
