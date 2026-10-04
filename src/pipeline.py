@@ -91,6 +91,7 @@ from .portfolio import (
 )
 from .execution import CycleBarrier, Executor
 from .execution.barrier import rotation_tick
+from .execution.reconciliation import run_post_cycle_reconciliation
 from .prompt_builder import (
     build_prompts,
     build_screening_prompt,
@@ -342,6 +343,7 @@ def run_one_model(
             screening_shortlist=shortlisted,
             screening_metadata=screening_metadata,
             memory_hit=memory_hit,
+            cycle_id=executor.cycle_id,
             fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
             screening_latency_seconds=_scr_latency,
         )
@@ -433,6 +435,7 @@ def run_one_model(
         screening_shortlist=shortlisted,
         screening_metadata=screening_metadata,
         memory_hit=memory_hit,
+        cycle_id=executor.cycle_id,
         fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
         screening_latency_seconds=_scr_latency,
     )
@@ -738,6 +741,22 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     models_elapsed = time.monotonic() - models_start
     logger.info("All %d models completed in %.2fs (parallel wall-clock)",
                 len(enabled_models), models_elapsed)
+
+    # Level-2 (broker-authoritative) reconciliation -- G-BOOK. Broker modes
+    # only; every book's state is durably saved by this point (each thread
+    # above called save_portfolio before returning). Runs after every book
+    # so it sees the whole cycle's fills, not a partial set.
+    if executor.broker_enabled:
+        try:
+            run_post_cycle_reconciliation(
+                executor.broker, executor.cycle_id,
+                [mk for mk, _ in enabled_models])
+        except Exception as e:
+            logger.exception("Reconciliation failed to run: %s", e)
+            send_alert("CRITICAL", "G-BOOK reconciliation could not run",
+                      str(e), {"cycle_id": executor.cycle_id},
+                      kind="gbook_reconciliation_error",
+                      dedup_key=f"gbook_reconciliation_error:{executor.cycle_id}")
 
     # Mark this intraday boundary handled now that every model's decisions are
     # made. The workflow commits this in the SAME commit as the decision logs +

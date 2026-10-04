@@ -40,6 +40,11 @@ NEWS_CACHE_DIR = DATA_DIR / "news_cache"
 # "fire once per threshold ever" milestone ledger survives across the
 # ephemeral GitHub Actions runners.
 ALERTS_DIR = DATA_DIR / "alerts"
+# Level-2 (broker-authoritative) reconciliation records, one line per
+# broker-mode cycle. Empty/absent for every paper-mode cycle -- Gate 4 (and
+# therefore this directory) is registered as live-phase-scoped. See
+# src/execution/reconciliation.py.
+RECONCILIATION_DIR = DATA_DIR / "reconciliation"
 
 _LOG_CONFIGURED = False
 
@@ -201,6 +206,48 @@ def registered_capital_base(settings: dict[str, Any] | None = None,
     """
     settings = settings if settings is not None else load_settings()
     return live_cohort_book_count(settings) * starting_capital(settings, mode)
+
+
+class PendingReconciliationBaselineError(RuntimeError):
+    """The venue account's unallocated-cash baseline is not confirmed.
+
+    Fatal for the same reason as `PendingCapitalError`: level-2 reconciliation
+    compares the sum of book cash against the venue's cash, and the two differ
+    by whatever the account holds that no book owns. Comparing against an
+    invented baseline would either raise a G-BOOK event on every cycle or,
+    worse, be tuned until it stopped -- a check that reports success over a
+    condition it does not measure.
+    """
+
+
+def reconciliation_params(settings: dict[str, Any] | None = None,
+                          mode: str | None = None) -> dict[str, float]:
+    """Level-2 reconciliation parameters for `mode`.
+
+    Returns `cash_tolerance_usd` and `unallocated_cash_usd`. For `live` the
+    unallocated cash is `reserve_master()` by construction; for `broker_paper`
+    it must be set explicitly in `reconciliation.unallocated_cash_usd`, else
+    `PendingReconciliationBaselineError`.
+    """
+    settings = settings if settings is not None else load_settings()
+    mode = mode or settings.get("mode", "paper")
+    rec = settings.get("reconciliation", {}) or {}
+    if "cash_tolerance_usd" not in rec:
+        raise PendingReconciliationBaselineError(
+            "reconciliation.cash_tolerance_usd is not set in config/settings.json")
+    if mode == "live":
+        unallocated = reserve_master(settings)
+    else:
+        configured = (rec.get("unallocated_cash_usd") or {}).get(mode)
+        if configured is None:
+            raise PendingReconciliationBaselineError(
+                f"reconciliation.unallocated_cash_usd.{mode} is not set. Read the "
+                f"venue account's funded cash balance off the broker dashboard, "
+                f"subtract the sum of enabled books' starting_capital, and record "
+                f"the difference in config/settings.json.")
+        unallocated = float(configured)
+    return {"cash_tolerance_usd": float(rec["cash_tolerance_usd"]),
+            "unallocated_cash_usd": float(unallocated)}
 
 
 def load_universe() -> dict[str, Any]:

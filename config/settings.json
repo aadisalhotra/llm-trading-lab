@@ -21,6 +21,13 @@
     "live_cohort_keys": ["claude", "claude_opus", "gpt", "gemini", "grok"],
     "_live_cohort_keys_note": "RULED by the hub 2026-09-14. DeepSeek is excluded per the exploratory-only determination; the other five books fund. This resolves the UNRESOLVED state this key carried from 2026-09-14 (count registered, composition not) -- config_loader.live_cohort_keys() no longer raises PendingCohortError. NOT a derived value: it is not the core cohort (that would keep deepseek and drop claude_opus, the expansion book), which is exactly why deriving it was refused. SUBJECT TO RATIFICATION at the Rossi methodology review 2026-09-17; a reversal is a one-line amendment to this array plus live_cohort_book_count, and nothing else moves -- the registered capital base is computed from the count, so it follows automatically. See operational_events.2026-09.live_cohort_composition_ruled."
   },
+  "reconciliation": {
+    "_note": "Level-2 (broker-authoritative) reconciliation parameters, read ONLY through config_loader.reconciliation_params(). PROPOSED 2026-10-04, pending hub registration: no ledger entry or prereg landing note carries these figures yet (blocked on CLAUDE.md rule 7 -- the v4 lane holds the ledger staged). cash_tolerance_usd is an explicit accommodation for SEC Section 31 / FINRA TAF fees the pipeline ledger does not model (Portfolio.buy/sell/short/cover compute cash from shares x fill price only); it is NOT slack for bugs. Position tolerance is Portfolio.GHOST_SHARES_EPSILON by construction, so level 1 and level 2 agree on what 'no position' means. unallocated_cash_usd is the cash the venue account holds that no book owns: for live it is DERIVED from capital_structure.reserve_master_usd and is not configurable here; for broker_paper it is the paper account's funded balance minus the sum of enabled books' starting capital, which only the PI can read off the dashboard (no reset or balance API is authoritative before funding) -- null raises PendingReconciliationBaselineError rather than letting level-2 compare against a guessed figure.",
+    "cash_tolerance_usd": 1.00,
+    "unallocated_cash_usd": {
+      "broker_paper": null
+    }
+  },
   "execution": {
     "_note": "Live order-lifecycle parameters. fill_deadline_seconds is the registered fill-time cap (2026-08-29 ruling): an order still unfilled at the deadline has its remainder cancelled and its partial fill stands, logged as an UNFILLED_AT_DEADLINE execution-constraint event, which is execution-SUCCESSFUL and separately a disclosed per-model descriptor. Frozen with the configuration on Oct 1; tunable only before then.",
     "fill_deadline_seconds": 300,

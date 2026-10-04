@@ -58,6 +58,7 @@ def log_decision_run(
     screening_shortlist: list[str] | None = None,
     screening_metadata: dict[str, Any] | None = None,
     memory_hit: bool = False,
+    cycle_id: str = "",
     fetch_started_at: str = "",
     screening_latency_seconds: float | None = None,
 ) -> None:
@@ -70,6 +71,12 @@ def log_decision_run(
     record = {
         "date": run_date.strftime("%Y-%m-%d"),
         "timestamp": datetime.utcnow().isoformat(),
+        # The Executor's cycle_id (added 2026-09-16, empty on every record
+        # before this) -- the join key between this book's executions and
+        # that cycle's level-2 reconciliation record (data/reconciliation/),
+        # since six books' own record timestamps drift by each model's own
+        # latency and are not a reliable cross-book join key.
+        "cycle_id": cycle_id,
         # Latency instrumentation (Hub registration, 2026-09-17): the single
         # per-tick market-data fetch that this decision saw, and the
         # screening call's own duration — both previously computed upstream
