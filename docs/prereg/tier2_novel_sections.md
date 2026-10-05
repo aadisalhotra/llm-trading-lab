@@ -411,3 +411,13 @@ The registered text above is **not edited**. This note supersedes the clauses li
 | 6 | "base permutation rotated by t mod 6"; "priority visits each book once per six-cycle window" | Cross-book submission-order parity | The barrier rotates the participating books by `t mod len(books)` (`src/execution/barrier.py`), so with five venue books it is **mod 5** and priority visits each book once per **five**-cycle window. Still deterministic, reproducible from `t` alone, no randomness. The registered "6" was correct for a six-venue-book account and is stale for the live cohort. |
 
 Source for the date arithmetic: NYSE calendar via `pandas_market_calendars`, checked 2026-10-04. Items 5 and 6 are corrections to registered prose that already disagreed with the shipped code; they are recorded here, not silently edited.
+
+### Addendum 2026-10-05 — September-anchored values (found after the first landing sweep)
+
+The first sweep searched October- and November-anchored dates and missed the September-anchored ones the same move displaces. Same terms as above: the registered text is not edited; each quoted phrase was verified verbatim in this file.
+
+| # | Superseded clause (quoted) | Where | Now |
+|---|---|---|---|
+| 7 | "2026-09-15 branch decision" — the date column of every decision-gated marker (`[SEPT 15]`, marker index rows 1, 2, 5, 6, 7 and the marker-count notes) | Marker index; landing notes | **2026-10-15** (hub schedule 2026-09-30). The markers' meaning and clearing rule are unchanged; only the decision date moves. |
+| 8 | "The Phase B prompt freezes 2026-09-30"; "v4 lands 2026-09-16" | T2.4 — Prompt declaration | Prompt freeze **2026-10-31** (a Saturday; 2026-10-30 is the last trading day). v4 **conditional landing 2026-10-16**, after the 2026-10-15 branch decision. |
+| 9 | "any third diff component fails verification" (v4 = two components: the shorting ablation plus the settlement representation) | T2.4 | By hub relay (2026-10-05) of a Research ruling delivered inline 2026-09-11 — **relay-only, no committed artifact** — v4 amends to **three** components: the removal of the two rendered environment-mode lines joins as the third verified diff component, and any **fourth** fails verification. See `docs/v4_landing_checklist.md`, Step 2. **Status of the second component:** the settlement representation is specified here but is NOT yet built — `prompts/v4.txt` is still byte-identical to `prompts/v2.txt` and `prompt_builder.py` does not render settled/unsettled balances. |

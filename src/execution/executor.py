@@ -201,8 +201,8 @@ class Executor:
     def settlement_enforced(self, run_date: str | None = None) -> bool:
         """Whether the settled-funds constraint binds for this run.
 
-        Inert until the cash branch is chosen and its 2026-09-16 activation
-        arrives; see portfolio/settlement.py.
+        Inert until the cash branch is chosen and its activation arrives
+        (originally 2026-09-16, now 2026-10-16); see portfolio/settlement.py.
         """
         return settlement_enforcement_active(self.settings, self._run_date(run_date))
 

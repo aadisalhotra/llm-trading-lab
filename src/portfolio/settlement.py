@@ -16,11 +16,13 @@ observes a free-riding violation and the 90-day-restriction class is
 unreachable. The ledger is therefore a pre-trade gate, not a post-trade audit.
 
 Activation. Built now, binds at the branch: enforcement requires BOTH the
-`settlement.enforce_settled_funds` flag (flipped at the signed-off 2026-09-16
-pre-market activation, same discipline as the 2026-07-01 shorting flip) AND the
-run date being on or after `settlement.activation_date`. Until the September 15
-branch decision picks the cash branch, the flag stays false and every code path
-here is inert.
+`settlement.enforce_settled_funds` flag (flipped at a signed-off pre-market
+activation, same discipline as the 2026-07-01 shorting flip) AND the run date
+being on or after `settlement.activation_date`. Until the branch decision picks
+the cash branch, the flag stays false and every code path here is inert.
+(Dates moved by the 2026-09-30 boundary move: branch decision 2026-10-15,
+enforcement from 2026-10-16; the 2026-09-16 / September 15 originals never
+fired.)
 
 Accounting note. Paper fills credit sale proceeds to `Portfolio.cash`
 immediately, exactly as a broker does — the money is in the account, it is just

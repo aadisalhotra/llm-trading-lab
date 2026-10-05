@@ -48,7 +48,7 @@
     "allow_options": false
   },
   "settlement": {
-    "_note": "Settled-funds execution constraint (cash-account branch), registered 2026-08-17. BOTH conditions must hold for enforcement to bind: enforce_settled_funds true AND run date >= activation_date. The flag flips at the signed-off 2026-09-16 pre-market activation, and only if the September 15 branch decision selects the cash branch -- same discipline as the 2026-07-01 shorting flip. Until then every settled-funds code path is inert and settled_cash == cash.",
+    "_note": "Settled-funds execution constraint (cash-account branch), registered 2026-08-17. BOTH conditions must hold for enforcement to bind: enforce_settled_funds true AND run date >= activation_date. The flag flips at a signed-off pre-market activation, and only if the branch decision selects the cash branch -- same discipline as the 2026-07-01 shorting flip. MOVED by the 2026-09-30 boundary move: branch decision 2026-10-15, enforcement from 2026-10-16 (hub 2026-10-04); activation_date below still reads 2026-09-16 and is changed, with the flag, in that activation event (the flag is false, so nothing binds meanwhile). Until then every settled-funds code path is inert and settled_cash == cash.",
     "enforce_settled_funds": false,
     "activation_date": "2026-09-16",
     "settlement_days": 1
