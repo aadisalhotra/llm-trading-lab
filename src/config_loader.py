@@ -197,6 +197,45 @@ def live_cohort_keys(settings: dict[str, Any] | None = None) -> list[str]:
     return keys
 
 
+# Execution modes in which a real venue is contacted. Mirrors
+# src/execution/broker.BROKER_MODES; duplicated as a literal because broker.py
+# imports this module.
+_VENUE_MODES = frozenset({"broker_paper", "live"})
+
+
+def effective_mode(model_key: str, settings: dict[str, Any] | None = None) -> str:
+    """The execution mode `model_key`'s book actually runs under.
+
+    The lab-wide `mode` unless it is a venue mode AND the book is outside the
+    live cohort, in which case the book runs on the simulator: "paper".
+    Hub ruling 2026-09-11 (restated 2026-10-05): DeepSeek is exploratory-only
+    and paper-only, so it must never submit a venue order, join the cross-book
+    barrier's expected set, or count toward the reconciliation sum. Every
+    consumer that asks "which mode is this book in" routes through here so the
+    executor, the inception-epoch guard, the logged execution_mode and the
+    reconciliation set cannot disagree.
+
+    In `paper` mode this is the identity, so Phase A behavior is unchanged.
+    `live_cohort_keys` raises PendingCohortError on a misconfigured cohort;
+    that is deliberate (fail loud, never fall back to routing everyone).
+    """
+    settings = settings if settings is not None else load_settings()
+    mode = settings.get("mode", "paper")
+    if mode not in _VENUE_MODES:
+        return mode
+    return mode if model_key in live_cohort_keys(settings) else "paper"
+
+
+def venue_book_keys(enabled_keys: list[str],
+                    settings: dict[str, Any] | None = None) -> list[str]:
+    """The enabled books that trade on the venue (order preserved). Empty
+    outside a venue mode. This is the set the cross-book barrier waits for and
+    the set level-2 reconciliation sums over."""
+    settings = settings if settings is not None else load_settings()
+    return [k for k in enabled_keys
+            if effective_mode(k, settings) in _VENUE_MODES]
+
+
 def registered_capital_base(settings: dict[str, Any] | None = None,
                             mode: str | None = None) -> float:
     """Total registered capital for `mode` — the ONLY valid return denominator.

@@ -87,6 +87,10 @@ def _executor(broker, mode="broker_paper"):
     e.settings = {"mode": mode, "settlement": {"enforce_settled_funds": False}}
     e.mode = mode
     e.broker = broker
+    # Per-book routing (2026-10-05): these tests exercise the venue path for
+    # whichever book they use, so every book is a venue book here. The
+    # non-cohort routing is pinned in tests/test_venue_routing.py.
+    e.venue_books = type("AllBooks", (), {"__contains__": lambda self, k: True})()
     e.cycle_id = "20261006T1430Z"
     e._order_seq = {}
     return e

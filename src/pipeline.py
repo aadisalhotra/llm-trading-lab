@@ -49,11 +49,13 @@ from .alerts.preflight import assert_configured as alert_preflight
 from .analytics import build_leaderboard, compute_budget_status
 from .config_loader import (
     configure_logging,
+    effective_mode,
     ensure_dirs,
     load_env,
     load_settings,
     load_universe,
     universe_symbols,
+    venue_book_keys,
 )
 from .dashboard import build_dashboard_payload
 from .data import (
@@ -335,7 +337,8 @@ def run_one_model(
             accepted_decisions=[], violations=[], execution_results=forced_results,
             portfolio_snapshot_after=portfolio.snapshot(prices),
             prompt_version=prompt_version, data_inputs_hash=data_hash,
-            execution_mode=settings["mode"], inception_date=portfolio.inception_date,
+            execution_mode=effective_mode(model_key, settings),
+            inception_date=portfolio.inception_date,
             news_headlines_hash=news_hash,
             news_sentiment=sentiment_data or {},
             agreement_counts=_compute_agreement_counts(model_key, forced_results, settings),
@@ -427,7 +430,8 @@ def run_one_model(
         execution_results=all_exec,
         portfolio_snapshot_after=snapshot_after,
         prompt_version=prompt_version, data_inputs_hash=data_hash,
-        execution_mode=settings["mode"], inception_date=portfolio.inception_date,
+        execution_mode=effective_mode(model_key, settings),
+            inception_date=portfolio.inception_date,
         news_headlines_hash=news_hash,
         news_sentiment=sentiment_data or {},
         agreement_counts=_compute_agreement_counts(model_key, all_exec, settings),
@@ -693,7 +697,10 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     if executor.broker_enabled:
         exec_cfg = executor.settings.get("execution") or {}
         barrier = CycleBarrier(
-            expected_books={mk for mk, _ in enabled_models},
+            # Venue books only: a simulator book (DeepSeek) never registers,
+            # so waiting for it would stall every cycle to the timeout.
+            expected_books=set(venue_book_keys([mk for mk, _ in enabled_models],
+                                               executor.settings)),
             t=rotation_tick(run_date),
             registration_timeout=float(exec_cfg.get("barrier_registration_timeout_seconds", 300.0)),
             release_timeout=float(exec_cfg.get("barrier_release_timeout_seconds", 120.0)),
@@ -750,7 +757,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         try:
             run_post_cycle_reconciliation(
                 executor.broker, executor.cycle_id,
-                [mk for mk, _ in enabled_models])
+                venue_book_keys([mk for mk, _ in enabled_models], executor.settings))
         except Exception as e:
             logger.exception("Reconciliation failed to run: %s", e)
             send_alert("CRITICAL", "G-BOOK reconciliation could not run",

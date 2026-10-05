@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..config_loader import STATE_DIR, load_settings, starting_capital
+from ..config_loader import STATE_DIR, effective_mode, load_settings, starting_capital
 from .settlement import SettlementLedger
 
 logger = logging.getLogger("llmlab.portfolio")
@@ -363,7 +363,7 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
     not been confirmed raises instead of seeding six books at a stale default.
     """
     settings = load_settings()
-    mode = mode or settings["mode"]
+    mode = mode or effective_mode(model_key, settings)
     capital = starting_capital(settings, mode)
     today = datetime.utcnow().strftime("%Y-%m-%d")
     inception_date = settings.get("experiment_start_date", today)
@@ -395,7 +395,8 @@ class InceptionEpochError(RuntimeError):
 
 def _assert_epoch(model_key: str, path: Path, data: dict[str, Any]) -> None:
     settings = load_settings()
-    current = settings.get("mode", "paper")
+    # Per-book: a non-cohort book in a venue mode stays on its paper epoch.
+    current = effective_mode(model_key, settings)
     stored = data.get("inception_epoch") or "paper"
     if stored == current:
         return
@@ -480,7 +481,7 @@ def save_portfolio(p: Portfolio) -> None:
         "unsettled_cash": p.settlement.to_list(),
         # Stamped so a book cannot silently survive a phase boundary; see
         # InceptionEpochError.
-        "inception_epoch": p.inception_epoch or load_settings().get("mode", "paper"),
+        "inception_epoch": p.inception_epoch or effective_mode(p.model_key),
     }
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(_state_path(p.model_key), "w", encoding="utf-8") as f:

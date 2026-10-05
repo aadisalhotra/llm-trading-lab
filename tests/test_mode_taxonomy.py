@@ -50,6 +50,19 @@ from src.portfolio.portfolio import InceptionEpochError, Portfolio, load_portfol
 REPO = Path(__file__).resolve().parent.parent
 
 
+_COHORT = ["claude", "claude_opus", "gpt", "gemini", "grok"]
+
+
+def _cfg(mode):
+    """Minimal settings for the epoch tests. A venue mode now needs a named
+    live cohort (effective_mode raises PendingCohortError without one -- the
+    deliberate fail-loud), so the stub carries the registered five."""
+    return {"mode": mode,
+            "models": {k: {} for k in _COHORT + ["deepseek"]},
+            "capital_structure": {"live_cohort_book_count": 5,
+                                  "live_cohort_keys": _COHORT}}
+
+
 def _clear_alpaca_env(monkeypatch):
     for var in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY", "ALPACA_BASE_URL",
                 "ALPACA_PAPER_KEY", "ALPACA_PAPER_SECRET",
@@ -293,7 +306,7 @@ def test_a_phase_a_state_file_is_refused_by_a_broker_paper_run(tmp_path, monkeyp
     # and quietly stand in for a freshly incepted validation book.
     _state_dir(tmp_path, monkeypatch)
     save_portfolio(Portfolio(model_key="grok", cash=100_000.0, inception_epoch="paper"))
-    monkeypatch.setattr(pf_mod, "load_settings", lambda: {"mode": "broker_paper"})
+    monkeypatch.setattr(pf_mod, "load_settings", lambda: _cfg("broker_paper"))
     with pytest.raises(InceptionEpochError, match="do not carry across a phase boundary"):
         load_portfolio("grok")
 
@@ -304,7 +317,7 @@ def test_an_october_state_file_is_refused_by_a_live_run(tmp_path, monkeypatch):
     _state_dir(tmp_path, monkeypatch)
     save_portfolio(Portfolio(model_key="grok", cash=4_000.0,
                              inception_epoch="broker_paper"))
-    monkeypatch.setattr(pf_mod, "load_settings", lambda: {"mode": "live"})
+    monkeypatch.setattr(pf_mod, "load_settings", lambda: _cfg("live"))
     with pytest.raises(InceptionEpochError):
         load_portfolio("grok")
 
@@ -317,7 +330,7 @@ def test_a_legacy_state_file_without_the_field_reads_as_the_simulator_era(tmp_pa
         "model_key": "grok", "cash": 100_000.0, "holdings": {},
         "inception_value": 100_000.0, "inception_date": "2026-04-09",
     }), encoding="utf-8")
-    monkeypatch.setattr(pf_mod, "load_settings", lambda: {"mode": "paper"})
+    monkeypatch.setattr(pf_mod, "load_settings", lambda: _cfg("paper"))
     p = load_portfolio("grok")
     assert p.inception_epoch == "paper"
     assert p.cash == 100_000.0
@@ -327,5 +340,5 @@ def test_matching_epoch_loads_normally(tmp_path, monkeypatch):
     _state_dir(tmp_path, monkeypatch)
     save_portfolio(Portfolio(model_key="grok", cash=4_000.0,
                              inception_epoch="broker_paper"))
-    monkeypatch.setattr(pf_mod, "load_settings", lambda: {"mode": "broker_paper"})
+    monkeypatch.setattr(pf_mod, "load_settings", lambda: _cfg("broker_paper"))
     assert load_portfolio("grok").cash == 4_000.0

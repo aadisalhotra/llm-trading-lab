@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from ..config_loader import load_settings
+from ..config_loader import live_cohort_keys, load_settings
 from ..portfolio import Portfolio
 from ..portfolio.settlement import settlement_days, settlement_enforcement_active
 from .barrier import CycleBarrier, Intent
@@ -161,7 +161,11 @@ class Executor:
         # cancelled id stays consumed.
         self.cycle_id = cycle_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self._order_seq: dict[str, int] = {}
+        # Books that trade on the venue. Every other book runs the simulator
+        # even in a broker mode (DeepSeek: exploratory, paper-only, hub-ruled).
+        self.venue_books: frozenset[str] = frozenset()
         if self.mode in BROKER_MODES:
+            self.venue_books = frozenset(live_cohort_keys(self.settings))
             exec_cfg = (self.settings.get("execution") or {})
             self.broker = BrokerClient(
                 self.mode,
@@ -174,8 +178,15 @@ class Executor:
 
     @property
     def broker_enabled(self) -> bool:
-        """True when orders reach a real venue."""
+        """True when the venue is active for AT LEAST one book. Per-book
+        routing is `on_venue`; this is the lab-level question (does a barrier
+        or a reconciliation exist this cycle)."""
         return self.broker is not None
+
+    def on_venue(self, book: str) -> bool:
+        """True when `book`'s orders reach the venue. False for a non-cohort
+        book in a broker mode, which runs through the simulator."""
+        return self.broker is not None and book in self.venue_books
 
     def _next_order_id(self, book: str) -> str:
         seq = self._order_seq.get(book, 0)
@@ -306,7 +317,7 @@ class Executor:
         # Mature settled proceeds before anything is priced against them, so a
         # cycle never blocks a purchase on funds that settled this morning.
         self.advance_settlement(portfolio, run_date)
-        if self.broker_enabled:
+        if self.on_venue(portfolio.model_key):
             return self._execute_decisions_via_broker(portfolio, decisions, prices,
                                                        run_date, barrier)
         results: list[ExecutionResult] = []
@@ -724,7 +735,7 @@ class Executor:
                 "reasoning": f"Forced liquidation: {reason}",
             }
             try:
-                if self.broker_enabled:
+                if self.on_venue(portfolio.model_key):
                     results.append(self._force_close_via_venue(
                         portfolio, ticker, shares, price, side, d, reason, run_date))
                     continue
@@ -966,7 +977,7 @@ class Executor:
                 price: float, decision: dict[str, Any],
                 constraint: str = "") -> ExecutionResult:
         broker_order = None
-        if self.broker_enabled:
+        if self.on_venue(portfolio.model_key):
             placement = self._place(portfolio.model_key, ticker, shares, "buy", price)
             if not placement.moved:
                 return self._rejected(decision, ticker, "BUY", placement)
@@ -992,7 +1003,7 @@ class Executor:
                  run_date: str | None = None) -> ExecutionResult:
         broker_order = None
         constraint = ""
-        if self.broker_enabled:
+        if self.on_venue(portfolio.model_key):
             placement = self._place(portfolio.model_key, ticker, shares, "sell", price)
             if not placement.moved:
                 return self._rejected(decision, ticker, "SELL", placement)
@@ -1020,7 +1031,7 @@ class Executor:
         # Opening/adding a short submits a SELL order on the broker side.
         broker_order = None
         constraint = ""
-        if self.broker_enabled:
+        if self.on_venue(portfolio.model_key):
             placement = self._place(portfolio.model_key, ticker, shares, "sell", price)
             if not placement.moved:
                 return self._rejected(decision, ticker, "SHORT", placement)
@@ -1045,7 +1056,7 @@ class Executor:
         # Covering a short submits a BUY order on the broker side.
         broker_order = None
         constraint = ""
-        if self.broker_enabled:
+        if self.on_venue(portfolio.model_key):
             placement = self._place(portfolio.model_key, ticker, shares, "buy", price)
             if not placement.moved:
                 return self._rejected(decision, ticker, "COVER", placement)
