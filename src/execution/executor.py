@@ -6,10 +6,10 @@ Three modes, not two (see `execution/broker.py` for the mode taxonomy):
                      Fills are simulated at the latest market price and no
                      venue is contacted. Unchanged by the broker work.
   * `broker_paper` — the real order lifecycle against Alpaca's paper endpoint.
-                     This is what the registered October validation month runs:
+                     This is what the registered validation month (November 2026) runs:
                      the true submission / fill / rejection / reconciliation
                      path with zero capital at risk.
-  * `live`         — the same path against the live endpoint, from Nov 1.
+  * `live`         — the same path against the live endpoint, from 2026-12-01.
 
 The rule that separates them from the old code: in both broker modes the book
 is mutated ONLY from a terminal, broker-confirmed fill. Previously the book

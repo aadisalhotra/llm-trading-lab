@@ -198,7 +198,7 @@ reference a "resolved-identity check," which is not committed.
 
 > ### Forced-Change / Deprecation Exposure — Confirmatory Model Set
 >
-> **Purpose.** The confirmatory window runs November 1, 2026 – November 1, 2027.
+> **Purpose.** The confirmatory window runs December 1, 2026 – December 1, 2027.
 > Some pinned models carry documented or structural exposure to a provider-forced
 > model change inside that window. This section discloses the exposure and
 > pre-specifies the handling.
@@ -220,8 +220,7 @@ reference a "resolved-identity check," which is not committed.
 >
 > **Anthropic retirement-floor exposure.** `claude-sonnet-4-6` and `claude-opus-4-6`
 > carry documented "not sooner than" retirement floors inside the confirmatory
-> window. These are floors — earliest-possible dates, which may be extended. No
-> current Anthropic model has a floor past 2027-11-01, so the exposure cannot be
+> window. These are floors — earliest-possible dates, which may be extended. No Anthropic model had a retirement floor past 2027-11-01 at the registration audit; the confirmatory window now ends 2027-12-01 and this has NOT been re-audited against the extended end (re-audit due before the OSF deposit). The exposure cannot be
 > removed by snapshot selection.
 >
 > **Gemini preview-build supersession exposure.** Gemini 3.1 Pro is pinned to
@@ -323,3 +322,7 @@ corrected docs/RESEARCH_QUESTIONS.md RQ6 entry (Part 1E), the Forced-Change sect
 and the Gemini data-integrity item — is clear to land atomically. The pre-landing
 grep for the false temperature premise is fully covered: all seven occurrences have
 ratified handling in this commit.
+
+---
+
+**Amendment 2026-10-05 (landing sweep).** The confirmatory window moved from 2026-11-01 – 2027-11-01 to 2026-12-01 – 2027-12-01 (hub decision 2026-09-30, ledger operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]). The quoted section above was updated in place to match docs/PRE_REGISTRATION.md §3.10; the Anthropic floor sentence now carries an explicit re-audit caveat.

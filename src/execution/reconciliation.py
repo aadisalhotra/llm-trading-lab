@@ -43,8 +43,8 @@ logger = logging.getLogger("llmlab.execution.reconciliation")
 
 # Cash tolerance and the unallocated-cash baseline come from
 # config/settings.json -> reconciliation, via config_loader.reconciliation_params
-# (PROPOSED 2026-10-04, pending hub registration -- no ledger entry carries them
-# yet). The tolerance is NOT slack for bugs: it accommodates regulatory fees
+# (registered 2026-10-04: ledger
+# operational_events.2026-10[level2_reconciliation_parameters_registered]). The tolerance is NOT slack for bugs: it accommodates regulatory fees
 # (SEC Section 31 on sells, FINRA TAF) that the pipeline ledger does not model --
 # Portfolio.buy/sell/short/cover compute cash purely from shares * fill price
 # (verified by reading them; no fee deduction exists anywhere in src/portfolio

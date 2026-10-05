@@ -37,7 +37,7 @@ the commingling defect.
 
 **Scope.** This rule is Phase A pilot/exploratory only. It does **not** affect the
 Phase B confirmatory RQ5 test, which runs the full confirmatory window
-(November 1, 2026 onward) with all six models present and balanced.
+(December 1, 2026 onward) with all five live-cohort models present and balanced.
 
 **Generalization.** The same uniform post-shakedown start is applied to **all RQ
 Phase A pilot analyses**, not RQ5 alone — the commingling defect corrupts every
@@ -85,7 +85,7 @@ variable is a **derived/reconstructed quantity**.
   notably the assumption that holdings change between decision periods only through
   price drift, which a between-period 15% stop-loss trigger would violate. The change
   is additive, low-risk, and does not alter trading behavior. Recommended to be
-  implemented before Phase B begins (November 1, 2026) and logged as a data-integrity
+  implemented before Phase B begins (December 1, 2026) and logged as a data-integrity
   infrastructure change. It is forward-only and does not affect Phase A pilot data.
 
 ### Gemini missing-decision rate
@@ -104,7 +104,7 @@ RQ5 alone:
   must be characterized before the OSF deposit.
 - **Ongoing vs. historical.** If the ~49% rate reflects an ongoing condition rather
   than a resolved early-Phase-A issue, it endangers Gemini's Phase B confirmatory
-  data and must be addressed operationally before November 1, 2026. The current
+  data and must be addressed operationally before December 1, 2026. The current
   failure rate is to be confirmed.
 
 ---
@@ -115,3 +115,7 @@ Task 2 commits `RQ5-RQ6-specification.md` and this addendum to the repo, lands P
 into the RQ5 entry of `v1.json` and `RQ5-RQ6-specification.md`, and lands Part B as a
 Phase A data-integrity section of `PRE_REGISTRATION.md`. The RQ5 pilot-window rule
 (Part A) is incorporated into `compute_rq5`'s Phase A pilot estimation.
+
+---
+
+**Amendment 2026-10-05 (landing sweep).** The Phase B boundary moved from 2026-11-01 to 2026-12-01 (hub decision 2026-09-30, ledger operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]); the three dates above were updated in place. The confirmatory RQ5 test runs the five live-cohort books (DeepSeek is exploratory-only and paper-only, hub-ruled 2026-09-11); the earlier "all six models" wording is superseded.

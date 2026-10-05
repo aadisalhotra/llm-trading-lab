@@ -25,10 +25,10 @@ Given identical information, identical constraints, and identical execution infr
 |---|---|---|---|
 | 1: Build | Pre-launch (completed) | $0 | Pipeline + dashboard |
 | 2: Test | Pre-launch (completed) | $0 | Dry runs, validate guardrails |
-| A: Paper | Apr 9 – Oct 31, 2026 | $100k each | Validate viability (pilot) |
-| Paper Final Report | Late Oct 2026 | — | Go/no-go for live |
-| B: Live | Nov 1, 2026 – Nov 1, 2027 | $1k each | Real capital |
-| Capstone | Nov 2027 | — | Final report |
+| A: Paper (~7-month pilot) | Apr 9 – Nov 30, 2026 | $100k each | Validate viability (pilot); November = broker-paper venue validation |
+| Paper Final Report | Late Nov 2026 | — | Go/no-go for live |
+| B: Live (12-month confirmatory) | Dec 1, 2026 – Dec 1, 2027 | $2,000 per book, five books | Real capital |
+| Capstone | Dec 2027 | — | Final report |
 | C: Scale | 2028+ | TBD | Optional |
 
 ## Model Evolution Policy

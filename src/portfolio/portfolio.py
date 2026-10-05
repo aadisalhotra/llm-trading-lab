@@ -91,7 +91,10 @@ class Portfolio:
     # (2026-08-29): both phase boundaries re-incept fresh and nothing carries —
     # Oct 1 validation books incept in broker-paper at registered capital, Nov 1
     # confirmatory books incept from broker-authoritative funded reality with no
-    # positions, no P&L and no state from Phase A or October. A carried state
+    # positions, no P&L and no state from Phase A or October. (Dates moved by the
+    # 2026-09-30 boundary move: the validation books incept at the venue cutover,
+    # target 2026-11-02, and the confirmatory books on 2026-12-01; the no-carry
+    # rule itself is unchanged.) A carried state
     # file would silently defeat that, so the epoch is stamped here and checked
     # on every load. Empty means "written before this field existed", which is
     # the Phase A simulator era.

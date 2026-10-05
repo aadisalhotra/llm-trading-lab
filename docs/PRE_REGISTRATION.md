@@ -4,7 +4,7 @@
 **Pre-registration version:** v1
 **Status:** 🔒 LOCKED
 **Author:** Aadi Salhotra
-**Planned public deposit:** OSF, before the live phase begins on **2026-11-01** (so the deposit predates any inferential data)
+**Planned public deposit:** OSF, before the live phase begins on **2026-12-01** (so the deposit predates any inferential data)
 **Machine-readable copy:** [`data/pre_registration/v1.json`](../data/pre_registration/v1.json)
 
 ---
@@ -37,8 +37,8 @@ Six frontier LLMs each manage an independent portfolio under identical condition
 
 | Phase | Window | Capital | Role in this study |
 |-------|--------|---------|--------------------|
-| **A — Paper** | 2026-04-09 → 2026-10-31 | $100K simulated | **Pilot.** Pipeline validation, definition-locking, power analysis. *Not* confirmatory. |
-| **B — Live** | 2026-11-01 → 2027-11-01 | $1K real | **Confirmatory.** All inferential tests below run on this window. |
+| **A — Paper** | 2026-04-09 → 2026-11-30 | $100K simulated | **Pilot.** Pipeline validation, definition-locking, power analysis. *Not* confirmatory. |
+| **B — Live** | 2026-12-01 → 2027-12-01 | $2,000 real per book (five books; $10,000 registered base) | **Confirmatory.** All inferential tests below run on this window. |
 
 The single biggest threat to this study is that the live window covers only **one** market regime. That limitation, and the planned backtest harness that addresses it for RQ1/RQ4/RQ5, is documented in [`BACKTEST_HARNESS_SCOPE.md`](BACKTEST_HARNESS_SCOPE.md).
 
@@ -255,7 +255,7 @@ Discloses the Phase A (pilot) data-quality issues and the registered handling. P
 
 ### 3.10 Forced-Change / Deprecation Exposure — Confirmatory Model Set
 
-**Purpose.** The confirmatory window runs November 1, 2026 – November 1, 2027. Some pinned models carry documented or structural exposure to a provider-forced model change inside that window. This section discloses the exposure and pre-specifies the handling.
+**Purpose.** The confirmatory window runs December 1, 2026 – December 1, 2027. Some pinned models carry documented or structural exposure to a provider-forced model change inside that window. This section discloses the exposure and pre-specifies the handling.
 
 **Exposure table.** Populated from the model-lifecycle monitor as of the OSF deposit date.
 
@@ -270,7 +270,7 @@ Discloses the Phase A (pilot) data-quality issues and the registered handling. P
 
 The GPT-5.4 and Grok 4.20 rows are pending the OpenAI and xAI deprecation audit, which must complete before the OSF deposit.
 
-**Anthropic retirement-floor exposure.** `claude-sonnet-4-6` and `claude-opus-4-6` carry documented "not sooner than" retirement floors inside the confirmatory window. These are floors — earliest-possible dates, which may be extended. No current Anthropic model has a floor past 2027-11-01, so the exposure cannot be removed by snapshot selection.
+**Anthropic retirement-floor exposure.** `claude-sonnet-4-6` and `claude-opus-4-6` carry documented "not sooner than" retirement floors inside the confirmatory window. These are floors — earliest-possible dates, which may be extended. No Anthropic model had a retirement floor past 2027-11-01 at the registration audit; the confirmatory window now ends 2027-12-01 and this has NOT been re-audited against the extended end (re-audit due before the OSF deposit). The exposure cannot be removed by snapshot selection.
 
 **Gemini preview-build supersession exposure.** Gemini 3.1 Pro is pinned to `gemini-3.1-pro-preview`, a preview (pre-GA) build; Google exposes no dated, general-availability snapshot for this model. Preview builds carry elevated supersession risk: a preview is typically deprecated or replaced when the provider ships the general-availability version. If a GA `gemini-3.1-pro` is released during the confirmatory window, the pinned preview build may be deprecated, retired, or repointed — a provider-forced change inside the window. This is forced-change exposure of the same class as the Anthropic floors; the difference is that it is undated and structural, not a published floor.
 
@@ -309,6 +309,7 @@ Append-only. Each entry: date · what changed · why. No edits above this line a
 | 2026-05-19 | Initial registration (v1). | Locks design before the live (confirmatory) phase. |
 | 2026-05-20 | Reconciled phase dates to one canonical timeline: Phase A (paper) 2026-04-09 → 2026-10-31; Phase B (live) 2026-11-01 → 2027-11-01 (12-month live window). | Aligned `settings.json`, `README.md`, and `v1.json`; the prior draft ended paper on 2026-10-09 with an approximate live window. No change to research questions, metrics, or decision rules. |
 | 2026-05-22 | Landed the ratified RQ5/RQ6 specification. **RQ5** → four registered metrics (dropped `num_positions`) plus the pooled drawdown-conditioned concentration-response **headline test** (dHHI_trade ~ DD with model + tick-position fixed effects; L = round(n^(1/3)); one BH-family p-value). **RQ6** → reframed from "non-determinism at temperature 0" to "operational reproducibility of deployed agents" (characterization, not in the FDR family) with the Per-Model API Configuration table inline. Added **§3.9 Phase A data integrity** (shakedown April 9–22 / pilot window opens April 23; Sonnet/Opus state-file commingling; RQ5 derived dependent variable; Gemini availability + per-RQ tick-position handling). | Pre-deposit drafting (the OSF deposit has not occurred). Resolves the items raised by the Task 1 RQ5/Gemini diagnostics. Sources: `docs/RQ5-RQ6-specification.md`, `RQ5-pilot-window-and-Phase-A-data-integrity.md`, `Gemini-selection-bias-characterization-and-per-RQ-handling.md`, `RQ5-RQ6-spec-completion.md`. |
+| 2026-10-05 | **Phase B boundary moved to 2026-12-01** (hub decision 2026-09-30, pre-deposit; ledger operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01], fb41977f). Phase A (paper) now 2026-04-09 → 2026-11-30 (~7-month pilot, November = broker-paper venue validation); Phase B (live) 2026-12-01 → 2027-12-01 (12-month confirmatory); planned OSF deposit before 2026-12-01 (mid-November). Live capital corrected from $1K to $2,000 per book across the five-book live cohort ($10,000 registered base; DeepSeek exploratory-only, paper-only, hub-ruled 2026-09-11, ledger `live_cohort_composition_ruled`). §3.10 Anthropic floor sentence restated with a re-audit caveat. | Oct-1 cutover floor unmet; Research fallback S2 (shorten within the validation floor, then move the boundary, never compress the build). Schedule is recoverable; a defective confirmatory launch is not. No change to research questions, metrics or decision rules. |
 
 ---
 

@@ -59,8 +59,8 @@ Model lineup is reviewed on the first trading day of each month. Each provider's
 
 | Phase | Period | Capital | Purpose |
 |-------|--------|---------|---------|
-| **Paper** | Apr 9 - Oct 31, 2026 | $100K simulated per model | Validate pipeline, collect baseline data, tune risk controls |
-| **Live** | Nov 1, 2026 - Nov 1, 2027 | $1K real per model | Real execution with real slippage, fees, and consequences |
+| **Paper (pilot, ~7 months)** | Apr 9 - Nov 30, 2026 | $100K simulated per model | Validate pipeline, collect baseline data, tune risk controls; November is the broker-paper venue-validation month |
+| **Live (confirmatory, 12 months)** | Dec 1, 2026 - Dec 1, 2027 | $2,000 real per book, five books ($10,000 registered base) | Real execution with real slippage, fees, and consequences |
 | **Scale** | 2028+ (optional) | TBD | Increase capital if results warrant it |
 
 ## The 79-Asset Universe
@@ -142,11 +142,12 @@ An end-of-day pass at 5:30 PM ET writes daily performance snapshots, generates r
 
 ```
 Apr 9, 2026   Phase A - Paper trading begins ($100K per model)
-Oct 31, 2026  Phase A ends - ~7 months of paper data
-Late Oct 2026 Paper Trading Final Report - go/no-go for live
-Nov 1, 2026   Phase B - Live trading begins ($1K real per model)
-Nov 1, 2027   Phase B ends - 12 months of live data
-Nov 2027      Final Capstone Report
+Nov 2026      Venue-validation month (broker-paper, five live books)
+Nov 30, 2026  Phase A ends - ~7-month pilot
+Late Nov 2026 Paper Trading Final Report - go/no-go for live
+Dec 1, 2026   Phase B - Live trading begins ($2,000 real per book, five books)
+Dec 1, 2027   Phase B ends - 12 months of live data
+Dec 2027      Final Capstone Report
 ```
 
 ## Running Locally
