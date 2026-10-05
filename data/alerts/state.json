@@ -38,19 +38,27 @@
     ]
   },
   "daily": {
-    "date": "2026-10-02",
-    "sent_count": 1,
+    "date": "2026-10-05",
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "news:ABT:2575ca5ab9",
+      "news:ISRG:be90b0b191"
     ],
     "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-10-02T13:32:54.319588+00:00",
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABT (held by 4)",
+        "timestamp": "2026-10-05T21:31:51.742435+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ISRG (held by 4)",
+        "timestamp": "2026-10-05T21:31:52.464529+00:00",
         "disposition": "sent"
       }
     ]
