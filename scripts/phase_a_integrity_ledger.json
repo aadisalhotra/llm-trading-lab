@@ -1120,6 +1120,38 @@
         "required_action": "Correct or re-date the hunk, and its date-bearing sibling files, AT LANDING (conditional landing 2026-10-16; branch decision 2026-10-15), not after. The correction is ONE ATOMIC STEP (hub, 2026-10-05): the ledger fields, tests/test_v4_ablation.py::test_regime_boundary_registered (which pins the old date and scope by name) and the other stale references move together, or the suite fails.",
         "where_the_full_list_lives": "docs/v4_landing_checklist.md in the repository. It is the authoritative list; this entry does not restate it, so the two cannot disagree.",
         "relay_only": "v4's third verified component (removal of the two rendered EXECUTION MODE lines and retirement of their template variables; the v4 declaration amends from two components to three, and any fourth fails verification) rests on a hub relay of a Research ruling delivered inline on 2026-09-11. No committed artifact exists yet; the checklist flags it relay-only."
+      },
+      {
+        "id": "landing_sweep_addendum_both_directions",
+        "date": "2026-10-05",
+        "type": "addendum",
+        "scope": "experiment",
+        "addends": "operational_events.2026-10[landing_sweep_boundary_move_completed]",
+        "append_only": "That entry is NOT rewritten (hub, 2026-10-05: 'unpushed' is not an exception to append-only). This entry corrects it by append.",
+        "what_the_earlier_entry_gets_wrong": "landing_sweep_boundary_move_completed says '36 value changes in 12 files' and to read sweep_status as COMPLETE as of its commit. That accounts only for the FIRST pass, which searched forward only (October/November-anchored dates). The sweep is complete only as of the third pass below, and only as far as the scans listed here reach.",
+        "passes": [
+          {
+            "pass": 1,
+            "commit": "ebd354512",
+            "searched": "forward only: 2026-11-01, 2027-11-01, 2026-10-31, Nov 1, Oct 1 and their spellings",
+            "result": "36 value changes in 12 files (as recorded in landing_sweep_boundary_move_completed)."
+          },
+          {
+            "pass": 2,
+            "commit": "0683175b03481c33117b582759e1533769c94dff",
+            "searched": "September-anchored committed text the move also displaces: 2026-09-30, 2026-09-16, 2026-09-15, [SEPT 15], 2026-09-01",
+            "result": "docs/prereg/tier2_novel_sections.md addendum rows 7-9 (T2.4 prompt freeze 2026-09-30 -> 2026-10-31 and v4 landing 2026-09-16 -> conditional 2026-10-16; the [SEPT 15] decision-marker date 2026-09-15 -> 2026-10-15; v4 two components -> three, relay-only); config/settings.json settlement._note, settlement.py and executor docstrings (activation wording). settlement.activation_date VALUE deliberately unchanged: the flag is false and the date moves with the flag in the signed-off activation. docs/v4_landing_checklist.md rewritten to carry all five defect classes."
+          },
+          {
+            "pass": 3,
+            "commit": "931226fca709b331c0e748cae66ce8deb9b0f422",
+            "searched": "both directions: old-anchored month-name forms (Oct/October, Nov 2026, Oct 2027, Late Oct, Nov 2027) AND new values (2026-12-01, 2027-12-01, Dec 1) for consistency",
+            "result": "docs/METHODOLOGY.md bullets (go/no-go late Oct -> late Nov; capstone Nov -> Dec 2027), docs/BACKTEST_HARNESS_SCOPE.md live-phase span, docs/RESEARCH_QUESTIONS.md live-phase start, a src/config_loader.py comment, and an amendment note on docs/Gemini-continuity-diagnostic-close-out.md (November segment added to the clock). The new-value scan found 2026-12-01 / 2027-12-01 consistent everywhere they appear."
+          }
+        ],
+        "lesson": "A boundary move displaces dates in both directions. The first pass searched only forward and missed September-anchored committed text. Future sweeps search old values as well as new (hub, 2026-10-05).",
+        "completeness_is_bounded": "'Complete' means: no hit remains for the patterns scanned, other than the residuals below. It is not a proof that no date-anchored sentence exists in a spelling nobody searched for.",
+        "left_deliberately": "Amendment-log rows (append-only); the registered tier2 text (amended by appended sections only); the model-facing '18-month horizon' (hub ruling); historical comments in portfolio.py and tests; data/dashboard.json (regenerates from settings at the next build); and every stale 2026-09-01 inside the v4 lane's STAGED files, which is handled by docs/v4_landing_checklist.md Step 1 at landing, not by this sweep."
       }
     ]
   }
