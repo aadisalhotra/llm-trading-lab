@@ -1066,6 +1066,60 @@
           "venue_wide_correlation": "reconciliation is one aggregate record per cycle, so a divergence fails every book's cycle for that cycle_id, consistent with the registered correlation disclosure."
         },
         "defect_corrected_before_registration": "An uncommitted draft compared sum(book cash) to broker cash and cited a tolerance as 'registered 2026-09-16'. No registration existed. The citation was removed; this entry is the registration."
+      },
+      {
+        "id": "venue_book_routing_and_barrier_timeout",
+        "date": "2026-10-05",
+        "type": "build_record",
+        "scope": "execution / cross-book barrier / level-2 reconciliation",
+        "code_commit": "37fc654bb2738aadb841eb7841661d42ef0f48bc",
+        "ruling": "Hub, 2026-09-11 (restated 2026-10-05): the live cohort is five books (claude, claude_opus, gpt, gemini, grok); DeepSeek is exploratory-only and paper-only. Recorded in live_cohort_composition_ruled as hub-ruled.",
+        "what_was_built": "config_loader.effective_mode(book): the lab mode unless it is a venue mode and the book is outside live_cohort_keys, then 'paper'. config_loader.venue_book_keys(enabled) gives the venue books. Executor.on_venue(book) routes execute_decisions, force_liquidate and the four BUY/SELL/SHORT/COVER paths; the inception-epoch guard and init capital, the logged execution_mode, the barrier's expected_books and the reconciliation set all key on the same function. In paper mode it is the identity (Phase A unchanged). A venue mode with no named cohort raises PendingCohortError instead of routing all six books to the venue.",
+        "defect_this_closes": "Before this commit, in a broker mode nothing routed DeepSeek paper-only: enabled_models was all six, so DeepSeek would have submitted venue orders, been counted in the level-2 reconciliation sum, and joined the barrier's expected set.",
+        "barrier_timeout_finding": {
+          "mechanism": "CycleBarrier.register() blocks every book until the cycle's plan is built, which requires every EXPECTED book to have registered. Every venue book registers every cycle (an empty intent list when it has nothing to submit). A book that is expected but never registers therefore holds all the others until registration_timeout (config execution.barrier_registration_timeout_seconds = 300).",
+          "cost": "300 s of a 1800 s (30-minute) cycle grid, about 16.7%, EVERY cycle, delaying every venue order by the full timeout.",
+          "how_it_reports": "A single WARNING log line ('CycleBarrier: proceeding without [deepseek] after 300s'). No exception, no alert, no failed cycle, and orders still submit correctly after the delay; the cost is time, not an error.",
+          "same_failure_class": "A path that reports success while doing the wrong amount of work: the barrier 'worked', degraded, and said so only in a log line nobody is paged on.",
+          "never_observed_in_production": "No broker-mode cycle has run; the defect existed in code that production (paper mode, barrier None) never executed. It would have first appeared in the six-book broker_paper run.",
+          "fix": "pipeline passes expected_books=set(venue_book_keys(...)), so a simulator book never registers and is never waited for; reconciliation sums the same set.",
+          "regression_test": "tests/test_venue_routing.py (11 tests, mutation-verified: returning all keys from venue_book_keys, or dropping the cohort test from effective_mode, fails them)."
+        },
+        "registered_prose_consequence": "docs/prereg/tier2_novel_sections.md, cross-book submission-order parity, says the rotation is 't mod 6'; the code rotates 't mod len(books)', so with five venue books it is mod 5. Recorded in the 2026-10-05 tier2 amendment section; the registered text is not edited.",
+        "open_residual": "src/prompt_builder.py:685 still prints settings['mode'] to every model, so DeepSeek's prompt reads BROKER_PAPER while it runs on the simulator. Known, dated, confined to one exploratory arm; resolved at the v4 landing (docs/v4_landing_checklist.md item 4)."
+      },
+      {
+        "id": "landing_sweep_boundary_move_completed",
+        "date": "2026-10-05",
+        "type": "completion_record",
+        "scope": "experiment",
+        "completes": "operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01].sweep_status",
+        "note_on_the_completed_entry": "That entry's sweep_status still reads PENDING and is deliberately NOT edited (hub, 2026-10-05): this entry supersedes it by append. Read sweep_status as COMPLETE as of the commit below.",
+        "code_commit": "ebd35451249788c99a53cd9f0a3c964959b53732",
+        "changed": "36 value changes in 12 files: config/settings.json (phase_a_end_date 2026-11-30, phase_b_start_date 2026-12-01, experiment_end_date 2027-12-01, note text); docs/PRE_REGISTRATION.md and data/pre_registration/v1.json (deposit date, phase windows, amendment-log entries, Anthropic floor sentence); README.md and docs/METHODOLOGY.md (phase windows restated as a ~7-month pilot and a 12-month confirmatory phase); docs/RQ5 and docs/RQ6 (dates in place, amendment notes appended); docs/prereg/tier2_novel_sections.md (registered text NOT edited; amendment section appended, six superseded-clause groups); executor, reconciliation and portfolio comments; new docs/v4_landing_checklist.md.",
+        "corrections_beyond_dates": [
+          "Live capital $1K -> $2,000 per book x five books ($10,000 registered base) in README, METHODOLOGY, PRE_REGISTRATION and v1.json (capital_usd 1000 -> 2000). The prior figure predated the 2026-09-11 capital ruling.",
+          "Six books -> five live books where venue-facing; the structure supports six, the live cohort is five.",
+          "Barrier rotation 't mod 6' in registered prose vs 't mod len(books)' in code (mod 5 for five venue books).",
+          "A stale 'PROPOSED / pending hub registration' statement in settings.reconciliation._note, true when written and false after the 2026-10-04 registration."
+        ],
+        "go_no_go": "The Paper Trading Final Report (go/no-go for live) moves from late October to late November 2026. Confirmed by the hub 2026-10-05 as the mechanical consequence of the boundary move.",
+        "not_restated": "Model-facing prompt text ('18-month horizon' in v2/v3/v4) is untouched by hub ruling: changing it would be a prompt-regime event.",
+        "caveat": "The Anthropic retirement-floor sentence in PRE_REGISTRATION section 3.10 and the RQ6 doc is restated with an explicit note that it has NOT been re-audited against 2027-12-01; the re-audit is due before the OSF deposit.",
+        "left_deliberately": "Amendment-log rows (append-only), historical comments in portfolio.py and tests, the unedited registered tier2 text, and data/dashboard.json (regenerates from settings.json at the next build).",
+        "relay_only_artifacts": "The boundary amendment (Research's text, delivered governing-inline) and the EXECUTION MODE removal ruling have no committed artifact; the hub relay is the only record. The hub is commissioning committed artifacts for both."
+      },
+      {
+        "id": "v4_staged_hunk_followup_2026_09_01_never_occurred",
+        "date": "2026-10-05",
+        "type": "followup_note",
+        "scope": "regime_boundaries.phase_b_long_only (staged by the v4 lane, uncommitted)",
+        "follows": "operational_events.2026-10[september_split_conditional_did_not_fire].consequence_for_the_staged_v4_entry",
+        "append_only": "Edits no earlier entry and does not touch the staged hunk.",
+        "the_hazard": "The staged phase_b_long_only hunk dates the v3->v4 boundary 2026-09-01 and sets scope all_six_models. September 2026 was a single homogeneous v3 segment (the flip never occurred), and the live cohort is five books. Landed as written, the ledger would assert a regime flip that did not happen.",
+        "required_action": "Correct or re-date the hunk, and its date-bearing sibling files, AT LANDING (conditional landing 2026-10-16; branch decision 2026-10-15), not after. The correction is ONE ATOMIC STEP (hub, 2026-10-05): the ledger fields, tests/test_v4_ablation.py::test_regime_boundary_registered (which pins the old date and scope by name) and the other stale references move together, or the suite fails.",
+        "where_the_full_list_lives": "docs/v4_landing_checklist.md in the repository. It is the authoritative list; this entry does not restate it, so the two cannot disagree.",
+        "relay_only": "v4's third verified component (removal of the two rendered EXECUTION MODE lines and retirement of their template variables; the v4 declaration amends from two components to three, and any fourth fails verification) rests on a hub relay of a Research ruling delivered inline on 2026-09-11. No committed artifact exists yet; the checklist flags it relay-only."
       }
     ]
   }
