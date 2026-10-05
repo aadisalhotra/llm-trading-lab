@@ -260,3 +260,7 @@ computed at 2026-08-31, over the full segment denominator, per
 and recorded in
 `scripts/phase_a_integrity_ledger.json` →
 `operational_events['2026-08'].gemini_continuity_diagnostic_close_out`.
+
+---
+
+**Amendment 2026-10-05.** The clock segments quoted above (August, September, October 2026) were extended by one: `phase_b_clock_spec.clock_end` moved from 2026-10-31 to 2026-11-30 with the Phase B boundary move (ledger `operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]`), adding a **November 2026** segment (about 3.9 months of validation from the 2026-08-03 clock start). Nothing in this close-out changes: the continuity diagnostic still yields no clock credit, and the 2026-08-03..08-14 window is still a proper subset of the first segment.

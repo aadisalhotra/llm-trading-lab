@@ -86,8 +86,8 @@ class PendingCapitalError(RuntimeError):
     Deliberately fatal. The alternative — a silent fallback to some default —
     is the failure class that produced the builder's hard-coded regime labels:
     a stale default that reads as a real value and is only caught by someone
-    noticing the number is wrong. October's validation books must size at the
-    scale Phase B actually runs, so an unconfirmed figure has to stop the run
+    noticing the number is wrong. The validation books (November 2026; October before the
+    2026-09-30 boundary move) must size at the scale Phase B actually runs, so an unconfirmed figure has to stop the run
     rather than quietly seed six books at the wrong capital.
     """
 

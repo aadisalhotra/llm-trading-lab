@@ -9,7 +9,7 @@
 
 ## 1. The limitation, stated plainly
 
-The live phase (≈ Nov 2026 → Oct 2027) covers **one** market-regime path — whatever the market happens to do over those twelve months. Three of the six research questions are only fully answerable **across** regimes:
+The live phase (≈ Dec 2026 → Nov 2027) covers **one** market-regime path — whatever the market happens to do over those twelve months. Three of the six research questions are only fully answerable **across** regimes:
 
 - **RQ1 (convergence)** predicts convergence is *strongest in trending regimes and weakest in vol-spikes*. You cannot test a cross-regime claim on a single regime path.
 - **RQ4 (style tilts)** estimates factor loadings that are known to rotate with the regime (value vs growth leadership flips; momentum crashes in reversals). One regime gives one snapshot of loadings.

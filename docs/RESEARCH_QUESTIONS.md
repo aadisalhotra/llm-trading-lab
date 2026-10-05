@@ -5,7 +5,7 @@
 **Pre-registration:** [`PRE_REGISTRATION.md`](PRE_REGISTRATION.md) · machine-readable [`data/pre_registration/v1.json`](../data/pre_registration/v1.json)
 **Regenerate:** `python -m src.analytics.research_metrics`
 
-> ⚠️ **Everything below is pilot data from the paper-trading phase.** Per the pre-registration, confirmatory tests run on **live-phase data only** (begins ≈ Nov 2026). The numbers here validate that the pipeline measures what it should and give early power estimates — they are **not** results. Decision rules will be applied to the live window.
+> ⚠️ **Everything below is pilot data from the paper-trading phase.** Per the pre-registration, confirmatory tests run on **live-phase data only** (begins ≈ Dec 2026). The numbers here validate that the pipeline measures what it should and give early power estimates — they are **not** results. Decision rules will be applied to the live window.
 
 This file is refreshed monthly alongside the monthly report. Each RQ shows its status, the headline metric, the current pilot reading, and (where applicable) the regime breakdown and bootstrap interval.
 

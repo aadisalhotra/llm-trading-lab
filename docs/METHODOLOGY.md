@@ -84,8 +84,8 @@ The Phase A shakedown period is designated **April 9 – April 22, 2026 inclusiv
 - **Daily**: dashboard auto-update
 - **Weekly**: snapshot commit
 - **Monthly**: full research report in `/reports`
-- **Late Oct 2026**: Paper Trading Final Report (go/no-go for live)
-- **Nov 2027**: Capstone
+- **Late Nov 2026**: Paper Trading Final Report (go/no-go for live)
+- **Dec 2027**: Capstone
 
 ## Compliance
 Personal investment experiment. Not financial advice. All risk is the operator's own.
