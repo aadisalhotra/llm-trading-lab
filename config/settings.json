@@ -25,7 +25,10 @@
     "_note": "Level-2 (broker-authoritative) reconciliation parameters, read ONLY through config_loader.reconciliation_params(). REGISTERED 2026-10-04 by hub dispatch: ledger operational_events.2026-10[level2_reconciliation_parameters_registered] (fb41977f). (Stale 'PROPOSED/pending' wording corrected in the 2026-10-05 sweep.) cash_tolerance_usd is an explicit accommodation for SEC Section 31 / FINRA TAF fees the pipeline ledger does not model (Portfolio.buy/sell/short/cover compute cash from shares x fill price only); it is NOT slack for bugs. Position tolerance is Portfolio.GHOST_SHARES_EPSILON by construction, so level 1 and level 2 agree on what 'no position' means. unallocated_cash_usd is the cash the venue account holds that no book owns: for live it is DERIVED from capital_structure.reserve_master_usd and is not configurable here; for broker_paper it is the paper account's funded balance minus the sum of enabled books' starting capital, which only the PI can read off the dashboard (no reset or balance API is authoritative before funding) -- null raises PendingReconciliationBaselineError rather than letting level-2 compare against a guessed figure.",
     "cash_tolerance_usd": 1.00,
     "unallocated_cash_usd": {
-      "broker_paper": null
+      "broker_paper": 89999.99
+    },
+    "_unallocated_cash_provenance": {
+      "broker_paper": "89999.99 = paper-account cash 99999.99 minus the five venue books' combined starting capital 10000 (5 x 2000; DeepSeek is paper-only and holds no venue cash). Supplied by the hub, 2026-10-05. READ FROM THE BROKER DASHBOARD, NOT THE API, at 2026-10-04 22:55 ET: cash 99999.99, zero positions, zero open orders. The September probe's PFE round-trips netted to one cent (hence .99). DATED: re-read before the E2E if anything has traded in the account since (the 2026-10-05 09:35 ET barrier probe trades in it)."
     }
   },
   "execution": {

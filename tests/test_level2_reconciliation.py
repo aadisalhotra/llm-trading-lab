@@ -187,6 +187,29 @@ def test_shipped_settings_resolve_for_live():
     assert p == {"cash_tolerance_usd": 1.0, "unallocated_cash_usd": 500.0}
 
 
+def test_shipped_broker_paper_baseline_resolves_and_is_dated():
+    """The PI/hub-supplied baseline (2026-10-05) clears PendingReconciliationBaselineError, and
+    its dashboard-read provenance (a retrieval timestamp, not an API read) is recorded with it."""
+    s = config_loader.load_settings()
+    p = config_loader.reconciliation_params(s, "broker_paper")
+    assert p["unallocated_cash_usd"] == pytest.approx(89999.99)
+    prov = s["reconciliation"]["_unallocated_cash_provenance"]["broker_paper"]
+    assert "2026-10-04 22:55 ET" in prov and "DASHBOARD" in prov
+
+
+def test_five_funded_venue_books_reconcile_clean_against_the_dashboard_cash():
+    """5 x $2,000 of book cash + the $89,999.99 baseline == the $99,999.99 the account showed."""
+    s = config_loader.load_settings()
+    params = config_loader.reconciliation_params(s, "broker_paper")
+    cohort = config_loader.live_cohort_keys(s)
+    books = [book(k, config_loader.starting_capital(s, "broker_paper")) for k in cohort]
+    r = rec.reconcile(books, FakeBroker(99999.99), "cyc-e2e", **params)
+    assert r.clean, [e.to_dict() for e in r.events]
+    # one cent of drift is inside the registered $1.00 tolerance; a $5 residue is not
+    assert rec.reconcile(books, FakeBroker(99999.99 - 0.01), "c", **params).clean
+    assert not rec.reconcile(books, FakeBroker(99999.99 - 5.0), "c", **params).clean
+
+
 # -------------------------------------------------------------- Gate 4 metric
 def fill(status="filled", **kw):
     return {"side": "BUY", "order_id": "LLM-x", "constraint": "", "error": "",
