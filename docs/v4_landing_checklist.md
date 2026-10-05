@@ -17,24 +17,24 @@ This repo has already had phantom ruling citations (class 1 below). A ruling wit
 
 ## The staged set (what is being landed)
 
-| path | check | value at 2026-10-05 |
+| path | check | value (NEW BASELINE recorded 2026-10-05 after the v4 build; pending hub re-certification) |
 |---|---|---|
-| `prompts/CHANGELOG.md` | blob | `93d89633` |
-| `prompts/v4.txt` | blob | `8cf46c17` |
-| `src/prompt_builder.py` | blob | `638956f7` |
-| `tests/test_v4_ablation.py` | blob | `b6107d6c` |
-| `scripts/build_monthly_data_layer.py` | delta | +15 / −0, two hunks (index `82d031cd`) |
-| `scripts/phase_a_integrity_ledger.json` | delta | +17 / −0, one contiguous insertion (index `c38bb595`) |
+| `prompts/CHANGELOG.md` | blob | `f322d216` (was `93d89633`) |
+| `prompts/v4.txt` | blob | `d8e38661` (was `8cf46c17`) |
+| `src/prompt_builder.py` | blob | `c1ed4823` (was `638956f7`) |
+| `tests/test_v4_ablation.py` | blob | `13c40070` (was `b6107d6c`) |
+| `scripts/build_monthly_data_layer.py` | delta | +15 / −0, two hunks (index `82d031cd`, unchanged) |
+| `scripts/phase_a_integrity_ledger.json` | delta | +17 / −0, one contiguous insertion (index `9fb45160`; one line, `v4_equivalence`, rewritten) |
+
+The four blob moves are the hub-ordered build (dispatch 2026-10-05, items ①②); the hub is asked to re-certify them. v4.txt sha256 (LF) is now `5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07`; v2 reference `963e7262…`.
 
 Every step below that edits a blob-checked file **moves its blob**; re-certify with the hub afterwards. The ledger hunk is recoverable with `git diff --cached -- scripts/phase_a_integrity_ledger.json`. Landing beside other lanes follows CLAUDE.md rules 5–8 (pathspec commit; ledger via quarantine with the hub's cross-lane sign-off; delta-identity, never reserialize).
 
-## Step 0 — the second v4 component is NOT BUILT (largest open item)
+## Step 0 — the settlement representation: BUILT 2026-10-05 (hub ①)
 
-Committed prereg, `docs/prereg/tier2_novel_sections.md` T2.4 (amended, supersedes "literal reverse"): *v4 composition (cash branch): two verified diff components, each verified separately. (1) The shorting ablation … verified mechanically against that diff. (2) The settlement representation — a minimal reviewed addition: the state schema splits cash into settled and unsettled balances, and the prompt carries one neutral sentence stating the settled-funds purchase rule (rule statement only, no strategy guidance). No other semantic content changes; any third diff component fails verification.*
+T2.4 component 2, to the registered spec and nothing beyond: the state schema splits cash into settled and unsettled (`prompt_builder._format_portfolio_block(..., settlement_split=True)`, keys from `Portfolio.snapshot()`), and `prompts/v4.txt` carries **one** neutral sentence as the last hard limit: "Purchases may use only your settled cash; the proceeds of a sale become settled cash one trading day after the sale." ("trading day" is accurate: settlement uses the NYSE calendar.) A second sentence is a fourth component and fails verification — pinned by test.
 
-**Component 1 is in the staged set. Component 2 is not.** Checked 2026-10-05: `git diff --no-index prompts/v2.txt prompts/v4.txt` is empty (v4 is byte-identical to v2), `prompts/v4.txt` contains nothing about settled funds, and `prompt_builder.py` (HEAD and staged) renders no settled/unsettled balances. `Portfolio.snapshot()` already carries `settled_cash` (`src/portfolio/portfolio.py:201`, landed `c6d77c72`), so the data exists; the prompt-facing half does not.
-
-To build before landing: render the settled/unsettled split in the portfolio block (`prompt_builder.py`, v4 only — see the gating note in Step 3), and add the one neutral rule-statement sentence to `prompts/v4.txt`. This **moves the `8cf46c17` and `638956f7` blobs** and invalidates the byte-identity premise (class 4).
+Not in the spec, added as a safety check (veto-able): a v4 prompt **refuses to build** (`SettlementPromptMismatchError`) while settled-funds enforcement is off, so the prompt can never state a rule the simulator is not enforcing. It makes v4's activation and the settlement flag one event — see Part C.
 
 ## Step 1 — correct the never-occurred 2026-09-01 flip: ONE ATOMIC STEP (hub, 2026-10-05)
 
@@ -69,27 +69,22 @@ Replace each with the **backing artifact** (CLAUDE.md, CORRECTIONS.md, the ledge
 
 **Done when:** `git diff --cached` for the staged files contains no `2026-09-01` that is not quoting history, `all_six_models` is not the scope of this boundary, no phantom ruling is cited as authority, and `python -m pytest tests -q` is green — all in one commit.
 
-## Step 2 — replace the byte-identity premise with the per-component verification (defect class 4)
+## Step 2 — the byte-identity premise replaced by per-component verification: DONE 2026-10-05 (defect class 4)
 
-The v4 lane's staged artifacts all encode "v4 is byte-identical to v2", which is false the moment Step 0 lands (and was already superseded by T2.4's two-component declaration):
-- Ledger hunk `v4_equivalence`: asserts byte-identity to `prompts/v2.txt`, sha256 `963e726207feec3d07934b4df80b28a4388c8b86145226d031a03e5887534f11` on both files. Rewrite as per-component evidence (ablation verified mechanically against the committed v3 shorting diff `57cb14f4`; settlement representation as a reviewed minimal addition; environment-mode removal as the third component).
-- `tests/test_v4_ablation.py`: `test_v4_is_byte_identical_to_v2` (line ~74) and `test_v4_matches_the_v2_blob_committed_at_the_v3_commit` (~86) must become component assertions; and `test_regime_boundary_registered` checks `digest in b["v4_equivalence"]` — it breaks if `v4_equivalence` is rewritten without it.
-- `prompts/CHANGELOG.md`: the "Verification gate — v4 ≡ v2, byte-identical" section.
-Land with Step 0 and Step 3 so the verification matches the final composition, and add the check that makes "any fourth component fails verification" true — today no test would fail on one.
+Done in the staged files: `tests/test_v4_ablation.py` (`test_v4_is_byte_identical_to_v2` and `test_v4_matches_the_v2_blob…` replaced by component 1/2/3 tests, plus a render-level test that fails on **any** difference beyond the three components, and a negative test that injects a fourth and requires it to fail); the ledger hunk's `v4_equivalence` (per-component claim with both digests; `test_regime_boundary_registered` now checks the v4.txt digest **and** the v2 reference digest); the CHANGELOG "Verification gate" section. **Remaining at landing:** nothing in this step beyond re-certifying the blobs above.
 
-## Step 3 — remove the EXECUTION MODE lines: v4's third verified diff component (RELAY-ONLY)
+## Step 3 — remove the EXECUTION MODE / PHASE lines: v4's third verified diff component — IMPLEMENTED, GATED (RELAY-ONLY)
 
-**Operative text (hub relay, 2026-10-05, of a Research ruling delivered inline 2026-09-11; no committed artifact):** option (i) is implemented as **removal**. The frozen prompt contains **no environment-mode metadata**. It lands as v4's **third verified diff component**: two rendered lines deleted, template variables retired. The v4 declaration amends from **two components to three** (T2.4: ablation + settlement representation + this), and **any fourth fails verification.** Rationale as relayed: any constant lies somewhere in the window — DeepSeek reading `BROKER_PAPER` while running on the simulator (`config_loader.effective_mode`) is that falsehood arriving early: known, dated, confined to one exploratory arm, resolved at this landing.
+**Operative text (hub relay, 2026-10-05, of a Research ruling delivered inline 2026-09-11; no committed artifact):** the frozen prompt contains **no environment-mode metadata**; the two rendered lines are deleted and their template variables retired; it is v4's **third** verified diff component and **any fourth fails verification.** Hub 2026-10-05 ②: the pair is `EXECUTION MODE:` and `PHASE:` (`prompt_builder.py:685–686`), removal gated to the **Oct 16 boundary and never before** — unconditional removal would be an unregistered mid-regime prompt event on live v3.
 
-Checked against the repo (CLAUDE.md rule 10):
-- **Not in the staged set.** `src/prompt_builder.py:685` still renders `EXECUTION MODE: {settings['mode'].upper()}`. Landing it **moves the `638956f7` blob**.
-- **Which two lines — confirm.** By the code, the lines carrying environment metadata are `EXECUTION MODE: …` (685) and `PHASE: {settings['phase']}` (686). The relay does not name them; I infer MODE and PHASE. *The hub should confirm the pair before landing.*
-- **Version-gate the removal.** `prompt_builder.py` renders these lines for every prompt version. Removing them unconditionally changes the live v3 prompt (v3 runs through 2026-10-15) and breaks v2/v3 reproducibility — itself a prompt-regime event. Apply to v4 only.
-- **The amended T2.4 sentence ("two … any third fails") is committed text that this contradicts**; the tier2 amendment (addendum row 9) records the change as relay-only. A committed Research artifact should replace the relay before the OSF deposit.
+Implemented (`prompt_builder.py`): `_environment_lines(version, settings)` omits both lines when `environment_metadata_removed` — i.e. for prompt major 4 (long-only branch: v4 *is* the Oct 16 event), **or** when `settings["prompt_environment_metadata"] == "removed"` (migration branch: the removal lands alone on v3 at the Oct 16 activation). The setting is **absent today**, so v1–v3 render the lines byte-for-byte as before (pinned by `test_v3_render_is_unchanged_by_the_v4_machinery`).
+
+**At landing:** on the long-only branch nothing extra — the `prompt_version` flip (Part C) is the removal. On the migration branch, the signed-off activation adds `"prompt_environment_metadata": "removed"` to `config/settings.json`; that is the Oct 16 event. Cite the ruling as a relay until a committed artifact exists.
 
 ## Part C — activation (a separate signed-off pre-market event, same morning)
 
 - Flip `prompt_version` v3 → v4 in `config/settings.json` **after** the force-cover step (1a, `exposure_as_of`).
+- **Flip the settlement flag in the SAME event as the version flip.** A v4 prompt states the settled-funds rule and will refuse to build (`SettlementPromptMismatchError`) while `settlement.enforce_settled_funds` is false or the run date precedes `settlement.activation_date`; setting both together (below) is what makes the sentence true.
 - Settled-cash enforcement from **2026-10-16** (hub 2026-10-04): `settlement.enforce_settled_funds` false → true and `settlement.activation_date` 2026-09-16 → 2026-10-16 — one regime line, not two. The date is still `2026-09-16` in settings (inert while the flag is false); its note text was corrected 2026-10-05.
 - October segmentation, per the ledger: v3 2026-10-01..10-15, v4 2026-10-16..10-31, both `insufficient_n` for regime-sensitive metrics; the v4 segment's registered function is operational verification of the ablation and of settled-funds enforcement.
 
