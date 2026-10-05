@@ -212,11 +212,14 @@
         "phase_b_clock_spec": {
           "supersedes": "gemini_budget_equalization.consequence clock clause ('August counted from 2026-08-03'; committed 3815ecf5)",
           "clock_start": "first logged post-migration Gemini success (timestamp recorded in cutover.first_logged_post_migration_success at observation)",
-          "clock_end": "2026-10-31",
+          "clock_end": "2026-11-30",
+          "clock_end_prior": "2026-10-31",
+          "clock_end_amended_by": "operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]",
           "segments": [
             "post-migration August segment (clock start .. 2026-08-31): counts as a clean-month observation if it passes the gates over its ~4 weeks",
             "September 2026: whole calendar month",
-            "October 2026: whole calendar month"
+            "October 2026: whole calendar month",
+            "November 2026: whole calendar month (added 2026-10-04 by the 2026-09-30 boundary move; the clock now runs through 2026-11-30)"
           ],
           "gates_per_segment": ">=0.80 decision completeness AND <=1% MAX_TOKENS-classified failures AND model identity stable",
           "no_averaging": true,
@@ -966,6 +969,103 @@
         },
         "consequence": "The registered barrier's release condition -- hold the contended side until the first order reaches terminal state, then release the other -- is a VALID release condition: terminal FILLED clears the block exactly as terminal CANCELLED already did (2026-08-29 spike). This unblocks P1's design. The fda71e90 residual stands until P1 ships: a stop can still be blocked by another book's still-OPEN (non-terminal) order, so the registered claim that stops are unconditional on this venue remains not literally true until the cross-book barrier lands.",
         "evidence": "C:/Users/Aadi/tmp/alpaca_spike/runs/run_20260915T133501Z-00d0cb.json; C:/Users/Aadi/tmp/alpaca_spike/runs/task_20260915T093501.log; fda71e90; docs/prereg/tier2_novel_sections.md (Gate 4 / submission-order parity / barrier mechanism / below-venue-minimum sections, 2026-09-15 landing); src/execution/executor.py (CONSTRAINT_WASH_TRADE_BLOCK, CONSTRAINT_BELOW_VENUE_MINIMUM)."
+      }
+    ],
+    "2026-10": [
+      {
+        "id": "phase_b_boundary_moved_to_2026_12_01",
+        "date": "2026-09-30",
+        "recorded": "2026-10-04",
+        "type": "boundary_amendment",
+        "scope": "experiment",
+        "ruling": "Hub, 2026-09-30, pre-deposit, while the Phase B date was still a draft parameter (after deposit it binds). Dates confirmed by Research. Relayed to Operations in the hub dispatch of 2026-10-04. NOTE: Research's own amendment document has not been delivered to Operations; the text below is the hub's relay of it and should be replaced by reference to that document when it is delivered, not treated as Research's verbatim words.",
+        "unmet_floor": "The 2026-10-01 cutover floor was not met: level-2 reconciliation had not landed (no landed code on origin/main as of 2026-10-03; an uncommitted draft existed in the Operations worktree, landed locally as daf31572 on 2026-10-04); no mode-flip activation event occurred; the six-book broker_paper pipeline had never run end to end.",
+        "fallback_invoked": "Research's registered fallback ranking (S2): shorten within the validation floor, then move the boundary, never compress the build. The first option was exhausted; the boundary moves.",
+        "dates": {
+          "branch_decision": "2026-10-15",
+          "v4_conditional_landing": "2026-10-16",
+          "cohort_pin": "2026-10-26",
+          "prompt_freeze": "2026-10-31 (a Saturday; 2026-10-30 is the last trading day)",
+          "venue_cutover_target": "2026-11-01 (a Sunday; first cycle Monday 2026-11-02)",
+          "venue_cutover_floor": "2026-11-09 (Monday, the sixth trading day of November) -- computed from the NYSE calendar, see validation_floor",
+          "validation_month": "November 2026",
+          "osf_deposit": "mid-November 2026, before 2026-12-01",
+          "live_capital": "2026-12-01",
+          "confirmatory_window": "2026-12-01 .. 2027-12-01",
+          "pilot_window": "2026-04-09 .. 2026-11-30 (~7 months)"
+        },
+        "validation_floor": {
+          "requirement": "S1: at least 15 trading days of live-path validation.",
+          "november_2026_trading_days": 20,
+          "calendar_facts": "NYSE, verified with pandas_market_calendars on 2026-10-04: 2026-11-26 (Thanksgiving) closed; 2026-11-27 is a 13:00 ET early close and counts as a trading day; 2026-11-11 (Veterans Day) is open.",
+          "validation_days_by_cutover_date": {
+            "2026-11-02": 20,
+            "2026-11-09": 15,
+            "2026-11-13": 11,
+            "2026-11-16": 10,
+            "2026-11-17": 9
+          },
+          "float": "A cutover by pre-market 2026-11-09 meets the full floor with ZERO float: the 2026-11-09 session must be a complete validation day. Target-to-floor slack is 5 trading days.",
+          "conditional_branch": "S1's conditional branch translates verbatim: 10-14 trading days (cutover 2026-11-10 .. 2026-11-16) requires all named demonstrations passed, zero unresolved organic G-BOOK/G-EXEC events, and explicit hub sign-off. Below 10 (cutover after 2026-11-16), November is not a validation month and the boundary question reopens."
+        },
+        "recompute": [
+          "1. The confirmatory window slides to 2027-12-01 (12 months from 2026-12-01).",
+          "2. The OSF deposit lands before 2026-12-01 (mid-November), not before 2026-11-01.",
+          "3. The capstone moves to December 2027.",
+          "4. The Anthropic retirement-floor cushion erodes by one month; noted, not decisive.",
+          "5. Gemini's clean-gate requirement extends through 2026-11-30 (clock_end amended in operational_events.2026-08[gemini_sdk_migration_2026_08].phase_b_clock_spec): ~3.9 months of validation from the 2026-08-03 clock start.",
+          "6. The SSRN target stands on ~9 months."
+        ],
+        "rationale": "Schedule is recoverable; a defective confirmatory launch is not.",
+        "phase_durations": "Pilot ~7 months (2026-04-09 .. 2026-11-30); confirmatory 12 months (2026-12-01 .. 2027-12-01). The earlier '18-month' total (April 2026 .. December 2027 is ~20 months) is retired for human-facing surfaces; model-facing prompt text is untouched by hub ruling (changing it would be a prompt-regime event).",
+        "amends": "Every date-anchored value keyed to the prior 2026-11-01 boundary; applied by the landing sweep, which is its own package and reports each value changed.",
+        "sweep_status": "PENDING -- not yet applied as of this entry. config/settings.json phase dates and the registered prose still carry the old dates until that package lands.",
+        "supersedes_for_dates": "The 'October-live ruling' and the 'landed by October 1' clause in docs/prereg/tier2_novel_sections.md (amendment note to be appended there; the registered text is not silently edited)."
+      },
+      {
+        "id": "september_split_conditional_did_not_fire",
+        "date": "2026-10-04",
+        "type": "resolution_note",
+        "scope": "all_six_models",
+        "detail": "The September split conditional did not fire. No branch resolved, v4 never landed, and the 2026-09-10 DeepSeek event was reclassified as an announcement with no serving change (see operational_events.2026-09[deepseek_v41_substitution_premise_false]). September 2026 is a single homogeneous v3 segment for all six arms.",
+        "measured": "data/trades/{model}_2026-09.jsonl at origin/main a0245d3e, 2026-10-04: 272 records per book for each of claude, claude_opus, deepseek, gemini, gpt, grok, 2026-09-01 .. 2026-09-30, every record prompt_version=v3 and execution_mode=paper. October through 2026-10-02 (13 gpt records per day) is also v3. config settlement.enforce_settled_funds stayed false; the 2026-09-16 activation never flipped.",
+        "append_only": "This entry is a resolution note. It edits no earlier entry.",
+        "where_the_conditional_lived": "There is NO committed ledger entry carrying the September conditional. The only registered text is (a) regime_boundaries.phase_b_long_only, a hunk held staged by the v4 lane and uncommitted as of this entry, which dates the v3->v4 boundary 2026-09-01 and says 'the 2026-09-30 freeze executes on v4'; and (b) the 'Split-September amendment' paragraph in docs/prereg/tier2_novel_sections.md, whose own landing note records that its base text is not in the committed corpus. Neither was edited.",
+        "consequence_for_the_staged_v4_entry": "When the v4 lane lands, regime_boundaries.phase_b_long_only will describe a 2026-09-01 flip that did not occur. That entry must carry its own dated correction or be re-dated at landing under the Oct 15 branch decision / Oct 16 conditional landing; it is flagged here so the contradiction is not discovered later.",
+        "october_segmentation": "Long-only branch: v3 2026-10-01..2026-10-15, v4 2026-10-16..2026-10-31, both insufficient_n for regime-sensitive metrics; the v4 segment's registered function is operational verification of the ablation and settled-funds enforcement. The simulator enforces settled cash from 2026-10-16, aligned with the prompt boundary (hub dispatch 2026-10-04, item 4). Not yet reflected in config/settings.json (activation_date still 2026-09-16, flag false) -- that flip is the signed-off pre-market activation event."
+      },
+      {
+        "id": "level2_reconciliation_parameters_registered",
+        "date": "2026-10-04",
+        "type": "registration",
+        "scope": "gate_4 / G-BOOK",
+        "authority": "Hub dispatch 2026-10-04, item 1 (tolerance registration carried in the ledger window).",
+        "code_commit": "daf315725e83480c45f4710028d14398a845b1f7",
+        "mechanism": "After every broker-mode cycle, the aggregate pipeline ledger is diffed against broker account state: cash, and net signed shares per ticker. Divergence raises a CRITICAL G-BOOK alert once, halts every enabled book, and NEVER adjusts a book toward the broker (HALT-never-repair, reused from level 1). Source: docs/prereg/tier2_novel_sections.md partition control (3) and Gate 4's second conjunct.",
+        "cash_comparison": "sum(book cash) + unallocated_cash versus broker cash. unallocated_cash: live = capital_structure.reserve_master_usd ($500, derived, not configurable); broker_paper = config/settings.json reconciliation.unallocated_cash_usd.broker_paper, which is NULL until the PI supplies the funded-balance figure and raises PendingReconciliationBaselineError rather than guess. Comparing sum(book cash) alone raises G-BOOK on cycle one.",
+        "tolerances": {
+          "cash_tolerance_usd": 1.0,
+          "cash_tolerance_basis": "Explicit accommodation for SEC Section 31 and FINRA TAF fees, which the pipeline ledger does not model (Portfolio.buy/sell/short/cover compute cash from shares x fill price only). Not slack for bugs. Tightening it requires modeling fees first.",
+          "position_tolerance_shares": 0.01,
+          "position_tolerance_basis": "Portfolio.GHOST_SHARES_EPSILON by construction, so level 1 and level 2 agree on what 'no position' means."
+        },
+        "gate_4_metric": {
+          "module": "src/analytics/execution_metrics.py",
+          "threshold": 0.8,
+          "cycle_success": "every intended order submitted AND resolved to a terminal broker state (filled, partial, legitimate constraint, or WASH_REJECT_POST_BARRIER) AND the cycle's reconciliation record exists and is clean.",
+          "fails_the_cycle": [
+            "submission failure",
+            "unresolved order status",
+            "stop_unprotected",
+            "un-mediated WASH_TRADE_BLOCK (its class is not ruled; only the post-barrier case is filed as a success class)",
+            "reconciliation diverged",
+            "reconciliation record MISSING (absence is not evidence of agreement)"
+          ],
+          "excluded_not_failed": "cycles whose model call produced no decision (Gate 1 owns that failure); counted in excluded_no_decision.",
+          "no_evidence_is_not_a_pass": "a segment with no broker-mode cycles reports execution_success_rate None and passes_gate_4 None.",
+          "venue_wide_correlation": "reconciliation is one aggregate record per cycle, so a divergence fails every book's cycle for that cycle_id, consistent with the registered correlation disclosure."
+        },
+        "defect_corrected_before_registration": "An uncommitted draft compared sum(book cash) to broker cash and cited a tolerance as 'registered 2026-09-16'. No registration existed. The citation was removed; this entry is the registration."
       }
     ]
   }

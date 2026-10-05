@@ -47,7 +47,8 @@ def test_clock_resolves_for_a_month_inside_the_window():
     # The naive form is what decision-log timestamps are compared against.
     assert pb["clock_start_naive"] == "2026-08-03T14:06:25.440972"
     assert pb["clock_start_date"] == "2026-08-03"
-    assert pb["clock_end"] == "2026-10-31"
+    # Amended 2026-10-04 (Phase B boundary moved to 2026-12-01): was 2026-10-31.
+    assert pb["clock_end"] == "2026-11-30"
 
 
 def test_clock_is_none_for_every_month_before_the_start():
@@ -58,7 +59,19 @@ def test_clock_is_none_for_every_month_before_the_start():
 
 
 def test_clock_is_none_after_clock_end():
-    assert B._phase_b_clock(LEDGER, "2026-11-01", "2026-11-30") is None
+    # clock_end moved 2026-10-31 -> 2026-11-30 with the boundary move, so the
+    # first month wholly after the clock is now December.
+    assert B._phase_b_clock(LEDGER, "2026-12-01", "2026-12-31") is None
+
+
+def test_november_is_inside_the_amended_clock():
+    pb = B._phase_b_clock(LEDGER, "2026-11-01", "2026-11-30")
+    assert pb is not None and pb["declared_in"] == "2026-08"
+    assert pb["seg_start"] == "2026-11-01" and pb["seg_end"] == "2026-11-30"
+    spec = [e for e in LEDGER["operational_events"]["2026-08"]
+            if e["id"] == "gemini_sdk_migration_2026_08"][0]["phase_b_clock_spec"]
+    assert spec["clock_end_prior"] == "2026-10-31", "the amendment keeps the prior value"
+    assert spec["segments"][-1].startswith("November 2026")
 
 
 def test_clock_is_found_in_a_later_month_than_it_was_declared():
