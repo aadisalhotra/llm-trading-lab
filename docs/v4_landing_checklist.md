@@ -28,6 +28,10 @@ This repo has already had phantom ruling citations (class 1 below). A ruling wit
 
 The four blob moves are the hub-ordered build (dispatch 2026-10-05, items ①②); the hub is asked to re-certify them. v4.txt sha256 (LF) is now `5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07`; v2 reference `963e7262…`.
 
+The recorded baseline lives in `docs/v4_staged_baseline.md` (full blob SHAs, added-line digests for the two delta-checked paths).
+
+**Precondition: take a fresh guard patch.** Any guard patch recorded before 2026-10-05 is stale: the build rewrote the ledger hunk's `v4_equivalence` line, so an old patch no longer matches the staged hunk and fails the delta-identity check for the wrong reason. Before the landing quarantine, run `git diff --cached -- scripts/phase_a_integrity_ledger.json > guard.patch` (and the same for the builder), confirm its added-line digest against `docs/v4_staged_baseline.md`, and use that patch as the proof. Never reuse an older one.
+
 Every step below that edits a blob-checked file **moves its blob**; re-certify with the hub afterwards. The ledger hunk is recoverable with `git diff --cached -- scripts/phase_a_integrity_ledger.json`. Landing beside other lanes follows CLAUDE.md rules 5–8 (pathspec commit; ledger via quarantine with the hub's cross-lane sign-off; delta-identity, never reserialize).
 
 ## Step 0 — the settlement representation: BUILT 2026-10-05 (hub ①)
