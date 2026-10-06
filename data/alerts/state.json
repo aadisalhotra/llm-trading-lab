@@ -39,13 +39,19 @@
   },
   "daily": {
     "date": "2026-10-06",
-    "sent_count": 2,
+    "sent_count": 8,
     "dedup_keys": [
       "macro_event:Systemic event",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:MSFT:dba55dba75",
+      "news:NVDA:dba55dba75",
+      "news:TSLA:5ab6dc9b9e",
+      "news:PM:bde0d2899c",
+      "news:ABBV:0e088540e6",
+      "news:CAT:dba55dba75"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +65,48 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-06T19:02:49.003036+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MSFT (held by 6)",
+        "timestamp": "2026-10-06T21:08:07.485053+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on NVDA (held by 5)",
+        "timestamp": "2026-10-06T21:08:09.711623+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TSLA (held by 4)",
+        "timestamp": "2026-10-06T21:08:11.037722+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PM (held by 5)",
+        "timestamp": "2026-10-06T21:08:11.864853+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ABBV (held by 6)",
+        "timestamp": "2026-10-06T21:08:13.196733+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on CAT (held by 4)",
+        "timestamp": "2026-10-06T21:08:14.560746+00:00",
         "disposition": "sent"
       }
     ]
