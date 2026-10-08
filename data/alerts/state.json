@@ -39,18 +39,34 @@
   },
   "daily": {
     "date": "2026-10-08",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:ISRG:2a68d7af81",
+      "news:UNP:f579787e8f"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-08T13:32:48.196663+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on ISRG (held by 4)",
+        "timestamp": "2026-10-08T21:08:03.740039+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on UNP (held by 5)",
+        "timestamp": "2026-10-08T21:08:05.082620+00:00",
         "disposition": "sent"
       }
     ]
