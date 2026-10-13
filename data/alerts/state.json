@@ -38,42 +38,19 @@
     ]
   },
   "daily": {
-    "date": "2026-10-12",
-    "sent_count": 3,
+    "date": "2026-10-13",
+    "sent_count": 1,
     "dedup_keys": [
-      "api_failure:gemini",
-      "news:MA:501c728975",
-      "news:GOOGL:b197faa9f9"
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "api_failure",
-        "severity": "WARN",
-        "title": "Model gemini failed",
-        "timestamp": "2026-10-12T19:02:48.090146+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on GOOGL (held by 4)",
-        "timestamp": "2026-10-12T21:08:07.959524+00:00",
-        "disposition": "send_failed"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on MA (held by 4)",
-        "timestamp": "2026-10-12T21:08:33.924565+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on GOOGL (held by 4)",
-        "timestamp": "2026-10-12T21:42:23.658117+00:00",
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-13T14:33:21.494388+00:00",
         "disposition": "sent"
       }
     ]
