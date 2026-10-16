@@ -38,43 +38,35 @@
     ]
   },
   "daily": {
-    "date": "2026-10-15",
-    "sent_count": 4,
+    "date": "2026-10-16",
+    "sent_count": 3,
     "dedup_keys": [
-      "api_failure:deepseek",
+      "macro_event:Macro crisis",
       "ath:claude",
-      "news:RTX:713a3352b1",
-      "news:MSFT:a475c95752"
+      "ath:gemini"
     ],
     "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "api_failure",
-        "severity": "WARN",
-        "title": "Model deepseek failed",
-        "timestamp": "2026-10-15T17:33:59.247646+00:00",
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-16T21:07:12.813919+00:00",
         "disposition": "sent"
       },
       {
         "kind": "ath",
         "severity": "INFO",
         "title": "Claude Sonnet 4.6 hit a new all-time high",
-        "timestamp": "2026-10-15T21:07:49.912515+00:00",
+        "timestamp": "2026-10-16T21:07:34.949928+00:00",
         "disposition": "sent"
       },
       {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on RTX (held by 4)",
-        "timestamp": "2026-10-15T21:07:51.328520+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Negative news on MSFT (held by 4)",
-        "timestamp": "2026-10-15T23:03:24.478511+00:00",
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-10-16T21:07:35.878728+00:00",
         "disposition": "sent"
       }
     ]
