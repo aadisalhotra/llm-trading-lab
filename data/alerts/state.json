@@ -38,43 +38,19 @@
     ]
   },
   "daily": {
-    "date": "2026-10-16",
-    "sent_count": 4,
+    "date": "2026-10-19",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Macro crisis",
-      "ath:claude",
-      "ath:gemini",
-      "macro_event:Geopolitical shock"
+      "api_failure:gemini"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-10-16T21:07:12.813919+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Claude Sonnet 4.6 hit a new all-time high",
-        "timestamp": "2026-10-16T21:07:34.949928+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro hit a new all-time high",
-        "timestamp": "2026-10-16T21:07:35.878728+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-10-16T23:18:01.600760+00:00",
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model gemini failed",
+        "timestamp": "2026-10-19T19:03:34.585540+00:00",
         "disposition": "sent"
       }
     ]
