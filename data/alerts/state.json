@@ -38,19 +38,27 @@
     ]
   },
   "daily": {
-    "date": "2026-10-19",
-    "sent_count": 1,
+    "date": "2026-10-20",
+    "sent_count": 2,
     "dedup_keys": [
-      "api_failure:gemini"
+      "ath:claude",
+      "budget:warn"
     ],
     "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "api_failure",
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-10-20T21:07:38.078718+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
         "severity": "WARN",
-        "title": "Model gemini failed",
-        "timestamp": "2026-10-19T19:03:34.585540+00:00",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-10-20T21:07:41.411685+00:00",
         "disposition": "sent"
       }
     ]
