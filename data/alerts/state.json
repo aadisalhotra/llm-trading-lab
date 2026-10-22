@@ -39,9 +39,10 @@
   },
   "daily": {
     "date": "2026-10-22",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Macro crisis"
+      "macro_event:Macro crisis",
+      "api_failure:gemini"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -51,6 +52,13 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-22T16:32:47.327169+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model gemini failed",
+        "timestamp": "2026-10-22T18:07:33.738823+00:00",
         "disposition": "sent"
       }
     ]
