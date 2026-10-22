@@ -39,13 +39,16 @@
   },
   "daily": {
     "date": "2026-10-22",
-    "sent_count": 2,
+    "sent_count": 5,
     "dedup_keys": [
       "macro_event:Macro crisis",
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "oversized:gemini:TSLA:2026-10-22T15:04:40.793314",
+      "news:LLY:9d7e3432a0",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -59,6 +62,27 @@
         "severity": "WARN",
         "title": "Model gemini failed",
         "timestamp": "2026-10-22T18:07:33.738823+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Gemini 3.1 Pro: 18.0% order in TSLA",
+        "timestamp": "2026-10-22T21:08:03.514504+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on LLY (held by 5)",
+        "timestamp": "2026-10-22T21:08:04.494022+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-10-22T21:08:06.998618+00:00",
         "disposition": "sent"
       }
     ]
