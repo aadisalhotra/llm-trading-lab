@@ -43,7 +43,7 @@
     "max_positions": 50,
     "max_position_pct": 0.20,
     "max_trades_per_day": 50,
-    "shorting_enabled": true,
+    "shorting_enabled": false,
     "max_long_exposure_pct": 1.00,
     "max_gross_short_pct": 0.20,
     "max_gross_exposure_pct": 1.20,
@@ -51,9 +51,9 @@
     "allow_options": false
   },
   "settlement": {
-    "_note": "Settled-funds execution constraint (cash-account branch), registered 2026-08-17. BOTH conditions must hold for enforcement to bind: enforce_settled_funds true AND run date >= activation_date. The flag flips at a signed-off pre-market activation, and only if the branch decision selects the cash branch -- same discipline as the 2026-07-01 shorting flip. MOVED by the 2026-09-30 boundary move: branch decision 2026-10-15, enforcement from 2026-10-16 (hub 2026-10-04); activation_date below still reads 2026-09-16 and is changed, with the flag, in that activation event (the flag is false, so nothing binds meanwhile). Until then every settled-funds code path is inert and settled_cash == cash.",
-    "enforce_settled_funds": false,
-    "activation_date": "2026-09-16",
+    "_note": "Settled-funds execution constraint (cash-account branch), registered 2026-08-17. BOTH conditions must hold for enforcement to bind: enforce_settled_funds true AND run date >= activation_date. The flag flips at a signed-off pre-market activation, and only if the branch decision selects the cash branch -- same discipline as the 2026-07-01 shorting flip. MOVED by the 2026-09-30 boundary move: branch decision 2026-10-15, enforcement from 2026-10-16 (hub 2026-10-04); activation_date below still reads 2026-09-16 and is changed, with the flag, in that activation event (the flag is false, so nothing binds meanwhile). Until then every settled-funds code path is inert and settled_cash == cash. ACTIVATED 2026-10-23 with the v4 flip, one event: the cash branch was selected 2026-10-15; enforce_settled_funds true, activation_date 2026-10-23 (the landing date; it first binds at the 2026-10-26 session, the first v4 session).",
+    "enforce_settled_funds": true,
+    "activation_date": "2026-10-23",
     "settlement_days": 1
   },
   "risk_controls": {
@@ -77,7 +77,7 @@
   },
   "benchmark_ticker": "SPY",
   "risk_free_rate": 0.0368,
-  "prompt_version": "v3",
+  "prompt_version": "v4",
   "data": {
     "lookback_days": 30,
     "include_volume": true,

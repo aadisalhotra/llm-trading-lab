@@ -213,7 +213,8 @@ def _underwater(values):
 
 def _reanchor_equity_series(series, base_date, clean_start):
     """Re-anchor an inception-anchored EOD (date, value) series onto the Phase-A
-    clean window for the DISPLAYED equity curve (Research ruling).
+    clean window for the DISPLAYED equity curve (the Phase-A re-anchor convention:
+    docs/REPORT_SCHEMA.md, equity_curve row; introduced in 374361688, 2026-06-28).
 
     The launch/shakedown window (inception .. base_date) is excluded: only points
     dated >= clean_start are shown. indexed_return rebases to index_base 100 at the
@@ -1981,11 +1982,26 @@ def _self_validate(layer):
 # superseded: settings.json now reads v3). It cannot be regenerated verbatim from
 # current state, so it is frozen here to keep reproduce-May an EXACT MATCH. Every
 # other month's note is generated from the derived stamps + the ledger boundary.
+#
+# July is frozen for a different reason: the note a published month emits depends
+# on the ledger's regime_boundaries, which grow FORWARD in time. Registering the
+# v3->v4 boundary (regime_boundaries.phase_b_long_only, 2026-10-23) gives v3 a
+# forward boundary it did not have when July was built, so _derive_regime_label
+# would start appending "Per the regime_boundaries ledger, v4 activates
+# 2026-10-23 ...; July is the pre-boundary v3 regime." to a note already published
+# in reports/monthly/2026-07/data_layer.json. The clause is true, but a rebuild
+# must not silently rewrite a published artifact — so July's emitted note is
+# pinned here verbatim. August (unpublished) correctly PICKS UP the new clause;
+# the general rule is that a month's note freezes when its report publishes.
 _FROZEN_PROMPT_VERSION_NOTES = {
     "2026-05": ("May decision records are entirely prompt_version=v1 (verified). "
                 "settings.json now reads prompt_version=v2 (flipped 2026-05-31, "
                 "commit deploys v2 from June); the May report pins the v1 regime the "
                 "data was generated under, NOT the current settings value."),
+    "2026-07": ("July decision records are entirely prompt_version=v3 (verified from "
+                "the per-record decision-log stamps, the authoritative regime "
+                "boundary). The July report pins the v3 regime the data was generated "
+                "under, derived from the stamps, NOT the current settings value."),
 }
 
 
@@ -2184,7 +2200,8 @@ def build(month: str) -> dict:
     # Behavioral evidence (fills perf turnover / hold, feeds profiles)
     # ====================================================================
     # SHORT/COVER-inclusive from the v3/shorting regime (2026-07-01) forward,
-    # per the Research ruling of 2026-09-05. Month-gated on the same boundary
+    # per the Research ruling of 2026-09-05 (ledger
+    # operational_events.2026-09[activity_metrics_short_inclusive]). Month-gated on the same boundary
     # every other shorting-aware block in this file uses, so May and June
     # reproduce byte-for-byte. Named at the call site, never defaulted.
     evidence = _behavioral_evidence(full_records, model_keys, win_start, win_end,

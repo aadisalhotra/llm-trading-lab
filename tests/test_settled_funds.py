@@ -85,13 +85,15 @@ def test_gate_requires_both_flag_and_date():
     assert settlement_enforcement_active(off, "2026-10-01") is False  # branch not chosen
 
 
-def test_gate_is_off_by_default_in_committed_settings():
-    """The committed config must not bind the constraint before the branch."""
+def test_gate_binds_from_the_v4_landing_in_committed_settings():
+    """The cash branch was selected 2026-10-15; enforcement flipped with v4 on
+    2026-10-23 (one event). It must bind from the first v4 session, not before."""
     from src.config_loader import load_settings
     s = load_settings()
-    assert s["settlement"]["enforce_settled_funds"] is False
-    assert s["settlement"]["activation_date"] == ACTIVE
-    assert settlement_enforcement_active(s, "2026-12-31") is False
+    assert s["settlement"]["enforce_settled_funds"] is True
+    assert s["settlement"]["activation_date"] == "2026-10-23"
+    assert settlement_enforcement_active(s, "2026-10-26") is True
+    assert settlement_enforcement_active(s, "2026-10-22") is False
 
 
 def test_missing_settlement_config_is_inert():

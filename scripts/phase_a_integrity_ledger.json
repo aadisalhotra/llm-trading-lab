@@ -131,6 +131,28 @@
       "change": "shorting enabled (long-only -> long+short)",
       "scope": "all_six_models",
       "note": "v2/long-only (2026-06-01..2026-06-30) vs v3/shorting (2026-07-01+). The before/after analysis (RQ1 herding, RQ2/3 direction segmentation) keys on this boundary."
+    },
+    "phase_b_long_only": {
+      "date": "2026-10-23",
+      "first_effective_session": "2026-10-26",
+      "landing_vs_first_effective": "A regime boundary has a landing date and a first-effective session, and they diverge whenever the flip lands after the close. This flip landed after the 2026-10-23 close, so every 2026-10-23 decision record is stamped v3 and the first v4 decision cycle is Monday 2026-10-26. 'date' records the LANDING; segmentation follows the per-record prompt_version stamps, which is what scripts/build_monthly_data_layer.py derives from. Registering both keeps the ledger and the data layer from disagreeing at the next boundary (hub ruling 2026-10-23).",
+      "type": "prompt_regime_boundary",
+      "prompt_version": {"from": "v3", "to": "v4"},
+      "change": "shorting disabled (long+short -> long-only)",
+      "scope": "all_six_arms",
+      "live_cohort": ["claude", "claude_opus", "gpt", "gemini", "grok"],
+      "scope_note": "Every arm reads the v4 prompt, so the boundary binds all six. The live cohort is five books; deepseek is exploratory-only and runs on the simulator (operational_events.2026-09[live_cohort_composition_ruled]). The staged draft said all_six_models, which read as six live books; corrected at landing.",
+      "reason": "Phase B runs on the cash branch selected at the 2026-10-15 branch decision (operational_events.2026-10[branch_decision_cash_long_only_v4]). A cash account cannot short (shorting requires margin: docs/broker/broker_confirmations_2026-08.md D-4), so the branch is long-only by construction, and T2.4 registers its prompt as 'v4 (cash/long-only branch)' (docs/prereg/tier2_novel_sections.md). v4 occupies the last pre-freeze change slot; the 2026-10-31 prompt freeze executes on v4. CORRECTED AT LANDING: the staged draft cited a '2026-08-08 execution-architecture ruling (reinstating the 2026-08-05 ruling)'. No 2026-08-08 session occurred, and the 2026-08-05 session covered cost accounting, Tier 1 corrections and routing, not long-only content (hub audit 2026-08-14).",
+      "v4_equivalence": "v4 is NOT newly authored, and since 2026-10-05 it is NOT byte-identical to v2 (that claim is superseded by the committed T2.4 two-component declaration, now three). It is v2 plus three separately-verified diff components over the v2 blob committed at the v3 commit (sha256 963e726207feec3d07934b4df80b28a4388c8b86145226d031a03e5887534f11 on prompts/v2.txt as stored, LF): (1) the shorting ablation, produced mechanically as the literal reverse of the committed v2->v3 shorting diff (57cb14f4, 3 hunks, +39/-13) applied to v3.txt -- v4.txt with its one settlement line removed equals that v2 byte for byte; (2) the settlement representation -- ONE neutral sentence in prompts/v4.txt (the last hard limit) plus the settled/unsettled cash split in the rendered portfolio block; (3) removal of the EXECUTION MODE and PHASE header lines (hub relay 2026-10-05 of a Research ruling delivered inline 2026-09-11; relay-only, no committed artifact). prompts/v4.txt sha256 5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07 as stored (LF). Any fourth component fails verification: tests/test_v4_ablation.py renders v2 and v4 with the real templates and fails on any other difference.",
+      "note": "v3/shorting (2026-07-01..2026-10-23, by record stamps) vs v4/long-only (2026-10-26+). v4's template differs from v2 only by the one settlement sentence (component 2); its rendered prompt also splits cash into settled and unsettled and drops the EXECUTION MODE / PHASE lines (components 2-3). So this boundary is the inverse of shorting_activation for the shorting content only: a before/after analysis keyed on shorting_activation has a second, opposite-signed crossing here, but June (v2) and v4 are NOT prompt-identical, and v4 coincides with settled-funds enforcement (one event by construction: a v4 prompt refuses to build without it). The staged draft dated this boundary 2026-09-01 and said 'Because v4 == v2'; the flip did not occur in September (operational_events.2026-10[september_split_conditional_did_not_fire]) and the identity claim was superseded 2026-10-05. Config flipped in the landing commit itself.",
+      "open_shorts_at_boundary": {
+        "status": "EXECUTED 2026-10-23 -- every open short force-covered under v3 at live prices before the flip; see operational_events.2026-10[v4_boundary_force_cover_2026_10_23].",
+        "hazard": "v4 removes SHORT/COVER from the action enum and the output-contract appendix. A short still open when the flip lands cannot be closed by its holder: the model has no COVER verb. It would sit in the book managed only by the automatic 10% short stop (risk.positions_breaching_stop), which under v4 is itself orphaned rule text, until forced out.",
+        "exposure_as_of": "2026-08-10T19:33Z -- ZERO open shorts cohort-wide (all six models num_shorts=0, short_exposure_pct=0.0). But the book is not stably flat: gemini ended 4 of the 6 August sessions short (08-03 V+TMUS, 08-04 NKE, 08-05 and 08-06 AMD+GOOGL carried overnight) and on 08-10 built INTC from 0 to 19.0% of equity -- just under the 20% gross cap -- before covering intraday. deepseek carried a single short on 84 ticks 07-02..07-14. A nonzero short book on the 2026-08-31 close is therefore likely, not hypothetical.",
+        "exposure_at_landing": "Re-swept from origin/main 8e0f4f356 data/state after the last intraday cycle of 2026-10-23 (19:35Z): zero open shorts in all six books. Gemini carried shorts at both pre-flip sweeps (19:11Z: NFLX, TMUS; 19:36Z, after the 19:35Z cycle reopened them: ISRG, TMUS); no other book carried one at either sweep.",
+        "recommended_procedure": "Force-cover every open short immediately before the prompt_version flip, at live prices, logged with a distinct reason code (BOUNDARY_ADMIN -> order_id FORCED_BOUNDARY_ADMIN; not RISK_STOP -- these are regime-boundary closes, and mislabeling them would contaminate the short stop-loss statistics). Ordering: cover under v3 (where the models' own rule set still explains the short book), then flip prompt_version to v4 and shorting_enabled to false. Realized P&L from a boundary force-cover is regime-attributable to v3 and is tagged as such for RQ2/RQ3 direction segmentation. Executed by scripts/boundary_force_cover.py, which re-reads the book at execution rather than accepting a position list. The general form is registered at operational_events.2026-10[v4_boundary_force_cover_2026_10_23].general_form. (The staged draft scheduled this as the first step of a 2026-09-01 pre-market activation; the procedure stood, the date did not.)",
+        "alternative_considered": "Let the shorts run off under the automatic stop. Rejected as a recommendation: it leaves an unmanageable position open for an unbounded time under a prompt that no longer describes it, and the resulting P&L would straddle the regime boundary."
+      }
     }
   },
 
@@ -1152,6 +1174,148 @@
         "lesson": "A boundary move displaces dates in both directions. The first pass searched only forward and missed September-anchored committed text. Future sweeps search old values as well as new (hub, 2026-10-05).",
         "completeness_is_bounded": "'Complete' means: no hit remains for the patterns scanned, other than the residuals below. It is not a proof that no date-anchored sentence exists in a spelling nobody searched for.",
         "left_deliberately": "Amendment-log rows (append-only); the registered tier2 text (amended by appended sections only); the model-facing '18-month horizon' (hub ruling); historical comments in portfolio.py and tests; data/dashboard.json (regenerates from settings at the next build); and every stale 2026-09-01 inside the v4 lane's STAGED files, which is handled by docs/v4_landing_checklist.md Step 1 at landing, not by this sweep."
+      },
+      {
+        "id": "branch_decision_cash_long_only_v4",
+        "date": "2026-10-15",
+        "recorded": "2026-10-23",
+        "type": "decision_record",
+        "scope": "experiment",
+        "decision": "Phase B branch: Alpaca cash account, long-only, prompt v4. Selects T2.4's 'v4 (cash/long-only branch)' alternative over 'v3 (migration branch)'.",
+        "authority": "Hub decision on the registered branch-decision date (operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01].dates.branch_decision = 2026-10-15), relayed to Operations in the hub dispatches of 2026-10-15/16 and restated in the dispatch of 2026-10-23 ('The branch is decided (Alpaca cash, long-only, v4)'). No separate committed decision document exists; this entry is the committed record.",
+        "rationale": [
+          "Venue: Alpaca, closed 2026-08-24 (docs/broker/quantization_analysis_2026-08-24.md, 8e7b7390). IBKR's Web API takes no fractional or notional equity orders (D-1, D-5, D-6); whole-share sizing fails the T1/T2 quantization tests at any plausible book size. Alpaca's $0.01 notional granularity makes quantization error identically zero, so the live weight grid matches the paper-phase grid.",
+          "Account type: cash, the registered primary Phase B structure (docs/prereg/tier2_novel_sections.md, 'Phase B account structure -- cash branch'). Margin-under-legacy-PDT is disqualified as a venue shape: a day-trade budget cannot coexist with unconditional stops (same document).",
+          "Long-only follows from cash: shorting requires margin (docs/broker/broker_confirmations_2026-08.md D-4), so no short can execute on the venue. A prompt still offering SHORT/COVER would invite trades the venue must reject; v4 removes them.",
+          "Settled-funds enforcement is the cash account's execution constraint (settled-funds build c6d77c72) and lands as one event with v4 (prompt_builder.SettlementPromptMismatchError)."
+        ],
+        "landing": "Conditional landing was 2026-10-16. It slipped because Gemini held open shorts on 2026-10-16 after the market closed, and a closed-market force-cover would fill at a stale close; the landing waited for a market-hours window, taken 2026-10-23. See operational_events.2026-10[v4_landed_2026_10_23]."
+      },
+      {
+        "id": "v4_boundary_force_cover_2026_10_23",
+        "date": "2026-10-23",
+        "type": "administrative_intervention",
+        "scope": "all_six_arms swept; gemini covered",
+        "boundary": "regime_boundaries.phase_b_long_only (open_shorts_at_boundary)",
+        "reason_code": "BOUNDARY_ADMIN",
+        "order_id": "FORCED_BOUNDARY_ADMIN",
+        "tool": "scripts/boundary_force_cover.py (added 293530ec7; no-overwrite capture fix 14f3be638)",
+        "venue": "None. effective_mode is paper for every book and the script refuses a venue book (Executor.on_venue). Simulator fills at live prices; no --prices-json.",
+        "runs": [
+          {
+            "run_at_utc": "2026-10-23T19:11:03Z",
+            "book": "gemini",
+            "prompt_version": "v3",
+            "head": "04bb2a97e",
+            "cycle_id": "20261023T191103Z",
+            "capture": "data/boundary/force_cover_2026-10-23_gemini.json",
+            "commit": "7c7234c06",
+            "pre_short_exposure_pct": 0.1778,
+            "legs": [
+              {
+                "ticker": "NFLX",
+                "side": "COVER",
+                "shares": 164.0832,
+                "fill_price": 66.09,
+                "notional": 10844.26,
+                "realized_pnl": 60.05
+              },
+              {
+                "ticker": "TMUS",
+                "side": "COVER",
+                "shares": 90.4335,
+                "fill_price": 147.69,
+                "notional": 13356.12,
+                "realized_pnl": 296.96
+              }
+            ],
+            "post_num_shorts": 0
+          },
+          {
+            "run_at_utc": "2026-10-23T19:36:43Z",
+            "book": "gemini",
+            "prompt_version": "v3",
+            "head": "416fb929e",
+            "cycle_id": "20261023T193643Z",
+            "capture": "data/boundary/force_cover_2026-10-23_gemini_2.json",
+            "commit": "8e0f4f356",
+            "pre_short_exposure_pct": 0.1001,
+            "legs": [
+              {
+                "ticker": "ISRG",
+                "side": "COVER",
+                "shares": 15.0428,
+                "fill_price": 452.875,
+                "notional": 6812.51,
+                "realized_pnl": -3.38
+              },
+              {
+                "ticker": "TMUS",
+                "side": "COVER",
+                "shares": 46.2608,
+                "fill_price": 147.35,
+                "notional": 6816.53,
+                "realized_pnl": -7.4
+              }
+            ],
+            "post_num_shorts": 0
+          }
+        ],
+        "realized_pnl_total_usd": 346.23,
+        "realized_pnl_basis": "(avg_cost - fill_price) x shares per leg, from each capture's realized_pnl; rounded to cents here, full precision in the captures.",
+        "other_books": "claude, claude_opus, gpt, grok, deepseek: zero open shorts at both sweeps and at the post-close re-sweep from origin (script dry-run NOTHING_TO_DO, and data/state read directly).",
+        "attribution": "Realized P&L is regime-attributable to v3: every leg covered under v3, before the flip.",
+        "trade_log_treatment": "Each run writes a standard trade-log record with provider == 'administrative', model ids 'n/a', api_success true, and no record_intraday_run. Censored from behavioral series by research_metrics._is_administrative (T2.3 censoring principle). Because api_success is true, each record enters completeness denominators and numerators: about a 0.1% effect on Gemini's 2026-10 completeness, disclosed here; the exclusion rule for the registered text is with Research. Readers that need a pure model-call population must exclude provider == 'administrative'.",
+        "findings": [
+          "STALE LIST. The position list read on 2026-10-16 (PEP -99.96, NFLX -94.05) was stale by execution: at 19:11Z on 2026-10-23 PEP was closed, NFLX was -164.0832 and TMUS -90.4335 was new. This is why the script re-reads the book at execution and never accepts a position list as input.",
+          "THE WINDOW IS LIVE. Gemini opened new shorts (ISRG, and TMUS again) in the 19:35Z cycle, the first cycle after the 19:11Z sweep; TMUS was re-shorted at 147.19 about 24 minutes after being covered at 147.69. The sweep is not a formality: it must follow the last outgoing-prompt cycle that can create the state, and repeat if a cycle intervenes.",
+          "EVIDENCE OVERWRITE. The second run wrote its capture to the first run's filename and overwrote the 19:11Z record in the worktree (restored unchanged from 7c7234c06; the second kept as _gemini_2.json). Fixed in 14f3be638: exclusive create, suffix _2, _3, never overwrite. A tool that produces evidence must not be able to destroy it."
+        ],
+        "general_form": {
+          "rule": "A regime boundary that removes a verb has a window in which the outgoing prompt can create state the incoming prompt cannot express. Here the verbs are SHORT/COVER and the state is an open short; the same holds for any future ablation that removes an action.",
+          "registered_procedure": [
+            "1. Sweep every arm immediately before the flip, after the last outgoing-prompt cycle that can create the state, reading the books live, never from a list.",
+            "2. Resolve that state administratively at live prices under the outgoing regime, with a distinct reason code, censored from behavioral series.",
+            "3. If a decision cycle intervenes between sweep and flip, re-sweep.",
+            "4. If the window closes (state exists that can no longer be resolved at live prices, e.g. created in a cycle finishing after the close), do NOT flip: the boundary waits for the books. Never fill at a stale price."
+          ],
+          "not_an_option": "Suppressing scheduled decision cycles to shrink the window. That is an intervention in the experiment; the censoring principle covers administrative resolutions of state, not suppressed cycles.",
+          "authority": "Hub rulings, dispatches of 2026-10-23."
+        }
+      },
+      {
+        "id": "v4_landed_2026_10_23",
+        "date": "2026-10-23",
+        "type": "regime_boundary_landing",
+        "scope": "all_six_arms",
+        "boundary": "regime_boundaries.phase_b_long_only",
+        "landed": "2026-10-23, after the 16:00 ET close and after the last intraday decision cycle (19:35Z). The 2026-10-23 end-of-day ticks mark to market only and place no orders. First v4 session: Monday 2026-10-26.",
+        "pre": {
+          "base_head": "14f3be638",
+          "prompt_version": "v3",
+          "portfolio_rules.shorting_enabled": true,
+          "settlement.enforce_settled_funds": false,
+          "settlement.activation_date": "2026-09-16",
+          "open_shorts": "zero in all six books (origin/main 8e0f4f356 data/state, re-swept after the close)",
+          "october_records": "every 2026-10 decision record stamped prompt_version v3"
+        },
+        "post": {
+          "prompt_version": "v4",
+          "portfolio_rules.shorting_enabled": false,
+          "settlement.enforce_settled_funds": true,
+          "settlement.activation_date": "2026-10-23",
+          "prompts/v4.txt_sha256_lf": "5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07",
+          "rendered_prompt": "no EXECUTION MODE / PHASE lines; settled and unsettled cash in the portfolio block; long-only output appendix (V2_OUTPUT_SCHEMA)"
+        },
+        "settlement_activation_note": "activation_date 2026-10-23 is the landing date. Enforcement first binds at the 2026-10-26 session, the first cycle that can place a buy.",
+        "october_segmentation": "v3 2026-10-01..2026-10-23 (17 sessions); v4 2026-10-26..2026-10-30 (5 sessions; 2026-10-31 is a Saturday). Both insufficient_n for regime-sensitive metrics; the v4 segment's registered function is operational verification of the ablation and of settled-funds enforcement. Segments follow the per-record prompt_version stamps.",
+        "supersedes_by_append": [
+          "operational_events.2026-10[september_split_conditional_did_not_fire].october_segmentation (v3 10-01..10-15 / v4 10-16..10-31; enforcement from 10-16): superseded by october_segmentation above. That entry is not edited.",
+          "operational_events.2026-10[v4_staged_hunk_followup_2026_09_01_never_occurred].required_action: DONE. The hunk was re-dated and corrected before it was committed, in the landing commit (docs/v4_landing_checklist.md Step 1).",
+          "operational_events.2026-10[venue_book_routing_and_barrier_timeout].open_residual (DeepSeek's prompt printing the lab mode): RESOLVED, since v4 renders no EXECUTION MODE line."
+        ],
+        "corrections_at_landing": "Step 1 of docs/v4_landing_checklist.md, applied atomically: 2026-09-01 -> 2026-10-23 in the ledger hunk, prompts/CHANGELOG.md, src/prompt_builder.py, tests/test_v4_ablation.py and builder comments; scope all_six_models -> all_six_arms with the five-book live cohort named; the phantom 2026-08-08 / 2026-08-05 citations replaced by backing artifacts; the undated '(Research ruling)' in the builder pointed at docs/REPORT_SCHEMA.md and 374361688, and 'Shorting design ratified by Research + PI' in the v3 changelog entry pointed at 57cb14f4 / fff1b165 / shorting_activation and flagged as having no committed ratification artifact.",
+        "relay_only": "v4's third component (EXECUTION MODE / PHASE removal) still rests on the hub relay of 2026-10-05 of a Research ruling delivered inline 2026-09-11; no committed artifact yet."
       }
     ]
   }

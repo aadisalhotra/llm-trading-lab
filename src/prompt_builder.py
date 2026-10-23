@@ -60,6 +60,59 @@ def uses_per_ticker_last_action(version: str) -> bool:
     return _prompt_major_version(version) >= 2
 
 
+# ---------------------------------------------------------------------------
+# v4 composition (docs/prereg/tier2_novel_sections.md, T2.4, amended): verified
+# diff components over v2, each verified separately, and ANY further component
+# fails verification (tests/test_v4_ablation.py pins this on the rendered prompt).
+#   1. the shorting ablation (the literal reverse of the committed v3 diff) --
+#      lives in prompts/v4.txt and `_SHORTING_PROMPT_MAJORS`;
+#   2. the settlement representation -- THIS registry: the portfolio block splits
+#      cash into settled and unsettled balances, and prompts/v4.txt carries ONE
+#      neutral sentence stating the settled-funds purchase rule (rule statement
+#      only, no strategy guidance);
+#   3. the removal of the environment-mode metadata -- the EXECUTION MODE and
+#      PHASE header lines (hub relay 2026-10-05 of a Research ruling delivered
+#      inline 2026-09-11; no committed artifact exists yet).
+# Explicit registries rather than `major >= 4`, like `_SHORTING_PROMPT_MAJORS`: a
+# future version opts in deliberately.
+_SETTLEMENT_REPRESENTATION_MAJORS = frozenset({4})
+_ENVIRONMENT_METADATA_REMOVED_MAJORS = frozenset({4})
+
+
+class SettlementPromptMismatchError(RuntimeError):
+    """A prompt that states the settled-funds rule is being built while the
+    simulator is not enforcing it. The prompt would tell every model a rule that
+    is false for this run -- a constant that lies, in the confirmatory input. Fatal
+    on purpose: v4's activation and settled-funds enforcement are ONE event."""
+
+
+def shows_settlement_split(version: str) -> bool:
+    """Whether this prompt version carries the settled/unsettled cash split."""
+    return _prompt_major_version(version) in _SETTLEMENT_REPRESENTATION_MAJORS
+
+
+def environment_metadata_removed(version: str, settings: dict[str, Any]) -> bool:
+    """Whether the EXECUTION MODE / PHASE header lines are omitted.
+
+    True for the versions in `_ENVIRONMENT_METADATA_REMOVED_MAJORS` (v4: landed
+    2026-10-23 on the long-only branch). On the migration branch (not selected)
+    the same removal would land ALONE as a boundary event on v3, which a version tag
+    cannot express: the signed-off activation sets
+    `settings["prompt_environment_metadata"] = "removed"`. Absent (today), every
+    version renders the lines exactly as before -- removal is never mid-regime.
+    """
+    if _prompt_major_version(version) in _ENVIRONMENT_METADATA_REMOVED_MAJORS:
+        return True
+    return (settings or {}).get("prompt_environment_metadata") == "removed"
+
+
+def _environment_lines(version: str, settings: dict[str, Any]) -> list[str]:
+    if environment_metadata_removed(version, settings):
+        return []
+    return [f"EXECUTION MODE: {settings['mode'].upper()}",
+            f"PHASE: {settings['phase']}"]
+
+
 def load_prompt_template(version: str) -> str:
     path = PROMPTS_DIR / f"{version}.txt"
     with open(path, "r", encoding="utf-8") as f:
@@ -135,10 +188,16 @@ def _format_market_data_block(
     return "\n".join(lines)
 
 
-def _format_portfolio_block(portfolio_state: dict[str, Any], max_positions: int) -> str:
+def _format_portfolio_block(portfolio_state: dict[str, Any], max_positions: int,
+                            settlement_split: bool = False) -> str:
     lines = ["YOUR CURRENT PORTFOLIO STATE:"]
     lines.append(f"  Total value:   ${portfolio_state['total_value']:,.2f}")
     lines.append(f"  Cash:          ${portfolio_state['cash']:,.2f} ({portfolio_state['cash_pct']*100:.1f}%)")
+    if settlement_split:
+        # v4 component 2 (state-schema half): cash split into settled and
+        # unsettled balances. Keys come from Portfolio.snapshot().
+        lines.append(f"  Settled cash:   ${portfolio_state['settled_cash']:,.2f}")
+        lines.append(f"  Unsettled cash: ${portfolio_state['unsettled_cash']:,.2f}")
     lines.append(f"  Open positions: {len(portfolio_state['holdings'])} / {max_positions} max")
     if portfolio_state["holdings"]:
         lines.append("")
@@ -548,14 +607,29 @@ Notes:
   when they do not apply."""
 
 
+# Prompt majors whose regime PERMITS shorting, and therefore carry the
+# shorting-aware output appendix. This is an explicit registry, not `major >= 3`,
+# because the shorting regime is not monotonic in version number: v4 (landed
+# 2026-10-23) is the Phase B long-only prompt — the literal ablation of v3's
+# shorting content back to v2 — so it must get the long-only appendix. Under
+# `>= 3` it would have inherited V3_OUTPUT_SCHEMA and kept offering the models
+# SHORT/COVER in the action enum, contradicting its own prompt text. A future
+# version that re-enables shorting adds its major here.
+_SHORTING_PROMPT_MAJORS = frozenset({3})
+
+
 def _output_schema_for(version: str) -> str | None:
     """The authoritative JSON output-schema appendix for a prompt version.
 
-    v3+ uses the shorting-aware schema (adds SHORT/COVER); v2 uses the long-only
-    schema; v1 carries its own in-template schema and gets no appendix.
+    Shorting-regime versions (see `_SHORTING_PROMPT_MAJORS`) use the
+    shorting-aware schema (adds SHORT/COVER); every other v2+ version uses the
+    long-only schema; v1 carries its own in-template schema and gets no appendix.
+    An unrecognized future major therefore falls back to long-only — the safe
+    direction, since an unwanted long-only appendix suppresses shorts visibly
+    while an unwanted shorting appendix silently invites rejected trades.
     """
     major = _prompt_major_version(version)
-    if major >= 3:
+    if major in _SHORTING_PROMPT_MAJORS:
         return V3_OUTPUT_SCHEMA
     if major >= 2:
         return V2_OUTPUT_SCHEMA
@@ -630,11 +704,19 @@ def build_prompts(
     settings = load_settings()
     universe = load_universe()
     version = settings["prompt_version"]
+    if shows_settlement_split(version):
+        from .portfolio.settlement import settlement_enforcement_active
+        if not settlement_enforcement_active(settings, run_date):
+            raise SettlementPromptMismatchError(
+                f"prompt {version!r} states the settled-funds purchase rule, but settled-funds "
+                f"enforcement is not active for {run_date:%Y-%m-%d} (settlement.enforce_settled_funds "
+                f"and settlement.activation_date). Flip the prompt and the enforcement together.")
     system_prompt = load_prompt_template(version)
     # v2+ describes its output in prose, so the pipeline appends the authoritative
     # JSON field-name contract here — same key names the parser already depends on.
-    # v3 swaps in the shorting-aware schema (adds SHORT/COVER); v2 uses the long-only
-    # one; v1's template carries its own schema, so it is untouched. The appendix is
+    # v3 (the shorting regime) swaps in the shorting-aware schema (adds
+    # SHORT/COVER); the long-only versions v2 and v4 use the long-only one; v1's
+    # template carries its own schema, so it is untouched. The appendix is
     # identical across every model and run.
     schema_appendix = _output_schema_for(version)
     if schema_appendix:
@@ -666,8 +748,7 @@ def build_prompts(
 
     parts = [
         f"DATE: {run_date.strftime('%Y-%m-%d')}",
-        f"EXECUTION MODE: {settings['mode'].upper()}",
-        f"PHASE: {settings['phase']}",
+        *_environment_lines(version, settings),
         "",
         _format_intraday_context_block(
             run_timestamp=run_date,
@@ -681,7 +762,8 @@ def build_prompts(
         "",
         market_data_section,
         "",
-        _format_portfolio_block(portfolio_state, int(settings["portfolio_rules"]["max_positions"])),
+        _format_portfolio_block(portfolio_state, int(settings["portfolio_rules"]["max_positions"]),
+                                settlement_split=shows_settlement_split(version)),
         "",
         _format_recent_decisions_block(recent_decisions),
         "",
