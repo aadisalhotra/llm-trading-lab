@@ -1,6 +1,7 @@
 # v4 landing checklist
 
-**Status:** v4 is STAGED (uncommitted, held by the v4 lane). Landing is conditional: branch decision **2026-10-15**, conditional landing **2026-10-16**. If the 10-15 decision does not select v4, none of this lands and the staged set stays dormant.
+**Status: LANDED 2026-10-23 in `ac7d20369`** (after the close; first v4 session 2026-10-26). Step 1 and Part C applied atomically; dates moved from the 2026-10-16 conditional landing to 2026-10-23, October segments v3 10-01..10-23 / v4 10-26..10-30 (ledger `operational_events.2026-10[v4_landed_2026_10_23]`). Kept as the record of the landing; the text below is as it stood before landing.
+**Prior status:** v4 is STAGED (uncommitted, held by the v4 lane). Landing is conditional: branch decision **2026-10-15**, conditional landing **2026-10-16**. If the 10-15 decision does not select v4, none of this lands and the staged set stays dormant.
 **Why this is a repo file:** hub ruling 2026-10-05 — a checklist that lives only in a session's memory is one cold start from gone, and this landing has to happen on a fixed date. This file is the authoritative list; the ledger entry `v4_staged_hunk_followup_2026_09_01_never_occurred` points here and does not restate it.
 **Provenance of the list:** the hub-ratified correction list (audited 2026-08-14, extended 2026-08-17: five defect classes across four staged artifacts), the 2026-10-04/05 dispatches, and a 2026-10-05 re-check of every item against the staged files and the committed prereg. Where an item rests on something that could not be verified, it says so.
 

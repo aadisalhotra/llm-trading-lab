@@ -1,7 +1,21 @@
 # v4 staged-set baseline
 
 **Recorded:** 2026-10-05, from the index at HEAD `56f56418`, after the v4 build (hub dispatch 2026-10-05 items 1-2).
-**Status:** pending hub re-certification. Supersedes the 2026-08 baseline (`93d89633` / `8cf46c17` / `638956f7` / `b6107d6c`), which no longer matches because the build moved all four blobs.
+**Status: RETIRED 2026-10-23.** The staged set this file records landed in `ac7d20369` (v4 landing, 2026-10-23). The pre-landing check held: all four blobs and both added-line digests below matched the index exactly on 2026-10-23, with fresh guard patches taken before the landing. This file is kept as the record of what was verified; it is no longer a live check, and nothing should verify against it.
+
+**Post-landing state at `ac7d20369`** (every blob-checked file moved, as Step 1 required, except `prompts/v4.txt`):
+
+| path | staged (this baseline) | landed |
+|---|---|---|
+| `prompts/CHANGELOG.md` | `f322d216` | `185532f8` |
+| `prompts/v4.txt` | `d8e38661` | `d8e38661` (unchanged; sha256 LF `5a275e2b…` still holds) |
+| `src/prompt_builder.py` | `c1ed4823` | `e14df7ea` |
+| `tests/test_v4_ablation.py` | `13c40070` | `9b8107cf` |
+| `scripts/build_monthly_data_layer.py` | delta +15/−0 | `6e303ac9` |
+| `scripts/phase_a_integrity_ledger.json` | delta +17/−0 | `26cbe998` (+164/−0 vs the pre-landing HEAD) |
+| `config/settings.json` | not staged | `10dc4419` (Part C activation) |
+
+**Prior status (2026-10-05):** pending hub re-certification. Supersedes the 2026-08 baseline (`93d89633` / `8cf46c17` / `638956f7` / `b6107d6c`), which no longer matches because the build moved all four blobs.
 **Why this is a repo file:** a baseline held only in memory is one cold start from gone. The landing checklist (`docs/v4_landing_checklist.md`, Part E) verifies against this file.
 
 ## Blob-checked paths (identity = full blob SHA, from `git ls-files -s`)
