@@ -115,6 +115,29 @@ def test_capture_records_pre_post_and_pnl(sim):
     assert pnl["NFLX"] == pytest.approx((70.75 - 72.0) * 94.0503)
 
 
+def test_second_cover_same_session_never_overwrites_the_first(sim):
+    """2026-10-23: the cycle after the first sweep reopened shorts; the second
+    run must add a record beside the first, not replace it."""
+    _run()
+    first = (sim / "boundary" / "force_cover_2026-10-19_gemini.json").read_bytes()
+    state = json.loads((sim / "state" / "gemini.json").read_text())
+    state["holdings"]["PEP"] = {"shares": -10.0, "avg_cost": 131.5}
+    (sim / "state" / "gemini.json").write_text(json.dumps(state))
+    out = _run()
+    assert out["status"] == "EXECUTED"
+    assert (sim / "boundary" / "force_cover_2026-10-19_gemini.json").read_bytes() == first
+    second = json.loads((sim / "boundary" / "force_cover_2026-10-19_gemini_2.json").read_text())
+    assert [f["ticker"] for f in second["fills"]] == ["PEP"]
+
+
+def test_write_capture_suffixes_past_every_existing_record(tmp_path):
+    for name in ("r.json", "r_2.json"):
+        (tmp_path / name).write_text("keep")
+    assert bfc.write_capture(tmp_path, "r", {"x": 1}).name == "r_3.json"
+    assert (tmp_path / "r.json").read_text() == "keep"
+    assert (tmp_path / "r_2.json").read_text() == "keep"
+
+
 def test_idempotent_second_run_is_a_noop(sim):
     _run()
     assert _run()["status"] == "NOTHING_TO_DO"

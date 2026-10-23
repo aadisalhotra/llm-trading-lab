@@ -228,12 +228,33 @@ def run(book: str, tickers: list[str] | None, prices: dict[str, float] | None,
                           "pnl": (p["avg_cost"] - p["price"]) * p["shares"]} for p in plan],
         "status": "EXECUTED",
     }
-    out_dir = portfolio_mod.STATE_DIR.parent / "boundary"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"force_cover_{session_date}_{book}.json"
-    path.write_text(json.dumps(capture, indent=2), encoding="utf-8")
+    path = write_capture(portfolio_mod.STATE_DIR.parent / "boundary",
+                         f"force_cover_{session_date}_{book}", capture)
     logger.info("[%s] covered %s; capture written to %s", book, targets, path)
     return capture
+
+
+def write_capture(out_dir: Path, stem: str, capture: dict) -> Path:
+    """Write the capture under a name no earlier capture holds; never overwrite.
+
+    A second cover on the same session (the outgoing prompt reopened shorts
+    after the first sweep, as Gemini did 2026-10-23) must not destroy the first
+    run's evidence. The first run takes `<stem>.json`, later runs `<stem>_2.json`,
+    `_3`, ... Exclusive create ("x") makes the no-overwrite guarantee hold even
+    if two runs race. Suffix rather than refuse: by this point the book is
+    already saved, so refusing would leave an executed cover with no record.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(capture, indent=2)
+    n = 1
+    while True:
+        path = out_dir / (f"{stem}.json" if n == 1 else f"{stem}_{n}.json")
+        try:
+            with open(path, "x", encoding="utf-8") as f:
+                f.write(payload)
+            return path
+        except FileExistsError:
+            n += 1
 
 
 def main(argv: list[str] | None = None) -> int:
