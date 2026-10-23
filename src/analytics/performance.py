@@ -33,7 +33,11 @@ def load_performance_history(model_key: str) -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
     df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values("date").reset_index(drop=True)
+    # Stable sort: dates repeat (the launch window double-wrote some EOD rows) and
+    # every consumer keeps the LAST row per date, i.e. file order. The default
+    # quicksort is not stable, so which duplicate survived depended on the file
+    # length: one appended row on 2026-10-21 changed May's drawdown series.
+    df = df.sort_values("date", kind="stable").reset_index(drop=True)
     return df
 
 
