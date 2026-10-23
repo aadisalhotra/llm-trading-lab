@@ -399,6 +399,39 @@ def test_anthropic_missing_cache_fields_degrade(anthropic_stub):
     assert md["input_tokens"] == 5400
 
 
+def test_cache_split_reconstructs_the_true_prompt_size_on_both_conventions(
+    openai_stub, xai_stub, anthropic_stub, gemini_stub
+):
+    """The invariant a future cache-aware cost path depends on.
+
+    `hit + miss == true total prompt size` must hold for every provider even
+    though the two conventions disagree about what `input_tokens` means. This
+    is what lets a cost path compute `miss * miss_rate + hit * hit_rate`
+    without knowing which provider it is looking at.
+
+    The trap it guards: for Anthropic, `input_tokens` is the UNCACHED portion,
+    not the prompt size. Re-deriving the split at the cost layer with the
+    OpenAI-shaped subtraction would under-count Anthropic input by the entire
+    cache-read count. Do the normalization in the adapter, as here.
+    """
+    # Inclusive convention: the provider's input count is already the total.
+    _t, _r, md = OpenAIAdapter("gpt-5.4")._call_api("s", "u")
+    assert md["cache_hit_tokens"] + md["cache_miss_tokens"] == 8500 == md["input_tokens"]
+
+    _t, _r, md = XAIAdapter("grok-4.20-0309-reasoning")._call_api("s", "u")
+    assert md["cache_hit_tokens"] + md["cache_miss_tokens"] == 9000 == md["input_tokens"]
+
+    _t, _r, md = GeminiAdapter("gemini-3.1-pro-preview")._call_api("s", "u")
+    assert md["cache_hit_tokens"] + md["cache_miss_tokens"] == 7000 == md["input_tokens"]
+
+    # Exclusive convention: input_tokens is the miss count, and the true prompt
+    # size is STRICTLY LARGER than the field we log as input_tokens.
+    _t, _r, md = AnthropicAdapter("claude-sonnet-4-6")._call_api("s", "u")
+    assert md["cache_hit_tokens"] + md["cache_miss_tokens"] == 3000 + 5400
+    assert md["input_tokens"] == 5400
+    assert md["cache_hit_tokens"] + md["cache_miss_tokens"] > md["input_tokens"]
+
+
 def test_gemini_missing_cache_field_degrades(gemini_stub):
     gemini_stub["reply"] = _gemini_response(cached=None)
     text, _rid, md = GeminiAdapter("gemini-3.1-pro-preview")._call_api("sys", "user")

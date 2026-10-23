@@ -44,12 +44,47 @@ running this lab would actually incur. Numbers are hand-edited as providers
 update pricing — there is no live billing API. When a provider changes a
 price, append a new period; never edit a past period (that falsifies history).
 
-Not modeled (all inert for lab traffic): cached-input discounts (adapters
-don't request caching and the logs carry no cached-token split), batch-tier
-discounts, and OpenAI's Priority tier. DeepSeek's cache-hit rates ARE now
-transcribed into the 2026-08-16 entries as reference data — every lab call is
-still priced at the cache-miss rate, which is the conservative (upper-bound)
-side of that unknown.
+Not modeled: cached-input discounts, batch-tier discounts, and OpenAI's
+Priority/Flex tiers. DeepSeek's cache-hit rates ARE transcribed into the
+2026-08-16 entries as reference data, but nothing here reads them — every lab
+call is priced at the full cache-MISS rate, the conservative (upper-bound) side
+of that unknown.
+
+Two corrections to what this paragraph used to claim (2026-09-09):
+
+  * "the logs carry no cached-token split" is no longer true. As of the
+    cohort-wide retention audit the decision log carries `cache_hit_tokens` /
+    `cache_miss_tokens` for every provider. The discount is still not modeled —
+    but it is now MEASURABLE rather than merely assumed conservative.
+  * "adapters don't request caching" was only ever half the story. It is true
+    of EXPLICIT caching (no adapter sends `cache_control` or a cached-content
+    handle), which is the only kind Anthropic offers — so Anthropic cache reads
+    are structurally zero. But OpenAI, DeepSeek and Gemini cache prompt
+    prefixes AUTOMATICALLY, with no opt-in, so a nonzero hit share is expected
+    there and was simply invisible. A 2026-09-10T01:16Z probe measured 512
+    cache-hit tokens on a back-to-back DeepSeek call, so this is observed, not
+    hypothetical.
+
+Neither correction changes a past figure. This module has never applied ANY
+cache convention: `compute_call_cost_usd` multiplies one input count by one
+input rate. There is therefore no historical cost figure in which the two
+providers' cache-accounting conventions could have been mixed — the cost path
+never consumed a split to mix.
+
+THE TRAP FOR WHOEVER WIRES CACHE-AWARE PRICING. The two conventions are real
+and they differ:
+
+  * OpenAI / xAI / Gemini / DeepSeek report a prompt count INCLUSIVE of cached
+    tokens, so miss = input - hit.
+  * Anthropic reports `input_tokens` EXCLUSIVE of cache reads, so miss = input,
+    and cache WRITES are a third counter billed at a premium.
+
+Each adapter already normalizes to one meaning, and the invariant that makes a
+future cache-aware cost path safe is `cache_hit_tokens + cache_miss_tokens ==
+the true total prompt size` on BOTH conventions. It is pinned by
+tests/test_adapter_field_retention.py. Do not re-derive the split from
+`input_tokens` at the cost layer: for Anthropic that field is the uncached
+portion, not the prompt size.
 
 Time-of-day pricing is NOT resolved here. DeepSeek's 2026-08-16 schedule prices
 a call by the UTC clock, but this module's only time input is a calendar date,
