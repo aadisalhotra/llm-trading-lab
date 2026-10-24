@@ -90,8 +90,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # The exact production lock (scripts/lock_requirements.py). --no-deps:
+          # nothing outside the lock is installed; pip check: a lock missing a
+          # dependency fails here instead of silently fetching the newest release.
+          python -m pip install "pip==26.2.2"
+          pip install --no-deps -r requirements.txt
+          pip check
 
       - name: Resolve run mode
         id: mode
@@ -243,7 +247,9 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - name: Install calendar dependency (best-effort)
-        run: pip install "pandas>=2.2.0" "pandas-market-calendars>=4.4.0" || true
+        # Same versions as production: -c applies the lock to every package
+        # pip pulls in, not just the two named.
+        run: pip install pandas pandas-market-calendars -c requirements.txt || true
       - name: Trading-day check
         id: check
         run: echo "trading=$(python scripts/check_trading_day.py)" >> "$GITHUB_OUTPUT"

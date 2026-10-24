@@ -49,8 +49,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # The exact production lock (scripts/lock_requirements.py). --no-deps:
+          # nothing outside the lock is installed; pip check: a lock missing a
+          # dependency fails here instead of silently fetching the newest release.
+          python -m pip install "pip==26.2.2"
+          pip install --no-deps -r requirements.txt
+          pip check
           # pytest is a test-only dependency, not in requirements.txt (the
           # pipeline does not need it). Pinned to the version the suite is
           # developed against.

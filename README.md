@@ -158,6 +158,8 @@ cp .env.example .env   # fill in API keys
 python -m src.pipeline --intraday --force
 ```
 
+`requirements.txt` is the exact production lock (Linux, CPython 3.11), generated from `requirements.in` by `scripts/lock_requirements.py`. To add or upgrade a dependency, edit `requirements.in`, regenerate, and land both files together.
+
 ## Repo Structure
 
 ```

@@ -1,0 +1,20 @@
+# Direct dependencies and their floors -- the INTENT, edited by hand.
+#
+# Production does NOT install from this file. It installs requirements.txt,
+# the exact lock generated from this file by scripts/lock_requirements.py
+# (hub ruling 2026-10-24: production does not float). Adding or upgrading a
+# dependency is a deliberate act: edit this file, regenerate the lock, run the
+# suite, land both files together.
+anthropic>=0.40.0
+openai>=1.50.0
+google-genai>=2.16.0
+requests>=2.32.0
+alpaca-py>=0.30.0
+yfinance>=0.2.40
+pandas>=2.2.0
+numpy>=1.26.0
+python-dotenv>=1.0.1
+pandas-market-calendars>=4.4.0
+matplotlib>=3.9.0
+mplfinance>=0.12.10b0
+nltk>=3.9.1
