@@ -1527,6 +1527,82 @@
         },
         "why_2026_10_23_held": "19:35Z held because the 15:30 slot ran on time in EDT on a full session. It would not hold on 2026-11-27 (last slot 12:30 ET) or on any EST day (last slot 20:30 UTC).",
         "determined_by": "Read from the code on 2026-10-24, not inferred from commits: the pipeline's gate is is_market_open_now() at run START (session_bounds open <= now < close), and one cycle runs per slot (per-boundary guard). Under the pre-2026-10-24 code the answer differed (see session_timing_calendar_close_and_et_chain)."
+      },
+      {
+        "id": "reproduce_may_ci_tolerance_1e12",
+        "date": "2026-10-24",
+        "type": "registration",
+        "scope": "tests/test_reproduce_may_data_layer.py::test_reproduce_may_data_layer_exact, the reproduce-May gate",
+        "authority": "Hub ruling 2026-10-24 (1): 1e-12 relative in CI, exact locally; register the tolerance with its justification.",
+        "strictness_by_environment": {
+          "local (GITHUB_ACTIONS unset)": "EXACT. Every float bit-identical, as before.",
+          "GitHub Actions (GITHUB_ACTIONS=true)": "A float pair passes if |a - b| <= 1e-12 * |b| (math.isclose, rel_tol=1e-12, abs_tol=0). Integers, strings, booleans, list lengths and keys stay exact. Every tolerated field is reported as a pytest warning naming the count, the max relative difference and the first path."
+        },
+        "reading_rule": "A green CI run is NOT proof of exactness. Exactness is proven only by a local run. A CI run that passed under the tolerance says so in its own warnings summary.",
+        "observed": "First Tests run (40060857750, 2026-10-24, ubuntu-latest, CPython 3.11, numpy 2.4.6, pandas 3.1.0): 38 float fields differed from the committed May layer at the last ULP, max relative 2.9e-14. Locally (Windows, CPython 3.14, numpy 2.4.4, pandas 3.0.2): exact.",
+        "cause_measured": [
+          "NOT the package versions. Production's numpy 2.4.6 + pandas 3.1.0 + python-dateutil 3.0.0 + pandas_market_calendars 5.5.0, overlaid locally on CPython 3.14, reproduce May EXACTLY (0 differences); the full suite passes on that overlay (552).",
+          "The interpreter, in part. CPython 3.12 made built-in sum() of floats compensated (Neumaier); 3.11 adds left to right in plain doubles. Patching builtins.sum with the 3.11 semantics in-process produces 6 last-ULP diffs, max relative 2.7e-14: concentration_mean_daily_hhi on profiles[1], [4], [5], and RQ5 headline_test beta / ci_low, among others. That these 6 are among the CI's 38 is NOT verified: the CI log needs credentials this session did not use.",
+          "The remainder is attributed to platform floating point (numpy builds, SIMD dispatch, CPU). Not proven."
+        ],
+        "hub_justification_amended": "The ruling cited numpy's lack of a cross-CPU bit-identity guarantee. That is true, but the one mechanism measured here is the interpreter version, not numpy. The ruling and the tolerance are unchanged; the justification is registered as measured.",
+        "margin": "The real regression this gate exists for (2026-10-21, the unstable sort) was ~2e-2 relative. The tolerance is 1e-12: ten orders of magnitude below the regression, ~35x above the largest observed platform difference (2.9e-14).",
+        "positive_control": "With 3.11 sum() simulated: GITHUB_ACTIONS unset -> FAIL (6 diffs); GITHUB_ACTIONS=true -> PASS with the warning 'reproduce-May NOT EXACT: 6 float field(s) passed under the CI tolerance (rel 1e-12), max relative 2.7e-14'. test_ci_tolerance_scope pins the boundary: a ULP pair is tolerated in CI only; 1e-10 relative, ints, bools, strings and 0.0 vs 1e-300 never are.",
+        "consequence_flagged_not_changed": "The local machine runs CPython 3.14; production runs 3.11. 'Exact locally' therefore proves exactness on an interpreter production does not run, and monthly layers built locally can differ at the last ULP from the same build on the runner. Not changed in this package (it would need a local CPython 3.11)."
+      },
+      {
+        "id": "production_dependency_lock",
+        "date": "2026-10-24",
+        "type": "defect_record",
+        "scope": "every pip install on the production path: intraday.yml (run job + gate job), competitor_monitor.yml; and tests.yml",
+        "authority": "Hub ruling 2026-10-24 (2): pin exact versions on the production path; production does not float.",
+        "defect": "requirements.txt held minimum-version floors (pandas>=2.2.0, numpy>=1.26.0, ...), so every release of any package in the closure reached production on the day it shipped, with no record in the lab. Releases inside the closure in the week before the lock: python-dateutil 3.0.0 (a major version, 2026-10-21 23:41Z), pandas 3.1.0 (2026-10-22 11:54Z), openai 3.37.0 (2026-10-22), google-genai 2.33.0 (2026-10-23), anthropic 2.3.0 (2026-10-23 23:18Z). pandas_market_calendars 5.5.0 has resolved since 2026-10-05. That production ran each of these from its release day is inferred from the floating install, not read from run logs.",
+        "fix": {
+          "requirements.in": "The direct dependencies and their floors: the intent, edited by hand (the old requirements.txt content, unchanged).",
+          "requirements.txt": "The exact lock: 73 pins (13 direct, 60 transitive), every package the production install contains. Generated by scripts/lock_requirements.py; not edited by hand.",
+          "install": "pip install --no-deps -r requirements.txt, then pip check. --no-deps: nothing outside the lock installs. pip check: a lock missing a dependency fails the install loudly instead of fetching the newest release. pip itself pinned (26.2.2); it was --upgrade.",
+          "gate_job": "pip install pandas pandas-market-calendars -c requirements.txt (the lock as constraints, so pulled-in dependencies are pinned too); still best-effort and fail-open.",
+          "ci": "tests.yml installs the same lock. No looser floor in CI: the gate should test the stack production runs. An upgrade-signal job against requirements.in can be added later if wanted.",
+          "guard": "tests/test_requirements_lock.py: every lock line is name==version, the lock covers every requirements.in name, and the production workflows install with --no-deps + pip check and never float pip or a floor."
+        },
+        "resolution_method": "pip install --dry-run --report for the production target (linux x86_64, CPython 3.11.14, wheels only), then the closure re-walked from requirements.in under a Linux marker environment. Two traps found and handled: (a) pip evaluates sys_platform markers against the HOST, so the raw report carried colorama (Windows-only via tqdm/click), dropped; (b) a bare --python-version 3.11 is read as 3.11.0 and resolved soupsieve 2.10, but soupsieve 3.0.4 requires >=3.11.5 and the runner installs it, so the target carries a micro version. Not the latest, legitimately: numpy 2.5 and contourpy 1.4 require Python >=3.12; tenacity is capped <9.2.0 by google-genai.",
+        "what_is_frozen": "The versions the floating install resolved on 2026-10-24, i.e. what production was already running, so the lock downgrades nothing. Published after Friday 2026-10-23's last intraday tick (19:30Z slot) and so new to production at its next run either way: anthropic 2.3.0 (23:18Z). First production tick on the lock: 2026-10-26, the first v4 session.",
+        "verified": "Locally, with production's numpy/pandas/dateutil/pandas_market_calendars overlaid: full suite 552 passed, reproduce-May exact. The Linux install of the lock itself (--no-deps + pip check on ubuntu-latest, CPython 3.11) is first proven by the Tests run on the push of this package, before the 2026-10-26 session.",
+        "residual_floats_disclosed": [
+          "setup-python \"3.11\": the 3.11 patch release floats with the runner toolcache.",
+          "runs-on: ubuntu-latest: the runner image floats.",
+          "GitHub Actions by major tag (actions/checkout@v4, setup-python@v5).",
+          "tests.yml only: pytest==9.0.3 is pinned, its own dependencies are not (test-only, not the production path)."
+        ],
+        "local_environment_not_changed": "This machine: CPython 3.14, numpy 2.4.4, pandas 3.0.2, pandas_market_calendars 5.3.2. Not aligned to the lock (no installs on this machine without approval). See reproduce_may_ci_tolerance_1e12.consequence_flagged_not_changed."
+      },
+      {
+        "id": "session_timing_calendar_version_restatement",
+        "date": "2026-10-24",
+        "type": "correction",
+        "scope": "operational_events.2026-10[session_timing_calendar_close_and_et_chain].expected_cycle_counts (that entry is not edited)",
+        "authority": "CLAUDE.md rule 10: a restatement must be checked against the fact it restates.",
+        "finding": "That entry sources the 2026-11-27 close to 'pandas_market_calendars 5.3.2'. 5.3.2 is the local machine's version. Production resolved 5.5.0 (released 2026-10-05) and is now locked at 5.5.0.",
+        "verified_under_production_version": "session_bounds() under pandas_market_calendars 5.5.0 + pandas 3.1.0: 2026-11-02 09:30-16:00; 2026-11-26 no session; 2026-11-27 09:30-13:00; 2026-12-24 09:30-13:00; 2026-12-31 09:30-16:00. Identical to 5.3.2.",
+        "expected_cycle_counts": "Unchanged: 13 (full, EDT and EST), 7 on 2026-11-27, 7 on 2026-12-24."
+      },
+      {
+        "id": "prompt_close_line_disclosed_limitation",
+        "date": "2026-10-24",
+        "type": "disclosed_limitation",
+        "scope": "model-facing intraday prompt on the two 2026 early-close sessions: 2026-11-27 and 2026-12-24",
+        "authority": "Hub ruling 2026-10-24 (3): the prompt stays as-is (frozen 2026-10-31; a change would be a prompt-regime event for a cosmetic fix); register the inaccuracy with its exact scope.",
+        "hub_stated_scope": "On 2026-11-27 and 2026-12-24, the 12:30 ET cycle reports runs remaining as though the session ran to 16:00.",
+        "exact_scope_from_code": {
+          "source": "src/prompt_builder.py _format_intraday_context_block: close_str is the constant '16:00 ET'; runs_remaining = (16:00 - now) // 30 minutes, with now = the run's start (datetime.now at pipeline start, observed 2-4 minutes into the slot).",
+          "affected_prompts": "Every intraday cycle on both days, 7 per book per day (09:30 .. 12:30 ET), every book. Not only the 12:30 cycle.",
+          "line_market_close": "'Market close: 16:00 ET' in all 7; the true close is 13:00 ET.",
+          "line_runs_left": "'Approx runs left' overstated by exactly 6 in each of the 7 (16:00 - 13:00 = six slots): rendered 12, 11, 10, 9, 8, 7, 6; true 6, 5, 4, 3, 2, 1, 0. At the 12:30 cycle, the session's last, the prompt says 6 runs remain (the 2026-10-24 entry's '~7' was approximate). It would be 7 only if a run started exactly on the slot minute.",
+          "eod": "Not affected: the end-of-day run returns before any prompt is built (src/pipeline.py run_one_model, is_eod branch)."
+        },
+        "why_wider_than_stated": "The ruling names one cycle and one line. The code renders both lines from the same 16:00 constant in every intraday prompt of the day, so the registered scope is the code's. The ruling (no change to the prompt) is unaffected.",
+        "full_sessions_unaffected": "On a 16:00 close the same formula is correct: 12 after the 09:30 run down to 0 after 15:30.",
+        "extent": "Two sessions in fourteen months; 14 prompts per book."
       }
     ]
   }
