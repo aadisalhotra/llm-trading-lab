@@ -17,7 +17,8 @@
       15,
       20,
       25,
-      30
+      30,
+      35
     ],
     "grok": [
       5,
@@ -39,18 +40,42 @@
   },
   "daily": {
     "date": "2026-10-23",
-    "sent_count": 1,
+    "sent_count": 4,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "ath:gemini",
+      "milestone:gemini:35",
+      "budget:warn"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-23T17:32:51.509809+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-10-23T21:07:56.163819+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "milestone",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro crossed +35%",
+        "timestamp": "2026-10-23T21:07:58.617221+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-10-23T21:08:02.181627+00:00",
         "disposition": "sent"
       }
     ]
