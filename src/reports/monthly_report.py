@@ -30,7 +30,7 @@ from ..analytics import (
     compute_api_cost_summary_window,
     compute_metrics,
     compute_spy_benchmark_metrics,
-    load_performance_history,
+    load_eod_history,
 )
 from ..config_loader import (
     starting_capital as _starting_capital_guarded,
@@ -136,7 +136,7 @@ def _month_bounds(month: datetime) -> tuple[datetime, datetime]:
 
 def _month_perf_slice(model_key: str, start: datetime, end: datetime) -> pd.DataFrame:
     """Slice the EOD perf log to the rows whose date falls in [start, end)."""
-    df = load_performance_history(model_key)
+    df = load_eod_history(model_key)
     if df.empty:
         return df
     # `date` column is already pd.Timestamp from load_performance_history
@@ -546,7 +546,7 @@ def _section_cost_analysis(
             else:
                 month_return_dollars = None
         # Full-history gross P&L
-        full_df = load_performance_history(key)
+        full_df = load_eod_history(key)
         gross_pnl_dollars: float | None = None
         if not full_df.empty:
             try:

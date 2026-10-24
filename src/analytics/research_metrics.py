@@ -44,7 +44,7 @@ from ..config_loader import (
     TRADES_DIR,
     load_settings,
 )
-from .performance import load_performance_history
+from .performance import load_eod_history, load_performance_history
 from .regime_classifier import (
     ALL_REGIMES,
     INSUFFICIENT,
@@ -1199,13 +1199,12 @@ def _ols(y: np.ndarray, X: np.ndarray) -> dict[str, Any]:
 
 
 def _model_daily_returns(model_key: str) -> dict[str, float]:
-    """EOD daily returns per date (deduped to one EOD row per date)."""
-    df = load_performance_history(model_key)
-    if df.empty or len(df) < 2:
+    """EOD daily returns per date (one EOD row per date, EOD_DEDUP_RULE)."""
+    eod = load_eod_history(model_key)
+    if eod.empty or len(eod) < 2:
         return {}
-    df = df.copy()
-    df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
-    eod = df.groupby("date_str", sort=True).last().reset_index()
+    eod = eod.copy()
+    eod["date_str"] = eod["date"].dt.strftime("%Y-%m-%d")
     if len(eod) < 2:
         return {}
     vals = eod["total_value"].astype(float).values

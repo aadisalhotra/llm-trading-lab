@@ -19,7 +19,7 @@ from ..analytics import (
     compute_api_cost_summary_window,
     compute_budget_status,
     compute_spy_benchmark_metrics,
-    load_performance_history,
+    load_eod_history,
 )
 from ..config_loader import (
     starting_capital as _starting_capital_guarded,
@@ -125,7 +125,9 @@ def _recent_summaries_per_model(
 
 
 def _equity_curve(model_key: str) -> list[dict[str, Any]]:
-    df = load_performance_history(model_key)
+    # One point per date (EOD_DEDUP_RULE). Until 2026-10-24 this plotted every
+    # raw row, so the launch window's duplicate dates drew extra points.
+    df = load_eod_history(model_key)
     if df.empty:
         return []
     return [
@@ -197,19 +199,17 @@ def _build_cost_tracker(model_keys: list[str], starting_capital: float) -> list[
         month = compute_api_cost_summary_window(key, since=month_start)
         total = compute_api_cost_summary_window(key, since=None)   # full history
 
-        # Gross P&L $ = current value - inception value, approximated from
-        # the perf log. For models with only one perf row (just initialized
-        # this session), fall back to current_value vs the configured
-        # starting_capital so the day-1 number isn't None.
-        df = load_performance_history(key)
+        # Gross P&L $ = current value - configured starting capital, the same
+        # inception anchor the leaderboard uses (performance._starting_capital).
+        # Until 2026-10-24 the anchor was the perf log's FIRST row, which for
+        # claude (no 2026-04-08 seed rows) was a 2026-04-09 smoke-test row,
+        # 100,035.24, and would have become the 04-09 close under the
+        # registered EOD_DEDUP_RULE. Neither is the book's inception value.
+        df = load_eod_history(key)
         gross_pnl_usd: float | None = None
         if not df.empty:
             try:
-                current_val = float(df["total_value"].iloc[-1])
-                inception = float(df["total_value"].iloc[0])
-                gross_pnl_usd = current_val - inception
-                if abs(gross_pnl_usd) < 0.001 and len(df) == 1:
-                    gross_pnl_usd = current_val - starting_capital
+                gross_pnl_usd = float(df["total_value"].iloc[-1]) - starting_capital
             except (KeyError, IndexError, ValueError):
                 pass
 
@@ -465,18 +465,17 @@ def _compute_correlation_matrix(
     import numpy as np
 
     # Load daily returns per model, keyed by date.
-    # Performance logs may have multiple rows per date (intraday ticks),
-    # so we deduplicate by keeping the last row per date (EOD snapshot)
+    # Performance logs carry frozen launch-window duplicate dates; the
+    # registered EOD_DEDUP_RULE keeps the last row per date (the EOD record)
     # before computing day-over-day returns.
     returns_by_model: dict[str, dict[str, float]] = {}
     for key in model_keys:
-        df = load_performance_history(key)
-        if df.empty or len(df) < 2:
+        eod = load_eod_history(key)
+        if eod.empty or len(eod) < 2:
             returns_by_model[key] = {}
             continue
-        # Keep last row per date (EOD value)
-        df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
-        eod = df.groupby("date_str", sort=True).last().reset_index()
+        eod = eod.copy()
+        eod["date_str"] = eod["date"].dt.strftime("%Y-%m-%d")
         if len(eod) < 2:
             returns_by_model[key] = {}
             continue

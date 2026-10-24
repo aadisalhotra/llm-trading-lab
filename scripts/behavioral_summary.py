@@ -59,8 +59,8 @@ from src.analytics.research_metrics import (  # noqa: E402
     _closed_trades,
     get_model_keys,
 )
+from src.analytics.performance import load_eod_history  # noqa: E402
 from src.config_loader import (  # noqa: E402
-    PERFORMANCE_DIR,
     configure_logging,
     force_utf8_console,
     load_settings,
@@ -113,23 +113,19 @@ def in_window(date_str: str, w: Window) -> bool:
 # ==========================================================================
 
 def cash_stats(model_key: str, w: Window):
-    """(avg, min, max, n) EOD cash % from the performance log, window rows only."""
-    path = PERFORMANCE_DIR / f"{model_key}.jsonl"
+    """(avg, min, max, n) EOD cash % from the performance log, window rows only.
+
+    One row per date (EOD_DEDUP_RULE) before the window and api_success filters,
+    so a duplicate-date row cannot be counted twice.
+    """
     vals: list[float] = []
-    if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    r = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if in_window(r.get("date", ""), w) and r.get("api_success", True):
-                    cp = r.get("cash_pct")
-                    if cp is not None:
-                        vals.append(float(cp) * 100.0)
+    for r in load_eod_history(model_key).to_dict("records"):
+        # A missing api_success column comes back NaN, which is truthy, matching
+        # the old r.get("api_success", True) default.
+        if in_window(r["date"].strftime("%Y-%m-%d"), w) and r.get("api_success", True):
+            cp = r.get("cash_pct")
+            if cp is not None and cp == cp:  # cp == cp drops NaN
+                vals.append(float(cp) * 100.0)
     if not vals:
         return None, None, None, 0
     return statistics.mean(vals), min(vals), max(vals), len(vals)

@@ -41,6 +41,43 @@ def load_performance_history(model_key: str) -> pd.DataFrame:
     return df
 
 
+# ---------------------------------------------------------------------------
+# Duplicate-date rows: ONE registered resolution rule for every reader.
+#
+# The launch window (2026-04-08 .. 2026-04-13) wrote more than one row for some
+# dates -- dry runs, smoke tests, and two EOD ticks on one day -- before the
+# writer's duplicate-date guard landed (bb41fe4a8, 2026-04-14T00:23Z). The rows
+# are never deleted: the log is append-only raw data and every published figure
+# was built on it. The set is instead FROZEN and registered in the integrity
+# ledger (operational_events.2026-10[perf_log_duplicate_rows_frozen]), and every
+# reader resolves it the same way: the LAST row per date in file order is the
+# end-of-day record. That rule reproduces every published figure.
+# tests/test_perf_log_duplicate_rows.py fails if the set ever changes.
+# ---------------------------------------------------------------------------
+EOD_DEDUP_RULE = "keep_last_row_in_file_order"
+
+
+def dedupe_eod(df: pd.DataFrame, date_col: str = "date") -> pd.DataFrame:
+    """One row per date under EOD_DEDUP_RULE: the last row in file order.
+
+    Needs a frame that is in file order within each date, which
+    load_performance_history guarantees (stable sort). Row-wise on purpose:
+    groupby(date).last() takes the last NON-NULL value per column and can stitch
+    one row together from two writes. On the frozen set the two agree (no last
+    row has a null that an earlier row fills), so adopting this rule changed no
+    output.
+    """
+    if df.empty:
+        return df
+    day = df[date_col].astype(str).str[:10]
+    return df.loc[~day.duplicated(keep="last")].reset_index(drop=True)
+
+
+def load_eod_history(model_key: str) -> pd.DataFrame:
+    """The performance log resolved to one end-of-day row per date (EOD_DEDUP_RULE)."""
+    return dedupe_eod(load_performance_history(model_key))
+
+
 # ===========================================================================
 # CANONICAL DISPLAY BASIS
 #
@@ -83,18 +120,17 @@ def canonical_perf_frame(
     """A model's perf history collapsed to one EOD row per trading date and
     sliced to >= the canonical inception.
 
-    The single basis every display metric is computed from. The dedupe mirrors
-    ``research_metrics._model_daily_returns`` (groupby date, keep the last EOD
-    snapshot); the inception slice drops pre-inception rows (e.g. the 2026-04-08
+    The single basis every display metric is computed from. Duplicate dates are
+    resolved by the registered EOD_DEDUP_RULE (keep the last row per date), like
+    every other reader; the inception slice drops pre-inception rows (e.g. the 2026-04-08
     launch-day shakedown rows) from the COMPUTATION only — the raw logs are
     never touched.
     """
-    df = load_performance_history(model_key)
+    df = load_eod_history(model_key)
     if df.empty:
         return df
     df = df.copy()
     df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
-    df = df.groupby("date_str", sort=True).last().reset_index()
     inception = _experiment_inception(settings)
     if inception:
         df = df[df["date_str"] >= inception].reset_index(drop=True)
@@ -141,10 +177,16 @@ def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame
     and carries pre-inception 2026-04-08 shakedown rows, so we:
 
       * drop pre-inception rows (date < configured inception),
-      * dedupe to exactly one row per date deterministically — models iterated in
-        sorted order, stable-sorted by date, first capture per date wins. This
-        replaces ``groupby(date).last()`` over an unstably-ordered concat, which
-        flipped the inception anchor (676.01 / 679.91) between runs,
+      * dedupe to exactly one row per date deterministically, in two steps:
+        WITHIN a model, duplicate dates resolve by the registered EOD_DEDUP_RULE
+        (last row per date); ACROSS models, models are concatenated in sorted
+        order and the first model's row per date wins. This replaces
+        ``groupby(date).last()`` over an unstably-ordered concat, which flipped
+        the inception anchor (676.01 / 679.91) between runs. (Until 2026-10-23
+        this read "first capture per date", relying on per-model append order
+        that load_performance_history's unstable sort did not preserve once a
+        log reached 143 rows; harmless only because the duplicate SPY values on
+        04-10 / 04-13 coincide and 04-09 is pinned below.)
       * pin the inception anchor to the ledger's ``spy_benchmark_anchor`` (the
         2026-04-09 first-real-tick SPY, 680.40), so bench[0] is a fixed fact
         rather than an emergent property of row order.
@@ -156,7 +198,7 @@ def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame
         return None
     frames = []
     for fp in sorted(PERFORMANCE_DIR.glob("*.jsonl")):  # sorted -> deterministic concat order
-        df = load_performance_history(fp.stem)
+        df = load_eod_history(fp.stem)
         if df.empty or "benchmark_value" not in df.columns:
             continue
         sub = df[["date", "benchmark_value"]].dropna()
@@ -169,8 +211,9 @@ def canonical_spy_series(settings: dict[str, Any] | None = None) -> pd.DataFrame
     inception = _experiment_inception(settings)
     if inception:
         allrows = allrows[allrows["date_str"] >= inception]
-    # Deterministic one-row-per-date: stable-sort by date (preserves per-model
-    # append order within a date), then keep the first capture per date.
+    # Deterministic one-row-per-date across models: each model is already one
+    # row per date (EOD_DEDUP_RULE); the stable sort keeps the sorted-model concat
+    # order within a date, so keep="first" takes the first model's row.
     allrows = allrows.sort_values("date", kind="stable")
     deduped = allrows.drop_duplicates(subset="date_str", keep="first").reset_index(drop=True)
     # Pin the inception anchor from the ledger (overrides the conflicting 04-09 rows).

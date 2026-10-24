@@ -47,7 +47,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.analytics.performance import canonical_spy_series, load_performance_history  # noqa: E402
+from src.analytics.performance import canonical_spy_series, load_eod_history  # noqa: E402
 from src.analytics.regime_classifier import (  # noqa: E402
     classify_regimes,
     label_for_dates,
@@ -158,13 +158,13 @@ def _eod_series(model_key: str, cap: str | None = None):
     prior month's cumulative return or equity curve. Returns a list of
     (date, total_value) sorted by date.
     """
-    df = load_performance_history(model_key)
+    df = load_eod_history(model_key)  # one row per date, EOD_DEDUP_RULE (keep last)
     if df.empty:
         return []
     eod = OrderedDict()
     for _, r in df.iterrows():
         d = r["date"].strftime("%Y-%m-%d")
-        eod[d] = float(r["total_value"])  # last write per date wins (chronological)
+        eod[d] = float(r["total_value"])
     return [(d, v) for d, v in sorted(eod.items())
             if d >= INCEPTION_DATE and (cap is None or d <= cap)]
 

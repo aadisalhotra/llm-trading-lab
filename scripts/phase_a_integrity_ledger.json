@@ -1337,6 +1337,149 @@
           "Duplicate launch-window rows: provenance and whether to resolve them at the source (assessment requested by the hub 2026-10-23).",
           "No automated test run exists; scoping requested by the hub 2026-10-23."
         ]
+      },
+      {
+        "id": "perf_log_duplicate_rows_frozen",
+        "date": "2026-10-24",
+        "type": "registration",
+        "scope": "data/performance/*.jsonl (all six books)",
+        "authority": "Hub ruling 2026-10-23 (three-part remedy ratified as proposed): register the frozen set, route every reader through one dedupe rule, tripwire the set. Rows are NOT deleted at the source.",
+        "why_not_delete": "The logs are append-only raw data and every published figure was built on them. Deleting rows either moves a published number or makes an undocumented choice; registering the set and the rule makes the choice explicit and leaves the data intact.",
+        "resolution_rule": "keep_last_row_in_file_order",
+        "resolution_rule_code": "src/analytics/performance.py EOD_DEDUP_RULE / dedupe_eod / load_eod_history",
+        "why_keep_last": "It reproduces every published figure: the monthly layers (_eod_series kept the last write per date), the leaderboard and the alert/correlation readers (groupby(date).last(), which agrees row-wise with keep-last on this set: no last row has a null an earlier row fills). Moving canonical_spy_series from keep-first to keep-last within a model changes nothing: the duplicate SPY values on 04-10 and 04-13 coincide and 04-09 is pinned by spy_benchmark_anchor.",
+        "conflicting_conventions_before": "Three rules coexisted: the writer keeps the FIRST row for a date (its duplicate-date guard is a no-op on a second write), _eod_series and the dashboard kept the LAST, canonical_spy_series kept the FIRST (and its 'preserves per-model append order' comment was false from 2026-10-21 until e976c7de7). Under the writer's own rule the 21:xx rows of 04-10 and 04-13 would have been the record; the readers, and every published figure, use the 23:xx rows. The registered rule follows the published record.",
+        "writer_guard": "bb41fe4a8 (2026-04-14T00:23Z) made log_daily_snapshot a no-op on a second same-date write; f79d81563 (2026-07-01) added the pre-inception refusal. No duplicate date exists after 2026-04-13.",
+        "frozen_set": {
+          "claude": {
+            "2026-04-09": [
+              {"line": 1, "commit": "4ffb6bfde", "total_value": 100035.2365458832, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 2, "commit": "237612e7c", "total_value": 104441.9304647003, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 3, "commit": "778432821", "total_value": 104469.67679325712, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 4, "commit": "e787f81df", "total_value": 104478.74133364104, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 5, "commit": "ca89377f7", "total_value": 104855.5995319809, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 6, "commit": "73b21acb9", "total_value": 104809.7658576721, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          },
+          "claude_opus": {
+            "2026-04-08": [
+              {"line": 1, "commit": "4ffb6bfde", "total_value": 100000.0, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 2, "commit": "4ffb6bfde", "total_value": 100000.0, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 3, "commit": "4ffb6bfde", "total_value": 100000.00000000001, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 4, "commit": "4ffb6bfde", "total_value": 100000.0, "eod_of_record": true, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"}
+            ],
+            "2026-04-09": [
+              {"line": 5, "commit": "4ffb6bfde", "total_value": 100000.0, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 6, "commit": "4ffb6bfde", "total_value": 101444.73879441223, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 7, "commit": "237612e7c", "total_value": 104441.63200752257, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 8, "commit": "778432821", "total_value": 104477.0143386795, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 9, "commit": "e787f81df", "total_value": 104477.0143386795, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 10, "commit": "ca89377f7", "total_value": 104809.7658576721, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 11, "commit": "73b21acb9", "total_value": 104809.7658576721, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          },
+          "deepseek": {
+            "2026-04-08": [
+              {"line": 1, "commit": "d432322d8", "total_value": 100000.0, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 2, "commit": "d432322d8", "total_value": 100000.0, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 3, "commit": "d432322d8", "total_value": 100000.0, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 4, "commit": "2dc7f687f", "total_value": 100000.0, "eod_of_record": true, "provenance": "pre-inception run committed 2026-04-09T03:29Z ('daily run 2026-04-09'), logged under date 2026-04-08"}
+            ],
+            "2026-04-09": [
+              {"line": 5, "commit": "aa01f91e9", "total_value": 99994.96150074768, "eod_of_record": false, "provenance": "local smoke test, intraday + EOD verification, committed 2026-04-09 07:09 ET (pre-market)"},
+              {"line": 6, "commit": "4ffb6bfde", "total_value": 101487.31971050568, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 7, "commit": "237612e7c", "total_value": 109040.69431655426, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 8, "commit": "778432821", "total_value": 108650.4157764435, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 9, "commit": "e787f81df", "total_value": 108658.20389245605, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 10, "commit": "ca89377f7", "total_value": 109755.17739009134, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 11, "commit": "73b21acb9", "total_value": 109755.17739009134, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          },
+          "gemini": {
+            "2026-04-08": [
+              {"line": 1, "commit": "d432322d8", "total_value": 99999.99999999999, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 2, "commit": "d432322d8", "total_value": 99999.99999999999, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 3, "commit": "d432322d8", "total_value": 99999.99999999999, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 4, "commit": "2dc7f687f", "total_value": 99999.99999999999, "eod_of_record": true, "provenance": "pre-inception run committed 2026-04-09T03:29Z ('daily run 2026-04-09'), logged under date 2026-04-08"}
+            ],
+            "2026-04-09": [
+              {"line": 5, "commit": "aa01f91e9", "total_value": 99994.81319789887, "eod_of_record": false, "provenance": "local smoke test, intraday + EOD verification, committed 2026-04-09 07:09 ET (pre-market)"},
+              {"line": 6, "commit": "4ffb6bfde", "total_value": 101740.87828089981, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 7, "commit": "237612e7c", "total_value": 96254.7431009819, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 8, "commit": "778432821", "total_value": 96517.19579994126, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 9, "commit": "e787f81df", "total_value": 96513.95186978986, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 10, "commit": "ca89377f7", "total_value": 98305.13221963272, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 11, "commit": "73b21acb9", "total_value": 98305.13221963272, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          },
+          "gpt": {
+            "2026-04-08": [
+              {"line": 1, "commit": "d432322d8", "total_value": 100000.00000000001, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 2, "commit": "d432322d8", "total_value": 100000.00000000003, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 3, "commit": "d432322d8", "total_value": 100000.00000000003, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 4, "commit": "2dc7f687f", "total_value": 100000.00000000001, "eod_of_record": true, "provenance": "pre-inception run committed 2026-04-09T03:29Z ('daily run 2026-04-09'), logged under date 2026-04-08"}
+            ],
+            "2026-04-09": [
+              {"line": 5, "commit": "aa01f91e9", "total_value": 99995.63391183624, "eod_of_record": false, "provenance": "local smoke test, intraday + EOD verification, committed 2026-04-09 07:09 ET (pre-market)"},
+              {"line": 6, "commit": "4ffb6bfde", "total_value": 101929.56806604768, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 7, "commit": "237612e7c", "total_value": 100742.50987454224, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 8, "commit": "778432821", "total_value": 101768.77094798737, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 9, "commit": "e787f81df", "total_value": 101766.45427863084, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 10, "commit": "ca89377f7", "total_value": 103263.57045464178, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 11, "commit": "73b21acb9", "total_value": 103263.57045464178, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          },
+          "grok": {
+            "2026-04-08": [
+              {"line": 1, "commit": "d432322d8", "total_value": 100000.0, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 2, "commit": "d432322d8", "total_value": 99999.99999999999, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 3, "commit": "d432322d8", "total_value": 99999.99999999999, "eod_of_record": false, "provenance": "pre-inception dry run (commit 'Phase 1: first successful 5-of-5 dry run output', 2026-04-08 23:17 ET)"},
+              {"line": 4, "commit": "2dc7f687f", "total_value": 100000.0, "eod_of_record": true, "provenance": "pre-inception run committed 2026-04-09T03:29Z ('daily run 2026-04-09'), logged under date 2026-04-08"}
+            ],
+            "2026-04-09": [
+              {"line": 5, "commit": "aa01f91e9", "total_value": 99995.43068291318, "eod_of_record": false, "provenance": "local smoke test, intraday + EOD verification, committed 2026-04-09 07:09 ET (pre-market)"},
+              {"line": 6, "commit": "4ffb6bfde", "total_value": 101756.09249728396, "eod_of_record": false, "provenance": "6-model smoke test, committed 2026-04-09 15:52 ET (before the close); also wrote claude_opus's 2026-04-08 rows"},
+              {"line": 7, "commit": "237612e7c", "total_value": 101649.18303079224, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-09T23:32:09Z"}
+            ],
+            "2026-04-10": [
+              {"line": 8, "commit": "778432821", "total_value": 101460.82276795272, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-10T21:29:17Z (first of two EOD ticks that day)"},
+              {"line": 9, "commit": "e787f81df", "total_value": 101465.03652338103, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-10T23:15:32Z (second EOD tick that day)"}
+            ],
+            "2026-04-13": [
+              {"line": 10, "commit": "ca89377f7", "total_value": 103867.0990948467, "eod_of_record": false, "provenance": "end-of-day tick 2026-04-13T21:33:00Z (first of two EOD ticks that day)"},
+              {"line": 11, "commit": "73b21acb9", "total_value": 103867.0990948467, "eod_of_record": true, "provenance": "end-of-day tick 2026-04-13T23:30:51Z (second EOD tick that day)"}
+            ]
+          }
+        },
+        "tripwire": "tests/test_perf_log_duplicate_rows.py asserts the duplicate set in data/performance equals this frozen_set exactly (dates, line numbers, values), that eod_of_record is the last row per date, and that dedupe_eod selects it. A new duplicate date, or an edit to a frozen row, fails the suite.",
+        "output_changes_on_adoption": [
+          "data/dashboard.json equity_curves: one point per date. The duplicate launch-window points are no longer drawn (claude 3, every other book 7 fewer points).",
+          "Dashboard cost tracker gross P&L: now current value minus the configured starting capital, the leaderboard's anchor. Previously current value minus the perf log's FIRST row, which for claude (no 04-08 rows) was a 2026-04-09 smoke-test row (100,035.24); claude's figure moves +35.24, every other book is unchanged. Keep-last alone would have made claude's anchor the 04-09 close, so the anchor was corrected rather than inherited.",
+          "scripts/behavioral_summary.py cash_stats: duplicate-date rows no longer counted twice. Only windows touching 2026-04-08..13 change (April: e.g. claude n 19->16, mean cash 6.60%->6.42%). The published May/June/July data layers use May-onward windows, which are identical.",
+          "Legacy src/reports/monthly_report.py April slices: one row per date. Its only output, reports/monthly/2026-04.md, is a 2026-04-09 smoke-test artifact that no job regenerates; nothing published moves."
+        ],
+        "verified_unchanged": "Measured before/after on 2026-10-24 across 53 reader outputs: canonical_spy_series and canonical_spy_return, build_leaderboard, the correlation matrix, canonical_perf_frame, research_metrics._model_daily_returns, the alert detectors' _eod_history, the digest daily P&L, and the May and October monthly slices are identical. tests/test_reproduce_may_data_layer.py stays EXACT.",
+        "not_routed": "src/reports/daily_report.py builds a SET of logged dates per model (the EOD-complete predicate); a set is invariant to which duplicate wins, so it reads the raw file unchanged."
       }
     ]
   }

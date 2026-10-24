@@ -61,8 +61,8 @@ def _color(x: float | None) -> str:
 
 def _daily_pnl_dollars(model_key: str) -> float | None:
     """Today minus prior-session total value, from the EOD performance log."""
-    from ..analytics.performance import load_performance_history
-    df = load_performance_history(model_key)
+    from ..analytics.performance import load_eod_history
+    df = load_eod_history(model_key)
     if df.empty:
         return None
     if len(df) == 1:

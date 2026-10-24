@@ -376,14 +376,15 @@ def _eod_history(model_key: str):
     "today vs the prior session" on the raw frame could pick a same-day
     duplicate as the prior session, so every detector that reasons about
     day-over-day transitions reads through this instead. Mirrors the
-    dashboard's correlation-matrix dedupe.
+    dashboard's correlation-matrix dedupe -- both now apply the registered
+    EOD_DEDUP_RULE (analytics.performance.dedupe_eod).
     """
+    from ..analytics.performance import dedupe_eod
     df = _perf_history(model_key)
     if df.empty or "date" not in df.columns:
         return df
-    df = df.copy()
+    df = dedupe_eod(df).copy()
     df["_d"] = df["date"].astype(str).str[:10]
-    df = df.groupby("_d", sort=True).last().reset_index()
     return df
 
 
