@@ -30,6 +30,24 @@ herding matrix-wmean==scalar reconciliation) is unchanged; only the equity-curve
 shakedown-fabrication flag literal was re-anchored (true -> false) per the Phase-A
 equity-curve re-anchor ruling. The mechanized build must pass it.
 
+EXACT LOCALLY, 1e-12 RELATIVE IN CI (hub ruling 2026-10-24). The strictness of
+this gate differs by environment, and a green CI run is NOT proof of exactness:
+  * locally (GITHUB_ACTIONS unset) every float must be bit-identical, as before;
+  * in GitHub Actions a float pair passes if |a - b| <= 1e-12 * |b|, and every
+    tolerated field is reported as a warning, so a green run states how many
+    fields were not exact and by how much.
+Why: on its first run (2026-10-24) the CI runner (Linux, CPython 3.11) differed
+from the committed layer at the last ULP on 38 fields, max relative 2.9e-14.
+The measured cause is the platform, not the package versions: production's
+numpy 2.4.6 / pandas 3.1.0 reproduce May exactly on the local machine
+(CPython 3.14), and Python 3.11's left-to-right built-in sum() (3.12 made float
+sum() compensated), patched in-process, produces 6 last-ULP diffs of the same
+magnitude (max relative 2.7e-14). That the 6 are among the CI's 38 is not
+verified; the rest is attributed to platform floating point, not proven. The real
+regression this gate exists for (2026-10-21) was ~2e-2 relative, ten orders of
+magnitude above the tolerance. Integers, strings, booleans, list lengths and
+keys stay exact everywhere. Registered: ledger reproduce_may_ci_tolerance_1e12.
+
 Run:  python -m pytest tests/test_reproduce_may_data_layer.py -q
       python -m tests.test_reproduce_may_data_layer        # human-readable report
 """
@@ -37,8 +55,10 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import sys
+import warnings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -66,13 +86,33 @@ EXCLUDE_PREFIX = (
 )
 
 
+# Relative tolerance for float leaves, in CI only; exact (None) everywhere else.
+CI_REL_TOL = 1e-12
+REL_TOL = CI_REL_TOL if os.environ.get("GITHUB_ACTIONS") == "true" else None
+
+
+def _tolerable(a, b) -> bool:
+    """True if a differing pair is a float pair within REL_TOL (CI only). bool is
+    an int subclass, so it is excluded explicitly; two ints are never tolerated."""
+    if REL_TOL is None:
+        return False
+    if isinstance(a, bool) or isinstance(b, bool):
+        return False
+    if not (isinstance(a, (int, float)) and isinstance(b, (int, float))):
+        return False
+    if not (isinstance(a, float) or isinstance(b, float)):
+        return False
+    return math.isclose(a, b, rel_tol=REL_TOL, abs_tol=0.0)
+
+
 def _excluded(path: str) -> bool:
     return path in EXCLUDE_EXACT or any(path.startswith(p) for p in EXCLUDE_PREFIX)
 
 
-def _diff(a, b, path, out):
+def _diff(a, b, path, out, tolerated=None):
     """Recursive structural diff (order-independent for dicts). Records every path
-    where candidate `a` and committed `b` disagree, skipping excluded paths."""
+    where candidate `a` and committed `b` disagree, skipping excluded paths. Float
+    leaves within REL_TOL (CI only) go to `tolerated` instead of `out`."""
     if _excluded(path):
         return
     if isinstance(a, dict) and isinstance(b, dict):
@@ -83,16 +123,20 @@ def _diff(a, b, path, out):
             if k not in a:
                 out.append(("ONLY_COMMITTED", path + "." + str(k)))
             else:
-                _diff(a[k], b[k], path + "." + str(k), out)
+                _diff(a[k], b[k], path + "." + str(k), out, tolerated)
     elif isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             out.append(("LISTLEN", path, len(a), len(b)))
         else:
             for i in range(len(a)):
-                _diff(a[i], b[i], f"{path}[{i}]", out)
+                _diff(a[i], b[i], f"{path}[{i}]", out, tolerated)
     else:
         if a != b:
-            out.append(("CHANGED", path, a, b))
+            if _tolerable(a, b):
+                if tolerated is not None:
+                    tolerated.append((path, a, b, abs(a - b) / abs(b)))
+            else:
+                out.append(("CHANGED", path, a, b))
 
 
 def _overlay_authored(candidate: dict, prebf: dict) -> dict:
@@ -116,8 +160,9 @@ def _overlay_authored(candidate: dict, prebf: dict) -> dict:
     return candidate
 
 
-def reproduce():
-    """Build May, overlay authored content, return (candidate, committed, diffs)."""
+def reproduce(tolerated=None):
+    """Build May, overlay authored content, return (candidate, committed, diffs).
+    In CI, float fields within REL_TOL are appended to `tolerated`."""
     candidate = build(MONTH)
     with open(COMMITTED, encoding="utf-8") as f:
         committed = json.load(f)
@@ -125,7 +170,7 @@ def reproduce():
         prebf = json.load(f)
     _overlay_authored(candidate, prebf)
     diffs: list = []
-    _diff(candidate, committed, "", diffs)
+    _diff(candidate, committed, "", diffs, tolerated)
     return candidate, committed, diffs
 
 
@@ -139,9 +184,16 @@ def run_definition_of_done(candidate: dict):
 
 def test_reproduce_may_data_layer_exact():
     """The mechanized build reproduces the committed May layer exactly (modulo the
-    documented build-time / authored exclusions)."""
-    _candidate, _committed, diffs = reproduce()
+    documented build-time / authored exclusions). In CI only, float fields within
+    1e-12 relative pass and are reported as a warning."""
+    tolerated: list = []
+    _candidate, _committed, diffs = reproduce(tolerated)
     assert not diffs, "reproduce-May diffs:\n" + "\n".join(str(d) for d in diffs)
+    if tolerated:
+        worst = max(t[3] for t in tolerated)
+        warnings.warn(f"reproduce-May NOT EXACT: {len(tolerated)} float field(s) passed "
+                      f"under the CI tolerance (rel {REL_TOL:g}), max relative {worst:.3g}; "
+                      f"first: {tolerated[0][0]}")
 
 
 def test_reproduce_may_passes_definition_of_done():
@@ -151,15 +203,42 @@ def test_reproduce_may_passes_definition_of_done():
     assert ok, "definition-of-done (backfill.verify) issues:\n" + "\n".join(issues)
 
 
+def test_ci_tolerance_scope(monkeypatch):
+    """The CI tolerance absorbs last-ULP float differences and nothing else; with
+    it off (the local default) the same ULP difference is a failure."""
+    mod = sys.modules[__name__]
+    ulp = 0.08314833686418835          # a real CI-vs-local pair (2026-10-24)
+    ulp_b = 0.08314833686418836
+    cases = {"ulp": (ulp, ulp_b), "big": (1.0, 1.0 + 1e-10), "int": (3, 4),
+             "bool": (True, False), "zero": (0.0, 1e-300), "str": ("a", "b")}
+    a = {k: v[0] for k, v in cases.items()}
+    b = {k: v[1] for k, v in cases.items()}
+
+    monkeypatch.setattr(mod, "REL_TOL", None)
+    out, tol = [], []
+    _diff(a, b, "", out, tol)
+    assert {d[1] for d in out} == {".ulp", ".big", ".int", ".bool", ".zero", ".str"}
+    assert tol == []
+
+    monkeypatch.setattr(mod, "REL_TOL", CI_REL_TOL)
+    out, tol = [], []
+    _diff(a, b, "", out, tol)
+    assert {d[1] for d in out} == {".big", ".int", ".bool", ".zero", ".str"}
+    assert [t[0] for t in tol] == [".ulp"]
+
+
 if __name__ == "__main__":
-    candidate, committed, diffs = reproduce()
+    tolerated: list = []
+    candidate, committed, diffs = reproduce(tolerated)
     print("REPRODUCE-MAY DIFF (modulo build-time + authored overlay)")
     print("-" * 70)
-    if not diffs:
+    if not diffs and not tolerated:
         print("  EXACT MATCH — 0 differences.")
     else:
         for d in diffs:
             print("  ", d)
+        for t in tolerated:
+            print("   TOLERATED (CI rel 1e-12):", t)
     ok, issues, w, s = run_definition_of_done(candidate)
     print("\nDEFINITION-OF-DONE (scripts/backfill_may_data_layer.verify; RQ-consistency cross-check unedited)")
     print("-" * 70)
