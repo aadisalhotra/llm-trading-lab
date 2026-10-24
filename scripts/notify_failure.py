@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+from html import escape
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,13 +38,17 @@ def main() -> int:
     ref = os.getenv("GITHUB_REF_NAME", "")
     mode = os.getenv("RUN_MODE", "")
     failed_jobs = os.getenv("FAILED_CONTEXT", "")
+    # What failed, in one sentence. Defaults to the pipeline wording; a workflow
+    # that is not the trading pipeline (e.g. the test suite) supplies its own.
+    summary = os.getenv("FAILURE_SUMMARY") or (
+        "The trading pipeline may not have completed — check the run log.")
     run_url = f"{server}/{repo}/actions/runs/{run_id}" if repo and run_id else server
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     title = f"Pipeline workflow failed: {workflow}"
     detail = f" ({mode})" if mode else ""
     body_text = (
-        f"A GitHub Actions run of '{workflow}'{detail} failed.\n\n"
+        f"A GitHub Actions run of '{workflow}'{detail} failed. {summary}\n\n"
         f"Repo:   {repo}\n"
         f"Branch: {ref}\n"
         f"Commit: {sha}\n"
@@ -52,6 +57,10 @@ def main() -> int:
     )
     if failed_jobs:
         body_text += f"Context: {failed_jobs}\n"
+    context_row = (
+        '<tr><td style="padding:3px 12px 3px 0;color:#666;vertical-align:top;">Context</td>'
+        f'<td style="padding:3px 0;color:#111;white-space:pre-wrap;">{escape(failed_jobs)}</td></tr>'
+        if failed_jobs else "")
 
     html = f"""\
 <!DOCTYPE html><html><head><meta charset="utf-8">
@@ -64,14 +73,14 @@ def main() -> int:
     <div style="color:#fff;font-size:18px;font-weight:700;margin-top:2px;">{title}{detail}</div>
   </td></tr>
   <tr><td style="padding:18px 20px;color:#222;font-size:14px;line-height:1.6;">
-    A GitHub Actions run of <b>{workflow}</b> failed{detail}. The trading pipeline may not have
-    completed — check the run log.
+    A GitHub Actions run of <b>{workflow}</b> failed{detail}. {escape(summary)}
     <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13px;margin-top:12px;">
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Repo</td><td style="padding:3px 0;color:#111;">{repo}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Branch</td><td style="padding:3px 0;color:#111;">{ref}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Commit</td><td style="padding:3px 0;color:#111;">{sha}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Time</td><td style="padding:3px 0;color:#111;">{ts}</td></tr>
       <tr><td style="padding:3px 12px 3px 0;color:#666;">Run</td><td style="padding:3px 0;"><a href="{run_url}">{run_url}</a></td></tr>
+      {context_row}
     </table>
   </td></tr>
   <tr><td style="padding:12px 20px;background:#fafafa;border-top:1px solid #eee;color:#9ca3af;font-size:11px;">

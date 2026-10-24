@@ -1,0 +1,124 @@
+name: Tests
+
+# The full pytest suite, run automatically. Added 2026-10-24 after
+# test_reproduce_may_data_layer_exact sat red on main for two days
+# (2026-10-21..23) with nothing reporting it: the failure was triggered by a
+# cron DATA commit (a performance log crossing a length threshold), not a code
+# change, so a human running tests occasionally would not have caught it.
+#
+# Triggers:
+#   * schedule -- the primary trigger. 00:30 UTC Tue-Sat, after the last
+#     end-of-day tick of each weekday session (observed up to ~23:56 UTC), so
+#     every session's data commits are tested. This is the trigger that catches
+#     data-driven failures: the cron pushes with the default GITHUB_TOKEN, and
+#     GitHub does NOT start workflow runs for pushes made with that token, so
+#     on-push alone would never see a cron commit.
+#   * push to main -- human commits (these do trigger).
+#   * workflow_dispatch -- manual.
+on:
+  schedule:
+    - cron: "30 0 * * 2-6"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      failed_tests: ${{ steps.summary.outputs.failed_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # tests/test_v4_ablation.py reads committed blobs from history
+          # (git show <v3 commit>:prompts/v2.txt); a shallow clone lacks them.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # pytest is a test-only dependency, not in requirements.txt (the
+          # pipeline does not need it). Pinned to the version the suite is
+          # developed against.
+          pip install "pytest==9.0.3"
+
+      - name: Run the suite
+        id: pytest
+        run: |
+          set -o pipefail
+          python -m pytest tests -q -rfE -p no:cacheprovider 2>&1 | tee pytest-output.txt
+
+      - name: Summarize failures
+        id: summary
+        if: failure() && steps.pytest.outcome == 'failure'
+        run: |
+          # First 15 FAILED/ERROR lines, newline-joined, for the alert email.
+          {
+            echo "failed_tests<<PYTEST_EOF"
+            grep -E '^(FAILED|ERROR) ' pytest-output.txt | head -n 15 || true
+            tail -n 1 pytest-output.txt
+            echo "PYTEST_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output
+          path: pytest-output.txt
+          retention-days: 30
+
+  # Alerting preflight, the same pattern as intraday.yml: STANDALONE, needs
+  # nothing. If the channel the failure alert uses cannot deliver, this job's
+  # non-zero exit reds the run on its own -- an email fault must not depend on
+  # email to report it. Stdlib-only, no pip install.
+  alerting-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify the daily alerting channel can deliver
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+        run: python scripts/check_alerting_config.py --channel daily
+
+  # A red suite emails ALERT_RECIPIENTS through the pipeline's own failure
+  # notifier. Fires on a test failure only, not on cancellation.
+  notify-failure:
+    needs: [test]
+    if: ${{ !cancelled() && needs.test.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # No pip install, same as intraday.yml's notifier: the fewer steps the
+      # alert path has, the fewer ways it can fail to report a failure.
+      - name: Send failure email
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+          RUN_MODE: ${{ github.event_name }}
+          FAILURE_SUMMARY: "The automated test suite failed, so a gate on main is red. The failing tests are listed below; the full output is the run's pytest-output artifact."
+          FAILED_CONTEXT: ${{ needs.test.outputs.failed_tests }}
+        run: python scripts/notify_failure.py
