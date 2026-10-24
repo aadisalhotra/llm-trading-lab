@@ -1603,6 +1603,25 @@
         "why_wider_than_stated": "The ruling names one cycle and one line. The code renders both lines from the same 16:00 constant in every intraday prompt of the day, so the registered scope is the code's. The ruling (no change to the prompt) is unaffected.",
         "full_sessions_unaffected": "On a 16:00 close the same formula is correct: 12 after the 09:30 run down to 0 after 15:30.",
         "extent": "Two sessions in fourteen months; 14 prompts per book."
+      },
+      {
+        "id": "hub_ratification_2026_10_24_ci_lock_package",
+        "date": "2026-10-24",
+        "type": "ratification",
+        "scope": "the four entries landed in 2935e9c67 (those entries are not edited)",
+        "authority": "Hub reply 2026-10-24, after the package push (c6f8864df..2935e9c67).",
+        "ratified": {
+          "reproduce_may_ci_tolerance_1e12": "Justification corrected to the measurement: the Python version (3.12's compensated float sum()), not the package versions, plus CPU variance that is unproven. The ledger carries the measurement, not the hub's original assumption.",
+          "production_dependency_lock": "The registered drift is the pinning's justification: pandas 3.1.0 on 2026-10-22 and python-dateutil 3.0.0, a major version, on 2026-10-21, both unannounced, both straight to production.",
+          "session_timing_calendar_version_restatement": "pandas_market_calendars 5.5.0 in production since 2026-10-05, same closes confirmed: noted and ratified.",
+          "prompt_close_line_disclosed_limitation": "The full scope is accepted as registered: all 7 intraday cycles on 2026-11-27 and 2026-12-24, overstating runs remaining by 6. The hub's wording was narrower than the code."
+        },
+        "known_unpinned": "The remainder of the production path left unpinned by production_dependency_lock (the setup-python \"3.11\" patch release, the ubuntu-latest runner image, the GitHub Actions major tags) is registered as KNOWN-UNPINNED, a decision with its scope stated, not an oversight. A behaviour change traced to any of these is a known-risk event, not a newly discovered defect.",
+        "first_green_tests_run": "40110046060 on 2935e9c67, 2026-10-24 16:06-16:10Z: test success, alerting-preflight success, notify-failure skipped. The lock installed on ubuntu-latest / CPython 3.11 with --no-deps + pip check. How many reproduce-May fields passed under the tolerance is in the run's warnings summary (the log needs credentials; not read in this session).",
+        "open_follow_up": {
+          "item": "Gate strictness is inverted: the exact gate runs on CPython 3.14, which production never runs; the tolerant gate runs on 3.11, which production does run.",
+          "status": "Assessment delivered to the hub 2026-10-24; to land after the cutover work. Not changed here."
+        }
       }
     ]
   }
