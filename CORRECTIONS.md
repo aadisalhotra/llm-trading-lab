@@ -336,3 +336,72 @@ output-version ledger entry (marker 9); the RQ3 entry cites it as the
 recomputation record (marker 14). The August methods note **cites this record and
 does not restate it** — a methods note is not the disclosure instrument for a
 superseded published figure.
+
+---
+
+## 2026-10-24 — Dashboard cost tracker: Claude gross P&L anchored on a smoke-test row; corrected +$35.24
+
+**Affects:** the dashboard cost panel's **gross P&L** (and the net P&L / ROI
+derived from it) for **Claude Sonnet 4.6 only**, every dashboard build since the
+cost tracker shipped. Does **not** affect: the leaderboard, cumulative return,
+alpha, daily reports, monthly data layers or PDFs, RQ datasets, or portfolio
+accounting. Every other book's figure is unchanged to the cent.
+
+### What was wrong
+
+`src/dashboard/build_data.py::_build_cost_tracker` computed gross P&L as the
+performance log's last row minus its **first row**, treating the first row as
+the inception value. For five books the first row is a 2026-04-08 seed row of
+exactly $100,000.00, so the shortcut happened to hold. Claude's log has no
+2026-04-08 rows: its first row is a **2026-04-09 smoke-test row**, $100,035.24,
+written by commit `4ffb6bfde` ("Smoke test artifacts for 6-model intraday + EOD
+verification", 15:52 ET, before that day's close). That row is an intraday
+reading taken during a test, not an inception value.
+
+| | Anchor | Gross P&L at the 2026-10-23 close ($118,439.03) |
+|---|---|---|
+| Carried | first log row, $100,035.24 (smoke test) | $18,403.80 |
+| Corrected | configured starting capital, $100,000.00 | **$18,439.03** |
+
+### Correction
+
+Gross P&L is now current value minus the **configured starting capital**
+(`config_loader.starting_capital`, $100,000.00 per book in paper mode), the same
+anchor the leaderboard's cumulative return uses (`performance._starting_capital`).
+The dashboard and the leaderboard now agree on what Claude's book started with.
+Landed in `79d527972`, pushed 2026-10-24; the published dashboard reflects it
+from the first build of Monday 2026-10-26.
+
+### Why this direction is attested, not merely plausible
+
+The correction raises one of our figures by $35.24, so the directional rule
+requires attestation. Three independent facts fix the anchor: (1) the paper
+books' configured capital is $100,000.00 and every book was initialised at it;
+(2) the leaderboard has always anchored Claude's cumulative return on
+$100,000.00, so the dashboard was the outlier; (3) the carried anchor traces to
+one named smoke-test commit, not to an initialisation. The shortcut was not a
+conservative choice either: it was an accident of which row happened to be first.
+
+### How it surfaced
+
+Routing every performance-log reader through one registered duplicate-date rule
+(ledger `operational_events.2026-10[perf_log_duplicate_rows_frozen]`). Under
+keep-last, Claude's first row would have become the 2026-04-09 close
+($104,441.93) and its gross P&L would have fallen $4,407. Measuring that change
+exposed that neither row is the book's inception, so the anchor was corrected
+rather than inherited.
+
+### Related dashboard changes in the same window (no figure corrected)
+
+- **Equity curves, one point per date.** The launch window's duplicate-date points
+  (2026-04-08..13) are no longer drawn: claude 3 and every other book 7 fewer
+  points. Same commit, `79d527972`.
+- **2026-04-10 point order** for gpt, gemini, grok and deepseek: emitted in swapped
+  order (same date, $2-8 apart) from the 2026-10-21T21:07Z EOD tick (`09f8fd25f`)
+  through `ad40230d9` (2026-10-23T23:47Z), caused by an unstable sort, fixed in
+  `e976c7de7`. Ledger
+  `operational_events.2026-10[performance_history_unstable_sort_2026_10_21]`.
+
+### Residual uncertainty
+
+None for the figure. It is recorded here because a published number moved.
