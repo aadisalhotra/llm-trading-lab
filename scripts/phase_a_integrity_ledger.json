@@ -1480,6 +1480,53 @@
         ],
         "verified_unchanged": "Measured before/after on 2026-10-24 across 53 reader outputs: canonical_spy_series and canonical_spy_return, build_leaderboard, the correlation matrix, canonical_perf_frame, research_metrics._model_daily_returns, the alert detectors' _eod_history, the digest daily P&L, and the May and October monthly slices are identical. tests/test_reproduce_may_data_layer.py stays EXACT.",
         "not_routed": "src/reports/daily_report.py builds a SET of logged dates per model (the EOD-complete predicate); a set is invariant to which duplicate wins, so it reads the raw file unchanged."
+      },
+      {
+        "id": "session_timing_calendar_close_and_et_chain",
+        "date": "2026-10-24",
+        "type": "defect_record",
+        "scope": "intraday scheduling: pipeline market gate, self-chain, backup crons (all six arms)",
+        "authority": "Hub dispatch 2026-10-23: chain stops on ET time, the day's close reads from pandas_market_calendars; build before 2026-11-02.",
+        "class": "A hardcoded value standing in for something that varies. Both defects are the same class.",
+        "defects": [
+          "CLOSE CONSTANT. src/data/market_data.is_market_open_now gated intraday ticks on 09:30 <= t < 16:00 ET with 16:00 a constant. On an early close the pipeline kept trading after the bell on stale prices. Simulated for 2026-11-27 (13:00 close) under the old code: 12 cycles, 5 of them after the close (13:00, 13:30, 14:00, 14:30, 15:00).",
+          "UTC CHAIN. The self-chain decided 'UTC hour >= 20 means closed', before and after its sleep. True only in EDT. In EST, 20:00 UTC is 15:00 ET, so after the 14:30 ET slot it dispatched EOD: 15:00 ran only if the 20:00 UTC backup cron fired (GitHub often delays it), and 15:30 had neither the chain nor a cron. Simulated for 2026-11-02 (EST, the validation month's first day) under the old code: 12 cycles, last 15:00, instead of 13. The lab started 2026-04-09 and has never run a session in EST.",
+          "EOD BACKUP AT THE BELL. The EOD backup cron was 21:00 UTC: 17:00 EDT but 16:00 EST, the closing bell itself."
+        ],
+        "fix": {
+          "market_gate": "market_data.session_bounds() reads the day's open and close from the NYSE calendar; is_market_open_now() uses it. Fallback without the calendar package: weekday 09:30-16:00 (the previous behaviour).",
+          "chain": "scripts/chain_schedule.py (stdlib, zoneinfo) decides in ET from the day's close: dispatch the next 30-minute slot only if it STARTS before the close; otherwise EOD at close + 65 min (17:05 ET full day, the same 21:05 UTC as before in EDT; 14:05 ET on a 13:00 close). The gate job publishes the close (check_trading_day.py --close), fail-open 16:00; the pipeline's calendar gate stays the authority on whether a tick trades.",
+          "backup_crons": "intraday */30 13-20 UTC (covers 09:30-15:30 in both regimes; out-of-session ticks skip); EOD 22:00 UTC (18:00 EDT / 17:00 EST).",
+          "tests": "tests/test_session_timing.py: calendar bounds (full, EST, both 2026 early closes, Thanksgiving, weekend), gate at the bell, chain decisions in EDT/EST/early close, and a whole-session simulation asserting the chain dispatches exactly the calendar's slots."
+        },
+        "expected_cycle_counts": {
+          "registered_before_the_fact": "Recorded 2026-10-24, before any of these sessions. A cycle is a 30-minute slot whose run starts before the day's close; one per slot (per-boundary guard).",
+          "full_session_edt": 13,
+          "full_session_est": "13 (09:30 .. 15:30) -- from 2026-11-02",
+          "2026-11-27": "7 (09:30 .. 12:30 ET; NYSE close 13:00 ET per pandas_market_calendars 5.3.2: market_close 18:00 UTC). EOD dispatched at 14:05 ET. Inside the validation month.",
+          "2026-12-24": "7 (09:30 .. 12:30 ET; close 13:00 ET). Live period.",
+          "2026-11-26": "0 (Thanksgiving, no session)",
+          "verify_after": "Count the distinct decision boundaries in data/trades/{book}_2026-11.jsonl dated 2026-11-27 (and data/intraday/) for each book; it must be 7, with none at or after 13:00 ET. Same check for 2026-11-02 (13, last 15:30)."
+        },
+        "not_changed_open_ruling": "src/prompt_builder.py renders 'Market close: 16:00 ET' and 'Approx runs left' from its own 16:00 constant into every intraday prompt. On 2026-11-27 the 12:30 cycle will tell every model ~7 runs remain when it is the last. That is model-facing prompt content after the 2026-10-31 freeze, so it is NOT changed in this package; ruling requested.",
+        "also_hardcoded_noted": "scripts/check_dashboard_staleness.py guards on 12:30-16:00 ET with a 16:00 constant. On an early close it cannot false-alarm (the last update is ~13:00-14:05, under 3h before 16:00), so it is left as is."
+      },
+      {
+        "id": "verb_removal_sweep_rule_slots",
+        "date": "2026-10-24",
+        "type": "registration",
+        "scope": "any regime boundary that removes a verb",
+        "authority": "Hub ruling 2026-10-23 (register the sweep rule as derived).",
+        "refines": "operational_events.2026-10[v4_boundary_force_cover_2026_10_23].general_form.registered_procedure step 1 (that entry is not edited).",
+        "rule": "Before any verb-removing boundary, the sweep runs after the LAST SLOT THAT CAN START BEFORE THAT DAY'S ACTUAL CLOSE. It is a slot, not a clock time. The run for that slot may finish after the close; the sweep waits for it.",
+        "last_slot_by_session": {
+          "full session, EDT": "15:30 ET (19:30 UTC slot; its run committed 19:35:16Z on 2026-10-23)",
+          "full session, EST": "15:30 ET (20:30 UTC slot)",
+          "early close (13:00 ET)": "12:30 ET (17:30 UTC in EST)",
+          "source": "the day's close from pandas_market_calendars (market_data.session_bounds), never a constant"
+        },
+        "why_2026_10_23_held": "19:35Z held because the 15:30 slot ran on time in EDT on a full session. It would not hold on 2026-11-27 (last slot 12:30 ET) or on any EST day (last slot 20:30 UTC).",
+        "determined_by": "Read from the code on 2026-10-24, not inferred from commits: the pipeline's gate is is_market_open_now() at run START (session_bounds open <= now < close), and one cycle runs per slot (per-boundary guard). Under the pre-2026-10-24 code the answer differed (see session_timing_calendar_close_and_et_chain)."
       }
     ]
   }

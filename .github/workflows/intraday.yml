@@ -2,19 +2,23 @@ name: Intraday Trading Pipeline
 
 on:
   schedule:
-    # Intraday ticks: every 30 minutes from 13:30 to 20:00 UTC, Mon-Fri.
-    # EDT (UTC-4): 09:30–16:00 ET. EST (UTC-5): 08:30–15:00 ET.
-    # The window is tight enough that no tick fires after 16:00 ET in
-    # either DST regime. The pipeline double-checks via is_market_open_now().
+    # Intraday ticks: every 30 minutes from 13:00 to 20:30 UTC, Mon-Fri, so the
+    # backup covers the whole session in BOTH DST regimes:
+    #   EDT (UTC-4): 09:00-16:30 ET.  EST (UTC-5): 08:00-15:30 ET.
+    # Ticks outside the day's session are skipped by the pipeline's own
+    # is_market_open_now(), which reads the day's real open/close from the NYSE
+    # calendar (early closes included). Until 2026-10-24 the window ended at
+    # 20:00 UTC, which in EST is 15:00 ET: the 15:30 ET slot had no backup.
     # This cron is a belt-and-suspenders backup — the primary trigger is
     # the self-perpetuating chain job below.
-    - cron: "*/30 13-19 * * 1-5"
-    - cron: "0 20 * * 1-5"
-    # End-of-day wrap-up: writes the EOD perf row, generates the daily
-    # report, and sends the daily summary alert. Fires at 21:00 UTC =
-    # 17:00 ET in DST / 16:00 ET in standard time — safely after close.
+    - cron: "*/30 13-20 * * 1-5"
+    # End-of-day wrap-up backup: writes the EOD perf row, generates the daily
+    # report, and sends the daily summary alert. 22:00 UTC = 18:00 EDT /
+    # 17:00 EST, at least an hour after a full-session close in either regime.
+    # (It was 21:00 UTC, which in EST is 16:00 ET, the closing bell itself.)
+    # The chain's own EOD dispatch, at close + 65 min, is the primary.
     # This run does NOT execute trades.
-    - cron: "0 21 * * 1-5"
+    - cron: "0 22 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -104,7 +108,7 @@ jobs:
           # only free-text sink in this workflow.
           INPUT_FORCE: ${{ github.event.inputs.force }}
         run: |
-          # The 21:00 UTC cron is the EOD wrap-up; everything else is intraday.
+          # The 22:00 UTC cron is the EOD wrap-up; everything else is intraday.
           # workflow_dispatch overrides via the `mode` input.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Normalized to a strict boolean rather than passed through: only the
@@ -114,7 +118,7 @@ jobs:
             if [ "$INPUT_FORCE" = "true" ]; then FORCE=true; else FORCE=false; fi
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
             echo "force=$FORCE" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "0 21 * * 1-5" ]; then
+          elif [ "${{ github.event.schedule }}" = "0 22 * * 1-5" ]; then
             echo "mode=end-of-day" >> $GITHUB_OUTPUT
             echo "force=false" >> $GITHUB_OUTPUT
           else
@@ -229,6 +233,9 @@ jobs:
     continue-on-error: true
     outputs:
       trading: ${{ steps.check.outputs.trading }}
+      # The day's NYSE close, ET "HH:MM" (13:00 on an early close). The chain
+      # schedules its last slot and the EOD dispatch from it; fail-open "16:00".
+      close_et: ${{ steps.close.outputs.close_et }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -240,15 +247,21 @@ jobs:
       - name: Trading-day check
         id: check
         run: echo "trading=$(python scripts/check_trading_day.py)" >> "$GITHUB_OUTPUT"
+      - name: Session close
+        id: close
+        run: echo "close_et=$(python scripts/check_trading_day.py --close)" >> "$GITHUB_OUTPUT"
 
-  # Self-perpetuating chain. After each successful intraday tick:
-  #   * If still inside market hours (< 20:00 UTC), sleep to the next
-  #     30-minute boundary (:00 or :30) and dispatch intraday.yml again.
-  #   * If market has closed (>= 20:00 UTC EDT), sleep until ~21:05 UTC
-  #     (giving close prices time to settle) and dispatch the EOD
-  #     wrap-up run with mode=end-of-day.
+  # Self-perpetuating chain. After each successful intraday tick it asks
+  # scripts/chain_schedule.py, which decides in ET from the day's close (gate
+  # output close_et, from the NYSE calendar):
+  #   * If the next 30-minute slot (:00 or :30) STARTS before the close, sleep
+  #     to it and dispatch intraday.yml again.
+  #   * Otherwise, sleep until close + 65 min (17:05 ET on a full day; 14:05 ET
+  #     on a 13:00 early close) and dispatch the EOD wrap-up, mode=end-of-day.
+  # Until 2026-10-24 this decided "hour >= 20 UTC means closed", true only in
+  # EDT: in EST it dispatched EOD after the 14:30 ET slot.
   # The chain is now the PRIMARY trigger for both intraday ticks AND the
-  # EOD wrap-up. The `0 21 * * 1-5` cron on the workflow is retained as a
+  # EOD wrap-up. The `0 22 * * 1-5` cron on the workflow is retained as a
   # belt-and-suspenders backup for the rare case where this chain job
   # itself fails — log_daily_snapshot is idempotent on date so a
   # double-fire writes exactly one row per day.
@@ -260,7 +273,7 @@ jobs:
     # workflow_dispatch force=true bypasses the gate like it bypasses the
     # pipeline's own market-open check.
     if: >-
-      success() && github.event.schedule != '0 21 * * 1-5' && github.event.inputs.mode != 'end-of-day'
+      success() && github.event.schedule != '0 22 * * 1-5' && github.event.inputs.mode != 'end-of-day'
       && (needs.gate.outputs.trading != 'false' || github.event.inputs.force == 'true')
     steps:
       - name: Checkout
@@ -285,6 +298,11 @@ jobs:
       - name: Chain next tick (intraday or EOD)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Bound to env, never interpolated into the script. Empty when the
+          # (continue-on-error) gate failed: chain_schedule.py then assumes a
+          # full 16:00 session, and the pipeline's own calendar gate still skips
+          # any tick after a real early close.
+          CLOSE_ET: ${{ needs.gate.outputs.close_et }}
         run: |
           set -e
 
@@ -370,59 +388,42 @@ jobs:
             dispatch_with_retry '{"ref":"main","inputs":{"mode":"intraday","force":"false"}}' "intraday"
           }
 
-          dispatch_eod() {
-            # Wait until 21:05 UTC (1h 5m after EDT market close) so prices
-            # settle, then dispatch mode=end-of-day. If already past 21:05,
-            # dispatch after a 30s safety buffer.
-            local h m s now target wait
-            h=$(date -u +%H); m=$(date -u +%M); s=$(date -u +%S)
-            now=$(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
-            target=$(( 21 * 3600 + 5 * 60 ))
-            wait=$(( target - now ))
-            if [ "$wait" -lt 30 ]; then
-              wait=30
-            fi
-            echo "Market closed — waiting ${wait}s before EOD dispatch..."
-            sleep "$wait"
+          # Sleep the given seconds, then dispatch mode=end-of-day.
+          dispatch_eod_after() {
+            echo "No slot left before the ${CLOSE_ET:-16:00 (default)} ET close — waiting ${1}s before EOD dispatch..."
+            sleep "$1"
             dispatch_with_retry '{"ref":"main","inputs":{"mode":"end-of-day","force":"false"}}' "end-of-day"
           }
 
-          NOW_MIN=$(date -u +%M)
-          NOW_SEC=$(date -u +%S)
-          NOW_HOUR=$(date -u +%H)
-          NOW_DOW=$(date -u +%u)  # 1=Mon..7=Sun
+          # The decision, in ET, from the day's close (scripts/chain_schedule.py;
+          # stdlib only). It prints "<action> <wait_seconds>". A malformed answer
+          # fails the chain loudly (notify-failure fires) rather than guessing;
+          # the backup crons keep ticking meanwhile.
+          read -r ACTION WAIT <<< "$(python scripts/chain_schedule.py --close-et "$CLOSE_ET")"
+          echo "Chain decision: ${ACTION} ${WAIT}s (close ${CLOSE_ET:-16:00 default} ET)"
+          case "$ACTION" in
+            stop)
+              echo "Weekend — stopping chain"
+              exit 0 ;;
+            eod)
+              # The EOD run itself won't re-trigger this chain job because the
+              # top-level `if:` excludes mode=end-of-day.
+              dispatch_eod_after "$WAIT"
+              exit 0 ;;
+            intraday) ;;
+            *)
+              echo "::error::chain_schedule.py returned '${ACTION} ${WAIT}'"
+              exit 1 ;;
+          esac
 
-          # Stop chain on weekends (shouldn't happen, but be safe)
-          if [ "$NOW_DOW" -gt 5 ]; then
-            echo "Weekend — stopping chain"
-            exit 0
-          fi
-
-          # Post-close: chain to the EOD wrap-up instead of another tick.
-          # The EOD run itself won't re-trigger this chain job because the
-          # top-level `if:` excludes mode=end-of-day.
-          if [ "$NOW_HOUR" -ge 20 ]; then
-            dispatch_eod
-            exit 0
-          fi
-
-          # Intraday path: sleep to the next 30-minute boundary (:00 or
-          # :30) + 30s buffer so the dispatch lands after the wall-clock
-          # minute rolls.
-          MIN_MOD=$(( 10#$NOW_MIN % 30 ))
-          WAIT=$(( (30 - MIN_MOD) * 60 - 10#$NOW_SEC + 30 ))
-          if [ "$WAIT" -lt 60 ]; then
-            WAIT=$(( WAIT + 1800 ))
-          fi
           echo "Sleeping ${WAIT}s until next tick..."
           sleep "$WAIT"
 
-          # If we crossed 20:00 UTC during the sleep, chain to EOD
-          # instead of dispatching another intraday.
-          POST_HOUR=$(date -u +%H)
-          if [ "$POST_HOUR" -ge 20 ]; then
-            echo "Crossed 20:00 UTC during sleep — chaining to EOD"
-            dispatch_eod
+          # Re-check after the sleep: the slot about to be dispatched must still
+          # start before the close. If not, chain to EOD instead.
+          if [ "$(python scripts/chain_schedule.py --close-et "$CLOSE_ET" --still-open)" != "true" ]; then
+            read -r _ACTION EOD_WAIT <<< "$(python scripts/chain_schedule.py --close-et "$CLOSE_ET")"
+            dispatch_eod_after "$EOD_WAIT"
             exit 0
           fi
 

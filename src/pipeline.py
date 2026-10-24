@@ -526,14 +526,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # used to bypass it but that let weekend/holiday "force" runs execute
     # trades on stale prices.
     # is_market_open_today() catches NYSE holidays via pandas-market-calendars;
-    # is_market_open_now() additionally enforces the 9:30-16:00 ET window.
+    # is_market_open_now() additionally enforces the day's own session window
+    # from the NYSE calendar (09:30-16:00 ET, or the early close, e.g. 13:00).
     if is_eod:
         if not is_market_open_today(run_date) and not force_trade:
             logger.info("Not a trading day — skipping EOD pass (use --force-trade to override)")
             return 0
     else:
         if not is_market_open_now(run_date) and not force_trade:
-            logger.info("Market closed (or outside 09:30-16:00 ET) — skipping intraday tick (use --force-trade to override)")
+            logger.info("Market closed (or outside today's NYSE session) — skipping intraday tick (use --force-trade to override)")
             return 0
 
     # --- Per-boundary idempotency guard (intraday only) ----------------------

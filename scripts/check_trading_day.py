@@ -17,7 +17,15 @@ to the backup crons, which is the harmful direction; a wasted holiday tick is
 benign. Diagnostics go to stderr via logging, never stdout (stdout is the
 value contract).
 
+With --close it prints the day's NYSE close instead, as ET wall-clock "HH:MM"
+(e.g. "13:00" on the 2026-11-27 early close), read from the same calendar via
+src.data.market_data.session_bounds. The chain job schedules its last intraday
+slot and the EOD dispatch from it. FAIL-OPEN to "16:00", a full session, which
+was the chain's behaviour before this flag existed; the pipeline's own
+is_market_open_now() stays the authority on whether a tick trades.
+
 Run:  python scripts/check_trading_day.py
+      python scripts/check_trading_day.py --close
 """
 from __future__ import annotations
 
@@ -33,7 +41,27 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO,
 logger = logging.getLogger("llmlab.trading_day_gate")
 
 
+def close_main() -> int:
+    try:
+        from zoneinfo import ZoneInfo
+
+        from src.data.market_data import session_bounds
+
+        et_now = datetime.now(ZoneInfo("America/New_York"))
+        bounds = session_bounds(et_now)
+        close = bounds[1].strftime("%H:%M") if bounds else "16:00"
+        logger.info("ET date %s -> NYSE close: %s%s", et_now.date(), close,
+                    "" if bounds else " (no session; default)")
+        print(close)
+    except Exception:
+        logger.exception("Session-close lookup failed — failing OPEN (16:00)")
+        print("16:00")
+    return 0
+
+
 def main() -> int:
+    if "--close" in sys.argv[1:]:
+        return close_main()
     try:
         from zoneinfo import ZoneInfo
 

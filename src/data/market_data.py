@@ -19,6 +19,10 @@ from ..config_loader import load_settings, universe_symbols
 logger = logging.getLogger("llmlab.data")
 
 EASTERN = ZoneInfo("America/New_York")
+# A FULL session's hours. Not the close of any particular day: early closes
+# (e.g. 13:00 ET on 2026-11-27 and 2026-12-24) come from the NYSE calendar via
+# session_bounds(). These constants are only the fallback when the calendar
+# package is unavailable.
 NYSE_OPEN = dtime(9, 30)
 NYSE_CLOSE = dtime(16, 0)
 
@@ -96,6 +100,29 @@ def get_latest_price(symbol: str, data: dict[str, pd.DataFrame] | None = None) -
         return None
 
 
+def session_bounds(reference: datetime | None = None) -> tuple[dtime, dtime] | None:
+    """(open, close) as ET wall-clock times for the NYSE session on the ET date
+    of `reference`, or None if that date has no session.
+
+    Read from the pandas_market_calendars NYSE schedule, so early closes are the
+    real close (13:00 ET on 2026-11-27), not 16:00. Without the calendar package
+    the fallback is the pre-2026-10-24 behaviour: weekdays are full sessions.
+    """
+    now = reference or datetime.now(EASTERN)
+    now = now.replace(tzinfo=EASTERN) if now.tzinfo is None else now.astimezone(EASTERN)
+    try:
+        import pandas_market_calendars as mcal
+    except ImportError:
+        return (NYSE_OPEN, NYSE_CLOSE) if now.weekday() < 5 else None
+    day = now.date()
+    sched = mcal.get_calendar("NYSE").schedule(start_date=day, end_date=day)
+    if sched.empty:
+        return None
+    row = sched.iloc[0]
+    return (row["market_open"].tz_convert(EASTERN).time(),
+            row["market_close"].tz_convert(EASTERN).time())
+
+
 def is_market_open_today(reference: datetime | None = None) -> bool:
     """True if today is a US trading day (NYSE)."""
     try:
@@ -114,9 +141,12 @@ def is_market_open_today(reference: datetime | None = None) -> bool:
 def is_market_open_now(reference: datetime | None = None) -> bool:
     """True if NYSE is open RIGHT NOW (intraday-aware).
 
-    Combines a holiday-aware day check with an ET time-of-day window of
-    9:30–16:00. Used by the intraday cron to skip silently outside hours
-    even when the cron itself is firing every 30 minutes UTC.
+    The window is the day's own session from the NYSE calendar
+    (session_bounds): 09:30-16:00 ET on a full day, 09:30-13:00 ET on an early
+    close. Until 2026-10-24 the close was a 16:00 constant, which would have run
+    roughly six decision cycles on stale prices after the 2026-11-27 early close.
+    Used by the intraday cron to skip silently outside hours even when the cron
+    itself is firing every 30 minutes UTC.
     """
     now = reference or datetime.now(EASTERN)
     if now.tzinfo is None:
@@ -124,11 +154,11 @@ def is_market_open_now(reference: datetime | None = None) -> bool:
     else:
         now = now.astimezone(EASTERN)
 
-    if not is_market_open_today(now):
+    bounds = session_bounds(now)
+    if bounds is None:
         return False
-
     t = now.timetz().replace(tzinfo=None)
-    return NYSE_OPEN <= t < NYSE_CLOSE
+    return bounds[0] <= t < bounds[1]
 
 
 def fetch_intraday_data(
