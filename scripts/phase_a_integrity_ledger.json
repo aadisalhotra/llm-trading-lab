@@ -1316,6 +1316,27 @@
         ],
         "corrections_at_landing": "Step 1 of docs/v4_landing_checklist.md, applied atomically: 2026-09-01 -> 2026-10-23 in the ledger hunk, prompts/CHANGELOG.md, src/prompt_builder.py, tests/test_v4_ablation.py and builder comments; scope all_six_models -> all_six_arms with the five-book live cohort named; the phantom 2026-08-08 / 2026-08-05 citations replaced by backing artifacts; the undated '(Research ruling)' in the builder pointed at docs/REPORT_SCHEMA.md and 374361688, and 'Shorting design ratified by Research + PI' in the v3 changelog entry pointed at 57cb14f4 / fff1b165 / shorting_activation and flagged as having no committed ratification artifact.",
         "relay_only": "v4's third component (EXECUTION MODE / PHASE removal) still rests on the hub relay of 2026-10-05 of a Research ruling delivered inline 2026-09-11; no committed artifact yet."
+      },
+      {
+        "id": "performance_history_unstable_sort_2026_10_21",
+        "date": "2026-10-23",
+        "type": "defect_record",
+        "scope": "data/performance readers (all six books)",
+        "defect": "src/analytics/performance.load_performance_history sorted by date with pandas' default quicksort, which is not stable. The launch window wrote duplicate-date rows (2026-04-08 x4, 04-09 x3, 04-10 x2, 04-13 x2 for five books; claude 04-09/10/13 x2), so the order of duplicates depended on file length. On the real logs they reorder once a book's file reaches 143 rows; the 2026-10-21 EOD tick (09f8fd25f) crossed it.",
+        "fix_commit": "e976c7de7 (kind=\"stable\"; regression test tests/test_performance_history_order.py, mutation-verified to fail at exactly 143 rows). Pushed 2026-10-24 in ad40230d9..3c666cf58.",
+        "gate_effect": "tests/test_reproduce_may_data_layer.py::test_reproduce_may_data_layer_exact was red on main from 09f8fd25f until the fix (May underwater drawdown, grok and deepseek point [1], ~4e-5). The committed May layer was never changed; only the rebuild disagreed. Nothing reported it: no automated job runs the suite.",
+        "published_output_effect": {
+          "artifact": "data/dashboard.json equity_curves",
+          "what": "gpt, gemini, grok and deepseek: the two 2026-04-10 points emitted in swapped order (same date, values $2-8 apart). claude and claude_opus unaffected (their duplicates did not reorder).",
+          "window": "from the 2026-10-21T21:07Z EOD tick (09f8fd25f) through the 2026-10-23T23:47Z EOD tick (ad40230d9). Every earlier dashboard.json checked (09f8fd25f~1, a95b6d741, b07727907) matches file order.",
+          "self_correction": "the first dashboard rebuild after the push restores file order: the first cron tick of Monday 2026-10-26 (no weekday cron runs on 10-24/25).",
+          "verified_unaffected": "build_leaderboard (every field identical under both sorts, computed 2026-10-24), the dashboard correlation matrix (identical), canonical_spy_series (duplicate SPY values on 04-10 and 04-13 coincide; the 04-09 anchor is pinned from spy_benchmark_anchor), and the published May/June/July monthly layers (built below the threshold, or reproduced exactly with the fix).",
+          "correction_to_the_hub_report": "Operations first reported that 'the dashboard and leaderboard outputs' used reordered rows. Measured: the leaderboard read reordered rows but emitted identical values; the dashboard equity curve is the only published output that changed."
+        },
+        "followups_open": [
+          "Duplicate launch-window rows: provenance and whether to resolve them at the source (assessment requested by the hub 2026-10-23).",
+          "No automated test run exists; scoping requested by the hub 2026-10-23."
+        ]
       }
     ]
   }
