@@ -40,13 +40,15 @@
   },
   "daily": {
     "date": "2026-10-27",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "api_failure:grok",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "news:LLY:8ccaf60d8f",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
@@ -60,6 +62,20 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-27T16:03:03.467926+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on LLY (held by 5)",
+        "timestamp": "2026-10-27T21:08:12.779563+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-10-27T21:08:16.423292+00:00",
         "disposition": "sent"
       }
     ]
