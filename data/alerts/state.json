@@ -39,43 +39,19 @@
     ]
   },
   "daily": {
-    "date": "2026-10-26",
-    "sent_count": 4,
+    "date": "2026-10-27",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "ath:claude",
-      "ath:gemini",
-      "budget:critical"
+      "api_failure:grok"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-10-26T15:03:18.999809+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Claude Sonnet 4.6 hit a new all-time high",
-        "timestamp": "2026-10-26T21:07:45.210312+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Gemini 3.1 Pro hit a new all-time high",
-        "timestamp": "2026-10-26T21:07:47.322602+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "budget",
-        "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "timestamp": "2026-10-26T21:07:50.745507+00:00",
+        "kind": "api_failure",
+        "severity": "WARN",
+        "title": "Model grok failed",
+        "timestamp": "2026-10-27T15:08:03.127121+00:00",
         "disposition": "sent"
       }
     ]
