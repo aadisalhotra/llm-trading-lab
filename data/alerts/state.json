@@ -40,9 +40,10 @@
   },
   "daily": {
     "date": "2026-10-27",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "api_failure:grok"
+      "api_failure:grok",
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -52,6 +53,13 @@
         "severity": "WARN",
         "title": "Model grok failed",
         "timestamp": "2026-10-27T15:08:03.127121+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-27T16:03:03.467926+00:00",
         "disposition": "sent"
       }
     ]
