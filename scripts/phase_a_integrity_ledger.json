@@ -1657,6 +1657,25 @@
           "enforcement_operated": "UNSETTLED_FUNDS blocks / UNSETTLED_FUNDS_CAPPED fills under v4: 2026-10-26 gemini 9/1, grok 0/1; 2026-10-27 gemini 10/1, grok 1/1, claude 1/0. Counted from data/trades/*_2026-10.jsonl executions[].constraint at origin/main 541c7c1ed."
         },
         "freeze": "The prompt freeze executes on the amended form. 2026-10-31 is a Saturday, so the effective freeze is Friday 2026-10-30. Sessions on the amended form before the freeze: 2026-10-28, 2026-10-29, 2026-10-30."
+      },
+      {
+        "id": "v4_component2_amendment_landed_and_boundary_limitation_2026_10_27",
+        "date": "2026-10-27",
+        "type": "landing_record_and_known_limitation",
+        "scope": "all_six_arms",
+        "amends_by_append": "operational_events.2026-10[v4_component2_rendering_amendment_2026_10_27]",
+        "landing": {
+          "origin_range": "541c7c1ed..00557e557",
+          "commit": "00557e557dd3cf9bbd911ac6b362ff8370d1e6fb",
+          "pushed": "2026-10-27 evening ET, on hub sign-off, before the first 2026-10-28 cycle; the single commit, origin/main had not moved since 541c7c1ed. first_effective_session 2026-10-28 therefore holds."
+        },
+        "dates_ruled": "Hub 2026-10-27: sessions on the amended form before the freeze are 2026-10-28, 2026-10-29, 2026-10-30; effective freeze Friday 2026-10-30. The relay's 'today's remainder' phrasing was wrong (2026-10-27's session had already closed).",
+        "authorship_ruled": "Hub 2026-10-27: the wording in docs/amendments/v4_component2_rendering_amendment.md section 3 is the registered wording unless Research replaces it. Research review is due Wednesday 2026-10-28, so a correction cannot land mid-verification.",
+        "known_limitation": {
+          "limitation": "The landed and amended forms of v4 are both stamped prompt_version v4, and decision records carry no prompt hash. The internal revision boundary is identified only by the ledger date (first_effective_session 2026-10-28).",
+          "scope": "Sufficient for this amendment, as hub-ruled 2026-10-27: it corrects implementation to registration intent rather than changing treatment, and no registered estimand stratifies below the regime level. It does not cover any future revision that changes treatment, or any analysis that would stratify within a regime.",
+          "follow_up": "Prompt hash on decision records: Phase B list. Does not land before the freeze."
+        }
       }
     ]
   }
