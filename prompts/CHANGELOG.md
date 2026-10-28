@@ -6,6 +6,7 @@ All changes to the universal trading prompt are logged here. Each version is sav
 **Author:** Aadi
 **Status:** Active (built 2026-08-11; landed 2026-10-23 after the close; first v4 session 2026-10-26, Phase B)
 **Supersedes:** v3 (active 2026-07-01 – 2026-10-23)
+**Revised:** 2026-10-27 — component-2 rendering amendment (internal revision, `prompt_version` stays v4; first amended session 2026-10-28). See "Revision 2026-10-27" below.
 
 Phase B is long-only because the 2026-10-15 branch decision selected the cash branch
 (ledger `operational_events.2026-10[branch_decision_cash_long_only_v4]`). A cash account
@@ -34,7 +35,8 @@ it is **superseded** (2026-10-05) by the committed two-component declaration in
 `docs/prereg/tier2_novel_sections.md` T2.4, now three. Each component is verified on
 its own, and any fourth fails verification:
 
-1. **Shorting ablation — mechanical.** `v4.txt` with its one settlement line removed is
+1. **Shorting ablation — mechanical.** `v4.txt` with its component-2 edits reverted (the one
+   settlement line removed; since 2026-10-27 also the three cash-sweep passages restored) is
    byte-identical to the v2 blob committed at `57cb14f4`
    (sha256 as stored, LF: `963e726207feec3d07934b4df80b28a4388c8b86145226d031a03e5887534f11`).
    This keeps the June certification: had any hunk of the v2→v3 diff been non-shorting,
@@ -46,6 +48,8 @@ its own, and any fourth fails verification:
    `settlement_split`), and `v4.txt` carries **one** neutral sentence, the last hard limit:
    "Purchases may use only your settled cash; the proceeds of a sale become settled cash
    one trading day after the sale." Rule statement only, no strategy guidance.
+   Amended 2026-10-27 (see "Revision 2026-10-27" below): settled cash leads the block as the
+   deployable figure, and the decision guidance on cash denotes settled cash.
 3. **Environment-mode metadata removed** — the `EXECUTION MODE` and `PHASE` header lines
    (hub relay 2026-10-05 of a Research ruling delivered inline 2026-09-11; **relay-only,
    no committed artifact**). Gated: v4 omits them; on the migration branch the same
@@ -54,7 +58,8 @@ its own, and any fourth fails verification:
    selected, and there the v4 flip itself is the removal.) Until then v1–v3 render the lines
    exactly as before.
 
-`v4.txt` sha256 (as stored, LF): `5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07`. Re-checkable at any time by
+`v4.txt` sha256 (as stored, LF): `fbba04e1a558bab43cb35a52a22f5935dc16e5ddbf9e514889fdcc56f331e703` since the
+2026-10-27 revision; as landed 2026-10-23, `5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07`. Re-checkable at any time by
 `tests/test_v4_ablation.py`, which renders v2 and v4 with the real templates and fails on
 **any** difference beyond these three components, rather than trusting this note.
 A v4 prompt also refuses to build while settled-funds enforcement is off
@@ -91,6 +96,26 @@ every open short (`Executor.force_liquidate` already covers rather than sells a 
 position). **Executed 2026-10-23:** two sweeps, four covers on Gemini's book at live prices
 under v3 (`scripts/boundary_force_cover.py`, reason `BOUNDARY_ADMIN`); see ledger
 `operational_events.2026-10[v4_boundary_force_cover_2026_10_23]`.
+
+**Revision 2026-10-27 — component-2 rendering amendment.** Governing memo:
+`docs/amendments/v4_component2_rendering_amendment.md` (Research ruling relayed by the hub on
+the 2026-10-26 rendering finding). As landed, the portfolio block led with total `Cash: $X (y%)`
+and the guidance said "cash" unqualified, so it pointed at a figure the settled-funds rule makes
+non-deployable whenever proceeds are unsettled. Implementation corrected to registration intent,
+not a treatment change; not a fourth component.
+1. **Salience inversion:** `Settled cash (deployable): $X (y%)` is the first cash line and the only
+   one with a percent; `Total cash` and `Unsettled cash` follow as bare amounts.
+2. **Consistency sweep:** the "What you receive" bullet, "Cash as a position" and the Output-format
+   cash-rationale bullet in `v4.txt`, plus the `cash_rationale` line of the JSON appendix (new
+   `V4_OUTPUT_SCHEMA`, derived from `V2_OUTPUT_SCHEMA` with that one line replaced; v2's appendix
+   untouched), now denote settled cash.
+3. **Pinned rendering:** `tests/test_v4_ablation.py::test_v4_cash_block_renders_exactly` (and the
+   same pin through `build_prompts`).
+
+`prompt_version` stays v4. Internal revision boundary in the ledger,
+`operational_events.2026-10[v4_component2_rendering_amendment_2026_10_27]`: 10-26 and 10-27
+ran the landed form and are the smoke-segment verification record, not behavioral data;
+the amended form runs from 10-28. The freeze (effective Friday 2026-10-30) executes on it.
 
 ## v3 — effective 2026-07-01
 **Author:** Aadi

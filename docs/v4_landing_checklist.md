@@ -39,6 +39,8 @@ Every step below that edits a blob-checked file **moves its blob**; re-certify w
 
 T2.4 component 2, to the registered spec and nothing beyond: the state schema splits cash into settled and unsettled (`prompt_builder._format_portfolio_block(..., settlement_split=True)`, keys from `Portfolio.snapshot()`), and `prompts/v4.txt` carries **one** neutral sentence as the last hard limit: "Purchases may use only your settled cash; the proceeds of a sale become settled cash one trading day after the sale." ("trading day" is accurate: settlement uses the NYSE calendar.) A second sentence is a fourth component and fails verification — pinned by test.
 
+**Amended 2026-10-27** (`docs/amendments/v4_component2_rendering_amendment.md`): component 2's spec now also puts settled cash first as the deployable figure (`Settled cash (deployable): $X (y%)`, then `Total cash` and `Unsettled cash` as bare amounts) and points every decision-guidance reference to cash at settled cash (three `v4.txt` passages plus the appendix `cash_rationale` line, `V4_OUTPUT_SCHEMA`). The one-sentence rule above is unchanged; the cash-sweep wording is not a second rule sentence.
+
 Not in the spec, added as a safety check (veto-able): a v4 prompt **refuses to build** (`SettlementPromptMismatchError`) while settled-funds enforcement is off, so the prompt can never state a rule the simulator is not enforcing. It makes v4's activation and the settlement flag one event — see Part C.
 
 ## Step 1 — correct the never-occurred 2026-09-01 flip: ONE ATOMIC STEP (hub, 2026-10-05)

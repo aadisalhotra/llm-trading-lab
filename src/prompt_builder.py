@@ -69,7 +69,12 @@ def uses_per_ticker_last_action(version: str) -> bool:
 #   2. the settlement representation -- THIS registry: the portfolio block splits
 #      cash into settled and unsettled balances, and prompts/v4.txt carries ONE
 #      neutral sentence stating the settled-funds purchase rule (rule statement
-#      only, no strategy guidance);
+#      only, no strategy guidance). Amended 2026-10-27 (implementation corrected
+#      to registration intent, docs/amendments/v4_component2_rendering_amendment.md):
+#      settled cash leads the block as the deployable figure, and every decision-
+#      guidance reference to cash -- in prompts/v4.txt and in V4_OUTPUT_SCHEMA's
+#      cash_rationale -- denotes settled cash, so rule, state and guidance point
+#      at one figure;
 #   3. the removal of the environment-mode metadata -- the EXECUTION MODE and
 #      PHASE header lines (hub relay 2026-10-05 of a Research ruling delivered
 #      inline 2026-09-11; no committed artifact exists yet).
@@ -192,12 +197,20 @@ def _format_portfolio_block(portfolio_state: dict[str, Any], max_positions: int,
                             settlement_split: bool = False) -> str:
     lines = ["YOUR CURRENT PORTFOLIO STATE:"]
     lines.append(f"  Total value:   ${portfolio_state['total_value']:,.2f}")
-    lines.append(f"  Cash:          ${portfolio_state['cash']:,.2f} ({portfolio_state['cash_pct']*100:.1f}%)")
     if settlement_split:
-        # v4 component 2 (state-schema half): cash split into settled and
-        # unsettled balances. Keys come from Portfolio.snapshot().
-        lines.append(f"  Settled cash:   ${portfolio_state['settled_cash']:,.2f}")
+        # v4 component 2 (state-schema half), as amended 2026-10-27
+        # (docs/amendments/v4_component2_rendering_amendment.md): settled cash is
+        # the first cash line, labeled deployable, and alone carries the
+        # percent-of-book figure -- it is the only cash the purchase rule lets a
+        # model spend. Total and unsettled follow as bare informational amounts.
+        # Keys come from Portfolio.snapshot(). Pinned literally by
+        # tests/test_v4_ablation.py::test_v4_cash_block_renders_exactly.
+        lines.append(f"  Settled cash (deployable): ${portfolio_state['settled_cash']:,.2f} "
+                     f"({portfolio_state['settled_cash_pct']*100:.1f}%)")
+        lines.append(f"  Total cash:     ${portfolio_state['cash']:,.2f}")
         lines.append(f"  Unsettled cash: ${portfolio_state['unsettled_cash']:,.2f}")
+    else:
+        lines.append(f"  Cash:          ${portfolio_state['cash']:,.2f} ({portfolio_state['cash_pct']*100:.1f}%)")
     lines.append(f"  Open positions: {len(portfolio_state['holdings'])} / {max_positions} max")
     if portfolio_state["holdings"]:
         lines.append("")
@@ -618,12 +631,35 @@ Notes:
 _SHORTING_PROMPT_MAJORS = frozenset({3})
 
 
+# v4 output-format JSON contract: V2_OUTPUT_SCHEMA with ONE line changed -- the
+# `cash_rationale` description, which under the v4 component-2 amendment
+# (2026-10-27, docs/amendments/v4_component2_rendering_amendment.md) must denote
+# settled cash, the figure the purchase rule makes deployable. Derived from the v2
+# constant rather than copied so the two cannot drift anywhere else; v2 itself is
+# untouched. Selected for `_SETTLEMENT_REPRESENTATION_MAJORS`.
+_V2_CASH_RATIONALE_LINE = (
+    '  "cash_rationale": "<why your current cash level is a deliberate choice; '
+    'required when cash is near zero or unusually high, otherwise null>",'
+)
+_V4_CASH_RATIONALE_LINE = (
+    '  "cash_rationale": "<why your current settled (deployable) cash level is a '
+    'deliberate choice; required when settled cash is near zero or unusually high, '
+    'otherwise null>",'
+)
+if V2_OUTPUT_SCHEMA.count(_V2_CASH_RATIONALE_LINE) != 1:
+    raise RuntimeError("V2_OUTPUT_SCHEMA no longer carries the cash_rationale line "
+                       "V4_OUTPUT_SCHEMA is derived from; re-derive it deliberately")
+V4_OUTPUT_SCHEMA = V2_OUTPUT_SCHEMA.replace(_V2_CASH_RATIONALE_LINE, _V4_CASH_RATIONALE_LINE)
+
+
 def _output_schema_for(version: str) -> str | None:
     """The authoritative JSON output-schema appendix for a prompt version.
 
     Shorting-regime versions (see `_SHORTING_PROMPT_MAJORS`) use the
-    shorting-aware schema (adds SHORT/COVER); every other v2+ version uses the
-    long-only schema; v1 carries its own in-template schema and gets no appendix.
+    shorting-aware schema (adds SHORT/COVER); settlement-representation versions
+    (v4) use the long-only schema with the settled-cash `cash_rationale` line;
+    every other v2+ version uses the long-only schema; v1 carries its own
+    in-template schema and gets no appendix.
     An unrecognized future major therefore falls back to long-only — the safe
     direction, since an unwanted long-only appendix suppresses shorts visibly
     while an unwanted shorting appendix silently invites rejected trades.
@@ -631,6 +667,8 @@ def _output_schema_for(version: str) -> str | None:
     major = _prompt_major_version(version)
     if major in _SHORTING_PROMPT_MAJORS:
         return V3_OUTPUT_SCHEMA
+    if major in _SETTLEMENT_REPRESENTATION_MAJORS:
+        return V4_OUTPUT_SCHEMA
     if major >= 2:
         return V2_OUTPUT_SCHEMA
     return None

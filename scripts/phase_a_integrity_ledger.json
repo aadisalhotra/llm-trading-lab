@@ -1622,6 +1622,41 @@
           "item": "Gate strictness is inverted: the exact gate runs on CPython 3.14, which production never runs; the tolerant gate runs on 3.11, which production does run.",
           "status": "Assessment delivered to the hub 2026-10-24; to land after the cutover work. Not changed here."
         }
+      },
+      {
+        "id": "v4_component2_rendering_amendment_2026_10_27",
+        "date": "2026-10-27",
+        "type": "prompt_internal_revision",
+        "scope": "all_six_arms",
+        "boundary": "regime_boundaries.phase_b_long_only",
+        "prompt_version": "v4",
+        "authority": "Research ruling relayed by the hub 2026-10-27, on Operations' 2026-10-26 rendering finding. Governing memo: docs/amendments/v4_component2_rendering_amendment.md. The relay named that path but carried no memo body; the file records the ruling as relayed plus the exact implemented wording, which is Operations' and subject to correction by append if Research's own text differs.",
+        "classification": "Implementation corrected to registration intent, NOT a treatment change. Amends component 2's content and spec under T2.4 (docs/prereg/tier2_novel_sections.md, Amendment 2026-10-27, row 10). The three-component verification rule stands; this is not a fourth component.",
+        "internal_revision_boundary": "The v4 segment (regime_boundaries.phase_b_long_only, first_effective_session 2026-10-26) is split internally: 2026-10-26 and 2026-10-27 ran the landed form; 2026-10-28 onward runs the amended form. prompt_version stays v4, so the record stamps do NOT distinguish the two forms and no decision record carries a prompt hash: the boundary is this entry's date, not a stamp. It holds only if the landing reaches origin/main before the first 2026-10-28 cycle. If it does not, the boundary is corrected by a later append, not by editing this entry.",
+        "landed": "2026-10-27, after the close and after the last 2026-10-27 decision cycle; landing commit = the commit that adds this entry.",
+        "first_effective_session": "2026-10-28",
+        "pre_revision_sessions": [
+          "2026-10-26",
+          "2026-10-27"
+        ],
+        "pre": {
+          "prompts/v4.txt_sha256_lf": "5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07",
+          "cash_block": "Cash: $X (y%) first (TOTAL cash, carrying the percent-of-book figure); 'Settled cash: $X' and 'Unsettled cash: $X' after it as bare amounts",
+          "decision_guidance": "'cash' unqualified in the What-you-receive bullet, the Cash-as-a-position section, the Output-format cash-rationale bullet and the JSON appendix cash_rationale line (V2_OUTPUT_SCHEMA)"
+        },
+        "post": {
+          "prompts/v4.txt_sha256_lf": "fbba04e1a558bab43cb35a52a22f5935dc16e5ddbf9e514889fdcc56f331e703",
+          "cash_block": "'Settled cash (deployable): $X (y%)' first, the only line with a percent (snapshot settled_cash_pct); then 'Total cash: $X' and 'Unsettled cash: $X' as bare amounts. Pinned literally by tests/test_v4_ablation.py::test_v4_cash_block_renders_exactly.",
+          "decision_guidance": "the same four sites denote settled (deployable) cash; the appendix is V4_OUTPUT_SCHEMA = V2_OUTPUT_SCHEMA with the cash_rationale line replaced (v2 untouched). Distinction-neutral and left unchanged: 'Cash is a position. Holding it forgoes expected return', 'There is no required cash level', '(no open positions — 100% cash)'."
+        },
+        "verification": "tests/test_v4_ablation.py: component 1 = v4.txt with the registered component-2 edits reverted (rule line removed, three cash-sweep passages restored) equals the v2 blob at 57cb14f4 byte for byte; component 2 = the rule is one neutral sentence and the last hard limit, each sweep passage names settled cash with v2's sentence count and no added guidance vocabulary, and the appendix differs from V2_OUTPUT_SCHEMA in exactly one line; the v2-vs-v4 render differs by nothing beyond the three components, and an injected fourth still fails.",
+        "smoke_segment_verification_record": {
+          "status": "Verification record of the smoke segment. EXPLICITLY NOT BEHAVIORAL DATA: no metric, RQ or comparison treats 2026-10-26 / 2026-10-27 as observations of model behavior under the registered instrument. The figures below show only that the instrument and the enforcement operated, and where the landed rendering diverged from the rule.",
+          "finding_2026_10_26": "Both component-2 halves were present but the instrument was internally inconsistent: the salient cash figure (total, with percent) was not deployable under the rule the prompt states, and the decision guidance pointed at it. No test asserted the rendered cash block.",
+          "rendering_divergence_observed": "Post-cycle snapshots (portfolio_after, which the next cycle renders) with total cash > settled cash: 2026-10-26 gemini 13/13 (max total $41,894.19 = 30.7% of book, settled $0.02), grok 9/13; 2026-10-27 gemini 13/13 (max $53,098.70 = 39.0%, settled $0.05), grok 7/13, claude 12/13; claude_opus, gpt, deepseek 0 on both days.",
+          "enforcement_operated": "UNSETTLED_FUNDS blocks / UNSETTLED_FUNDS_CAPPED fills under v4: 2026-10-26 gemini 9/1, grok 0/1; 2026-10-27 gemini 10/1, grok 1/1, claude 1/0. Counted from data/trades/*_2026-10.jsonl executions[].constraint at origin/main 541c7c1ed."
+        },
+        "freeze": "The prompt freeze executes on the amended form. 2026-10-31 is a Saturday, so the effective freeze is Friday 2026-10-30. Sessions on the amended form before the freeze: 2026-10-28, 2026-10-29, 2026-10-30."
       }
     ]
   }

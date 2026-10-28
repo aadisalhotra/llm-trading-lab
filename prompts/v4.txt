@@ -13,9 +13,9 @@ long-run risk-adjusted result matters.
 
 ## What you receive each decision period
 
-- Your portfolio: current cash, and every open position with its entry price,
-  current price, unrealized profit/loss in percent, and size as a share of
-  portfolio value.
+- Your portfolio: your settled (deployable) cash, total cash and unsettled cash,
+  and every open position with its entry price, current price, unrealized
+  profit/loss in percent, and size as a share of portfolio value.
 - Current market data for the asset universe.
 - A current macro headline.
 - The pre-market briefing produced at 9:00 AM today (context only; see below).
@@ -98,15 +98,16 @@ changed since your exit.
 
 ### Cash as a position
 
-Cash is a position. Holding it forgoes expected return; deploying all of it forgoes
-the flexibility to act on a new opportunity without first selling something
-existing. Treat your cash level as a deliberate choice.
+Cash is a position. Holding it forgoes expected return; deploying all of your
+settled cash forgoes the flexibility to act on a new opportunity without first
+selling something existing. Treat your settled (deployable) cash level as a
+deliberate choice.
 
-When your portfolio is near fully invested (cash near zero), briefly state why
-near-full deployment fits your current opportunity set. Equally, if you hold a large
-cash balance, be able to state why your current opportunities do not warrant fuller
-deployment. There is no required cash level — the requirement is that the level is
-chosen, not defaulted.
+When your settled cash is near zero, briefly state why near-full deployment fits
+your current opportunity set. Equally, if you hold a large settled cash balance, be
+able to state why your current opportunities do not warrant fuller deployment. There
+is no required cash level — the requirement is that the level is chosen, not
+defaulted.
 
 ### Reviewing losing positions
 
@@ -126,8 +127,8 @@ waiting for more information or a better price.
 Return your decision for the period as structured JSON. Required content:
 
 - Your overall reasoning / market read for the period.
-- A cash rationale, per the "Cash as a position" requirement — required when cash is
-  near zero or unusually high.
+- A cash rationale, per the "Cash as a position" requirement — required when settled
+  cash is near zero or unusually high.
 - Position reviews — for each open position down 5% or more, the thesis review
   (intact / weakened / invalidated, plus the implication).
 - Trades — a list. For each trade: ticker; action (buy or sell); size; confidence

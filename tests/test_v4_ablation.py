@@ -6,7 +6,10 @@ components (docs/prereg/tier2_novel_sections.md, T2.4, amended):
      committed v2->v3 shorting diff, never hand-edited from v3;
   2. the settlement representation -- the portfolio block splits cash into settled
      and unsettled balances, and the prompt carries ONE neutral sentence stating
-     the settled-funds purchase rule;
+     the settled-funds purchase rule; amended 2026-10-27
+     (docs/amendments/v4_component2_rendering_amendment.md): settled cash leads the
+     block as the deployable figure, the decision guidance on cash denotes settled
+     cash (CASH_SWEEP_EDITS + V4_OUTPUT_SCHEMA), and the cash block is pinned;
   3. the removal of the environment-mode header lines (EXECUTION MODE / PHASE).
 Any further component fails verification. The earlier safety argument ("v4 is
 byte-identical to v2, so it contains no novel language") held only until
@@ -40,6 +43,7 @@ from src import prompt_builder as pb  # noqa: E402
 from src.prompt_builder import (  # noqa: E402
     V2_OUTPUT_SCHEMA,
     V3_OUTPUT_SCHEMA,
+    V4_OUTPUT_SCHEMA,
     SettlementPromptMismatchError,
     _environment_lines,
     _format_portfolio_block,
@@ -81,6 +85,72 @@ HALTS_LINE = "- Trading halts if the portfolio draws down 30% from its peak valu
 GUIDANCE_WORDS = ("should", "avoid", "prefer", "consider", "recommend", "best",
                   "ideally", "try to", "make sure", "you ought")
 
+# Component 2, consistency sweep (amendment 2026-10-27,
+# docs/amendments/v4_component2_rendering_amendment.md, element 2): every
+# decision-guidance reference to cash in the template denotes settled
+# (deployable) cash. Each pair is (v2 passage, v4 passage), quoted exactly; these
+# and the rule line are the ONLY template differences component 2 may make.
+CASH_SWEEP_EDITS = (
+    (  # "What you receive"
+        "- Your portfolio: current cash, and every open position with its entry price,\n"
+        "  current price, unrealized profit/loss in percent, and size as a share of\n"
+        "  portfolio value.\n",
+        "- Your portfolio: your settled (deployable) cash, total cash and unsettled cash,\n"
+        "  and every open position with its entry price, current price, unrealized\n"
+        "  profit/loss in percent, and size as a share of portfolio value.\n",
+    ),
+    (  # "Cash as a position"
+        "Cash is a position. Holding it forgoes expected return; deploying all of it forgoes\n"
+        "the flexibility to act on a new opportunity without first selling something\n"
+        "existing. Treat your cash level as a deliberate choice.\n"
+        "\n"
+        "When your portfolio is near fully invested (cash near zero), briefly state why\n"
+        "near-full deployment fits your current opportunity set. Equally, if you hold a large\n"
+        "cash balance, be able to state why your current opportunities do not warrant fuller\n"
+        "deployment. There is no required cash level — the requirement is that the level is\n"
+        "chosen, not defaulted.\n",
+        "Cash is a position. Holding it forgoes expected return; deploying all of your\n"
+        "settled cash forgoes the flexibility to act on a new opportunity without first\n"
+        "selling something existing. Treat your settled (deployable) cash level as a\n"
+        "deliberate choice.\n"
+        "\n"
+        "When your settled cash is near zero, briefly state why near-full deployment fits\n"
+        "your current opportunity set. Equally, if you hold a large settled cash balance, be\n"
+        "able to state why your current opportunities do not warrant fuller deployment. There\n"
+        "is no required cash level — the requirement is that the level is chosen, not\n"
+        "defaulted.\n",
+    ),
+    (  # the cash_rationale requirement, Output format
+        "- A cash rationale, per the \"Cash as a position\" requirement — required when cash is\n"
+        "  near zero or unusually high.\n",
+        "- A cash rationale, per the \"Cash as a position\" requirement — required when settled\n"
+        "  cash is near zero or unusually high.\n",
+    ),
+)
+
+# Component 2, salience inversion (amendment element 1) and pinned rendering
+# (element 3): the literal cash block a v4 model receives for a known state.
+PINNED_STATE = {"total_value": 2000.0, "cash": 1500.0, "cash_pct": 0.75,
+                "settled_cash": 1100.0, "unsettled_cash": 400.0,
+                "settled_cash_pct": 0.55, "holdings": []}
+PINNED_V4_CASH_BLOCK = (
+    "YOUR CURRENT PORTFOLIO STATE:\n"
+    "  Total value:   $2,000.00\n"
+    "  Settled cash (deployable): $1,100.00 (55.0%)\n"
+    "  Total cash:     $1,500.00\n"
+    "  Unsettled cash: $400.00\n"
+    "  Open positions: 0 / 50 max\n"
+    "  (no open positions — 100% cash)"
+)
+V2_CASH_LINE_PREFIX = "  Cash:          $"
+V4_CASH_LINE_PREFIXES = ("  Settled cash (deployable): $", "  Total cash:     $",
+                         "  Unsettled cash: $")
+
+
+def _sweep_lines(side: int) -> set[str]:
+    """Every line of the registered sweep passages on one side (0 = v2, 1 = v4)."""
+    return {l for pair in CASH_SWEEP_EDITS for l in pair[side].split("\n") if l}
+
 
 def _norm(b: bytes) -> bytes:
     """EOL-normalize. The repo is core.autocrlf=true: blobs are LF, checkouts CRLF."""
@@ -105,22 +175,34 @@ def _v4_text() -> str:
     return _norm((PROMPTS / "v4.txt").read_bytes()).decode("utf-8")
 
 
-def test_component_1_shorting_ablation_is_mechanically_v2():
-    """Component 1. Remove the one settlement line and v4 must equal the v2 that
-    the inverted diff was computed against, byte for byte. A delta here is an
-    ablation error or a non-shorting change smuggled into v3 back in June -- a
-    HALT condition, not something to absorb."""
-    v4 = _v4_text()
+def _revert_component_2(v4: str) -> str:
+    """v4 with every registered component-2 template edit undone."""
     assert v4.count(SETTLEMENT_RULE_LINE + "\n") == 1
-    assert v4.replace(SETTLEMENT_RULE_LINE + "\n", "") == _v2_at_v3_commit()
+    out = v4.replace(SETTLEMENT_RULE_LINE + "\n", "")
+    for v2_passage, v4_passage in CASH_SWEEP_EDITS:
+        assert out.count(v4_passage) == 1, f"sweep passage not found exactly once: {v4_passage[:60]!r}"
+        out = out.replace(v4_passage, v2_passage)
+    return out
+
+
+def test_component_1_shorting_ablation_is_mechanically_v2():
+    """Component 1. Undo the registered component-2 edits (the rule line and the
+    three cash-sweep passages) and v4 must equal the v2 that the inverted diff was
+    computed against, byte for byte. A delta here is an ablation error or a
+    non-shorting change smuggled into v3 back in June -- a HALT condition, not
+    something to absorb."""
+    assert _revert_component_2(_v4_text()) == _v2_at_v3_commit()
 
 
 def test_component_2_settlement_rule_is_exactly_one_neutral_sentence():
-    """Component 2 (prompt half). The diff against v2 is ONE inserted line, it is
-    the registered sentence, it sits directly after the last hard limit, and it is
-    a rule statement with no strategy guidance. A second sentence is a fourth
-    component and fails verification."""
-    v2, v4 = _v2_at_v3_commit().split("\n"), _v4_text().split("\n")
+    """Component 2 (rule statement). With the cash sweep set aside, the diff
+    against v2 is ONE inserted line, it is the registered sentence, it sits
+    directly after the last hard limit, and it is a rule statement with no
+    strategy guidance. A second sentence is a fourth component and fails."""
+    v4_sans_sweep = _v4_text()
+    for v2_passage, v4_passage in CASH_SWEEP_EDITS:
+        v4_sans_sweep = v4_sans_sweep.replace(v4_passage, v2_passage)
+    v2, v4 = _v2_at_v3_commit().split("\n"), v4_sans_sweep.split("\n")
     ops = [op for op in difflib.SequenceMatcher(None, v2, v4).get_opcodes() if op[0] != "equal"]
     assert len(ops) == 1 and ops[0][0] == "insert" and ops[0][4] - ops[0][3] == 1, ops
     inserted = v4[ops[0][3]]
@@ -131,16 +213,50 @@ def test_component_2_settlement_rule_is_exactly_one_neutral_sentence():
     assert not any(w in inserted.lower() for w in GUIDANCE_WORDS), "rule statement only"
 
 
-def test_component_2_state_schema_splits_cash_into_settled_and_unsettled():
-    state = {"total_value": 2000.0, "cash": 1500.0, "cash_pct": 0.75,
-             "settled_cash": 1100.0, "unsettled_cash": 400.0, "holdings": []}
-    plain = _format_portfolio_block(state, 50).split("\n")
-    split = _format_portfolio_block(state, 50, settlement_split=True).split("\n")
-    assert [l for l in split if l not in plain] == [
-        "  Settled cash:   $1,100.00", "  Unsettled cash: $400.00"]
-    assert [l for l in plain if l not in split] == []
+def test_component_2_cash_sweep_points_guidance_at_settled_cash_and_adds_no_guidance():
+    """Amendment element 2. Each swept passage names settled cash, adds no
+    strategy-guidance vocabulary, and keeps v2's sentence count (wording is
+    re-pointed, never extended). The schema's cash_rationale line is the one
+    code-side member of the sweep."""
+    for v2_passage, v4_passage in CASH_SWEEP_EDITS:
+        assert "settled" in v4_passage and "settled" not in v2_passage
+        for w in GUIDANCE_WORDS:
+            assert v4_passage.lower().count(w) == v2_passage.lower().count(w), w
+        assert v4_passage.count(".") == v2_passage.count(".")
+    v2_schema, v4_schema = V2_OUTPUT_SCHEMA.split("\n"), V4_OUTPUT_SCHEMA.split("\n")
+    changed = [(a, b) for a, b in zip(v2_schema, v4_schema) if a != b]
+    assert len(v2_schema) == len(v4_schema) and len(changed) == 1
+    assert changed[0][0].startswith('  "cash_rationale":') and "settled" in changed[0][1]
+
+
+def test_component_2_state_schema_settled_cash_leads_as_the_deployable_figure():
+    """Amendment element 1. Settled cash is the first cash line and the only one
+    with a percent-of-book figure; total and unsettled follow as bare amounts.
+    v1-v3 keep the single Cash line unchanged."""
+    plain = _format_portfolio_block(PINNED_STATE, 50).split("\n")
+    split = _format_portfolio_block(PINNED_STATE, 50, settlement_split=True).split("\n")
+    assert [l for l in plain if l not in split] == ["  Cash:          $1,500.00 (75.0%)"]
+    added = [l for l in split if l not in plain]
+    assert added == ["  Settled cash (deployable): $1,100.00 (55.0%)",
+                     "  Total cash:     $1,500.00", "  Unsettled cash: $400.00"]
+    assert "%" in added[0] and not any("%" in l for l in added[1:])
+    assert split.index(added[0]) == 2, "settled cash is the first cash line"
     assert shows_settlement_split("v4") and shows_settlement_split("v4.0")
     assert not any(shows_settlement_split(v) for v in ("v1", "v2", "v3"))
+
+
+def test_v4_cash_block_renders_exactly():
+    """Amendment element 3: the literal rendered cash block, pinned. Any change to
+    labels, order, spacing or which line carries the percent fails here."""
+    assert _format_portfolio_block(PINNED_STATE, 50, settlement_split=True) == PINNED_V4_CASH_BLOCK
+
+
+def test_v4_cash_block_renders_exactly_in_the_full_user_prompt(monkeypatch):
+    """The same pin, through build_prompts with the real template: what a v4 model
+    actually receives, not just the helper's output."""
+    _system, user = _render(monkeypatch, "v4", state=PINNED_STATE)
+    assert PINNED_V4_CASH_BLOCK in user
+    assert "  Cash:          $" not in user
 
 
 def test_component_3_environment_lines_removed_for_v4_and_only_by_a_signed_off_event_elsewhere():
@@ -166,7 +282,7 @@ def _mkdf(base):
         index=pd.date_range("2026-04-01", periods=30, freq="D"))
 
 
-def _render(monkeypatch, version, template_hook=None, enforce=True, extra=None):
+def _render(monkeypatch, version, template_hook=None, enforce=True, extra=None, state=None):
     """(system, user) as a model receives them, with the REAL templates."""
     settings = {
         "prompt_version": version, "mode": "broker_paper", "phase": "Phase A - Paper Trading",
@@ -179,10 +295,10 @@ def _render(monkeypatch, version, template_hook=None, enforce=True, extra=None):
         real = pb.load_prompt_template
         monkeypatch.setattr(pb, "load_prompt_template", lambda v: template_hook(real(v)))
     tickers = ["AAPL", "TSLA", "MSFT"]
-    state = {"total_value": 2000.0, "cash": 1500.0, "cash_pct": 0.75,
-             "settled_cash": 1100.0, "unsettled_cash": 400.0,
-             "holdings": [{"ticker": "AAPL", "shares": 2.0, "avg_cost": 178.0,
-                           "current_price": 180.0, "weight": 0.18, "unrealized_pl_pct": 0.011}]}
+    state = state or {"total_value": 2000.0, "cash": 1500.0, "cash_pct": 0.75,
+                      "settled_cash": 1100.0, "unsettled_cash": 400.0, "settled_cash_pct": 0.55,
+                      "holdings": [{"ticker": "AAPL", "shares": 2.0, "avg_cost": 178.0,
+                                    "current_price": 180.0, "weight": 0.18, "unrealized_pl_pct": 0.011}]}
     system, user, _v, _i = build_prompts(
         state, {t: _mkdf(b) for t, b in zip(tickers, [180, 250, 420])},
         datetime(2026, 10, 16, 9, 35), shortlisted_symbols=tickers, recent_decisions=[],
@@ -195,19 +311,28 @@ def _line_delta(a: str, b: str):
     return ([l[2:] for l in d if l.startswith("- ")], [l[2:] for l in d if l.startswith("+ ")])
 
 
+def _schema_delta_rows() -> list[int]:
+    a, b = V2_OUTPUT_SCHEMA.split("\n"), V4_OUTPUT_SCHEMA.split("\n")
+    return [i for i, (x, y) in enumerate(zip(a, b)) if x != y]
+
+
 def _fourth_component_violations(v2_render, v4_render):
     """Everything that differs between v2 and v4 renders beyond the three registered
     components. Empty means verified."""
     (v2s, v2u), (v4s, v4u) = v2_render, v4_render
     bad = []
     sys_removed, sys_added = _line_delta(v2s, v4s)
-    bad += [("system -", l) for l in sys_removed]
-    bad += [("system +", l) for l in sys_added if l != SETTLEMENT_RULE_LINE]
+    # component 2: the rule line, the registered cash-sweep passages, and the
+    # appendix's one cash_rationale line (V2 -> V4 output schema)
+    v2_ok = _sweep_lines(0) | {V2_OUTPUT_SCHEMA.split("\n")[i] for i in _schema_delta_rows()}
+    v4_ok = _sweep_lines(1) | {V4_OUTPUT_SCHEMA.split("\n")[i] for i in _schema_delta_rows()}
+    bad += [("system -", l) for l in sys_removed if l not in v2_ok]
+    bad += [("system +", l) for l in sys_added if l != SETTLEMENT_RULE_LINE and l not in v4_ok]
     usr_removed, usr_added = _line_delta(v2u, v4u)
     bad += [("user -", l) for l in usr_removed
-            if not (l.startswith("EXECUTION MODE: ") or l.startswith("PHASE: "))]
-    bad += [("user +", l) for l in usr_added
-            if not (l.startswith("  Settled cash:") or l.startswith("  Unsettled cash:"))]
+            if not (l.startswith("EXECUTION MODE: ") or l.startswith("PHASE: ")
+                    or l.startswith(V2_CASH_LINE_PREFIX))]
+    bad += [("user +", l) for l in usr_added if not l.startswith(V4_CASH_LINE_PREFIXES)]
     return bad
 
 
@@ -217,7 +342,9 @@ def test_v4_render_differs_from_v2_by_exactly_the_three_components(monkeypatch):
     assert _fourth_component_violations(v2, v4) == []
     # and the three components are each actually present
     assert SETTLEMENT_RULE_LINE in v4[0] and SETTLEMENT_RULE_LINE not in v2[0]
-    assert "Settled cash:" in v4[1] and "Unsettled cash:" in v4[1] and "Settled cash:" not in v2[1]
+    assert "Settled cash (deployable):" in v4[1] and "Unsettled cash:" in v4[1]
+    assert "Settled cash" not in v2[1]
+    assert all(after in v4[0] and after not in v2[0] for _before, after in CASH_SWEEP_EDITS)
     assert "EXECUTION MODE" in v2[1] and "PHASE:" in v2[1]
     assert "EXECUTION MODE" not in v4[1] and "PHASE:" not in v4[1]
 
@@ -305,8 +432,8 @@ def test_v4_retains_everything_that_must_not_change():
     ("v1", None),
     ("v2", V2_OUTPUT_SCHEMA),
     ("v3", V3_OUTPUT_SCHEMA),   # the shorting regime — unchanged
-    ("v4", V2_OUTPUT_SCHEMA),   # long-only again: the v2 appendix, reused verbatim
-    ("v4.0", V2_OUTPUT_SCHEMA),
+    ("v4", V4_OUTPUT_SCHEMA),   # long-only: v2's appendix with the settled-cash cash_rationale
+    ("v4.0", V4_OUTPUT_SCHEMA),
     ("v5", V2_OUTPUT_SCHEMA),   # unknown future major falls back long-only (safe direction)
 ])
 def test_output_schema_selection(version, expected):
@@ -351,14 +478,43 @@ def test_regime_boundary_registered():
     assert b["scope"] == "all_six_arms"
     assert b["live_cohort"] == ["claude", "claude_opus", "gpt", "gemini", "grok"]
     assert "open_shorts_at_boundary" in b
-    # The equivalence claim in the ledger must match the files on disk.
+    # The boundary entry is append-only, so it keeps the landed (pre-amendment)
+    # digest; the CURRENT v4.txt must match the latest internal revision entry.
+    assert V4_LANDED_SHA256 in b["v4_equivalence"]
+    revision = _v4_revision_entry(ledger)
+    assert revision["pre"]["prompts/v4.txt_sha256_lf"] == V4_LANDED_SHA256
     digest = hashlib.sha256(_norm((PROMPTS / "v4.txt").read_bytes())).hexdigest()
-    assert digest in b["v4_equivalence"], (
+    assert digest == revision["post"]["prompts/v4.txt_sha256_lf"], (
         "ledger records a v4 sha256 that no longer matches prompts/v4.txt"
     )
     # Component 1's reference: the v2 blob the inverted diff was computed against.
     ref = hashlib.sha256(_norm(_blob(V3_COMMIT, "prompts/v2.txt"))).hexdigest()
     assert ref in b["v4_equivalence"], "ledger lost the component-1 reference digest"
+
+
+V4_LANDED_SHA256 = "5a275e2b0eb306cccb48c136f39784817de9f727e32b3154673403643b4c6d07"
+V4_REVISION_ID = "v4_component2_rendering_amendment_2026_10_27"
+
+
+def _v4_revision_entry(ledger):
+    hits = [e for e in ledger["operational_events"]["2026-10"] if e.get("id") == V4_REVISION_ID]
+    assert len(hits) == 1, f"ledger must carry exactly one {V4_REVISION_ID} entry"
+    return hits[0]
+
+
+def test_v4_internal_revision_registered_as_a_boundary_within_the_segment():
+    """The amendment is an internal revision of the v4 segment, not a new regime:
+    prompt_version stays v4, the regime boundary is untouched, and the ledger
+    names where the revision starts."""
+    ledger = json.loads((ROOT / "scripts" / "phase_a_integrity_ledger.json").read_text(encoding="utf-8"))
+    e = _v4_revision_entry(ledger)
+    assert e["type"] == "prompt_internal_revision"
+    assert e["boundary"] == "regime_boundaries.phase_b_long_only"
+    assert e["prompt_version"] == "v4"
+    assert e["first_effective_session"] == "2026-10-28"
+    assert e["pre_revision_sessions"] == ["2026-10-26", "2026-10-27"]
+    settings = json.loads((ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    assert settings["prompt_version"] == "v4"
 
 
 def test_config_flipped_at_landing():
