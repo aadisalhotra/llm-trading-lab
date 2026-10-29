@@ -39,51 +39,19 @@
     ]
   },
   "daily": {
-    "date": "2026-10-28",
-    "sent_count": 5,
+    "date": "2026-10-29",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "news:MSFT:44a464bd8e",
-      "news:V:3649300057",
-      "news:ABBV:334933e275",
-      "budget:critical"
+      "api_failure:deepseek"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-10-28T13:33:24.661946+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
+        "kind": "api_failure",
         "severity": "WARN",
-        "title": "Very Positive news on MSFT (held by 5)",
-        "timestamp": "2026-10-28T21:08:28.328193+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on V (held by 6)",
-        "timestamp": "2026-10-28T21:08:30.061878+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Negative news on ABBV (held by 6)",
-        "timestamp": "2026-10-28T21:08:31.323183+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "budget",
-        "severity": "CRITICAL",
-        "title": "Monthly API budget exceeded",
-        "timestamp": "2026-10-28T21:08:35.530583+00:00",
+        "title": "Model deepseek failed",
+        "timestamp": "2026-10-29T13:34:44.742901+00:00",
         "disposition": "sent"
       }
     ]
