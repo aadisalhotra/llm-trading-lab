@@ -41,15 +41,19 @@
   },
   "daily": {
     "date": "2026-10-30",
-    "sent_count": 4,
+    "sent_count": 8,
     "dedup_keys": [
       "position_stop:deepseek",
       "macro_event:Geopolitical shock",
       "macro_event:Macro crisis",
-      "macro_event:Systemic event"
+      "macro_event:Systemic event",
+      "ath:claude",
+      "ath:gemini",
+      "news:HON:bfe889ddc2",
+      "budget:critical"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "position_stop",
@@ -77,6 +81,34 @@
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-10-30T18:32:27.853609+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-10-30T21:07:47.826802+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-10-30T21:07:48.479433+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on HON (held by 4)",
+        "timestamp": "2026-10-30T21:07:48.970652+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-10-30T21:07:51.772560+00:00",
         "disposition": "sent"
       }
     ]
