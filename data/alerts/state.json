@@ -41,9 +41,11 @@
   },
   "daily": {
     "date": "2026-10-30",
-    "sent_count": 1,
+    "sent_count": 3,
     "dedup_keys": [
-      "position_stop:deepseek"
+      "position_stop:deepseek",
+      "macro_event:Geopolitical shock",
+      "macro_event:Macro crisis"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -53,6 +55,20 @@
         "severity": "WARN",
         "title": "Position stop on deepseek",
         "timestamp": "2026-10-30T13:33:03.756543+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-30T14:03:14.851437+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-30T14:03:16.706195+00:00",
         "disposition": "sent"
       }
     ]
