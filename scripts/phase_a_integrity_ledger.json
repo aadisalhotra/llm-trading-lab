@@ -1676,6 +1676,56 @@
           "scope": "Sufficient for this amendment, as hub-ruled 2026-10-27: it corrects implementation to registration intent rather than changing treatment, and no registered estimand stratifies below the regime level. It does not cover any future revision that changes treatment, or any analysis that would stratify within a regime.",
           "follow_up": "Prompt hash on decision records: Phase B list. Does not land before the freeze."
         }
+      },
+      {
+        "id": "v4_prompt_freeze_2026_10_30",
+        "date": "2026-10-30",
+        "type": "prompt_freeze",
+        "scope": "all_six_arms",
+        "boundary": "regime_boundaries.phase_b_long_only",
+        "prompt_version": "v4",
+        "authority": "Hub dispatch 2026-10-30 ('freeze, 10/30 close'), executing T2.4's freeze (docs/prereg/tier2_novel_sections.md, Amendment row 8: freeze 2026-10-31, a Saturday; 2026-10-30 the last trading day).",
+        "effective": "Close of Friday 2026-10-30, after the 2026-10-30 end-of-day tick (origin/main d136dbb2ae8c20340a38ea0db7e6ce6dead44f0d, 2026-10-31T01:24:19Z). Same freeze as the registered 2026-10-31 date, not a second one.",
+        "frozen_form": "v4, amended form: operational_events.2026-10[v4_component2_rendering_amendment_2026_10_27], first_effective_session 2026-10-28. Not the landed form that ran 2026-10-26 and 2026-10-27, which is the smoke-segment verification record.",
+        "frozen_at": {
+          "commit": "00557e557dd3cf9bbd911ac6b362ff8370d1e6fb",
+          "why_this_commit": "The last commit to touch prompts/ or src/prompt_builder.py. prompts/, src/ and config/ are tree-identical between it and the freeze tick d136dbb2a, so every 2026-10-28..2026-10-30 cycle rendered from it.",
+          "prompts_tree": "163f95e979b12037641f9c7fb1d564b8e32e17bf",
+          "src_tree": "e9488ede7bb116565484243ad7ec9f47ab5a6078",
+          "prompts/v4.txt_blob": "43985f53bfeae1d755ba50ee81724d51598aa5f9",
+          "prompts/v4.txt_sha256_lf": "fbba04e1a558bab43cb35a52a22f5935dc16e5ddbf9e514889fdcc56f331e703",
+          "prompts/v4.txt_sha256_check": "Equals the amendment entry's post.prompts/v4.txt_sha256_lf. Recomputed from the blob at the freeze tick, not copied.",
+          "src/prompt_builder.py_blob": "b3e30db9175c28692432cba74675f33772e17faf",
+          "V4_OUTPUT_SCHEMA_sha256_utf8": "7f2e74c63601e822df4dec44ba142a90499485472bfe2e454f6b081cd987685d",
+          "config/settings.json_blob": "10dc4419f677f6a9ce31761157fa3e2998b18dc2"
+        },
+        "verification_sessions": {
+          "dates": [
+            "2026-10-28",
+            "2026-10-29",
+            "2026-10-30"
+          ],
+          "record": "Counted from data/trades/{arm}_2026-10.jsonl at d136dbb2a: 13 decision cycles per arm per date (the full EDT session, 09:30..15:30), every record stamped prompt_version v4. api_success 13/13 for every arm and date, except deepseek 2026-10-29 at 12/13.",
+          "test_status": "tests/test_v4_ablation.py 27 passed at the freeze, including test_v4_cash_block_renders_exactly and its full-user-prompt variant."
+        },
+        "freeze_window": "Nothing enters prompts/ for twelve months from the freeze (through 2027-10-30), as dispatched. The model-facing prompt is also produced by src/prompt_builder.py (the cash block, the close line, V4_OUTPUT_SCHEMA), so the freeze covers the rendered prompt, not only the prompts/ directory. The 2026-10-24 entries already treat builder-rendered lines as frozen model-facing content (prompt_close_line_disclosed_limitation).",
+        "rendered_prompt_hash_check": {
+          "arms_as_dispatched": "2026-10-31",
+          "first_armed_session_as_dispatched": "2026-11-02",
+          "status_at_freeze": "NO IMPLEMENTING ARTIFACT. At the freeze commit no code, test or CI job in the repository computes or compares a rendered-prompt hash, and decision records carry no prompt hash (operational_events.2026-10[v4_component2_amendment_landed_and_boundary_limitation_2026_10_27].known_limitation; follow-up on the Phase B list). This entry records the dispatched dates only. Until an artifact lands, 'armed' has no mechanism behind it (CLAUDE.md rule 9).",
+          "reference_values": "The frozen_at hashes above are the static inputs any such check would compare against. A per-cycle rendered prompt also carries market data, holdings and time, so it cannot have one fixed hash; the check has to hash the static parts or carry a per-record hash."
+        },
+        "rendered_cash_block_evidence": {
+          "book": "gemini (live cohort; execution_mode paper before the venue cutover)",
+          "cycle": "20261028T160425Z (2026-10-28, 12:04 ET slot), amended form",
+          "block": [
+            "  Settled cash (deployable): $2,043.58 (1.5%)",
+            "  Total cash:     $8,901.93",
+            "  Unsettled cash: $6,858.35"
+          ],
+          "method": "Rendered prompts are not logged. This cycle executed nothing, so portfolio_after equals the snapshot_before that build_prompts received (same prices dict, no state change between them; src/pipeline.py). The block is _format_portfolio_block at the freeze commit applied to that logged snapshot. It is an exact re-render, not a capture of the bytes sent.",
+          "independent_corroboration": "That cycle's cash_rationale opens 'Settled cash is deliberately held at a near-zero level (1.5%)'. 1.5% is settled_cash_pct; total cash would have rendered 6.5%. Under the landed form the only percent shown was the total."
+        }
       }
     ]
   }
