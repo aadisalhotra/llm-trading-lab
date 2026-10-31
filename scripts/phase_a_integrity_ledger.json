@@ -1787,6 +1787,19 @@
         },
         "freeze_proof_going_forward": "This package changes src/ (two new modules and the pipeline hook), so the src/ tree hash in the freeze entry's frozen_at moves by infrastructure alone. src/prompt_builder.py (blob b3e30db9175c28692432cba74675f33772e17faf), prompts/ and config/ are unchanged. From here the golden combined hash, not the src/ tree hash, is the per-cycle proof that the frozen prompt is still what a cycle would send.",
         "tests": "tests/test_prompt_integrity.py, 16 tests: the current tree renders the reference; the reference is pinned to the frozen commit and the fixture; config, universe and template changes are each detected in the right component; every failure path returns a status without raising; not armed before 2026-10-31; the bounded entry returns within its limit; the pipeline calls it only after decisions, inside a guard. Full suite 582 passed."
+      },
+      {
+        "id": "rendered_prompt_hash_check_arming_conditional",
+        "date": "2026-10-30",
+        "type": "amendment_by_append",
+        "scope": "all_six_arms",
+        "amends": "operational_events.2026-10[rendered_prompt_hash_check_landed_2026_10_30].armed",
+        "authority": "Hub ruling 2026-10-30 (push approval of 6921a73b6..52ff7710e, item 1).",
+        "ruling": "Arming is PROVISIONAL until tests/test_prompt_integrity.py::test_current_tree_renders_the_frozen_reference passes on main in the Tests workflow. CI and production both run CPython 3.11 on the production lock, so for this artifact the Tests workflow is a genuine production proof, not the inverted gate registered 2026-10-24. The landing entry's 'armed_from 2026-10-31' is to be read as conditional on that run.",
+        "if_it_passes": "Arming stands at 2026-10-31. A one-line entry confirms it, naming the run.",
+        "if_it_fails": "The check is reverted before the first 2026-11-02 cycle. A correction records that it never armed, and the disclosed gap starts 2026-10-31.",
+        "proof_run": "Tests workflow run 41157967732 on 52ff7710e (pushed 2026-10-31T02:00Z). Not complete when this entry was written.",
+        "why": "The same discipline as the freeze entry, which refused to record 'armed' against a check that did not exist: a record of arming must not run ahead of its proof."
       }
     ]
   }
