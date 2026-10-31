@@ -782,6 +782,19 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     if not is_eod:
         mark_boundary_handled(*boundary_parts(run_date))
 
+    # Rendered-prompt hash check (hub ruling 2026-10-30; infrastructure class,
+    # no change slot, no version boundary). Runs only now, after every model
+    # has decided and the boundary is marked, so it cannot touch decision
+    # generation. Bounded in time and never raises; the import sits inside
+    # the guard too, so even a broken module cannot fail the tick. Its record
+    # lands in data/prompt_integrity/ and is committed with this cycle.
+    if not is_eod:
+        try:
+            from .logging.prompt_integrity import run_prompt_integrity_check_bounded
+            run_prompt_integrity_check_bounded(run_date)
+        except Exception as e:
+            logger.exception("Prompt hash check skipped: %s", e)
+
     # Build dashboard payload (intraday + EOD both refresh this — the dashboard
     # is always live)
     logger.info("Building dashboard payload")
