@@ -3,7 +3,8 @@
     "claude": [
       5,
       10,
-      15
+      15,
+      20
     ],
     "gpt": [
       5,
@@ -39,43 +40,75 @@
     ]
   },
   "daily": {
-    "date": "2026-10-27",
-    "sent_count": 4,
+    "date": "2026-10-30",
+    "sent_count": 8,
     "dedup_keys": [
-      "api_failure:grok",
+      "position_stop:deepseek",
       "macro_event:Geopolitical shock",
-      "news:LLY:8ccaf60d8f",
+      "macro_event:Macro crisis",
+      "macro_event:Systemic event",
+      "ath:claude",
+      "ath:gemini",
+      "news:HON:bfe889ddc2",
       "budget:critical"
     ],
     "overflow": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "api_failure",
+        "kind": "position_stop",
         "severity": "WARN",
-        "title": "Model grok failed",
-        "timestamp": "2026-10-27T15:08:03.127121+00:00",
+        "title": "Position stop on deepseek",
+        "timestamp": "2026-10-30T13:33:03.756543+00:00",
         "disposition": "sent"
       },
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
-        "timestamp": "2026-10-27T16:03:03.467926+00:00",
+        "timestamp": "2026-10-30T14:03:14.851437+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-30T14:03:16.706195+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-10-30T18:32:27.853609+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-10-30T21:07:47.826802+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Gemini 3.1 Pro hit a new all-time high",
+        "timestamp": "2026-10-30T21:07:48.479433+00:00",
         "disposition": "sent"
       },
       {
         "kind": "news_impact",
         "severity": "WARN",
-        "title": "Very Negative news on LLY (held by 5)",
-        "timestamp": "2026-10-27T21:08:12.779563+00:00",
+        "title": "Very Positive news on HON (held by 4)",
+        "timestamp": "2026-10-30T21:07:48.970652+00:00",
         "disposition": "sent"
       },
       {
         "kind": "budget",
         "severity": "CRITICAL",
         "title": "Monthly API budget exceeded",
-        "timestamp": "2026-10-27T21:08:16.423292+00:00",
+        "timestamp": "2026-10-30T21:07:51.772560+00:00",
         "disposition": "sent"
       }
     ]
