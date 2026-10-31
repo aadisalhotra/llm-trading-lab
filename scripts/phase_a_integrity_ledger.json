@@ -1726,6 +1726,67 @@
           "method": "Rendered prompts are not logged. This cycle executed nothing, so portfolio_after equals the snapshot_before that build_prompts received (same prices dict, no state change between them; src/pipeline.py). The block is _format_portfolio_block at the freeze commit applied to that logged snapshot. It is an exact re-render, not a capture of the bytes sent.",
           "independent_corroboration": "That cycle's cash_rationale opens 'Settled cash is deliberately held at a near-zero level (1.5%)'. 1.5% is settled_cash_pct; total cash would have rendered 6.5%. Under the landed form the only percent shown was the total."
         }
+      },
+      {
+        "id": "correction_prompt_freeze_window_to_2027_12_01",
+        "date": "2026-10-30",
+        "type": "correction",
+        "scope": "all_six_arms",
+        "corrects": "operational_events.2026-10[v4_prompt_freeze_2026_10_30].freeze_window",
+        "authority": "Hub dispatch 2026-10-30 (push approval of d136dbb2a..6921a73b6, item 1).",
+        "correction": "The prompt freeze binds through the end of the confirmatory window, 2027-12-01, not for twelve months to 2027-10-30.",
+        "attribution": "The hub's freeze dispatch said nothing enters prompts/ 'for twelve months'. The hub has ruled that wording loose, and the freeze entry inherited it as dispatched. The freeze entry is not edited; this append governs.",
+        "consistency_check": "Rule 10: 2027-12-01 agrees with docs/PRE_REGISTRATION.md (Phase B, Live, 2026-12-01 to 2027-12-01, confirmatory) and config/settings.json experiment_end_date 2027-12-01.",
+        "unchanged": "Everything else in the freeze entry stands, including that the freeze covers the rendered prompt (prompts/ and what src/prompt_builder.py renders), not only the prompts/ directory."
+      },
+      {
+        "id": "rendered_prompt_hash_check_landed_2026_10_30",
+        "date": "2026-10-30",
+        "type": "infrastructure",
+        "scope": "all_six_arms",
+        "authority": "Hub ruling 2026-10-30 (push approval, item 2): build before Monday's first cycle, or it does not ship.",
+        "classification": "Infrastructure class, as hub-ruled: read-only, observes decision generation without touching it, consumes no monthly change slot and opens no version boundary. Same class as the 2026-08-02 Gemini SDK migration.",
+        "supersedes_by_append": "operational_events.2026-10[v4_prompt_freeze_2026_10_30].rendered_prompt_hash_check.status_at_freeze ('NO IMPLEMENTING ARTIFACT'). That entry is not edited.",
+        "design": {
+          "method": "Golden fixture, not live-prompt hashing. A live rendered prompt carries portfolio state and prices, so its hash differs every cycle and detects nothing. Each intraday cycle renders a fixed synthetic input (src/logging/prompt_golden_fixture.py) with the code, config and dependencies the cycle is running, hashes each model-facing text, and compares against a reference rendered from the frozen commit.",
+          "generalizes": "tests/test_v4_ablation.py's pinned rendering (the 2026-10-27 amendment's element 3) from one cash block in CI to the whole prompt, per cycle.",
+          "components": "decision_system (template + V4_OUTPUT_SCHEMA), decision_user, screening_system, screening_user. Every model-facing text the pipeline sends.",
+          "flows_in_live": "config/settings.json, config/universe.json, prompts/, src/prompt_builder.py and its imports, installed dependencies. A change in any of them that alters a prompt alters a hash. Hashing v4.txt and prompt_builder.py alone would miss a config or dependency change.",
+          "determinism": "Every fixture price is a multiple of 0.25 and every volume an integer, so sums, means, highs and lows are exact in binary floating point whatever the summation order; the rest is correctly rounded IEEE arithmetic and Python's own formatting.",
+          "not_covered": "The universe chart image (PNG bytes depend on the font stack and plotting build, so it cannot be hashed stably); adapter-level API formatting, which T2.4 defines as not prompt content."
+        },
+        "reference": {
+          "path": "data/pre_registration/prompt_golden_reference_v4.json",
+          "frozen_commit": "00557e557dd3cf9bbd911ac6b362ff8370d1e6fb",
+          "built_by": "scripts/build_prompt_golden_reference.py: renders the fixture against a temporary detached git worktree of the frozen commit (the child interpreter's import of src.prompt_builder is asserted to resolve inside that worktree), also renders it against the current tree, and refuses to write unless the two are identical. They were.",
+          "combined_sha256": "b415afcb588792873743df073fac242f642a60f19508d4a414add356c87e38b7",
+          "component_sha256": {
+            "decision_system": "4ab16655364c4d2a91f8e7559e8058f83fda82a79f8fb2b20a72330a61aa9d91",
+            "decision_user": "7cabfd2f484e90ff57a5c4cd71ad4cdaf1fa09dd50857a97ab7d05e3507a9723",
+            "screening_system": "98f906d7da41b6507790db8c2288fbedc1ee855f6088fa8de1303c7a831f83e0",
+            "screening_user": "aadf3685498ff81a60c9148b26c5ff3a42b9973df79a8c6f6d8b4285cf9b6303"
+          },
+          "fixture_sha256_lf": "fa5186318cc82b78c0fb53fc051d08b559161d56bb4af3bf25a2f9327baf5a7b",
+          "build_environment": "Windows 11, CPython 3.14.4, pandas 3.0.2, numpy 2.4.4"
+        },
+        "non_blocking": {
+          "placement": "src/pipeline.py, intraday only, after every model thread has joined and after mark_boundary_handled; the module import sits inside the same try/except, so even an import failure cannot fail the tick.",
+          "bound": "run_prompt_integrity_check_bounded runs the check on a daemon thread joined for at most 20 s; past it the pipeline proceeds and a WARN is sent. Measured: 0.9 s end to end on the build machine, mostly imports the pipeline has already loaded.",
+          "never_raises": "Reference missing, fixture edited, render error, log write failure and alert failure each become a status or a logged exception. It never halts, retries or alters a cycle.",
+          "statuses": "match (logged, no alert); mismatch (CRITICAL, names the changed components and the first differing line); render_error, fixture_changed, reference_unreadable, timeout (WARN). Alerts dedupe once per day per status (the alerter's existing dedup_key rule) (kind prompt_integrity).",
+          "record": "One JSON line per cycle in data/prompt_integrity/YYYY-MM.jsonl, committed with the cycle's decision logs by the intraday workflow's existing git add data/."
+        },
+        "armed": {
+          "armed_from": "2026-10-31 (ARMED_FROM in src/logging/prompt_integrity.py)",
+          "first_armed_session": "2026-11-02, provided this package reaches origin/main before the first 2026-11-02 cycle. Otherwise the first armed session is the first cycle after the push, recorded by a later append."
+        },
+        "production_environment_proof": {
+          "status": "PENDING at landing.",
+          "why": "The reference was rendered on the build machine. Production runs ubuntu-latest, CPython 3.11, on the production lock (pandas 3.1.0, numpy 2.4.6).",
+          "proof": "tests/test_prompt_integrity.py::test_current_tree_renders_the_frozen_reference re-renders the fixture in the Tests workflow, on that same lock and Python, on push to main. Green there is the proof. If it is red, the check does not ship before Monday (hub ruling): it is reverted and the gap is recorded as a disclosed limitation with its start date."
+        },
+        "freeze_proof_going_forward": "This package changes src/ (two new modules and the pipeline hook), so the src/ tree hash in the freeze entry's frozen_at moves by infrastructure alone. src/prompt_builder.py (blob b3e30db9175c28692432cba74675f33772e17faf), prompts/ and config/ are unchanged. From here the golden combined hash, not the src/ tree hash, is the per-cycle proof that the frozen prompt is still what a cycle would send.",
+        "tests": "tests/test_prompt_integrity.py, 16 tests: the current tree renders the reference; the reference is pinned to the frozen commit and the fixture; config, universe and template changes are each detected in the right component; every failure path returns a status without raising; not armed before 2026-10-31; the bounded entry returns within its limit; the pipeline calls it only after decisions, inside a guard. Full suite 582 passed."
       }
     ]
   }
