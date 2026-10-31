@@ -1807,6 +1807,24 @@
         "type": "confirmation",
         "confirms": "operational_events.2026-10[rendered_prompt_hash_check_arming_conditional]",
         "confirmation": "Arming stands at 2026-10-31: Tests run 41157967732 (job 124408878076) on 52ff7710e, 2026-10-31T02:00:25Z-02:03:51Z, step 'Run the suite' success -- CPython 3.11, production lock, set -o pipefail, whole tests/ directory, so tests/test_prompt_integrity.py::test_current_tree_renders_the_frozen_reference (no skip marks) passed in the production environment. Read from the run's job and step records, not its badge; the pytest-output artifact needs credentials and was not read."
+      },
+      {
+        "id": "rendered_prompt_hash_check_arming_basis_amended",
+        "date": "2026-10-30",
+        "type": "amendment_by_append",
+        "amends": "operational_events.2026-10[rendered_prompt_hash_check_arming_confirmed]",
+        "authority": "Hub dispatch 2026-10-30 (push approval of 52ff7710e..f065bdb83, item 1): the entry must say what was observed, not what was inferred.",
+        "pass_line_observed": "NO. gh is not installed on the Operations machine and no GITHUB_TOKEN/GH_TOKEN is set; the run log and the pytest-output artifact both need credentials (logs endpoint returned 403). No credential was extracted from the git credential store to get round that. The per-test PASSED line was not read.",
+        "observed": "From the public run records: run 41157967732, job 124408878076, head 52ff7710e; step 'Run the suite' conclusion success, 'Summarize failures' skipped (it runs only on failure). The step's command at 52ff7710e is `set -o pipefail` then `python -m pytest tests -q -rfE -p no:cacheprovider | tee pytest-output.txt`, so a failing or erroring test fails the step.",
+        "skip_paths_inspected_at_52ff7710e": {
+          "config": "No pytest.ini, pyproject.toml, setup.cfg, tox.ini or conftest.py anywhere in the tree: no addopts, no collection hooks, no autouse fixtures.",
+          "workflow": "No -k, --deselect or PYTEST_ADDOPTS in .github/.",
+          "plugins": "requirements.txt (installed --no-deps) holds no pytest plugin; pytest==9.0.3 is the only test-time install.",
+          "test_file": "tests/test_prompt_integrity.py contains no skip, xfail, importorskip or pytest.exit. The test's only fixture, `reference`, is a json.loads of the reference file, which errors on failure and cannot skip. evaluate() never calls pytest. A failed import of src.prompt_builder or the fixture module is a collection error, which fails the step.",
+          "src": "No reference to pytest or a Skip exception anywhere in src/.",
+          "other_skips": "The suite's runtime skips (test_adapter_field_retention.py:357, test_alerts.py:244, three importorskip calls in test_session_timing.py) are each inside their own test function and cannot reach this test."
+        },
+        "basis": "The confirmation rests on the observed step success plus the inspection above, which finds no reachable path by which this test could have been skipped or deselected. It is not a read of the pass line. Arming at 2026-10-31 stands on that basis."
       }
     ]
   }
