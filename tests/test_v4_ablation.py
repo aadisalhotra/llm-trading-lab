@@ -190,7 +190,19 @@ def test_component_1_shorting_ablation_is_mechanically_v2():
     three cash-sweep passages) and v4 must equal the v2 that the inverted diff was
     computed against, byte for byte. A delta here is an ablation error or a
     non-shorting change smuggled into v3 back in June -- a HALT condition, not
-    something to absorb."""
+    something to absorb.
+
+    Why the baseline is v2, not v3 (reader aid): T2.4 registers v4 as v2 plus three
+    components, so v2 is the registered base. v2 carries no shorting content, so any
+    v3 content left behind by the ablation surfaces here as a difference -- comparing
+    against v2 is the stronger check, not a skipped one. This test covers the whole
+    template file (prompts/v4.txt). v3 itself is covered elsewhere:
+    test_v3_working_tree_still_matches_its_commit pins v3 to 57cb14f4, and
+    test_v4_carries_no_shorting_enablement_and_v3_does checks each shorting phrase is
+    in v3 and absent from v4. The no-fourth-component guarantee is not this test's
+    job: test_v4_render_differs_from_v2_by_exactly_the_three_components compares the
+    full rendered prompts (system with output appendix, and user), and
+    test_any_fourth_component_fails_verification proves that check fires."""
     assert _revert_component_2(_v4_text()) == _v2_at_v3_commit()
 
 
