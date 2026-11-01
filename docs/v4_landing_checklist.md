@@ -12,7 +12,7 @@ Two things this checklist depends on rest on a **hub relay and nothing else**. T
 | item | what rests on the relay | where it is used |
 |---|---|---|
 | Phase B boundary amendment | Research's text was delivered governing-inline; the hub relay is the faithful transcription (hub, 2026-10-05). Recorded in ledger `operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]` as a relay. | the new dates throughout |
-| EXECUTION MODE removal | A Research ruling delivered inline **2026-09-11**; the hub relay is the only record (hub, 2026-10-05). | Step 3 |
+| EXECUTION MODE removal | A Research ruling delivered inline **2026-09-11**; the hub relay is the only record (hub, 2026-10-05). *Superseded 2026-11-01 by `docs/registrations/v4_verification_rule.md`; the relay-only status above stands as the record as of its date.* | Step 3 |
 
 This repo has already had phantom ruling citations (class 1 below). A ruling with no artifact is the shape one takes.
 
@@ -83,6 +83,8 @@ Done in the staged files: `tests/test_v4_ablation.py` (`test_v4_is_byte_identica
 ## Step 3 — remove the EXECUTION MODE / PHASE lines: v4's third verified diff component — IMPLEMENTED, GATED (RELAY-ONLY)
 
 **Operative text (hub relay, 2026-10-05, of a Research ruling delivered inline 2026-09-11; no committed artifact):** the frozen prompt contains **no environment-mode metadata**; the two rendered lines are deleted and their template variables retired; it is v4's **third** verified diff component and **any fourth fails verification.** Hub 2026-10-05 ②: the pair is `EXECUTION MODE:` and `PHASE:` (`prompt_builder.py:685–686`), removal gated to the **Oct 16 boundary and never before** — unconditional removal would be an unregistered mid-regime prompt event on live v3.
+
+*Superseded 2026-11-01 by `docs/registrations/v4_verification_rule.md`, the first committed registration of this ruling. "No committed artifact" above is kept as the status as of 2026-10-05; it is the record that let the citation-resolution gate catch a phantom citation to `docs/amendments/prompt_mode_line_removal.md` before it reached the deposit.*
 
 Implemented (`prompt_builder.py`): `_environment_lines(version, settings)` omits both lines when `environment_metadata_removed` — i.e. for prompt major 4 (long-only branch: v4 *is* the Oct 16 event), **or** when `settings["prompt_environment_metadata"] == "removed"` (migration branch: the removal lands alone on v3 at the Oct 16 activation). The setting is **absent today**, so v1–v3 render the lines byte-for-byte as before (pinned by `test_v3_render_is_unchanged_by_the_v4_machinery`).
 
