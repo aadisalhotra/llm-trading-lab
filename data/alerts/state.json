@@ -41,18 +41,42 @@
   },
   "daily": {
     "date": "2026-11-02",
-    "sent_count": 1,
+    "sent_count": 4,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "macro_event:Macro crisis",
+      "ath:claude",
+      "news:UNP:c27b88bd8e"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
         "timestamp": "2026-11-02T14:33:24.021706+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-02T22:08:16.610496+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "ath",
+        "severity": "INFO",
+        "title": "Claude Sonnet 4.6 hit a new all-time high",
+        "timestamp": "2026-11-02T22:08:17.834552+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on UNP (held by 4)",
+        "timestamp": "2026-11-02T22:08:18.695935+00:00",
         "disposition": "sent"
       }
     ]
