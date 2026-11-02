@@ -67,6 +67,14 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # CRITICAL on a stuck or unexplained probe position (hub ruling
+          # 2026-11-02 ②) goes out by the same Gmail path as the pipeline's
+          # alerts. Recipients are a secret, never committed.
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+          # No live credentials are passed. The probe refuses any endpoint but
+          # paper (scripts/barrier_probe.assert_paper_only).
         run: python scripts/barrier_probe.py
 
       - name: Commit probe record

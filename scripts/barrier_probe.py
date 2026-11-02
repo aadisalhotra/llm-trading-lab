@@ -39,6 +39,13 @@ Shared paper account. It trades in the account the validation month uses, so:
     recorded as `residual_cash_usd`. Level-2 reconciliation adds them to the
     unallocated term (src/execution/administrative.py), so probe orders never
     enter the cash comparison.
+  * If it cannot get back to flat, the position it holds is recorded as
+    `position_delta`, and it raises CRITICAL at once. Level 2 reconciles the
+    position against that record rather than halting (attributable, not
+    exempt). The next scheduled run closes it first and records the negative
+    delta. A position in F the records do not account for is unexplained: the
+    probe refuses to trade on top of it and alerts, and level 2 halts.
+  * It refuses any endpoint but Alpaca paper.
   * It only cancels or flattens its OWN orders and its own F position.
     `DELETE /v2/orders` (cancel everything) is never called. The old probe's
     cleanup called it, and after cutover that would cancel the books' orders.
@@ -93,7 +100,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config_loader import load_env, load_settings  # noqa: E402
-from src.execution.administrative import PROBE_BOOK_PREFIX, PROBE_DIR  # noqa: E402
+from src.execution.administrative import (  # noqa: E402
+    PROBE_BOOK_PREFIX,
+    PROBE_DIR,
+    PROBE_MODE,
+    administrative_positions,
+)
 from src.execution.barrier import CycleBarrier, rotation_tick  # noqa: E402
 from src.execution.broker import BrokerClient, build_order_id  # noqa: E402
 from src.execution.executor import Executor  # noqa: E402
@@ -102,7 +114,10 @@ from src.portfolio.portfolio import Holding, Portfolio  # noqa: E402
 logger = logging.getLogger("llmlab.barrier_probe")
 
 ET = ZoneInfo("America/New_York")
-MODE = "broker_paper"
+# Broker-paper only, never the live endpoint (hub ruling 2026-11-02 ②): from
+# 2026-12-01 live is real capital and a probe has no business in it.
+MODE = PROBE_MODE
+PAPER_ENDPOINT = "https://paper-api.alpaca.markets"
 
 SYMBOL = "F"                 # liquid, fractionable, NOT in config/universe.json
 SEED_SHARES = 10.0           # seeds the sell-side book (~$100 notional)
@@ -283,6 +298,36 @@ def evaluate(plan: dict, results: dict[str, dict], release_log: list[dict]) -> d
                           "intent released on that terminal state and reached the venue "
                           "after the winner's filled_at (venue timestamps)")
     return out
+
+
+def assert_paper_only(client: Any) -> None:
+    """Refuse anything but the Alpaca paper endpoint. A real check, not an
+    `assert`, which `python -O` strips."""
+    mode = getattr(client, "mode", None)
+    url = str(getattr(client, "base_url", "")).rstrip("/")
+    if mode != PROBE_MODE or url != PAPER_ENDPOINT:
+        raise SystemExit(f"barrier probe refuses mode={mode!r} endpoint={url!r}: "
+                         f"it runs against {PAPER_ENDPOINT} only, never live")
+
+
+def position_explained(broker_qty: float, attributed_qty: float) -> bool:
+    """Whether the venue's position in SYMBOL is exactly what the probe's
+    committed records account for."""
+    return abs(broker_qty - attributed_qty) < 1e-6
+
+
+def raise_critical(title: str, body: str, context: dict) -> bool:
+    """CRITICAL alert for a probe integrity failure (a stuck or unexplained
+    position, or an unverified cleanup). Returns whether the dispatch was
+    attempted without raising."""
+    try:
+        from src.alerts.alerter import send_alert
+        send_alert("CRITICAL", title, body, context, kind="barrier_probe",
+                   dedup_key=f"barrier_probe:{context.get('cycle_id')}:{title}")
+        return True
+    except Exception:                       # noqa: BLE001 -- logged, never masks the run
+        logger.exception("CRITICAL alert dispatch failed: %s", title)
+        return False
 
 
 def completed_today(out_dir: Path, et_date: str) -> bool:
@@ -510,6 +555,71 @@ def cleanup(client: BrokerClient, cycle_id: str, started: datetime,
     return out
 
 
+def settle_record(client: Any, record: dict, cycle_id: str, started: datetime,
+                  attributed: float, recovery: bool, code: int) -> int:
+    """Measure what the run left in the account, record it, and alert.
+
+    Records `residual_cash_usd` (cash) and `position_delta` (shares) for
+    level 2. A position the probe still holds afterwards is recorded, so level
+    2 reconciles it instead of halting, and raises CRITICAL at once. A position
+    it cannot measure or explain is recorded as None (unaccounted, so level 2
+    halts) and also raises CRITICAL. Returns the exit code.
+    """
+    try:
+        mine = run_orders(_list_orders(client, started), cycle_id)
+        record["orders"] = [_order_view(o) for o in mine]
+        fill_cash, net = fill_cash_and_position(mine)
+        others = [o for o in _list_orders(client, started)
+                  if not str(o.get("client_order_id", "")).startswith(PROBE_BOOK_PREFIX)
+                  and float(o.get("filled_qty") or 0) > 0]
+        record["account_after"] = _account_view(client)
+        _, qty_after = _symbol_state(client)
+        cash_delta = round(record["account_after"]["cash"] - record["account_before"]["cash"], 6)
+        quiet = not others
+        record.update(fill_cash_usd=fill_cash, account_cash_delta_usd=cash_delta,
+                      account_quiet=quiet, position_after=qty_after)
+        # With no other fills in the window the account's own cash delta is
+        # exact (it includes any fee). Otherwise only the fills are
+        # attributable to the probe.
+        record["residual_cash_usd"] = cash_delta if quiet else fill_cash
+        record["residual_basis"] = "account_cash_delta" if quiet else "probe_fills"
+        # Position: this run's own fills, cross-checked against the venue.
+        # F is outside the universe, so nothing else moves it.
+        if position_explained(qty_after, attributed + net):
+            record["position_delta"] = {SYMBOL: net} if abs(net) > 1e-9 else {}
+        else:
+            record["position_delta"] = None
+            record["position_error"] = (f"venue {SYMBOL} {qty_after:g} != recorded "
+                                        f"{attributed:g} + this run's fills {net:g}")
+    except Exception as e:                      # noqa: BLE001
+        record["residual_cash_usd"] = None
+        record["residual_basis"] = f"UNMEASURED: {type(e).__name__}: {e}"
+        record["position_delta"] = None
+        record["position_error"] = record["residual_basis"]
+        code = EXIT_FAIL
+
+    delta = record.get("position_delta")
+    unclean = (not recovery) and not (record.get("cleanup") or {}).get("clean")
+    if delta is None:
+        held_msg = (f"The probe could not account for its {SYMBOL} position "
+                    f"({record.get('position_error')}). It is unaccounted, so level-2 "
+                    "reconciliation will halt every book on it.")
+        stuck = True
+    else:
+        held = attributed + sum(delta.values())
+        stuck = abs(held) > 1e-9
+        held_msg = (f"The probe holds {held:g} {SYMBOL} after its run. It is recorded, so "
+                    "level 2 reconciles it without halting; the next scheduled run "
+                    "closes it first.")
+    if stuck or unclean:
+        code = EXIT_FAIL
+        record["critical_alert"] = raise_critical(
+            f"Barrier probe: {SYMBOL} not flat in the paper account",
+            f"{held_msg} Cleanup: {record.get('cleanup')}",
+            {"cycle_id": cycle_id, "position_delta": delta, "attributed_before": attributed})
+    return code
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true",
@@ -540,7 +650,10 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("VERDICT: %s", (record.get("evaluation") or {}).get("verdict", outcome))
         return code
 
-    if not args.dry_run and completed_today(out_dir, et_date):
+    # A recorded stuck position overrides the once-a-day rule: the next
+    # attempt must close it, not wait for tomorrow.
+    if (not args.dry_run and completed_today(out_dir, et_date)
+            and not administrative_positions(MODE, out_dir)):
         logger.info("A COMPLETED probe run is already recorded for %s; nothing to do.", et_date)
         return EXIT_OK
 
@@ -549,7 +662,7 @@ def main(argv: list[str] | None = None) -> int:
     settings["mode"] = MODE
     executor = Executor(cycle_id=cycle_id, settings=settings, venue_books={SELL_BOOK, BUY_BOOK})
     client = executor.broker
-    assert client is not None and "paper-api" in client.base_url, "probe is paper-only"
+    assert_paper_only(client)
 
     clock = client._request("GET", "/v2/clock")
     market_open = bool(clock.get("is_open"))
@@ -570,12 +683,22 @@ def main(argv: list[str] | None = None) -> int:
                 else ("production cycle active: " + why)
             return finish("SKIPPED", EXIT_OK)
 
+    # The venue's position in SYMBOL must be exactly what the committed probe
+    # records account for: zero normally, or a recorded stuck position.
+    attributed = administrative_positions(MODE, out_dir).get(SYMBOL, 0.0)
     opens, qty = _symbol_state(client)
-    if opens or abs(qty) > 1e-9:
+    record["attributed_position_before"] = attributed
+    if opens or not position_explained(qty, attributed):
         record["precondition"] = {"open_orders_in_symbol": [_order_view(o) for o in opens],
-                                  "position_in_symbol": qty}
-        record["error"] = (f"{SYMBOL} is not clean before the run; refusing to trade on top "
-                           "of state the probe did not create")
+                                  "position_in_symbol": qty, "attributed": attributed}
+        record["error"] = (f"{SYMBOL} state is not what the probe records account for "
+                           f"(venue {qty:g}, recorded {attributed:g}, {len(opens)} open "
+                           "orders); refusing to trade on top of it")
+        record["critical_alert"] = raise_critical(
+            f"Barrier probe: unexplained {SYMBOL} state in the paper account",
+            record["error"] + ". Level-2 reconciliation will halt every book on an "
+            "unexplained position. Identify it before the next cycle.",
+            {"cycle_id": cycle_id, **record["precondition"]})
         return finish("PRECONDITION_FAILED", EXIT_FAIL)
 
     record["account_before"] = _account_view(client)
@@ -583,26 +706,42 @@ def main(argv: list[str] | None = None) -> int:
     append_record(out_dir, record)
     code = EXIT_FAIL
     outcome = "ERROR"
+    recovery = attributed > 1e-9
     try:
         if not args.dry_run and not submission_allowed(datetime.now(timezone.utc)):
-            raise ProbeAbort("submission cutoff reached before the seed order")
-        seed, _ = client.place_and_confirm(
-            ticker=SYMBOL, shares=SEED_SHARES, side="buy",
-            client_order_id=build_order_id(SEED_BOOK, cycle_id, 0),
-            deadline_seconds=None if market_open else 10)
-        record["seed"] = {"status": seed.status, "filled_qty": seed.filled_qty,
-                          "filled_avg_price": seed.filled_avg_price, "filled_at": seed.filled_at}
-        if seed.filled_qty < SEED_SHARES or seed.filled_avg_price <= 0:
-            raise ProbeAbort(f"seed did not fill completely ({seed.status}, "
-                             f"{seed.filled_qty:g}/{SEED_SHARES:g}); no contention possible")
-        if not args.dry_run and not submission_allowed(datetime.now(timezone.utc)):
-            raise ProbeAbort("submission cutoff reached before the contended cycle")
-        plan, results, releases = run_contention(
-            executor, seed.filled_qty, seed.filled_avg_price, datetime.now(timezone.utc))
-        record.update(plan=plan, results=results, release_log=releases)
-        record["evaluation"] = evaluate(plan, results, releases)
-        outcome = "COMPLETED"
-        code = EXIT_OK if record["evaluation"]["verdict"].startswith("CLEARS") else EXIT_FAIL
+            raise ProbeAbort("submission cutoff reached before the first order")
+        if recovery:
+            # A stuck position from an earlier run: close it, record the
+            # negative delta, and leave the contention for the next attempt.
+            if not market_open:
+                raise ProbeAbort(f"recorded stuck position {attributed:g} {SYMBOL}; market closed")
+            order, hit = client.place_and_confirm(
+                ticker=SYMBOL, shares=attributed, side="sell",
+                client_order_id=build_order_id(CLEANUP_BOOK, cycle_id, 0))
+            record["recovery"] = {"requested": attributed, "status": order.status,
+                                  "filled_qty": order.filled_qty, "deadline_hit": hit}
+            outcome = ("RECOVERED" if order.filled_qty >= attributed - 1e-9
+                       else "RECOVERY_INCOMPLETE")
+            code = EXIT_OK if outcome == "RECOVERED" else EXIT_FAIL
+        else:
+            seed, _ = client.place_and_confirm(
+                ticker=SYMBOL, shares=SEED_SHARES, side="buy",
+                client_order_id=build_order_id(SEED_BOOK, cycle_id, 0),
+                deadline_seconds=None if market_open else 10)
+            record["seed"] = {"status": seed.status, "filled_qty": seed.filled_qty,
+                              "filled_avg_price": seed.filled_avg_price,
+                              "filled_at": seed.filled_at}
+            if seed.filled_qty < SEED_SHARES or seed.filled_avg_price <= 0:
+                raise ProbeAbort(f"seed did not fill completely ({seed.status}, "
+                                 f"{seed.filled_qty:g}/{SEED_SHARES:g}); no contention possible")
+            if not args.dry_run and not submission_allowed(datetime.now(timezone.utc)):
+                raise ProbeAbort("submission cutoff reached before the contended cycle")
+            plan, results, releases = run_contention(
+                executor, seed.filled_qty, seed.filled_avg_price, datetime.now(timezone.utc))
+            record.update(plan=plan, results=results, release_log=releases)
+            record["evaluation"] = evaluate(plan, results, releases)
+            outcome = "COMPLETED"
+            code = EXIT_OK if record["evaluation"]["verdict"].startswith("CLEARS") else EXIT_FAIL
     except ProbeAbort as e:
         record["error"] = str(e)
         outcome = "ABORTED"
@@ -610,32 +749,10 @@ def main(argv: list[str] | None = None) -> int:
         record["error"] = f"{type(e).__name__}: {e}"
         record["traceback"] = traceback.format_exc()
     finally:
-        record["cleanup"] = cleanup(client, cycle_id, started, market_open)
-        try:
-            mine = run_orders(_list_orders(client, started), cycle_id)
-            record["orders"] = [_order_view(o) for o in mine]
-            fill_cash, net = fill_cash_and_position(mine)
-            others = [o for o in _list_orders(client, started)
-                      if not str(o.get("client_order_id", "")).startswith(PROBE_BOOK_PREFIX)
-                      and float(o.get("filled_qty") or 0) > 0]
-            record["account_after"] = _account_view(client)
-            cash_delta = round(record["account_after"]["cash"] - record["account_before"]["cash"], 6)
-            quiet = not others
-            record.update(fill_cash_usd=fill_cash, account_cash_delta_usd=cash_delta,
-                          account_quiet=quiet, net_shares_after=net)
-            # With no other fills in the window the account's own cash delta is
-            # exact (it includes any fee). Otherwise only the fills are
-            # attributable to the probe.
-            record["residual_cash_usd"] = cash_delta if quiet else fill_cash
-            record["residual_basis"] = "account_cash_delta" if quiet else "probe_fills"
-        except Exception as e:                  # noqa: BLE001
-            record["residual_cash_usd"] = None
-            record["residual_basis"] = f"UNMEASURED: {type(e).__name__}: {e}"
-            code = EXIT_FAIL
-        if not record["cleanup"].get("clean"):
-            code = EXIT_FAIL
+        if not recovery:
+            record["cleanup"] = cleanup(client, cycle_id, started, market_open)
+        code = settle_record(client, record, cycle_id, started, attributed, recovery, code)
     return finish(outcome, code)
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

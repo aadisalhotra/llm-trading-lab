@@ -91,6 +91,10 @@ class ReconciliationResult:
     # (src/execution/administrative.py). Already INCLUDED in ledger_cash_total;
     # carried separately so a divergence can be attributed.
     administrative_cash: float = 0.0
+    # Probe positions its committed records account for (hub ruling
+    # 2026-11-02 ②: attributable, not exempt). Already INCLUDED in
+    # ledger_positions; carried separately for attribution.
+    administrative_positions: dict[str, float] = field(default_factory=dict)
 
     @property
     def clean(self) -> bool:
@@ -103,6 +107,7 @@ class ReconciliationResult:
             "ledger_cash_total": self.ledger_cash_total, "broker_cash": self.broker_cash,
             "unallocated_cash": self.unallocated_cash,
             "administrative_cash": self.administrative_cash,
+            "administrative_positions": self.administrative_positions,
             "ledger_positions": self.ledger_positions, "broker_positions": self.broker_positions,
             "events": [e.to_dict() for e in self.events],
         }
@@ -111,7 +116,9 @@ class ReconciliationResult:
 def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
              cycle_id: str, *, cash_tolerance_usd: float,
              unallocated_cash_usd: float,
-             administrative_cash_usd: float = 0.0) -> ReconciliationResult:
+             administrative_cash_usd: float = 0.0,
+             administrative_positions: dict[str, float] | None = None,
+             ) -> ReconciliationResult:
     """Diff the aggregate pipeline ledger against broker-authoritative state.
 
     `portfolios` must be every ENABLED book's freshly-loaded (post-fill)
@@ -123,7 +130,13 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
     in the account (administrative.administrative_cash_usd). It is part of the
     cash no book owns, so it joins the unallocated term rather than widening
     the tolerance.
+
+    `administrative_positions` are the probe positions its committed records
+    account for (administrative.administrative_positions). They join the
+    ledger side, so an accounted probe position reconciles and does not halt.
+    A probe position the records do NOT account for still diverges and halts.
     """
+    administrative_positions = dict(administrative_positions or {})
     # Expected venue cash = what the books own + what the account holds outside
     # any book (registered baseline + administrative residual). Every term is in
     # the record so a divergence is attributable.
@@ -137,6 +150,8 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
             # signed share counts across books, not valuing them, is what
             # makes this comparable to the venue's own signed qty.
             ledger_positions[ticker] = ledger_positions.get(ticker, 0.0) + h.shares
+    for ticker, q in administrative_positions.items():
+        ledger_positions[ticker] = ledger_positions.get(ticker, 0.0) + q
     # Dust the aggregate exactly as Portfolio.sweep_ghost_positions does at
     # the book level, so summing several books' fractional shares doesn't
     # fail on float noise around a genuinely flat position.
@@ -176,6 +191,7 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
         ledger_positions=ledger_positions, broker_positions=broker_positions,
         events=events, unallocated_cash=unallocated_cash_usd,
         administrative_cash=administrative_cash_usd,
+        administrative_positions=administrative_positions,
     )
 
 
@@ -234,15 +250,17 @@ def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
     portfolio-package import cycle with execution."""
     from ..config_loader import load_settings, reconciliation_params
     from ..portfolio.portfolio import load_portfolio
-    from .administrative import administrative_cash_usd
+    from .administrative import administrative_cash_usd, administrative_positions
     settings = load_settings()
     params = reconciliation_params(settings)
     portfolios = [load_portfolio(k) for k in enabled_book_keys]
-    # Keyed on the same mode reconciliation_params resolved the baseline for:
-    # probe records are broker_paper-only, so a live cycle gets 0 by construction.
-    admin_cash = administrative_cash_usd(settings.get("mode", "paper"))
+    # Keyed on the same mode reconciliation_params resolved the baseline for.
+    # Both readers return nothing for any mode but broker_paper, so a live
+    # cycle never counts a probe term.
+    mode = settings.get("mode", "paper")
     result = reconcile(portfolios, broker, cycle_id, **params,
-                       administrative_cash_usd=admin_cash)
+                       administrative_cash_usd=administrative_cash_usd(mode),
+                       administrative_positions=administrative_positions(mode))
     record_reconciliation(result)
     handle_reconciliation_result(result, portfolios)
     return result

@@ -18,9 +18,25 @@ component. It is not tolerance. Without it, enough runs would add up past the
 $1.00 cash tolerance and raise a G-BOOK event, halting every book over orders
 no book placed.
 
-Positions are deliberately NOT carved out. A probe run that cannot get back to
-flat leaves a venue position that no book claims. That is real account state,
-and level 2 should see it and halt; it is not to be excused from a log line.
+Positions are ATTRIBUTABLE, not exempt (hub ruling 2026-11-02 ②). Probe
+activity is excluded from research estimands and never from integrity checks.
+A probe position is real: it consumes buying power and carries market risk. So
+level 2 still compares it, but against the probe's own recorded state, the same
+shape as unallocated cash:
+
+  * a position the probe's committed records account for (the sum of each
+    FINISHED record's `position_delta`) is expected, joins the ledger side, and
+    reconciles without halting;
+  * a position the probe does not account for is unexplained and halts every
+    book, exactly as any other divergence.
+
+The probe also raises CRITICAL on its own stuck position the moment it sees
+one, so it gets fixed in minutes rather than found by a halt. Its next
+scheduled run closes the attributed position first and records the negative
+delta.
+
+Broker-paper only. Live probe records cannot exist (the probe refuses any
+other endpoint), and neither function below ever counts one for `live`.
 """
 from __future__ import annotations
 
@@ -65,6 +81,30 @@ def probe_records(probe_dir: Path | None = None) -> list[dict]:
     return out
 
 
+PROBE_MODE = "broker_paper"
+
+
+def _finished(mode: str, probe_dir: Path | None) -> list[dict]:
+    if mode != PROBE_MODE:
+        return []
+    return [r for r in probe_records(probe_dir)
+            if r.get("phase") == "FINISHED" and r.get("mode") == PROBE_MODE]
+
+
+def administrative_positions(mode: str, probe_dir: Path | None = None) -> dict[str, float]:
+    """Net shares, by ticker, the committed probe runs account for as open.
+
+    The sum of `position_delta` over FINISHED records. A run whose delta is
+    unmeasured (None) contributes nothing: an unmeasured position is not an
+    accounted one, so if it exists, level 2 reports it as unexplained.
+    """
+    totals: dict[str, float] = {}
+    for r in _finished(mode, probe_dir):
+        for ticker, q in (r.get("position_delta") or {}).items():
+            totals[ticker] = totals.get(ticker, 0.0) + float(q)
+    return {t: round(q, 9) for t, q in totals.items() if abs(q) > 1e-9}
+
+
 def administrative_cash_usd(mode: str, probe_dir: Path | None = None) -> float:
     """Net cash the committed probe runs have left in the `mode` account.
 
@@ -73,9 +113,7 @@ def administrative_cash_usd(mode: str, probe_dir: Path | None = None) -> float:
     moved is unattributed, and level 2 is right to report it.
     """
     total = 0.0
-    for r in probe_records(probe_dir):
-        if r.get("phase") != "FINISHED" or r.get("mode") != mode:
-            continue
+    for r in _finished(mode, probe_dir):
         v = r.get("residual_cash_usd")
         if v is not None:
             total += float(v)

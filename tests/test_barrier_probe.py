@@ -11,8 +11,11 @@ these tests pin the properties that keep those runs honest and harmless:
     state and reached the venue after it;
   * cleanup scoping selects only this run's FORCED_PROBE_ orders;
   * level-2 reconciliation adds the committed residual to the unallocated
-    term, so probe orders never enter the cash comparison, and never hides a
-    position;
+    term, so probe orders never enter the cash comparison. A probe position
+    is attributable, not exempt (hub ruling 2026-11-02 ②): a recorded one
+    reconciles, while an unrecorded or disagreeing one still halts. A stuck
+    position raises CRITICAL;
+  * the probe refuses every endpoint but paper;
   * the Executor's injection seam replaces the `__new__` bypass that killed
     the 2026-10-05 run.
 """
@@ -252,8 +255,25 @@ def test_administrative_cash_sums_finished_records_for_the_mode(tmp_path):
         {"phase": "FINISHED", "mode": "live", "residual_cash_usd": 5.0},
     ])
     assert adm.administrative_cash_usd("broker_paper", d) == pytest.approx(-0.16)
-    assert adm.administrative_cash_usd("live", d) == 5.0
+    # Broker-paper only: even a record claiming `live` is never counted.
+    assert adm.administrative_cash_usd("live", d) == 0.0
     assert adm.administrative_cash_usd("broker_paper", tmp_path / "absent") == 0.0
+
+
+def test_administrative_positions_sum_recorded_deltas_and_net_to_zero(tmp_path):
+    d = _write(tmp_path, [
+        {"phase": "FINISHED", "mode": "broker_paper", "position_delta": {}},
+        {"phase": "FINISHED", "mode": "broker_paper", "position_delta": {"F": 9.0991}},  # stuck
+        {"phase": "STARTED", "mode": "broker_paper", "position_delta": {"F": 50}},       # ignored
+        {"phase": "FINISHED", "mode": "broker_paper", "position_delta": None},           # unmeasured
+        {"phase": "FINISHED", "mode": "live", "position_delta": {"F": 3}},               # never live
+    ])
+    assert adm.administrative_positions("broker_paper", d) == {"F": 9.0991}
+    assert adm.administrative_positions("live", d) == {}
+    with open(d / "2026-11.jsonl", "a", encoding="utf-8") as f:   # the recovery run
+        f.write(json.dumps({"phase": "FINISHED", "mode": "broker_paper",
+                            "position_delta": {"F": -9.0991}}) + "\n")
+    assert adm.administrative_positions("broker_paper", d) == {}
 
 
 def test_malformed_probe_record_raises_rather_than_guessing(tmp_path):
@@ -290,10 +310,33 @@ def test_residual_is_carved_out_of_the_cash_comparison():
     assert with_admin.clean and with_admin.to_dict()["administrative_cash"] == -1.25
 
 
-def test_residual_never_excuses_a_stranded_probe_position():
+def test_unaccounted_probe_position_halts():
     broker = _Broker(2000.0 + 89999.99, positions=[("F", 10.0)])
     r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
                       unallocated_cash_usd=89999.99, administrative_cash_usd=0.0)
+    assert [e.ticker for e in r.events] == ["F"]
+
+
+def test_recorded_probe_position_reconciles_without_halting():
+    broker = _Broker(2000.0 + 89999.99, positions=[("F", 10.0)])
+    r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
+                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
+    assert r.clean and r.to_dict()["administrative_positions"] == {"F": 10.0}
+
+
+def test_recorded_probe_position_that_disagrees_with_the_venue_still_halts():
+    # The record says 10; the venue holds 14. The extra 4 is unexplained.
+    broker = _Broker(2000.0 + 89999.99, positions=[("F", 14.0)])
+    r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
+                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
+    assert [(e.ticker, e.delta) for e in r.events] == [("F", -4.0)]
+
+
+def test_recorded_position_the_venue_no_longer_holds_halts():
+    # Flattened by hand without a probe record: the record is now wrong.
+    broker = _Broker(2000.0 + 89999.99)
+    r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
+                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
     assert [e.ticker for e in r.events] == ["F"]
 
 
@@ -301,7 +344,8 @@ def test_post_cycle_hook_reads_the_committed_residual(tmp_path, monkeypatch):
     from src import config_loader
     import src.portfolio.portfolio as pf
     import src.alerts.alerter as alerter
-    d = _write(tmp_path, [{"phase": "FINISHED", "mode": "broker_paper", "residual_cash_usd": -1.5}])
+    d = _write(tmp_path, [{"phase": "FINISHED", "mode": "broker_paper", "residual_cash_usd": -1.5,
+                           "position_delta": {"F": 2.5}}])
     monkeypatch.setattr(adm, "PROBE_DIR", d)
     monkeypatch.setattr(rec, "RECONCILIATION_DIR", tmp_path / "rec")
     monkeypatch.setattr(rec, "save_portfolio", lambda p: None)
@@ -310,8 +354,118 @@ def test_post_cycle_hook_reads_the_committed_residual(tmp_path, monkeypatch):
     monkeypatch.setattr(config_loader, "load_settings", lambda: {
         "mode": "broker_paper", "reconciliation": {
             "cash_tolerance_usd": 1.0, "unallocated_cash_usd": {"broker_paper": 89999.99}}})
-    r = rec.run_post_cycle_reconciliation(_Broker(2000.0 + 89999.99 - 1.5), "c9", ["claude"])
+    r = rec.run_post_cycle_reconciliation(
+        _Broker(2000.0 + 89999.99 - 1.5, positions=[("F", 2.5)]), "c9", ["claude"])
     assert r.clean and r.administrative_cash == -1.5
+    assert r.administrative_positions == {"F": 2.5}
+
+
+# ------------------------------------------------------- paper-only boundary
+class _Client:
+    def __init__(self, mode, url):
+        self.mode, self.base_url = mode, url
+
+
+def test_paper_only_boundary():
+    bp.assert_paper_only(_Client("broker_paper", "https://paper-api.alpaca.markets"))
+    for c in (_Client("live", "https://api.alpaca.markets"),
+              _Client("broker_paper", "https://api.alpaca.markets"),
+              _Client("live", "https://paper-api.alpaca.markets")):
+        with pytest.raises(SystemExit):
+            bp.assert_paper_only(c)
+
+
+def test_probe_workflow_passes_no_live_credentials():
+    wf = (Path(__file__).resolve().parent.parent / ".github" / "workflows"
+          / "barrier_probe.yml").read_text(encoding="utf-8")
+    assert "ALPACA_LIVE" not in wf
+
+
+# ------------------------------------------------- settle_record and CRITICAL
+CYC = "20261103T153801Z"
+
+
+class _Venue:
+    """Scripted venue state after a run: this run's orders and the F position."""
+    def __init__(self, orders, f_qty, cash=99999.99):
+        self.orders, self.f_qty, self.cash = orders, f_qty, cash
+
+    def _request(self, method, path, params=None, body=None):
+        if path == "/v2/orders":
+            if (params or {}).get("status") == "open":
+                return []
+            return self.orders
+        if path == "/v2/account/configurations":
+            return {"no_shorting": True, "max_margin_multiplier": "1"}
+        raise AssertionError(path)
+
+    def get_account(self):
+        return {"cash": str(self.cash), "multiplier": "1"}
+
+    def get_positions(self):
+        return [{"symbol": "F", "qty": str(self.f_qty)}] if self.f_qty else []
+
+
+def _o(book, side, qty, price):
+    return {"client_order_id": f"{book}-{CYC}-00-a0", "side": side,
+            "filled_qty": str(qty), "filled_avg_price": str(price), "symbol": "F"}
+
+
+@pytest.fixture
+def alerts(monkeypatch):
+    sent = []
+    monkeypatch.setattr(bp, "raise_critical", lambda t, b, c: sent.append((t, b, c)) or True)
+    return sent
+
+
+def _settle(venue, attributed=0.0, recovery=False, clean=True):
+    rec_ = {"account_before": {"cash": 99999.99}, "cleanup": {"clean": clean}}
+    code = bp.settle_record(venue, rec_, CYC, datetime.now(timezone.utc),
+                            attributed, recovery, bp.EXIT_OK)
+    return code, rec_
+
+
+def test_flat_run_records_no_position_and_no_alert(alerts):
+    v = _Venue([_o(bp.SEED_BOOK, "buy", 10, 11), _o(bp.SELL_BOOK, "sell", 10, 11),
+                _o(bp.BUY_BOOK, "buy", 9, 11), _o(bp.CLEANUP_BOOK, "sell", 9, 11)], 0)
+    code, r = _settle(v)
+    assert code == bp.EXIT_OK and r["position_delta"] == {} and alerts == []
+
+
+def test_stuck_position_is_recorded_and_raises_critical(alerts):
+    v = _Venue([_o(bp.SEED_BOOK, "buy", 10, 11), _o(bp.SELL_BOOK, "sell", 10, 11),
+                _o(bp.BUY_BOOK, "buy", 9, 11)], 9.0, cash=99999.99 - 99)
+    code, r = _settle(v, clean=False)
+    assert code == bp.EXIT_FAIL
+    assert r["position_delta"] == {"F": 9.0}        # attributable: level 2 reconciles it
+    assert len(alerts) == 1 and "recorded" in alerts[0][1] and r["critical_alert"]
+
+
+def test_position_the_fills_do_not_explain_is_unaccounted(alerts):
+    v = _Venue([_o(bp.SEED_BOOK, "buy", 10, 11), _o(bp.SELL_BOOK, "sell", 10, 11)], 4.0)
+    code, r = _settle(v)
+    assert code == bp.EXIT_FAIL and r["position_delta"] is None   # level 2 halts
+    assert len(alerts) == 1 and "unaccounted" in alerts[0][1]
+
+
+def test_unmeasurable_run_is_unaccounted(alerts):
+    class Down(_Venue):
+        def _request(self, *a, **k):
+            raise ConnectionError("venue down")
+    code, r = _settle(Down([], 0))
+    assert code == bp.EXIT_FAIL and r["position_delta"] is None and r["residual_cash_usd"] is None
+    assert len(alerts) == 1
+
+
+def test_recovery_run_records_the_negative_delta(alerts):
+    v = _Venue([_o(bp.CLEANUP_BOOK, "sell", 9.0, 11)], 0)
+    code, r = _settle(v, attributed=9.0, recovery=True)
+    assert code == bp.EXIT_OK and r["position_delta"] == {"F": -9.0} and alerts == []
+
+
+def test_position_explained():
+    assert bp.position_explained(9.0991, 9.0991) and bp.position_explained(0.0, 0.0)
+    assert not bp.position_explained(10.0, 0.0)
 
 
 # --------------------------------------------------------------- executor seam
