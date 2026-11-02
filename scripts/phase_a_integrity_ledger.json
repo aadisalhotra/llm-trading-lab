@@ -1913,6 +1913,60 @@
         "exit_status": "0 for CLEARS or a recorded skip; 1 for FAILED, INCONCLUSIVE, aborted, an unclean cleanup or an unmet precondition, which turns the workflow run red.",
         "verified": "tests/test_barrier_probe.py, 36 tests: window and DST crons (read from the workflow file), the production guard keying on the 'run' job (the chain job keeps intraday runs in_progress all session), fail-closed, cleanup scoping, scoring, the reconciliation carve-out, and that a stranded position is still reported. Full suite 622 passed. Against the venue with the market closed: two dry runs aborted cleanly (seed queued, cancelled unfilled), the account was unchanged, and the exit status was 1. The production guard was checked against the live GitHub API.",
         "status": "Not yet run against an open market. The first scheduled attempt is 2026-11-03 15:38 UTC (10:38 ET), and only if this package is pushed before then."
+      },
+      {
+        "id": "session_cycles_11_30_slot_ruled",
+        "date": "2026-11-02",
+        "type": "amendment_by_append",
+        "amends": "operational_events.2026-11[session_cycles_verified_2026_11_02].edt_comparison.status",
+        "authority": "Hub dispatch 2026-11-02 close (push approval of 2fa1f473f and 94ea08545, four rulings), ruling 1.",
+        "ruling": "DECIDED: not a shifted slot. The DST question was whether slots moved by an hour. They did not. All 13 fired, all stamped EST, including the 15:30 slot the old chain dropped in EST.",
+        "why_the_band_is_not_a_test": "The EDT band (+1:58 .. +2:52) is the minimum and maximum of one 13-slot session, so it has no statistical content. A second session exceeds it about half the time by construction. An 18 s exceedance at 11:30 (+3:10) is noise against a one-session envelope, not evidence.",
+        "no_timing_instrument": "None is to be built. Nothing downstream depends on sub-minute slot latency."
+      },
+      {
+        "id": "paper_account_options_level_disclosed",
+        "date": "2026-11-02",
+        "type": "amendment_by_append",
+        "amends": "operational_events.2026-11[paper_account_configuration_aligned_2026_11_02].read_from_the_venue.options",
+        "authority": "Hub dispatch 2026-11-02 close (push approval of 2fa1f473f and 94ea08545, four rulings), ruling 3. The hub asked for this to be folded into the configuration entry. That entry was pushed (94ea08545) before the ruling and the ledger does not edit a pushed entry, so it is folded by an amendment scoped to that entry's options field rather than opened as a separate topic.",
+        "finding": "The options level is a DISCLOSED, NON-LOAD-BEARING venue mismatch. The PI confirms the Alpaca dashboard does not let a paper account's options level be changed. That is a venue limitation, not a missed setting.",
+        "why_non_load_bearing": "The pipeline has no code path that submits an option order, so the permission cannot be reached from the system under test. It is unlike the margin finding, which was load-bearing: margin changed settled-cash semantics and removed the venue-side free-riding backstop.",
+        "decisive_test": {
+          "question": "Does anything beyond the multiplier extend credit? If so, the mismatch is not cosmetic.",
+          "read": "GET /v2/account, 2026-11-02 18:11 ET, from the API, not the dashboard: cash 99999.99; buying_power 99999.99; regt_buying_power 99999.99; non_marginable_buying_power 99999.99; options_buying_power 99999.99; effective_buying_power 99999.99; daytrading_buying_power null; multiplier '1'; initial_margin 0; maintenance_margin 0. Re-read 18:16 ET: cash and buying_power still 99999.99.",
+          "result": "PASS. Buying power equals cash on every field, and the multiplier is 1. Nothing extends credit, so the options level is inert."
+        },
+        "activity_update": "One more barrier-probe dry-run seed has been submitted since the configuration entry: FORCED_PROBE_SEED-20261102T231608Z-00-a0, buy 10 F, cancelled with 0 filled. That makes three such orders since 2026-10-04, all cancelled unfilled. The account is unchanged."
+      },
+      {
+        "id": "barrier_probe_positions_attributable",
+        "date": "2026-11-02",
+        "type": "infrastructure",
+        "supersedes": "operational_events.2026-11[barrier_probe_scheduled_job_landed].deliberate_exception (that entry is not edited)",
+        "authority": "Hub dispatch 2026-11-02 close (push approval of 2fa1f473f and 94ea08545, four rulings), ruling 2.",
+        "commit": "b29acbfbe",
+        "principle": "Probe activity is excluded from research estimands and never from integrity checks. An unaccounted position is a real position: it consumes buying power, carries market risk, and from Phase B would be real money. Reconciliation must see it.",
+        "ruling": "The dispatch (exempt the position) was wrong, and the build (halt every book on it) was right in principle but fragile: during the validation month it could cost a validation day, the scarce resource. A probe position is ATTRIBUTABLE, not exempt, the same shape as unallocated_cash_usd.",
+        "mechanism": {
+          "recorded": "Every FINISHED probe record carries position_delta: the probe's net shares from its own venue fills in that run, cross-checked against the venue's position. src/execution/administrative.administrative_positions sums the deltas.",
+          "reconciles": "Level-2 reconciliation adds those positions to the ledger side and records them as administrative_positions. A position the probe records as open reconciles against that record and does not halt.",
+          "halts": "A position the probe does not account for still halts every book, exactly as before: one that is unrecorded, one whose delta could not be measured (position_delta null), or one that disagrees with the record in either direction, including a recorded position someone flattened by hand without a probe record.",
+          "critical": "The probe raises CRITICAL (kind barrier_probe, by the pipeline's Gmail path) the moment it finds its own stuck position or one it cannot explain, so it is fixed in minutes rather than discovered by a halt. It refuses to trade on top of an unexplained position.",
+          "recovery": "The next run that finds a recorded stuck position closes it first and records the negative delta, even if a COMPLETED run is already logged that day. Contention waits for the following attempt."
+        },
+        "paper_only": "The probe runs against broker-paper only, never the live endpoint. From 2026-12-01 live is real capital and a probe has no business in it. Enforced by scripts/barrier_probe.assert_paper_only, a real check rather than an `assert` (stripped under -O): it refuses any mode but broker_paper and any endpoint but https://paper-api.alpaca.markets. The workflow passes no live credentials, and both administrative readers return nothing for any mode but broker_paper.",
+        "verified": "tests/test_barrier_probe.py, 48 tests, adding: a recorded position reconciles; unrecorded, disagreeing and hand-flattened positions halt; stuck, unexplained and unmeasurable runs each raise one CRITICAL; a recovery run records the negative delta; the paper-only boundary; no live credentials in the workflow. Full suite 634 passed. Dry run against the venue (market closed): aborted cleanly, position_delta {}, residual 0.00, no alert, exit 1."
+      },
+      {
+        "id": "prompt_hash_critical_delivery_unproven",
+        "date": "2026-11-02",
+        "type": "open_obligation",
+        "scope": "src/logging/prompt_integrity._alert -> src/alerts/alerter.send_alert -> email to the PI",
+        "authority": "Hub dispatch 2026-11-02 close (push approval of 2fa1f473f and 94ea08545, four rulings), ruling 4. Queued, not for tonight.",
+        "finding": "Detection is tested; delivery is not. tests/test_prompt_integrity.py proves a mismatch is detected and routed to a CRITICAL, but that CRITICAL has never fired in production, so it has never been shown to reach the PI.",
+        "obligation": "Before the lab relies on that alert for twelve months, prove the path end-to-end once: induce a mismatch in a controlled context and confirm the alert actually reaches the PI.",
+        "why": "An alert nobody receives is the same failure class as a probe that exits 0 (rule 9)."
       }
     ]
   }
