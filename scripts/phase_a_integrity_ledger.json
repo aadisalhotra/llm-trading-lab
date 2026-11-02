@@ -1826,6 +1826,94 @@
         },
         "basis": "The confirmation rests on the observed step success plus the inspection above, which finds no reachable path by which this test could have been skipped or deselected. It is not a read of the pass line. Arming at 2026-10-31 stands on that basis."
       }
+    ],
+    "2026-11": [
+      {
+        "id": "session_cycles_verified_2026_11_02",
+        "date": "2026-11-02",
+        "type": "verification",
+        "scope": "intraday scheduling, all six arms; first EST session and the validation month's first trading day",
+        "verifies": "operational_events.2026-10[session_timing_calendar_close_and_et_chain].expected_cycle_counts.full_session_est (13, restated unchanged by operational_events.2026-10[session_timing_calendar_version_restatement])",
+        "authority": "Hub dispatch 2026-11-02 (Monday close, item 1): the registered DST verification.",
+        "count": "python scripts/verify_session_cycles.py 2026-11-02 at main 39a07223f: claude, claude_opus, deepseek, gemini, gpt, grok each 13/13 (09:30 .. 15:30 ET), OVERALL PASS, exit 0. The 15:30 slot the UTC chain dropped in EST is present.",
+        "first_invocation": "Exited 2 ('no decision-log ticks dated 2026-11-02') because the local checkout was 17 cron ticks behind origin/main. Re-run after a fast-forward. The verifier reads the checkout it is given; a stale checkout reads as missing cycles, not as a pass.",
+        "slot_timings": {
+          "source": "fetch_started_at in data/trades/{book}_2026-11.jsonl. It is one shared fetch per tick and identical across all six books.",
+          "lag_after_boundary": {
+            "09:30": "+2:51",
+            "10:00": "+2:40",
+            "10:30": "+2:19",
+            "11:00": "+2:30",
+            "11:30": "+3:10",
+            "12:00": "+2:38",
+            "12:30": "+2:27",
+            "13:00": "+2:24",
+            "13:30": "+2:21",
+            "14:00": "+2:39",
+            "14:30": "+2:10",
+            "15:00": "+2:28",
+            "15:30": "+2:09"
+          },
+          "range": "+2:09 .. +3:10"
+        },
+        "edt_comparison": {
+          "edt_band": "+1:58 .. +2:52, the 2026-10-26 session's per-slot range. Recomputed here from data/trades/{book}_2026-10.jsonl, not restated: the band appears in no ledger entry or doc in the repo.",
+          "result": "12 of 13 EST slots inside the EDT band. 11:30 ET is outside it at +3:10, 18 s above the band's ceiling. No slot is shifted by an hour and none is missing.",
+          "what_the_band_is": "The min and max of one 13-slot session. That is an observed range, not a tolerance. A new 13-slot session exceeds an old one's max about half the time by construction, so an 18 s exceedance does not by itself distinguish a DST shift from cron jitter.",
+          "status": "NOT ADJUDICATED. Whether the 11:30 slot counts as 'a green count with a shifted slot' is the hub's call."
+        }
+      },
+      {
+        "id": "rendered_prompt_hash_check_first_armed_cycle",
+        "date": "2026-11-02",
+        "type": "confirmation",
+        "confirms": "operational_events.2026-10[rendered_prompt_hash_check_arming_basis_amended]",
+        "authority": "Hub dispatch 2026-11-02 (Monday close, item 2). The hub relayed the result; Operations read it from the committed file, not from the relay.",
+        "observed": "data/prompt_integrity/2026-11.jsonl at main 39a07223f: 13 records for 2026-11-02, one per cycle, every one status 'match'. First: boundary 2026-11-02T09:32:50.967323-05:00, checked_at 2026-11-02T14:36:42.341349Z, combined_sha256 b415afcb588792873743df073fac242f642a60f19508d4a414add356c87e38b7.",
+        "against_the_reference": "Equal to reference_combined_sha256 in every record and to combined_sha256 in data/pre_registration/prompt_golden_reference_v4.json (frozen_commit 00557e557dd3cf9bbd911ac6b362ff8370d1e6fb). All four component hashes equal the reference's, and fixture_sha256_lf equals the reference's fa5186318cc82b78c0fb53fc051d08b559161d56bb4af3bf25a2f9327baf5a7b.",
+        "environment": "Production: Python 3.11.17, numpy 2.4.6, pandas 3.1.0. The reference was rendered on Python 3.14.4, numpy 2.4.4, pandas 3.0.2 (Windows), so the match is identity across environments, not a re-render on the reference's own.",
+        "residual_closed": "Arming at 2026-10-31 stood on inspection (no reachable skip path) plus the suite step's success, not on an observed pass line. The instrument has now operated in production, at every cycle of the first armed session, and matched. That closes the residual by observation.",
+        "mismatch_path": "Read at HEAD in src/logging/prompt_integrity.py: _alert returns silently only on 'match'. 'mismatch' sends a CRITICAL ('Frozen prompt drift'); any other status ('render_error', 'fixture_changed', ...) sends a WARN. A non-matching render would have alerted, not passed silently. The CRITICAL path has not fired in production; tests/test_prompt_integrity.py covers it."
+      },
+      {
+        "id": "paper_account_configuration_aligned_2026_11_02",
+        "date": "2026-11-02",
+        "type": "venue_configuration",
+        "scope": "Alpaca paper account (broker_paper), the account the validation month trades in",
+        "authority": "Hub dispatch 2026-11-02 (Monday close, item 3).",
+        "as_relayed": "On 2026-11-02 the paper account was changed to margin multiplier 1, shorting disabled, options disabled, matching the live account approved the same day, which is a cash account.",
+        "read_from_the_venue": {
+          "when": "2026-11-02 17:53 ET, GET /v2/account and /v2/account/configurations. Identifiers are not recorded (the repo is public).",
+          "margin": "CONFIRMED. account.multiplier '1'; configurations.max_margin_multiplier '1'.",
+          "shorting": "CONFIRMED disabled. account.shorting_enabled false; configurations.no_shorting true.",
+          "options": "NOT CONFIRMED. account.options_trading_level 3 and options_approved_level 3. configurations returns no max_options_trading_level key. Nothing the API returns shows options disabled. Open: the PI should check the dashboard setting against this. The barrier probe records all of these fields on every run, so any later change shows in data/barrier_probe/.",
+          "other": "configurations.fractional_trading true; status ACTIVE; trading_blocked false."
+        },
+        "baseline": "reconciliation.unallocated_cash_usd.broker_paper = 89999.99 stands. Cash read from the API is 99999.99 (equity 99999.99), 0 positions, 0 open orders: unchanged from the 2026-10-04 dashboard read the baseline was registered from.",
+        "activity_since_baseline": "GET /v2/orders?status=all since 2026-10-04 returns two orders, both administrative: FORCED_PROBE_SEED-20261102T230051Z-00-a0 and FORCED_PROBE_SEED-20261102T230128Z-00-a0, buy 10 F each. They were barrier-probe dry runs, submitted after the close and cancelled with 0 filled. /v2/account/activities since 2026-10-04 is empty. The 2026-10-05 probe submitted nothing; it died before its first order.",
+        "no_e2e": "No E2E has run in this account, which the order and activity history above confirms. The pre-change configuration (margin, shorting enabled) was therefore never validated against. That is true only by timing: nothing prevented an E2E from running against it."
+      },
+      {
+        "id": "barrier_probe_scheduled_job_landed",
+        "date": "2026-11-02",
+        "type": "infrastructure",
+        "scope": "Alpaca paper account; P1 cross-book barrier (src/execution/barrier.py)",
+        "authority": "Hub dispatch 2026-11-02 (Monday close, item 4): build the barrier probe as a scheduled job.",
+        "commit": "2fa1f473f",
+        "cause_of_the_misses": "Two different causes. 2026-09-14 was scheduling: the machine was off. 2026-10-05 was not: the task fired at 09:35:01 ET with the market open, and both book threads died on AttributeError: 'Executor' object has no attribute 'venue_books' (the probe built its Executor with __new__). The run then exited 0 with verdict INCONCLUSIVE and outcome COMPLETED, an instrument reporting success while measuring nothing (rule 9). The build fixes both causes.",
+        "spec_to_mechanism": {
+          "standalone_broker_paper": "scripts/barrier_probe.py builds its own broker_paper Executor through new constructor seams (settings=, venue_books=) whatever the committed mode is. Production passes neither, so its construction is unchanged. It does not require the cutover.",
+          "scheduled_rth_unattended": ".github/workflows/barrier_probe.yml, crons 15:38 and 17:08 UTC Mon-Fri (10:38/12:08 EST, 11:38/13:08 EDT). GitHub Actions, so it needs no desktop. The second attempt is a no-op once a run has COMPLETED that day. Every run, skip included, appends to data/barrier_probe/YYYY-MM.jsonl and the workflow commits it.",
+          "genuine_contention": "FORCED_PROBE_SELL holds a seeded 10 F and intends SELL; FORCED_PROBE_BUY intends BUY (~$100). Same ticker, same cycle, through the production Executor and CycleBarrier on real threads against the real venue. Recorded: engaged, winner vs rule 2's prediction (sell-side), the winner's terminal venue state and filled_at, and for each held intent whether it released on terminal or on timeout, its venue submitted_at, and whether that is at or after the winner's filled_at.",
+          "administrative_and_censored": "Every order id starts FORCED_PROBE_, the FORCED_ stem research_metrics._is_administrative censors (same handling as FORCED_BOUNDARY_ADMIN). The books exist only in memory and the probe writes no state, trades or decision-log file.",
+          "out_of_reconciliation_and_estimands": "F is not in config/universe.json, so no book can trade or contend on it. Cleanup cancels and flattens only this run's own orders and F position; it never calls DELETE /v2/orders. Each run records residual_cash_usd: the account's cash delta when no other order filled in the window, else the probe's own fills. src/execution/administrative.py sums the committed residuals, and level-2 reconciliation adds them to the unallocated term as a separate, recorded component (administrative_cash). The cash comparison therefore never sees probe orders, and the $1.00 tolerance is not widened.",
+          "non_interfering": "Starts only in minutes 6-18 of a half-hour slot (production cycles fire at :00/:30 and fetch ~2-3 min after), with no intraday 'run' job queued or in progress per the GitHub Actions API (fails closed: unverifiable means skip), at least 30 min before the close, and with F flat. It submits nothing after minute 25 of the slot. It is in its own concurrency group, not intraday-pipeline, so a pending probe can never displace a pending production tick."
+        },
+        "deliberate_exception": "A stranded probe position is NOT carved out of reconciliation. If cleanup cannot return F to flat, level 2 sees a position no book claims and halts, and the run exits non-zero. Excusing a real venue position on the strength of a log line would hide the failure class level 2 exists to catch. Flagged for hub ruling, not silently decided.",
+        "exit_status": "0 for CLEARS or a recorded skip; 1 for FAILED, INCONCLUSIVE, aborted, an unclean cleanup or an unmet precondition, which turns the workflow run red.",
+        "verified": "tests/test_barrier_probe.py, 36 tests: window and DST crons (read from the workflow file), the production guard keying on the 'run' job (the chain job keeps intraday runs in_progress all session), fail-closed, cleanup scoping, scoring, the reconciliation carve-out, and that a stranded position is still reported. Full suite 622 passed. Against the venue with the market closed: two dry runs aborted cleanly (seed queued, cancelled unfilled), the account was unchanged, and the exit status was 1. The production guard was checked against the live GitHub API.",
+        "status": "Not yet run against an open market. The first scheduled attempt is 2026-11-03 15:38 UTC (10:38 ET), and only if this package is pushed before then."
+      }
     ]
   }
 }
