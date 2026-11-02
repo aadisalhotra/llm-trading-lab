@@ -1,0 +1,100 @@
+name: Barrier Probe
+
+# Scheduled P1 cross-book barrier probe (scripts/barrier_probe.py). Runs
+# unattended during RTH against the Alpaca paper account, independent of the
+# pipeline's committed mode, and commits its record to data/barrier_probe/.
+#
+# Why Actions, not Task Scheduler: three desktop attempts missed. 2026-09-14
+# missed because the machine was off. 2026-10-05 fired on time and died on a
+# code defect (the Executor `__new__` bypass), then exited 0 on an
+# INCONCLUSIVE. Actions removes the machine dependency. The script's exit code
+# removes the silent-success failure.
+#
+# Two attempts per trading day. Both crons land at minute 8 of a half-hour
+# slot in EST and EDT alike:
+#   15:38 UTC = 10:38 EST / 11:38 EDT
+#   17:08 UTC = 12:08 EST / 13:08 EDT
+# The script skips (and records the skip) outside minutes 6-18 of the slot,
+# when an intraday `run` job is queued or in progress, on a closed market, or
+# within 30 min of the close. The second attempt is a no-op once the first
+# has COMPLETED. To stop the probe, disable this workflow in the Actions UI.
+on:
+  schedule:
+    - cron: "38 15 * * 1-5"
+    - cron: "8 17 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: read
+
+# Never two probes at once. Deliberately NOT the intraday-pipeline group:
+# sharing it would let a pending probe displace a pending production tick.
+concurrency:
+  group: barrier-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          # The production lock, exactly as intraday.yml installs it.
+          python -m pip install "pip==26.2.2"
+          pip install --no-deps -r requirements.txt
+          pip check
+
+      - name: Run barrier probe
+        id: probe
+        continue-on-error: true
+        env:
+          ALPACA_PAPER_KEY: ${{ secrets.ALPACA_PAPER_KEY }}
+          ALPACA_PAPER_SECRET: ${{ secrets.ALPACA_PAPER_SECRET }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/barrier_probe.py
+
+      - name: Commit probe record
+        if: always()
+        run: |
+          git config user.name "llm-trading-lab-bot"
+          git config user.email "actions@github.com"
+          git add data/barrier_probe/ || true
+          if git diff --cached --quiet; then
+            echo "No probe record to commit."
+            exit 0
+          fi
+          git commit -m "barrier probe $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Same rebase-and-retry as intraday.yml. The probe touches only
+          # data/barrier_probe/, so a cron tick landing first rebases cleanly.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              echo "Pushed probe record [attempt ${attempt}]"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $(( attempt * 5 ))
+          done
+          echo "::error::Could not push the probe record after 5 attempts."
+          exit 1
+
+      - name: Fail the run if the probe did not clear
+        if: steps.probe.outcome == 'failure'
+        run: |
+          echo "::error::Barrier probe exited non-zero: FAILED, INCONCLUSIVE, aborted, unclean cleanup or unmet precondition. Read data/barrier_probe/."
+          exit 1

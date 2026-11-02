@@ -151,8 +151,18 @@ class _SizedOrder:
 class Executor:
     """Single executor across the simulator, broker-paper and live modes."""
 
-    def __init__(self, cycle_id: str | None = None) -> None:
-        self.settings = load_settings()
+    def __init__(self, cycle_id: str | None = None, *,
+                 settings: dict[str, Any] | None = None,
+                 venue_books: set[str] | frozenset[str] | None = None) -> None:
+        # `settings` and `venue_books` are injection seams for callers that
+        # must run the real broker path without the committed mode or cohort
+        # -- the barrier probe (scripts/barrier_probe.py) runs broker_paper
+        # with synthetic administrative books while production is still
+        # `paper`. Production passes neither. They exist so no caller builds an
+        # Executor with `__new__` and hand-set attributes: the 2026-10-05 probe
+        # did, and died on the first attribute the constructor gained after it
+        # was written (`venue_books`).
+        self.settings = settings if settings is not None else load_settings()
         self.mode = self.settings["mode"]
         self.broker: BrokerClient | None = None
         # Order tagging. Every order carries its book identity via
@@ -165,7 +175,8 @@ class Executor:
         # even in a broker mode (DeepSeek: exploratory, paper-only, hub-ruled).
         self.venue_books: frozenset[str] = frozenset()
         if self.mode in BROKER_MODES:
-            self.venue_books = frozenset(live_cohort_keys(self.settings))
+            self.venue_books = (frozenset(venue_books) if venue_books is not None
+                                else frozenset(live_cohort_keys(self.settings)))
             exec_cfg = (self.settings.get("execution") or {})
             self.broker = BrokerClient(
                 self.mode,

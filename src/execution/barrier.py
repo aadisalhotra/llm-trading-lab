@@ -167,6 +167,22 @@ class CycleBarrier:
         self._built = True
         self._plan_ready.set()
 
+    def plan(self) -> dict[str, dict]:
+        """Read-only view of the built plan: for each contended ticker, the
+        winner and the held (book, action) pairs with whether each gate has
+        released. Empty until the plan is built, and for an uncontended cycle.
+        Observability for the barrier probe; nothing in the execution path
+        reads it."""
+        with self._lock:
+            out: dict[str, dict] = {}
+            for ticker, (book, action) in self._winners.items():
+                out[ticker] = {
+                    "winner": {"book": book, "action": action},
+                    "held": [{"book": b, "action": a, "released": g.is_set()}
+                             for (t, b, a), g in self._gates.items() if t == ticker],
+                }
+            return out
+
     def gate_for(self, book: str, ticker: str, action: str) -> threading.Event | None:
         """Whether (book, ticker, action) is a held order, and its release gate."""
         return self._gates.get((ticker, book, action))

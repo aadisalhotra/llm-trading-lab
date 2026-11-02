@@ -87,6 +87,10 @@ class ReconciliationResult:
     broker_positions: dict[str, float]
     events: list[GBookEvent] = field(default_factory=list)
     unallocated_cash: float = 0.0
+    # The part of unallocated cash left by administrative probe orders
+    # (src/execution/administrative.py). Already INCLUDED in ledger_cash_total;
+    # carried separately so a divergence can be attributed.
+    administrative_cash: float = 0.0
 
     @property
     def clean(self) -> bool:
@@ -98,6 +102,7 @@ class ReconciliationResult:
             "books": self.books, "clean": self.clean,
             "ledger_cash_total": self.ledger_cash_total, "broker_cash": self.broker_cash,
             "unallocated_cash": self.unallocated_cash,
+            "administrative_cash": self.administrative_cash,
             "ledger_positions": self.ledger_positions, "broker_positions": self.broker_positions,
             "events": [e.to_dict() for e in self.events],
         }
@@ -105,17 +110,25 @@ class ReconciliationResult:
 
 def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
              cycle_id: str, *, cash_tolerance_usd: float,
-             unallocated_cash_usd: float) -> ReconciliationResult:
+             unallocated_cash_usd: float,
+             administrative_cash_usd: float = 0.0) -> ReconciliationResult:
     """Diff the aggregate pipeline ledger against broker-authoritative state.
 
     `portfolios` must be every ENABLED book's freshly-loaded (post-fill)
     state for this cycle -- a stale or partial set produces a false G-BOOK
     event, so the caller reloads from disk after every book's thread has
     saved (see `run_post_cycle_reconciliation`).
+
+    `administrative_cash_usd` is the residual cash committed probe runs left
+    in the account (administrative.administrative_cash_usd). It is part of the
+    cash no book owns, so it joins the unallocated term rather than widening
+    the tolerance.
     """
     # Expected venue cash = what the books own + what the account holds outside
-    # any book. Both terms are in the record so a divergence is attributable.
-    ledger_cash_total = sum(p.cash for p in portfolios) + unallocated_cash_usd
+    # any book (registered baseline + administrative residual). Every term is in
+    # the record so a divergence is attributable.
+    ledger_cash_total = (sum(p.cash for p in portfolios) + unallocated_cash_usd
+                         + administrative_cash_usd)
     ledger_positions: dict[str, float] = {}
     for p in portfolios:
         for ticker, h in p.holdings.items():
@@ -162,6 +175,7 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
         ledger_cash_total=ledger_cash_total, broker_cash=broker_cash,
         ledger_positions=ledger_positions, broker_positions=broker_positions,
         events=events, unallocated_cash=unallocated_cash_usd,
+        administrative_cash=administrative_cash_usd,
     )
 
 
@@ -220,9 +234,15 @@ def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
     portfolio-package import cycle with execution."""
     from ..config_loader import load_settings, reconciliation_params
     from ..portfolio.portfolio import load_portfolio
-    params = reconciliation_params(load_settings())
+    from .administrative import administrative_cash_usd
+    settings = load_settings()
+    params = reconciliation_params(settings)
     portfolios = [load_portfolio(k) for k in enabled_book_keys]
-    result = reconcile(portfolios, broker, cycle_id, **params)
+    # Keyed on the same mode reconciliation_params resolved the baseline for:
+    # probe records are broker_paper-only, so a live cycle gets 0 by construction.
+    admin_cash = administrative_cash_usd(settings.get("mode", "paper"))
+    result = reconcile(portfolios, broker, cycle_id, **params,
+                       administrative_cash_usd=admin_cash)
     record_reconciliation(result)
     handle_reconciliation_result(result, portfolios)
     return result
