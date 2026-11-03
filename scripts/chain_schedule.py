@@ -29,6 +29,21 @@ there. The close comes from the gate job (scripts/check_trading_day.py
 --close), which has the NYSE calendar; an empty or malformed value falls back
 to 16:00, a full session. The pipeline's own is_market_open_now() remains the
 authority on whether a dispatched tick actually trades.
+
+The barrier probe rides the same chain (2026-11-03):
+
+    python scripts/chain_schedule.py --probe-slot
+    -> prints "probe <wait_s>" | "none 0"
+
+asked by intraday.yml's `probe-dispatch` job right after the `run` job of a
+slot finishes. On a nominated slot (PROBE_SLOTS_ET, in ET so it holds in both
+DST regimes) it answers "probe" with the seconds to wait until minute
+PROBE_DISPATCH_FLOOR_MIN of the slot; the job then dispatches barrier_probe.yml.
+The probe first ran on bare cron and GitHub delayed both of its 2026-11-03
+firings by over five hours (16:23 and 17:17 ET for 10:38 and 12:08): the
+backup-cron failure this chain exists to avoid. This answers only "is this a
+probe slot, and how long to wait"; scripts/barrier_probe.py stays the authority
+on the clock, its own window, production idleness and once-per-day.
 """
 from __future__ import annotations
 
@@ -42,6 +57,16 @@ FULL_SESSION_CLOSE = time(16, 0)
 EOD_DELAY = timedelta(minutes=65)   # close + 65 min: 17:05 ET on a full day
 SLOT = timedelta(minutes=30)
 DISPATCH_BUFFER = timedelta(seconds=30)  # land after the wall-clock minute rolls
+
+# Barrier-probe slots, ET slot starts. 10:30 and 12:00 are the slots the
+# probe's original crons targeted in EST; both leave >= 54 min to a 13:00
+# early close, so the probe's 30-min-to-close guard never decides alone.
+PROBE_SLOTS_ET = (time(10, 30), time(12, 0))
+# Dispatch no earlier than this minute of the slot. A probe run's setup
+# (runner + pip install) took 1:54 and 9:07 on 2026-11-03; dispatching at
+# minute 5 lands the probe's own start at minute ~7 or later, and the probe
+# skips (and records it) if setup pushes it past its own window.
+PROBE_DISPATCH_FLOOR_MIN = 5
 
 
 def parse_close(value: str | None) -> time:
@@ -83,15 +108,37 @@ def still_open(now_utc: datetime, close: time) -> bool:
     return slot_start.time() < close and now_et.weekday() < 5
 
 
+def probe_dispatch(now_utc: datetime) -> tuple[str, int]:
+    """('probe', seconds to wait) on a nominated probe slot, else ('none', 0).
+
+    The slot is the one now falls in -- the slot whose `run` job just finished.
+    A late run still in a nominated slot dispatches anyway: the probe records a
+    window SKIP, which is the honest outcome, rather than this script silently
+    deciding the probe's window for it."""
+    now_et = now_utc.astimezone(ET)
+    if now_et.weekday() >= 5:
+        return "none", 0
+    slot = now_et.replace(minute=(now_et.minute // 30) * 30, second=0, microsecond=0)
+    if slot.time() not in PROBE_SLOTS_ET:
+        return "none", 0
+    floor = slot + timedelta(minutes=PROBE_DISPATCH_FLOOR_MIN)
+    return "probe", max(int((floor - now_et).total_seconds()), 0)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--close-et", default="", help="the day's NYSE close, ET 'HH:MM' (default 16:00)")
     ap.add_argument("--still-open", action="store_true", help="post-sleep re-check")
+    ap.add_argument("--probe-slot", action="store_true",
+                    help="is the current slot a barrier-probe slot? 'probe <wait_s>' | 'none 0'")
     ap.add_argument("--now", help="ISO timestamp override (tests only)")
     args = ap.parse_args(argv)
     now = datetime.fromisoformat(args.now) if args.now else datetime.now(timezone.utc)
     close = parse_close(args.close_et)
-    if args.still_open:
+    if args.probe_slot:
+        action, wait = probe_dispatch(now)
+        print(f"{action} {wait}")
+    elif args.still_open:
         print("true" if still_open(now, close) else "false")
     else:
         action, wait = decide(now, close)

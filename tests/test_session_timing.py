@@ -156,3 +156,83 @@ def test_chain_dispatches_exactly_the_calendar_slots(day, expected):
     ran = _simulate_chain(day, close)
     assert len(ran) == expected, ran
     assert ran[-1] == {13: "15:30", 7: "12:30"}[expected]
+
+
+# ---------------------------------------------------------------- barrier probe
+# The probe rides the chain (2026-11-03): its bare crons were delayed 5+ hours
+# on its first real day. These pin the dispatch decision and its wiring.
+
+def utc_of(s: str) -> datetime:
+    return et(s).astimezone(timezone.utc)
+
+
+@pytest.mark.parametrize("day", ["2026-07-07", "2026-11-03"])   # EDT, EST
+@pytest.mark.parametrize("slot", ["10:30", "12:00"])
+def test_probe_slots_dispatch_at_minute_5_in_both_dst_regimes(day, slot):
+    # The `run` job finished 3 minutes in: wait until minute 5.
+    hh, mm = slot.split(":")
+    done = utc_of(f"{day} {hh}:{int(mm) + 3:02d}:00")
+    assert cs.probe_dispatch(done) == ("probe", 120)
+    # Finished after minute 5: dispatch at once.
+    late = utc_of(f"{day} {hh}:{int(mm) + 7:02d}:00")
+    assert cs.probe_dispatch(late) == ("probe", 0)
+
+
+@pytest.mark.parametrize("when", ["2026-11-03 09:34:00", "2026-11-03 10:04:00",
+                                  "2026-11-03 11:04:00", "2026-11-03 12:34:00",
+                                  "2026-11-03 15:34:00", "2026-11-03 17:10:00"])
+def test_other_slots_do_not_dispatch(when):
+    assert cs.probe_dispatch(utc_of(when)) == ("none", 0)
+
+
+def test_weekend_never_dispatches_the_probe():
+    assert cs.probe_dispatch(utc_of("2026-11-07 10:33:00")) == ("none", 0)
+
+
+def test_probe_cli_contract():
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cs.main(["--probe-slot", "--now", "2026-11-04T15:34:00+00:00"])   # 10:34 EST
+    assert buf.getvalue().split() == ["probe", "60"]
+
+
+def test_probe_slots_are_slots_the_chain_runs_and_fit_the_probe_window():
+    # Each nominated slot must be one the chain actually dispatches, on a full
+    # day and on an early close, and the dispatch floor must sit before the
+    # probe's own window opens (setup takes >= ~2 min), with room to the close.
+    from scripts import barrier_probe as bp
+    assert cs.PROBE_DISPATCH_FLOOR_MIN < bp.WINDOW_START_MIN
+    for day, close in (("2026-11-03", "16:00"), ("2026-11-27", "13:00")):
+        ran = _simulate_chain(day, close)
+        for slot in cs.PROBE_SLOTS_ET:
+            assert slot.strftime("%H:%M") in ran, (day, slot)
+            c = cs.parse_close(close)
+            to_close = (c.hour * 60 + c.minute) - (slot.hour * 60 + slot.minute + bp.WINDOW_END_MIN)
+            assert to_close >= bp.MIN_MINUTES_TO_CLOSE, (day, slot)
+
+
+def test_intraday_workflow_wires_the_probe_dispatch_off_the_chain():
+    from pathlib import Path
+    yaml = pytest.importorskip("yaml")
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent / ".github" / "workflows"
+                         / "intraday.yml").read_text(encoding="utf-8"))
+    jobs = wf["jobs"]
+    pd = jobs["probe-dispatch"]
+    assert set(pd["needs"]) == {"run", "gate"}
+    script = "\n".join(s.get("run", "") for s in pd["steps"])
+    assert "chain_schedule.py --probe-slot" in script
+    assert "workflows/barrier_probe.yml/dispatches" in script
+    # Standalone: a failed probe dispatch must never stop the trading chain or
+    # page CRITICAL, and its job name must not collide with the job the probe's
+    # idle check treats as production.
+    from scripts import barrier_probe as bp
+    assert "probe-dispatch" not in jobs["chain"]["needs"]
+    assert "probe-dispatch" not in jobs["notify-failure"]["needs"]
+    assert bp.PRODUCTION_JOB == "run" and "probe-dispatch" != bp.PRODUCTION_JOB
+    # The probe workflow must accept the dispatch and keep its backup crons.
+    probe = yaml.safe_load((Path(__file__).resolve().parent.parent / ".github" / "workflows"
+                            / "barrier_probe.yml").read_text(encoding="utf-8"))
+    on = probe[True] if True in probe else probe["on"]   # PyYAML reads `on:` as True
+    assert "workflow_dispatch" in on and len(on["schedule"]) == 2

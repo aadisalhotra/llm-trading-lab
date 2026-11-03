@@ -10,18 +10,29 @@ name: Barrier Probe
 # INCONCLUSIVE. Actions removes the machine dependency. The script's exit code
 # removes the silent-success failure.
 #
-# Two attempts per trading day. Both crons land at minute 8 of a half-hour
-# slot in EST and EDT alike:
+# TRIGGER (2026-11-03). PRIMARY: dispatched from intraday.yml's
+# `probe-dispatch` job right after the `run` job of a nominated slot finishes
+# (10:30 and 12:00 ET, scripts/chain_schedule.py PROBE_SLOTS_ET), at minute 5
+# of the slot. BACKUP: the two crons below. They are bare cron, and on
+# 2026-11-03, the probe's first real day, GitHub delayed both by over five
+# hours (16:23 and 17:17 ET for 10:38 and 12:08 EST), so both recorded
+# "market closed". A delayed backup is harmless by construction: it records a
+# SKIP. It is kept because it costs nothing and covers a chain failure.
+#
+# The backup crons land at minute 8 of a half-hour slot in EST and EDT alike:
 #   15:38 UTC = 10:38 EST / 11:38 EDT
 #   17:08 UTC = 12:08 EST / 13:08 EDT
 # The script skips (and records the skip) outside minutes 6-18 of the slot,
 # when an intraday `run` job is queued or in progress, on a closed market, or
-# within 30 min of the close. The second attempt is a no-op once the first
-# has COMPLETED. To stop the probe, disable this workflow in the Actions UI.
+# within 30 min of the close. Later attempts are no-ops once one has
+# COMPLETED that day. To stop the probe, disable this workflow in the Actions
+# UI; the chain's probe-dispatch reads the workflow state and stands down.
 on:
+  # BACKUP only. The primary trigger is the dispatch below, from the chain.
   schedule:
     - cron: "38 15 * * 1-5"
     - cron: "8 17 * * 1-5"
+  # PRIMARY: intraday.yml `probe-dispatch` (and manual runs).
   workflow_dispatch: {}
 
 permissions:

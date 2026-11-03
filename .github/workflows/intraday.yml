@@ -257,6 +257,107 @@ jobs:
         id: close
         run: echo "close_et=$(python scripts/check_trading_day.py --close)" >> "$GITHUB_OUTPUT"
 
+  # Barrier-probe trigger (PRIMARY since 2026-11-03). The probe ran on bare
+  # cron, and GitHub delayed both 2026-11-03 firings by over five hours (16:23
+  # and 17:17 ET for 10:38 and 12:08), so both recorded "market closed". That
+  # is the delayed-backup-cron failure the chain exists to avoid, so the probe
+  # now hangs off the chain: right after a nominated slot's `run` job finishes
+  # (10:30 and 12:00 ET, scripts/chain_schedule.py PROBE_SLOTS_ET), this job
+  # waits until minute 5 of the slot and dispatches barrier_probe.yml.
+  # Production is idle at that moment by construction: this slot's `run` has
+  # finished (`needs`) and the next is not dispatched until the next slot.
+  #
+  # Why not `workflow_run` on this workflow completing: a run of this workflow
+  # stays in progress ~30 min, because `chain` sleeps inside it until the next
+  # slot (2026-11-03: every run ended at slot+0:41). `completed` therefore fires
+  # after the NEXT slot's `run` has started, and the probe would skip every time.
+  #
+  # Standalone like alerting-preflight: `chain` does not need it and
+  # notify-failure does not watch it, so a failed probe dispatch reds the run
+  # without touching the trading chain or paging CRITICAL. barrier_probe.yml
+  # keeps its crons as the labelled backup. The probe stays the authority on
+  # the clock, its window, production idleness and once-per-day.
+  probe-dispatch:
+    needs: [run, gate]
+    runs-on: ubuntu-latest
+    if: >-
+      success() && github.event.schedule != '0 22 * * 1-5' && github.event.inputs.mode != 'end-of-day'
+      && needs.gate.outputs.trading != 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dispatch the barrier probe on a nominated slot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          read -r ACTION WAIT <<< "$(python scripts/chain_schedule.py --probe-slot)"
+          echo "Probe decision: ${ACTION} ${WAIT}s"
+          case "$ACTION" in
+            none) echo "Not a probe slot."; exit 0 ;;
+            probe) ;;
+            *) echo "::error::chain_schedule.py --probe-slot returned '${ACTION} ${WAIT}'"; exit 1 ;;
+          esac
+          sleep "$WAIT"
+
+          # Disabling barrier_probe.yml in the Actions UI is the documented way
+          # to stop the probe; a dispatch to a disabled workflow is refused
+          # (HTTP 422), which would red this run twice a day. Read the state
+          # first. Anything but an explicit non-active state proceeds, so an
+          # unreadable state cannot silently suppress the probe.
+          STATE=$(curl -sS -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${API}/actions/workflows/barrier_probe.yml" | jq -r '.state // "unknown"' 2>/dev/null || echo unknown)
+          case "$STATE" in
+            disabled_manually|disabled_inactivity)
+              echo "::notice::barrier_probe.yml is ${STATE}; not dispatching."; exit 0 ;;
+          esac
+
+          latest_probe_run() {
+            curl -sS -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${API}/actions/workflows/barrier_probe.yml/runs?per_page=1" \
+              | jq -r '.workflow_runs[0].id // 0' 2>/dev/null || echo 0
+          }
+
+          # Same contract as the chain's dispatch: retry only on a non-204,
+          # verify a new run appeared, never re-dispatch on a failed verify
+          # (a second probe would just record a once-per-day no-op, but a
+          # double dispatch is still not something to do on a guess).
+          before=$(latest_probe_run)
+          for attempt in 1 2 3 4; do
+            code=$(curl -sS -o /tmp/probe_body -w '%{http_code}' -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${API}/actions/workflows/barrier_probe.yml/dispatches" \
+              -d '{"ref":"main"}') || code="000"
+            if [ "$code" = "204" ]; then
+              echo "Probe dispatch accepted (HTTP 204) [attempt ${attempt}]"
+              for i in 1 2 3 4 5 6; do
+                sleep 6
+                latest=$(latest_probe_run)
+                if [ "${latest:-0}" -gt "${before:-0}" ]; then
+                  echo "Confirmed probe run ${latest} (baseline ${before})"
+                  exit 0
+                fi
+              done
+              echo "::error::Probe dispatch returned 204 but no new barrier_probe.yml run appeared."
+              exit 1
+            fi
+            echo "::warning::Probe dispatch attempt ${attempt}/4: HTTP ${code} — $(cat /tmp/probe_body 2>/dev/null)"
+            if [ "$attempt" -lt 4 ]; then sleep $(( attempt * 5 )); fi
+          done
+          echo "::error::All 4 barrier-probe dispatch attempts failed (last HTTP ${code})."
+          exit 1
+
   # Self-perpetuating chain. After each successful intraday tick it asks
   # scripts/chain_schedule.py, which decides in ET from the day's close (gate
   # output close_et, from the NYSE calendar):
