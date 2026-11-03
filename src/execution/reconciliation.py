@@ -54,6 +54,17 @@ logger = logging.getLogger("llmlab.execution.reconciliation")
 # cash) alone: the venue account holds cash no book owns (live: the $500 master
 # reserve; broker_paper: whatever the paper account was funded above the books).
 # Comparing against books alone raises a G-BOOK event on cycle one.
+#
+# Every term is its own named field, and the expected venue state is their
+# EXPLICIT sum (hub 2026-11-03 ③). Until then the record carried
+# `ledger_cash_total` and `ledger_positions`, names that read as "what the books
+# hold" but summed in unallocated cash and probe inventory; a reader attributing
+# a divergence to the books from those fields would have been misled. No record
+# was ever written under the old names (production never ran a broker mode
+# before the cutover), so there is no migration.
+#
+#   expected_cash      = book_cash + unallocated_cash + probe_cash
+#   expected_positions = book_positions + probe_positions   (per ticker, dusted)
 
 # Position tolerance reuses the ledger's own dust threshold rather than
 # inventing a second one -- level 1 and level 2 agree on what "no position"
@@ -65,14 +76,16 @@ POSITION_TOLERANCE_SHARES = Portfolio.GHOST_SHARES_EPSILON
 class GBookEvent:
     kind: str                  # "cash" or "position"
     ticker: str = ""            # empty for the cash-level event
-    ledger_value: float = 0.0
+    # The expected side (expected_cash / expected_positions[ticker]): books,
+    # unallocated cash and probe together, not the books alone.
+    expected_value: float = 0.0
     broker_value: float = 0.0
-    delta: float = 0.0
+    delta: float = 0.0          # expected_value - broker_value
     tolerance: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {"kind": self.kind, "ticker": self.ticker,
-               "ledger_value": self.ledger_value, "broker_value": self.broker_value,
+               "expected_value": self.expected_value, "broker_value": self.broker_value,
                "delta": self.delta, "tolerance": self.tolerance}
 
 
@@ -81,20 +94,37 @@ class ReconciliationResult:
     cycle_id: str
     timestamp: str
     books: list[str]
-    ledger_cash_total: float     # sum(book cash) + unallocated_cash
+    # --- cash terms -----------------------------------------------------
+    book_cash: float             # sum of the enabled books' own cash, nothing else
     broker_cash: float
-    ledger_positions: dict[str, float]     # net signed shares, by ticker
+    # --- position terms (net signed shares by ticker, dusted) ------------
+    book_positions: dict[str, float]       # the enabled books' inventory, nothing else
     broker_positions: dict[str, float]
     events: list[GBookEvent] = field(default_factory=list)
+    # Cash the venue holds that no book owns: the registered baseline
+    # (config reconciliation.unallocated_cash_usd; live: the master reserve).
     unallocated_cash: float = 0.0
-    # The part of unallocated cash left by administrative probe orders
-    # (src/execution/administrative.py). Already INCLUDED in ledger_cash_total;
-    # carried separately so a divergence can be attributed.
-    administrative_cash: float = 0.0
+    # Residual cash left by administrative probe orders
+    # (src/execution/administrative.py). Its own term, folded into neither of
+    # the others, so a divergence can be attributed.
+    probe_cash: float = 0.0
     # Probe positions its committed records account for (hub ruling
-    # 2026-11-02 ②: attributable, not exempt). Already INCLUDED in
-    # ledger_positions; carried separately for attribution.
-    administrative_positions: dict[str, float] = field(default_factory=dict)
+    # 2026-11-02 ②: attributable, not exempt).
+    probe_positions: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def expected_cash(self) -> float:
+        """What the venue should hold: the three cash terms, summed explicitly."""
+        return self.book_cash + self.unallocated_cash + self.probe_cash
+
+    @property
+    def expected_positions(self) -> dict[str, float]:
+        """What the venue should hold, by ticker: book inventory plus probe
+        inventory, summed explicitly, then dusted like a book."""
+        out = dict(self.book_positions)
+        for ticker, q in self.probe_positions.items():
+            out[ticker] = out.get(ticker, 0.0) + q
+        return _dust(out)
 
     @property
     def clean(self) -> bool:
@@ -104,20 +134,28 @@ class ReconciliationResult:
         return {
             "cycle_id": self.cycle_id, "timestamp": self.timestamp,
             "books": self.books, "clean": self.clean,
-            "ledger_cash_total": self.ledger_cash_total, "broker_cash": self.broker_cash,
-            "unallocated_cash": self.unallocated_cash,
-            "administrative_cash": self.administrative_cash,
-            "administrative_positions": self.administrative_positions,
-            "ledger_positions": self.ledger_positions, "broker_positions": self.broker_positions,
+            "book_cash": self.book_cash, "unallocated_cash": self.unallocated_cash,
+            "probe_cash": self.probe_cash, "expected_cash": self.expected_cash,
+            "broker_cash": self.broker_cash,
+            "book_positions": self.book_positions, "probe_positions": self.probe_positions,
+            "expected_positions": self.expected_positions,
+            "broker_positions": self.broker_positions,
             "events": [e.to_dict() for e in self.events],
         }
+
+
+def _dust(positions: dict[str, float]) -> dict[str, float]:
+    """Drop |qty| below the ledger's dust threshold, as
+    Portfolio.sweep_ghost_positions does at the book level, so summing several
+    books' fractional shares doesn't fail on float noise around a flat position."""
+    return {t: q for t, q in positions.items() if abs(q) >= POSITION_TOLERANCE_SHARES}
 
 
 def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
              cycle_id: str, *, cash_tolerance_usd: float,
              unallocated_cash_usd: float,
-             administrative_cash_usd: float = 0.0,
-             administrative_positions: dict[str, float] | None = None,
+             probe_cash_usd: float = 0.0,
+             probe_positions: dict[str, float] | None = None,
              ) -> ReconciliationResult:
     """Diff the aggregate pipeline ledger against broker-authoritative state.
 
@@ -126,40 +164,31 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
     event, so the caller reloads from disk after every book's thread has
     saved (see `run_post_cycle_reconciliation`).
 
-    `administrative_cash_usd` is the residual cash committed probe runs left
-    in the account (administrative.administrative_cash_usd). It is part of the
-    cash no book owns, so it joins the unallocated term rather than widening
-    the tolerance.
+    `probe_cash_usd` is the residual cash committed probe runs left in the
+    account (administrative.administrative_cash_usd). It is cash no book owns,
+    so it is an expected-side term of its own rather than a wider tolerance.
 
-    `administrative_positions` are the probe positions its committed records
-    account for (administrative.administrative_positions). They join the
-    ledger side, so an accounted probe position reconciles and does not halt.
-    A probe position the records do NOT account for still diverges and halts.
+    `probe_positions` are the probe positions its committed records account
+    for (administrative.administrative_positions). They are an expected-side
+    term, so an accounted probe position reconciles and does not halt. A probe
+    position the records do NOT account for still diverges and halts.
+
+    Book inventory is dusted before the probe term is added. The probe trades
+    only a symbol outside the trading universe (scripts/barrier_probe.SYMBOL,
+    pinned by tests/test_barrier_probe.py), so no ticker carries both terms
+    and this cannot change an outcome; it is what makes the recorded terms
+    sum exactly to expected_positions.
     """
-    administrative_positions = dict(administrative_positions or {})
-    # Expected venue cash = what the books own + what the account holds outside
-    # any book (registered baseline + administrative residual). Every term is in
-    # the record so a divergence is attributable.
-    ledger_cash_total = (sum(p.cash for p in portfolios) + unallocated_cash_usd
-                         + administrative_cash_usd)
-    ledger_positions: dict[str, float] = {}
+    book_positions: dict[str, float] = {}
     for p in portfolios:
         for ticker, h in p.holdings.items():
             # Constant-price-mark convention reused from level 1: a
             # position's sign IS its direction (negative = short); summing
             # signed share counts across books, not valuing them, is what
             # makes this comparable to the venue's own signed qty.
-            ledger_positions[ticker] = ledger_positions.get(ticker, 0.0) + h.shares
-    for ticker, q in administrative_positions.items():
-        ledger_positions[ticker] = ledger_positions.get(ticker, 0.0) + q
-    # Dust the aggregate exactly as Portfolio.sweep_ghost_positions does at
-    # the book level, so summing several books' fractional shares doesn't
-    # fail on float noise around a genuinely flat position.
-    ledger_positions = {t: q for t, q in ledger_positions.items()
-                        if abs(q) >= POSITION_TOLERANCE_SHARES}
+            book_positions[ticker] = book_positions.get(ticker, 0.0) + h.shares
 
     account = broker.get_account()
-    broker_cash = float(account.get("cash") or 0.0)
     broker_positions: dict[str, float] = {}
     for bp in broker.get_positions():
         ticker = from_venue_symbol(str(bp.get("symbol") or ""))
@@ -168,31 +197,35 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
         # needed against this venue.
         broker_positions[ticker] = float(bp.get("qty") or 0.0)
 
-    events: list[GBookEvent] = []
-    cash_delta = ledger_cash_total - broker_cash
-    if abs(cash_delta) > cash_tolerance_usd:
-        events.append(GBookEvent(kind="cash", ledger_value=ledger_cash_total,
-                                 broker_value=broker_cash, delta=cash_delta,
-                                 tolerance=cash_tolerance_usd))
-
-    for ticker in sorted(set(ledger_positions) | set(broker_positions)):
-        lv = ledger_positions.get(ticker, 0.0)
-        bv = broker_positions.get(ticker, 0.0)
-        delta = lv - bv
-        if abs(delta) > POSITION_TOLERANCE_SHARES:
-            events.append(GBookEvent(kind="position", ticker=ticker,
-                                     ledger_value=lv, broker_value=bv, delta=delta,
-                                     tolerance=POSITION_TOLERANCE_SHARES))
-
-    return ReconciliationResult(
+    result = ReconciliationResult(
         cycle_id=cycle_id, timestamp=datetime.now(timezone.utc).isoformat(),
         books=sorted(p.model_key for p in portfolios),
-        ledger_cash_total=ledger_cash_total, broker_cash=broker_cash,
-        ledger_positions=ledger_positions, broker_positions=broker_positions,
-        events=events, unallocated_cash=unallocated_cash_usd,
-        administrative_cash=administrative_cash_usd,
-        administrative_positions=administrative_positions,
+        book_cash=sum(p.cash for p in portfolios),
+        broker_cash=float(account.get("cash") or 0.0),
+        book_positions=_dust(book_positions), broker_positions=broker_positions,
+        unallocated_cash=unallocated_cash_usd, probe_cash=probe_cash_usd,
+        probe_positions=dict(probe_positions or {}),
     )
+
+    # The comparison reads the explicit sums, the same properties the record
+    # writes, so what is compared and what is recorded cannot disagree.
+    expected_cash = result.expected_cash
+    cash_delta = expected_cash - result.broker_cash
+    if abs(cash_delta) > cash_tolerance_usd:
+        result.events.append(GBookEvent(kind="cash", expected_value=expected_cash,
+                                        broker_value=result.broker_cash, delta=cash_delta,
+                                        tolerance=cash_tolerance_usd))
+
+    expected_positions = result.expected_positions
+    for ticker in sorted(set(expected_positions) | set(broker_positions)):
+        ev = expected_positions.get(ticker, 0.0)
+        bv = broker_positions.get(ticker, 0.0)
+        delta = ev - bv
+        if abs(delta) > POSITION_TOLERANCE_SHARES:
+            result.events.append(GBookEvent(kind="position", ticker=ticker,
+                                            expected_value=ev, broker_value=bv, delta=delta,
+                                            tolerance=POSITION_TOLERANCE_SHARES))
+    return result
 
 
 def record_reconciliation(result: ReconciliationResult,
@@ -230,7 +263,7 @@ def handle_reconciliation_result(result: ReconciliationResult,
     send_alert_fn(
         "CRITICAL", f"G-BOOK reconciliation divergence — {len(result.events)} event(s)",
         f"Cycle {result.cycle_id}: " + "; ".join(
-            f"{e.kind}{(' ' + e.ticker) if e.ticker else ''} ledger={e.ledger_value:.4f} "
+            f"{e.kind}{(' ' + e.ticker) if e.ticker else ''} expected={e.expected_value:.4f} "
             f"broker={e.broker_value:.4f} delta={e.delta:.4f} (tolerance {e.tolerance:.4f})"
             for e in result.events),
         {"cycle_id": result.cycle_id, "books": result.books},
@@ -259,8 +292,8 @@ def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
     # cycle never counts a probe term.
     mode = settings.get("mode", "paper")
     result = reconcile(portfolios, broker, cycle_id, **params,
-                       administrative_cash_usd=administrative_cash_usd(mode),
-                       administrative_positions=administrative_positions(mode))
+                       probe_cash_usd=administrative_cash_usd(mode),
+                       probe_positions=administrative_positions(mode))
     record_reconciliation(result)
     handle_reconciliation_result(result, portfolios)
     return result

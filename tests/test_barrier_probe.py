@@ -306,29 +306,29 @@ def test_residual_is_carved_out_of_the_cash_comparison():
                             unallocated_cash_usd=89999.99)
     assert not without.clean           # what level 2 would report with no carve-out
     with_admin = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
-                               unallocated_cash_usd=89999.99, administrative_cash_usd=-1.25)
-    assert with_admin.clean and with_admin.to_dict()["administrative_cash"] == -1.25
+                               unallocated_cash_usd=89999.99, probe_cash_usd=-1.25)
+    assert with_admin.clean and with_admin.to_dict()["probe_cash"] == -1.25
 
 
 def test_unaccounted_probe_position_halts():
     broker = _Broker(2000.0 + 89999.99, positions=[("F", 10.0)])
     r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
-                      unallocated_cash_usd=89999.99, administrative_cash_usd=0.0)
+                      unallocated_cash_usd=89999.99, probe_cash_usd=0.0)
     assert [e.ticker for e in r.events] == ["F"]
 
 
 def test_recorded_probe_position_reconciles_without_halting():
     broker = _Broker(2000.0 + 89999.99, positions=[("F", 10.0)])
     r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
-                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
-    assert r.clean and r.to_dict()["administrative_positions"] == {"F": 10.0}
+                      unallocated_cash_usd=89999.99, probe_positions={"F": 10.0})
+    assert r.clean and r.to_dict()["probe_positions"] == {"F": 10.0}
 
 
 def test_recorded_probe_position_that_disagrees_with_the_venue_still_halts():
     # The record says 10; the venue holds 14. The extra 4 is unexplained.
     broker = _Broker(2000.0 + 89999.99, positions=[("F", 14.0)])
     r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
-                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
+                      unallocated_cash_usd=89999.99, probe_positions={"F": 10.0})
     assert [(e.ticker, e.delta) for e in r.events] == [("F", -4.0)]
 
 
@@ -336,7 +336,7 @@ def test_recorded_position_the_venue_no_longer_holds_halts():
     # Flattened by hand without a probe record: the record is now wrong.
     broker = _Broker(2000.0 + 89999.99)
     r = rec.reconcile([_book(2000.0)], broker, "c1", cash_tolerance_usd=1.0,
-                      unallocated_cash_usd=89999.99, administrative_positions={"F": 10.0})
+                      unallocated_cash_usd=89999.99, probe_positions={"F": 10.0})
     assert [e.ticker for e in r.events] == ["F"]
 
 
@@ -356,8 +356,8 @@ def test_post_cycle_hook_reads_the_committed_residual(tmp_path, monkeypatch):
             "cash_tolerance_usd": 1.0, "unallocated_cash_usd": {"broker_paper": 89999.99}}})
     r = rec.run_post_cycle_reconciliation(
         _Broker(2000.0 + 89999.99 - 1.5, positions=[("F", 2.5)]), "c9", ["claude"])
-    assert r.clean and r.administrative_cash == -1.5
-    assert r.administrative_positions == {"F": 2.5}
+    assert r.clean and r.probe_cash == -1.5
+    assert r.probe_positions == {"F": 2.5}
 
 
 # ------------------------------------------------------- paper-only boundary

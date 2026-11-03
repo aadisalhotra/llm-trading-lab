@@ -72,7 +72,7 @@ def run(portfolios, broker, unallocated=500.0, tol=TOL):
 def test_clean_when_ledger_plus_unallocated_matches_broker():
     ps = [book("a", 1000.0, AAPL=2.0), book("b", 1500.0)]
     r = run(ps, FakeBroker(3000.0, [("AAPL", 2.0)]))
-    assert r.clean and r.ledger_cash_total == 3000.0 and r.unallocated_cash == 500.0
+    assert r.clean and r.expected_cash == 3000.0 and r.unallocated_cash == 500.0
 
 
 def test_omitting_the_unallocated_baseline_would_diverge():
@@ -301,3 +301,36 @@ def test_compute_execution_metrics_end_to_end(tmp_path):
     out = em.compute_execution_metrics("2026-11", ["gpt", "grok"], trades, recon_dir)
     assert out["gpt"]["execution_success_rate"] == 1.0 and out["gpt"]["passes_gate_4"] is True
     assert out["grok"]["passes_gate_4"] is None      # no file -> no evidence, not a pass
+
+
+# ------------------------------------------------- separated terms (2026-11-03)
+def test_record_names_each_term_and_sums_them_explicitly():
+    """Book inventory, unallocated cash and probe are separate fields; the
+    expected side is their explicit sum. The old ledger_* names summed probe
+    and unallocated cash under names that read as the books' own."""
+    ps = [book("a", 1000.0, AAPL=2.0), book("b", 1500.0, AAPL=1.0, MSFT=-3.0)]
+    broker = FakeBroker(1000.0 + 1500.0 + 500.0 - 1.25,
+                        [("AAPL", 3.0), ("MSFT", -3.0), ("F", 7.0)])
+    r = rec.reconcile(ps, broker, "cyc1", cash_tolerance_usd=TOL, unallocated_cash_usd=500.0,
+                      probe_cash_usd=-1.25, probe_positions={"F": 7.0})
+    assert r.clean, [e.to_dict() for e in r.events]
+    d = r.to_dict()
+    assert d["book_cash"] == 2500.0                      # the books alone
+    assert d["unallocated_cash"] == 500.0 and d["probe_cash"] == -1.25
+    assert d["expected_cash"] == d["book_cash"] + d["unallocated_cash"] + d["probe_cash"]
+    assert d["book_positions"] == {"AAPL": 3.0, "MSFT": -3.0}   # no probe inventory
+    assert d["probe_positions"] == {"F": 7.0}
+    summed = dict(d["book_positions"])
+    for t, q in d["probe_positions"].items():
+        summed[t] = summed.get(t, 0.0) + q
+    assert d["expected_positions"] == summed
+    assert not {"ledger_cash_total", "ledger_positions", "administrative_cash",
+                "administrative_positions"} & set(d)
+
+
+def test_cash_event_carries_the_expected_side():
+    r = rec.reconcile([book("a", 1000.0)], FakeBroker(1400.0), "cyc1", cash_tolerance_usd=TOL,
+                      unallocated_cash_usd=500.0, probe_cash_usd=-0.5)
+    (e,) = r.events
+    assert e.to_dict()["expected_value"] == 1499.5 and "ledger_value" not in e.to_dict()
+    assert e.delta == 1499.5 - 1400.0
