@@ -40,59 +40,19 @@
     ]
   },
   "daily": {
-    "date": "2026-11-02",
-    "sent_count": 6,
+    "date": "2026-11-03",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "macro_event:Macro crisis",
-      "ath:claude",
-      "news:UNP:c27b88bd8e",
-      "news:MSFT:fec227586d",
-      "news:MA:5b53a3742e"
+      "api_failure:deepseek"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-11-02T14:33:24.021706+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-11-02T22:08:16.610496+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "Claude Sonnet 4.6 hit a new all-time high",
-        "timestamp": "2026-11-02T22:08:17.834552+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
+        "kind": "api_failure",
         "severity": "WARN",
-        "title": "Very Positive news on UNP (held by 4)",
-        "timestamp": "2026-11-02T22:08:18.695935+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on MSFT (held by 4)",
-        "timestamp": "2026-11-02T22:18:05.223754+00:00",
-        "disposition": "sent"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on MA (held by 5)",
-        "timestamp": "2026-11-03T03:17:16.552248+00:00",
+        "title": "Model deepseek failed",
+        "timestamp": "2026-11-03T17:39:25.689288+00:00",
         "disposition": "sent"
       }
     ]
