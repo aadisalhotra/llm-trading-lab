@@ -1967,6 +1967,28 @@
         "finding": "Detection is tested; delivery is not. tests/test_prompt_integrity.py proves a mismatch is detected and routed to a CRITICAL, but that CRITICAL has never fired in production, so it has never been shown to reach the PI.",
         "obligation": "Before the lab relies on that alert for twelve months, prove the path end-to-end once: induce a mismatch in a controlled context and confirm the alert actually reaches the PI.",
         "why": "An alert nobody receives is the same failure class as a probe that exits 0 (rule 9)."
+      },
+      {
+        "id": "barrier_probe_first_real_runs_and_chain_trigger",
+        "date": "2026-11-03",
+        "type": "infrastructure",
+        "scope": "scripts/barrier_probe.py trigger: .github/workflows/barrier_probe.yml, .github/workflows/intraday.yml probe-dispatch, scripts/chain_schedule.py --probe-slot",
+        "authority": "Hub dispatch 2026-11-03 evening, item 1.",
+        "commit": "c04295443",
+        "first_real_runs": {
+          "records": "data/barrier_probe/2026-11.jsonl, two records, the probe's first real runs. Both outcome SKIPPED, phase FINISHED, skip_reason \"market closed\", mode broker_paper, residual_cash_usd 0.0.",
+          "run_1": "github_run_id 41719935379, event schedule (cron 38 15 * * 1-5, due 10:38 ET). Run created 2026-11-03T21:14:11Z, probe started 21:23:18Z = 16:23 ET. Committed as 1b7bb03fc.",
+          "run_2": "github_run_id 41729268685, event schedule (cron 8 17 * * 1-5, due 12:08 ET). Run created 2026-11-03T22:16:00Z, probe started 22:17:54Z = 17:17 ET. Committed as d56bc3449.",
+          "verdict": "The probe behaved correctly: it read the venue clock, found the market closed, recorded the skip and exited 0. No orders were placed and no position was opened. The defect was the schedule."
+        },
+        "diagnosis": "The UTC conversion was correct (15:38 and 17:08 UTC are 10:38 and 12:08 EST). GitHub delayed both bare cron firings by over five hours, past the close. The same day the intraday cron backup was mostly not delivered at all (one schedule run, 20:02Z, cancelled as a displaced pending run); every real tick came from the self-chain. The probe was built on the mechanism the pipeline exists to avoid; scripts/chain_schedule.py's header documents the earlier slot that was left to a delayed backup cron and never ran.",
+        "fix": "The chain is now the primary trigger. intraday.yml gains a standalone probe-dispatch job (needs run, gate; skipped on EOD runs and on a gate non-trading verdict). After a nominated slot's run job finishes, chain_schedule.probe_dispatch answers \"probe <wait>\" for the 10:30 and 12:00 ET slots (PROBE_SLOTS_ET, decided in ET so both DST regimes agree), the job waits until minute 5 of the slot (PROBE_DISPATCH_FLOOR_MIN) and dispatches barrier_probe.yml with the chain's retry-on-non-204 and run-created verify. A disabled probe workflow is read first and stood down rather than dispatched into a 422. The two crons stay as the labelled backup; a delayed backup records a harmless SKIP, as 2026-11-03 showed.",
+        "workflow_run_rejected": "The hub's preferred trigger was workflow_run on intraday.yml completing. Its premise, that production is idle for the slot at that moment, does not hold. An intraday run stays in progress about 30 minutes because the chain job sleeps inside it until the next slot: every chain-dispatched 2026-11-03 run ended 40 to 42 seconds into a later slot (for example 41654357592, 14:30:30Z to 15:00:41Z; 41699177381 ran to 20:00:42Z, two slots on). Completion therefore fires after the next slot's run job has started, and the probe would record \"production cycle active\" or a window skip on every firing. The hub's alternative, dispatch from the chain at a nominated slot, is what landed.",
+        "dispatch_floor_basis": "Probe-run setup (runner plus pip install, run created to probe started) took 9:07 and 1:54 on 2026-11-03. Dispatching at minute 5 puts the probe's own start at minute 7 or later, inside its 6-18 window; a setup long enough to push past minute 18 is recorded as a window SKIP and the 12:00 slot retries.",
+        "unchanged": "Once-per-day semantics, the clock check, the window check, the production-idle check (the run job only, so probe-dispatch is not mistaken for production), the paper-only refusal, CRITICAL on a stuck or unexplained position, and failing red on anything but a pass or a recorded skip. scripts/barrier_probe.py is not modified.",
+        "failure_isolation": "probe-dispatch is standalone like alerting-preflight: chain does not need it and notify-failure does not watch it. A failed dispatch reds the intraday run in the Actions UI without stopping the trading chain or paging CRITICAL.",
+        "verified": "tests/test_session_timing.py adds 14 cases: dispatch at minute 5 for both slots in EDT and EST, immediate dispatch when the run finished later, no dispatch on other slots or weekends, the CLI contract, both slots are ones the chain actually runs on a full day and on the 2026-11-27 early close with the probe window clearing the 30-minute close guard, the dispatch floor sits before the probe's window opens, and the workflow wiring (needs, not needed by chain or notify-failure, the probe workflow keeps workflow_dispatch and two backup crons). Full suite 648 passed.",
+        "status": "Not yet observed in production. The first chain-dispatched probe is due Wednesday 2026-11-04 at 10:35 ET. It is the production proof of this fix, and it is a precondition of the Thursday 2026-11-05 cutover: no flip on an unproven barrier."
       }
     ]
   }
