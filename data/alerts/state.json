@@ -41,18 +41,50 @@
   },
   "daily": {
     "date": "2026-11-03",
-    "sent_count": 1,
+    "sent_count": 5,
     "dedup_keys": [
-      "api_failure:deepseek"
+      "api_failure:deepseek",
+      "completeness:deepseek:2026-11-03",
+      "news:PG:bc3a70f7d5",
+      "news:V:6a01aedd2a",
+      "news:MA:6a01aedd2a"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
         "severity": "WARN",
         "title": "Model deepseek failed",
         "timestamp": "2026-11-03T17:39:25.689288+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "completeness",
+        "severity": "WARN",
+        "title": "DeepSeek V4 Pro completeness 50% today (6/12 cycles failed)",
+        "timestamp": "2026-11-03T22:16:32.182582+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PG (held by 5)",
+        "timestamp": "2026-11-03T22:16:32.901340+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on V (held by 6)",
+        "timestamp": "2026-11-03T22:16:33.459249+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on MA (held by 5)",
+        "timestamp": "2026-11-03T22:16:34.134644+00:00",
         "disposition": "sent"
       }
     ]
