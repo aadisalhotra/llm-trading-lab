@@ -1989,6 +1989,31 @@
         "failure_isolation": "probe-dispatch is standalone like alerting-preflight: chain does not need it and notify-failure does not watch it. A failed dispatch reds the intraday run in the Actions UI without stopping the trading chain or paging CRITICAL.",
         "verified": "tests/test_session_timing.py adds 14 cases: dispatch at minute 5 for both slots in EDT and EST, immediate dispatch when the run finished later, no dispatch on other slots or weekends, the CLI contract, both slots are ones the chain actually runs on a full day and on the 2026-11-27 early close with the probe window clearing the 30-minute close guard, the dispatch floor sits before the probe's window opens, and the workflow wiring (needs, not needed by chain or notify-failure, the probe workflow keeps workflow_dispatch and two backup crons). Full suite 648 passed.",
         "status": "Not yet observed in production. The first chain-dispatched probe is due Wednesday 2026-11-04 at 10:35 ET. It is the production proof of this fix, and it is a precondition of the Thursday 2026-11-05 cutover: no flip on an unproven barrier."
+      },
+      {
+        "id": "prompt_cutover_delta_precomputed_2026_11_03",
+        "date": "2026-11-03",
+        "type": "verification",
+        "scope": "scripts/prompt_cutover_delta.py against the post-cutover configuration, before the Thursday 2026-11-05 mode flip",
+        "authority": "Hub dispatch 2026-11-03 evening, item 2 (hard gate on Thursday's flip). Tool and procedure: hub ruling 2026-10-30.",
+        "candidate": {
+          "construction": "No staged cutover tree exists, and the cutover touches no src/: mode is read through config_loader.effective_mode, and re-inception is the inception-epoch guard plus a human archive of data/state. The post-cutover configuration is therefore config/settings.json at 82f3c09bc with exactly one edit, \"mode\": \"paper\" -> \"broker_paper\" (a 1-line diff, verified), and config/universe.json unchanged.",
+          "settings_sha256_lf": "7d0a300bde713364c5af30ac28d918fb6e59b7e3a357768fa4f16b85c41fe52f",
+          "universe_sha256_lf": "8840b2c26e1f059936b11d4ee82ee6de335c39230f389eb887e3fdd3ee510bde",
+          "universe_blob": "e4fe86da405195557f39bf7c38efa5c4bed5df2c (identical to HEAD)"
+        },
+        "controls": "Both passed: the current config reproduces the reference exactly (positive), and max_positions + 1 differs in decision_user only (negative).",
+        "hashes": {
+          "decision_system": "4ab16655364c4d2a91f8e7559e8058f83fda82a79f8fb2b20a72330a61aa9d91 match",
+          "decision_user": "7cabfd2f484e90ff57a5c4cd71ad4cdaf1fa09dd50857a97ab7d05e3507a9723 match",
+          "screening_system": "98f906d7da41b6507790db8c2288fbedc1ee855f6088fa8de1303c7a831f83e0 match",
+          "screening_user": "aadf3685498ff81a60c9148b26c5ff3a42b9973df79a8c6f6d8b4285cf9b6303 match",
+          "combined": "b415afcb588792873743df073fac242f642a60f19508d4a414add356c87e38b7, equal to the frozen reference (frozen_commit 00557e557)"
+        },
+        "verdict": "MATCH. The mode flip is prompt-neutral; the per-cycle rendered-prompt hash check will not fire on it. Exit 0.",
+        "keys_read_by_render": "portfolio_rules.max_positions, portfolio_rules.max_trades_per_day, prompt_version, settlement.activation_date, settlement.enforce_settled_funds. mode is not among them. Any further cutover edit outside these keys (for example a re-read reconciliation.unallocated_cash_usd) is prompt-neutral by construction; an edit to one of them needs a re-run.",
+        "independent_check": "The tool patches load_settings only in config_loader and prompt_builder, so a render path that imported load_settings elsewhere would read the on-disk \"paper\" and match falsely (rule 9: the instrument's own success is not the proof). Closed by rendering natively in a throwaway git worktree of 82f3c09bc with the candidate written to its config/settings.json, no override, load_settings()[\"mode\"] asserted \"broker_paper\": the same four hashes, combined b415afcb. Worktree removed.",
+        "scope_limit": "The hash check covers the frozen template and its settings-driven rendering against a fixed golden portfolio. Production prompts after the flip will show broker_paper book state ($2,000 per venue book, fresh inception), which is portfolio state and not frozen text."
       }
     ]
   }
