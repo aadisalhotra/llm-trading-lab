@@ -2014,6 +2014,25 @@
         "keys_read_by_render": "portfolio_rules.max_positions, portfolio_rules.max_trades_per_day, prompt_version, settlement.activation_date, settlement.enforce_settled_funds. mode is not among them. Any further cutover edit outside these keys (for example a re-read reconciliation.unallocated_cash_usd) is prompt-neutral by construction; an edit to one of them needs a re-run.",
         "independent_check": "The tool patches load_settings only in config_loader and prompt_builder, so a render path that imported load_settings elsewhere would read the on-disk \"paper\" and match falsely (rule 9: the instrument's own success is not the proof). Closed by rendering natively in a throwaway git worktree of 82f3c09bc with the candidate written to its config/settings.json, no override, load_settings()[\"mode\"] asserted \"broker_paper\": the same four hashes, combined b415afcb. Worktree removed.",
         "scope_limit": "The hash check covers the frozen template and its settings-driven rendering against a fixed golden portfolio. Production prompts after the flip will show broker_paper book state ($2,000 per venue book, fresh inception), which is portfolio state and not frozen text."
+      },
+      {
+        "id": "reconciliation_record_terms_separated",
+        "date": "2026-11-03",
+        "type": "infrastructure",
+        "scope": "src/execution/reconciliation.py: ReconciliationResult, GBookEvent, reconcile(); the data/reconciliation/<YYYY-MM>.jsonl record shape",
+        "authority": "Hub dispatch 2026-11-03 evening, item 3.",
+        "commit": "3270df702",
+        "finding": "ledger_cash_total and ledger_positions summed probe inventory and unallocated cash into terms named for the books. A reader attributing a divergence to the books from those two fields would have been misled. GBookEvent.ledger_value carried the same mixed sum.",
+        "field_names": {
+          "cash": "book_cash (the enabled books' own cash only), unallocated_cash (registered baseline, unchanged name), probe_cash (was administrative_cash), expected_cash = book_cash + unallocated_cash + probe_cash (replaces ledger_cash_total), broker_cash (unchanged)",
+          "positions": "book_positions (the enabled books' net signed inventory only, dusted), probe_positions (was administrative_positions), expected_positions = book_positions + probe_positions per ticker, dusted (replaces ledger_positions), broker_positions (unchanged)",
+          "event": "GBookEvent.expected_value (was ledger_value); delta = expected_value - broker_value",
+          "reconcile_kwargs": "probe_cash_usd, probe_positions (were administrative_cash_usd, administrative_positions). The readers in src/execution/administrative.py keep their names."
+        },
+        "explicit_sum": "expected_cash and expected_positions are properties computed from the named terms, and the comparison reads those same properties, so what is compared and what is recorded cannot disagree.",
+        "behaviour": "Unchanged. Book inventory is now dusted before the probe term is added rather than after. That cannot change an outcome: the probe trades only scripts/barrier_probe.SYMBOL, which tests/test_barrier_probe.py pins as outside the trading universe, so no ticker carries both terms. It is what makes the recorded terms sum exactly to expected_positions.",
+        "migration": "None. data/reconciliation/ has never existed: production has run only paper mode, and level 2 runs only in broker modes, so no record was ever written under the old names. The only downstream reader, src/analytics/execution_metrics.load_reconciliation, reads cycle_id and clean, both unchanged. This stops being true at the Thursday 2026-11-05 cutover; after that a further rename needs a migration.",
+        "verified": "tests/test_level2_reconciliation.py adds 2 tests: every term is its own field, the expected side equals the explicit sum of the recorded terms for cash and positions, and none of the old names appear in the record or event. Existing reconciliation and probe tests updated to the new names, outcomes unchanged. Full suite 650 passed."
       }
     ]
   }
