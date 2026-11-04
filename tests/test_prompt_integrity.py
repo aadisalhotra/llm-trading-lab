@@ -80,6 +80,24 @@ def test_config_change_is_detected(reference, monkeypatch):
     assert diff["expected"].endswith("/ 50 max") and diff["actual"].endswith("/ 49 max")
 
 
+def test_real_render_drift_names_the_line_in_the_critical_body(sandbox, monkeypatch):
+    """The 2026-11-04 delivery test zeroed a reference hash, so there was no
+    differing line and the alert correctly said line null. This pins the other
+    case: a genuine render drift names its line in the CRITICAL body itself."""
+    _log_dir, alerts = sandbox
+    real = pb.load_settings()
+    changed = {**real, "portfolio_rules": {**real["portfolio_rules"], "max_positions": 49}}
+    monkeypatch.setattr(pb, "load_settings", lambda: changed)
+    record = pi.run_prompt_integrity_check(ARMED_RUN)
+    diff = record["first_difference"]["decision_user"]
+    assert isinstance(diff["line"], int) and diff["line"] >= 1
+    (severity, _title, body, _ctx), _kw = alerts[-1]
+    assert severity == "CRITICAL"
+    assert f'"line": {diff["line"]}' in body
+    assert diff["expected"] in body and diff["actual"] in body
+    assert "/ 49 max" in body
+
+
 def test_universe_change_is_detected(reference, monkeypatch):
     real = pb.load_universe()
     changed = {**real, "tickers": real["tickers"][:-1]}

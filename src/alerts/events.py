@@ -22,11 +22,13 @@ same `dispatch_event()` via `alerter.send_alert()` as they happen.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
 import re
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -252,8 +254,12 @@ def dispatch_event(
     mark_milestones: tuple[str, list[int]] | None = None,
     settings: dict[str, Any] | None = None,
 ) -> str:
-    """Route one event. Returns disposition: sent | overflow | deduped |
-    logged | send_failed | disabled.
+    """Route one event. Returns disposition: queued | overflow | deduped |
+    logged | disabled, or (with ASYNC_SEND False) sent | send_failed.
+
+    `queued`: the cap slot and dedup key are reserved and the email is being
+    sent on a background thread; `_deliver` settles it to sent or send_failed
+    (a failure gives the slot and key back). The caller never waits on SMTP.
 
     `email`: None → email iff severity is WARN/CRITICAL. Positive events
     (milestones, ATH) pass email=True explicitly.
@@ -317,27 +323,94 @@ def dispatch_event(
             logger.info("Event over daily cap — bundled into digest: [%s] %s", kind, title)
             return "overflow"
 
-        # Under the cap → send now.
-        subject = f"[ALERT] {title}"
-        html = render_event_html(kind, severity, title, body, context, fired_at_et)
-        ok = send_email(
-            subject, html,
-            text_body=f"{severity} — {title}\n\n{body}\n\nModel(s): "
-                      f"{', '.join(str(m) for m in (context.get('models') or ([context['model']] if context.get('model') else [])))}"
-                      f"\nTime: {fired_at_et}",
-            alert_type="event", trigger=kind, settings=settings,
-        )
-        if ok:
-            daily["sent_count"] += 1
-            daily["dedup_keys"].append(dedup_key)
-            daily["fired_log"].append({**_compact(event_record), "disposition": "sent"})
-            _mark_milestones()
-            save_state(state)
-            return "sent"
-        # Transient send failure: do NOT mark dedup, so a later tick can retry.
-        daily["fired_log"].append({**_compact(event_record), "disposition": "send_failed"})
+        # Under the cap → reserve the cap slot and the dedup key now, under the
+        # lock, so a concurrent dispatch sees them. The send itself happens
+        # outside the lock (see _deliver); a failed send gives both back.
+        dispatch_id = uuid.uuid4().hex[:12]
+        reserved_date = daily["date"]
+        daily["sent_count"] += 1
+        daily["dedup_keys"].append(dedup_key)
+        daily["fired_log"].append({**_compact(event_record), "disposition": "queued",
+                                   "dispatch_id": dispatch_id})
         save_state(state)
-        return "send_failed"
+
+    subject = f"[ALERT] {title}"
+    html = render_event_html(kind, severity, title, body, context, fired_at_et)
+    text_body = (f"{severity} — {title}\n\n{body}\n\nModel(s): "
+                 f"{', '.join(str(m) for m in (context.get('models') or ([context['model']] if context.get('model') else [])))}"
+                 f"\nTime: {fired_at_et}")
+    job = functools.partial(_deliver, subject, html, text_body, kind, settings,
+                            reserved_date, dispatch_id, dedup_key, mark_milestones)
+    if not ASYNC_SEND:
+        return job()
+    t = threading.Thread(target=job, name=f"alert-send-{dispatch_id}", daemon=False)
+    with _PENDING_LOCK:
+        _PENDING[:] = [p for p in _PENDING if p.is_alive()]
+        _PENDING.append(t)
+    t.start()
+    return "queued"
+
+
+# Event emails are sent on their own non-daemon thread (hub dispatch
+# 2026-11-04). send_email retries up to three times, and a stalled SMTP server
+# can hold each attempt for SMTP_TIMEOUT per socket operation. Done inline, that
+# wait would land on the calling model thread. The position-stop and
+# model-failure alerts fire there BEFORE the book registers at the cross-book
+# barrier, so one slow send would delay every book's release. Non-daemon means
+# the interpreter waits for the thread before exiting, so the CI commit step,
+# which runs after the process exits, still captures the final disposition.
+# ASYNC_SEND = False runs the identical job inline (tests).
+ASYNC_SEND = True
+_PENDING: list[threading.Thread] = []
+_PENDING_LOCK = threading.Lock()
+
+
+def wait_for_pending_sends(timeout: float | None = None) -> bool:
+    """Join every in-flight event send. True when none is left running."""
+    with _PENDING_LOCK:
+        threads = list(_PENDING)
+    for t in threads:
+        t.join(timeout)
+    return not any(t.is_alive() for t in threads)
+
+
+def _deliver(subject: str, html: str, text_body: str, kind: str,
+             settings: dict[str, Any], reserved_date: str, dispatch_id: str,
+             dedup_key: str, mark_milestones: tuple[str, list[int]] | None) -> str:
+    """Send one reserved event email and settle its state. Never raises."""
+    try:
+        ok = send_email(subject, html, text_body=text_body,
+                        alert_type="event", trigger=kind, settings=settings)
+    except Exception:  # noqa: BLE001 -- send_email never raises; belt and braces
+        logger.exception("Event send raised unexpectedly: %s", subject)
+        ok = False
+    disposition = "sent" if ok else "send_failed"
+    try:
+        with _DISPATCH_LOCK:
+            state = load_state()
+            daily = state.get("daily") or {}
+            if daily.get("date") == reserved_date:
+                for entry in daily.get("fired_log", []):
+                    if entry.get("dispatch_id") == dispatch_id:
+                        entry["disposition"] = disposition
+                        break
+                if not ok:
+                    # A failed send does NOT consume the cap or the dedup key,
+                    # so a later tick can fire it again.
+                    daily["sent_count"] = max(0, int(daily.get("sent_count", 0)) - 1)
+                    if dedup_key in daily.get("dedup_keys", []):
+                        daily["dedup_keys"].remove(dedup_key)
+            if ok and mark_milestones:
+                mk, thresholds = mark_milestones
+                existing = set(state["milestones_fired"].get(mk, []))
+                existing.update(int(t) for t in thresholds)
+                state["milestones_fired"][mk] = sorted(existing)
+            save_state(state)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not settle alert state for %s (%s)", dispatch_id, disposition)
+    if not ok:
+        logger.error("Event email NOT delivered after retries: %s", subject)
+    return disposition
 
 
 def _compact(event_record: dict[str, Any]) -> dict[str, Any]:

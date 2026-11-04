@@ -50,6 +50,8 @@ def iso(tmp_path, monkeypatch):
         return True
 
     monkeypatch.setattr(events, "send_email", fake_send)
+    # Same delivery job, run inline, so dispositions are final on return.
+    monkeypatch.setattr(events, "ASYNC_SEND", False)
     return sent
 
 

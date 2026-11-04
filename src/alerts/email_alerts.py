@@ -28,6 +28,7 @@ import os
 import re
 import smtplib
 import ssl
+import time
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -43,6 +44,14 @@ EMAIL_LOG = ALERTS_DIR / "email_log.jsonl"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_SSL_PORT = 465
 SMTP_TIMEOUT = 20  # seconds — keep tight so a stalled connection can't hang a tick
+# Bounded retry (hub dispatch 2026-11-04). Persistent conditions self-heal by
+# re-detection on the next cycle; one-off events (a G-EXEC failure, a
+# reconciliation that could not run) do not, so a single transient SMTP failure
+# would lose them. Three attempts, short backoff between them. Event alerts run
+# this on a background thread (events.dispatch_event), so the retry never
+# delays a trading cycle.
+SEND_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = (2.0, 5.0)
 FROM_NAME = "LLM Trading Lab"
 
 
@@ -198,21 +207,68 @@ def send_email(
     msg.attach(MIMEText(plain, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    # --- Send ---
+    # --- Send, with bounded retry ---
+    payload = msg.as_string()
+    attempts = 0
+    last_error: Exception | None = None
+    for attempts in range(1, SEND_ATTEMPTS + 1):
+        try:
+            if _smtp_send_once(sender, password, recipients, payload):
+                logger.info("Email sent [%s] '%s' → %d recipient(s) [%s] (attempt %d/%d)",
+                            alert_type, subject, len(recipients),
+                            recipients_fingerprint(recipients), attempts, SEND_ATTEMPTS)
+                _log_email({**base_record, "status": "sent", "attempts": attempts})
+                return True
+        except Exception as e:  # noqa: BLE001 — a failed email must never crash the pipeline
+            last_error = e
+            transient = _is_transient(e)
+            logger.warning("Email send attempt %d/%d failed [%s] '%s' (%s): %s",
+                           attempts, SEND_ATTEMPTS, alert_type, subject,
+                           "transient" if transient else "permanent", e)
+            if not transient:
+                break
+            if attempts < SEND_ATTEMPTS:
+                time.sleep(RETRY_BACKOFF_SECONDS[min(attempts - 1, len(RETRY_BACKOFF_SECONDS) - 1)])
+    logger.error("Email send failed [%s] '%s' after %d attempt(s): %s",
+                 alert_type, subject, attempts, last_error)
+    _log_email({**base_record, "status": "failed", "attempts": attempts,
+                "error": str(last_error)})
+    return False
+
+
+def _smtp_send_once(sender: str, password: str, recipients: list[str], payload: str) -> bool:
+    """One SMTP session. Returns True once the server has accepted the message.
+
+    An exception raised AFTER `sendmail` returned (typically in QUIT, on the
+    context-manager exit) is swallowed: the message was already accepted, and
+    re-raising would make the caller retry and deliver it twice.
+    """
+    accepted = False
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_SSL_PORT, timeout=SMTP_TIMEOUT,
                               context=context) as server:
             server.login(sender, password)
-            server.sendmail(sender, recipients, msg.as_string())
-        logger.info("Email sent [%s] '%s' → %d recipient(s) [%s]", alert_type, subject,
-                    len(recipients), recipients_fingerprint(recipients))
-        _log_email({**base_record, "status": "sent"})
-        return True
-    except Exception as e:  # noqa: BLE001 — a failed email must never crash the pipeline
-        logger.exception("Email send failed [%s] '%s': %s", alert_type, subject, e)
-        _log_email({**base_record, "status": "failed", "error": str(e)})
+            server.sendmail(sender, recipients, payload)
+            accepted = True
+    except Exception:
+        if not accepted:
+            raise
+        logger.warning("SMTP error after the message was accepted; treated as sent",
+                       exc_info=True)
+    return accepted
+
+
+def _is_transient(e: Exception) -> bool:
+    """Worth another attempt? Network/socket errors, dropped connections and
+    SMTP 4xx replies are. Authentication failures, 5xx replies and refused
+    recipients are not: retrying them only delays the inevitable failure."""
+    if isinstance(e, (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused,
+                      smtplib.SMTPSenderRefused)):
         return False
+    if isinstance(e, smtplib.SMTPResponseException):
+        return 400 <= int(getattr(e, "smtp_code", 0) or 0) < 500
+    return isinstance(e, (OSError, smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError))
 
 
 def _send_test_email() -> bool:

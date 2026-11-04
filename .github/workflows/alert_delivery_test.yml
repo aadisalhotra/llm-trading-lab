@@ -1,0 +1,51 @@
+name: Alert delivery test
+
+# Fires ONE controlled CRITICAL from inside a GitHub Actions run, through the
+# production alert path, to the production recipients (ALERT_RECIPIENTS). It
+# closes the one link the 2026-11-04 local test could not reach: a CRITICAL
+# raised by CI code using CI's own secrets. See scripts/alert_delivery_test.py.
+#
+# Triggers: a push to main that changes this workflow or the test script (so
+# landing them IS the test, with no manual dispatch needed), or a manual
+# dispatch. It never runs on a schedule. It commits nothing, and it is not in
+# the intraday-pipeline concurrency group, so it cannot delay or collide with a
+# trading tick.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/alert_delivery_test.yml"
+      - "scripts/alert_delivery_test.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          # Same production lock as the intraday job.
+          python -m pip install "pip==26.2.2"
+          pip install --no-deps -r requirements.txt
+          pip check
+
+      - name: Fire controlled CRITICAL
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+        run: python scripts/alert_delivery_test.py
