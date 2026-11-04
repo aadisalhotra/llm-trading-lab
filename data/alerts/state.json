@@ -41,10 +41,11 @@
   },
   "daily": {
     "date": "2026-11-04",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "macro_event:Macro crisis",
-      "api_failure:deepseek"
+      "api_failure:deepseek",
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -61,6 +62,13 @@
         "severity": "WARN",
         "title": "Model deepseek failed",
         "timestamp": "2026-11-04T14:33:19.380099+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-04T15:03:08.782354+00:00",
         "disposition": "sent"
       }
     ]
