@@ -28,7 +28,7 @@
       "broker_paper": 89999.99
     },
     "_unallocated_cash_provenance": {
-      "broker_paper": "89999.99 = paper-account cash 99999.99 minus the five venue books' combined starting capital 10000 (5 x 2000; DeepSeek is paper-only and holds no venue cash). Supplied by the hub, 2026-10-05. READ FROM THE BROKER DASHBOARD, NOT THE API, at 2026-10-04 22:55 ET: cash 99999.99, zero positions, zero open orders. The September probe's PFE round-trips netted to one cent (hence .99). DATED: re-read before the E2E if anything has traded in the account since (the 2026-10-05 09:35 ET barrier probe trades in it)."
+      "broker_paper": "89999.99 = paper-account cash 99999.99 minus the five venue books' combined starting capital 10000 (5 x 2000; DeepSeek is paper-only and holds no venue cash). Supplied by the hub, 2026-10-05. READ FROM THE BROKER DASHBOARD, NOT THE API, at 2026-10-04 22:55 ET: cash 99999.99, zero positions, zero open orders. The September probe's PFE round-trips netted to one cent (hence .99). DATED: re-read before the E2E if anything has traded in the account since (the 2026-10-05 09:35 ET barrier probe trades in it). VERIFIED, NOT LOWERED, 2026-11-04: after the first trading barrier-probe run (20261104T153652Z) the account reads 99999.81 by API. That is this baseline plus 10000 book capital plus probe_cash -0.18. Probe runs are attributed per record by src/execution/administrative.administrative_cash_usd, counted from the first record in data/barrier_probe/, so lowering this figure would count them twice. Re-read means verify the equation; replace this value only for cash no probe record accounts for. Ledger: operational_events.2026-11[barrier_probe_clears_against_live_venue]."
     }
   },
   "execution": {

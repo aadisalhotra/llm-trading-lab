@@ -2033,6 +2033,31 @@
         "behaviour": "Unchanged. Book inventory is now dusted before the probe term is added rather than after. That cannot change an outcome: the probe trades only scripts/barrier_probe.SYMBOL, which tests/test_barrier_probe.py pins as outside the trading universe, so no ticker carries both terms. It is what makes the recorded terms sum exactly to expected_positions.",
         "migration": "None. data/reconciliation/ has never existed: production has run only paper mode, and level 2 runs only in broker modes, so no record was ever written under the old names. The only downstream reader, src/analytics/execution_metrics.load_reconciliation, reads cycle_id and clean, both unchanged. This stops being true at the Thursday 2026-11-05 cutover; after that a further rename needs a migration.",
         "verified": "tests/test_level2_reconciliation.py adds 2 tests: every term is its own field, the expected side equals the explicit sum of the recorded terms for cash and positions, and none of the old names appear in the record or event. Existing reconciliation and probe tests updated to the new names, outcomes unchanged. Full suite 650 passed."
+      },
+      {
+        "id": "barrier_probe_clears_against_live_venue",
+        "date": "2026-11-04",
+        "type": "infrastructure",
+        "scope": "scripts/barrier_probe.py; data/barrier_probe/2026-11.jsonl cycle 20261104T153652Z (commit 10284879a); src/execution/administrative.py; config/settings.json reconciliation.unallocated_cash_usd.broker_paper",
+        "authority": "Hub dispatch 2026-11-04 evening (barrier CLEARS; items 1-3).",
+        "observation": "First successful observation of the order barrier against the live venue (Alpaca paper). Chain dispatch, 10:36 ET, minute 6 of slot, production_check 'no intraday run job queued or in progress'. evaluation.engaged true, ordering_as_registered true. Rule-2 winner FORCED_PROBE_SELL filled_at 2026-11-04T15:37:00.930222Z; held FORCED_PROBE_BUY released on that terminal state and submitted_at 2026-11-04T15:37:02.857685733Z by the venue's own timestamps (submitted_after_winner_terminal true), filled 15:37:05.26Z. No wash-trade rejection (constraint and error empty on both books). Cleanup flattened 7.9365 F, clean true, position_after 0, position_delta {}. Verdict recorded by the probe: CLEARS. This is Thursday's gate.",
+        "probe_cash_defect_premise_false": {
+          "dispatch_claim": "administrative_cash_usd sums residual_cash_usd over FINISHED records, and today's record has residual_cash_usd 0.0 against account_cash_delta_usd -0.18, so the erosion is uncaptured (tolerance breach projected at run six, ~2026-11-12).",
+          "record": "The FINISHED record for 20261104T153652Z has residual_cash_usd -0.18, residual_basis 'account_cash_delta', account_quiet true. The 0.0 values in the file are the same cycle's STARTED line (excluded by the phase == FINISHED filter) and the two 2026-11-03 FINISHED records, which are outcome SKIPPED, 'market closed', and traded nothing.",
+          "computed": "administrative_cash_usd('broker_paper') on the committed file = -0.18 (0.0 + 0.0 + -0.18). The erosion is captured; there is no run-six breach.",
+          "proposed_fix_not_applied": "The dispatch's rule (sum account_cash_delta_usd where account_quiet, else contribute nothing) is identical to the code for quiet runs: settle_record already sets residual_cash_usd = account_cash_delta_usd when quiet. For non-quiet runs it would be a regression. The code records fill_cash_usd there, the probe's own fills, which are attributable even when the account delta is not. Contributing nothing would leave the probe's own spread unattributed and send it to level 2 as unexplained. The died-before-FINISHED principle covers runs whose cash is unmeasured. A non-quiet run's fills are measured. No code change.",
+          "decomposition": "fill_cash_usd -0.179365 = seed round trip 10 F at 12.60/12.59 (-0.10) + held BUY 7.9365 at 12.61 flattened at 12.60 (-0.079365). The account moved -0.18; the difference is the venue's cent rounding of fractional cash."
+        },
+        "baseline_and_probe_cash_boundary": {
+          "reread": "GET /v2/account 2026-11-04 22:58Z (after close, from the API; the dashboard read is the PI's): cash 99999.81, equity 99999.81, last_equity 99999.99, 0 positions, 0 open orders. Agrees with the record's account_after.cash 99999.81.",
+          "decision": "reconciliation.unallocated_cash_usd.broker_paper stays 89999.99. It is not lowered to 89999.81.",
+          "runs_inside_baseline": "None of the runs in data/barrier_probe/. 89999.99 is the 2026-10-04 22:55 ET dashboard read (99999.99 minus 10000 book capital), and the 2026-11-02 18:11 ET API read confirmed 99999.99 unchanged. The cent below 100000 is the September PFE probe, which predates the file and is inside the baseline.",
+          "probe_cash_counts_from": "Every FINISHED broker_paper record in data/barrier_probe/, from the first: 20261103T212318Z (SKIPPED, 0.0), 20261103T221754Z (SKIPPED, 0.0), 20261104T153652Z (the first trading run, -0.18). Today's 0.18 is counted once, in probe_cash.",
+          "closure": "expected_cash = book_cash 10000.00 + unallocated_cash 89999.99 + probe_cash -0.18 = 99999.81 = broker cash. Residual 0.00.",
+          "why_not_lower": "Lowering the baseline to 89999.81 while administrative_cash_usd still counts 20261104T153652Z double-counts it. Expected cash comes out at 99999.63, 0.18 short. That is inside the 1.00 tolerance, so nothing flags it. It grows 0.18 a run and breaches around run six. Avoiding the double count would need a cycle_id cutoff in administrative_cash_usd, which is a second way of saying the same thing that can disagree with the first (rule 10). The baseline is a fixed fact about funding. Probe erosion is a running, per-record term. Keeping them separate is what made the record terms separable on 2026-11-03.",
+          "provenance_note": "config/settings.json _unallocated_cash_provenance.broker_paper amended with this verification. The value is unchanged and the key is not among the prompt render's keys_read_by_render, so the edit is prompt-neutral by construction."
+        },
+        "next": "Thursday 2026-11-05: the mode flip, already shown prompt-neutral by prompt_cutover_delta_precomputed_2026_11_03."
       }
     ]
   }
