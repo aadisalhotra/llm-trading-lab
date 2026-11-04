@@ -2085,6 +2085,21 @@
           "status": "Fires on the push that lands fc7626e18. Its result is NOT recorded here and must be ledgered as its own entry once observed in the mailbox: the body names 'GitHub Actions run <id>'."
         },
         "render_side_diff": "Already exercised in part: test_config_change_is_detected (since the v4 freeze) asserts first_difference names the differing line on a real render drift. Added test_real_render_drift_names_the_line_in_the_critical_body, which pins that the line number and both line texts reach the CRITICAL body."
+      },
+      {
+        "id": "alert_send_bounds_and_test_subject",
+        "date": "2026-11-04",
+        "type": "infrastructure",
+        "scope": "src/alerts/events.py, src/alerts/email_alerts.py, scripts/alert_delivery_test.py, .github/workflows/alert_delivery_test.yml",
+        "authority": "Hub dispatch 2026-11-04 late evening, items 1 and 2 (before the push of the delivery package).",
+        "commit": "c76879adf",
+        "supersedes": "In critical_alert_delivery_proven.retry_gap_found_and_fixed: the statements 'sends on a non-daemon thread' and 'Non-daemon means the interpreter waits for the send before exiting', and the verified counts '12 tests' and '663 passed'. That entry stands as the record of what fc7626e18 did. This entry records the state as pushed.",
+        "timeouts_confirmed": {
+          "smtp_socket": "Bounded before this change and unchanged: smtplib.SMTP_SSL(timeout=SMTP_TIMEOUT=20) on every blocking socket operation (connect, TLS handshake, login, send). That bounds each operation, not a whole attempt: a server trickling bytes could stretch one attempt. send_email now also starts no new attempt past SEND_BUDGET_SECONDS = 90.",
+          "thread_join": "NOT bounded in fc7626e18. The send thread was non-daemon, so interpreter exit joined it with no timeout, and wait_for_pending_sends applied its timeout per thread rather than in total. intraday.yml sets no timeout-minutes, so a hung send would have held a cycle job open for GitHub's 6-hour default. Fixed: the thread is a daemon, and an atexit drain waits at most EXIT_WAIT_SECONDS = 120 in total. A send still running then is recorded as send_abandoned, with its cap slot and dedup key given back. If it completes afterwards, it takes them again. The CI commit step runs after process exit and captures whatever the drain settled."
+        },
+        "test_subject": "The CI delivery test's subject is now prefixed '[TEST - NOT A REAL ALERT] ' by wrapping the send_email name that dispatch_event calls. Detection, dispatch, threading, retry and SMTP are unchanged. Delivery is under test, not the subject string, and an inbox that learns the real subject is sometimes a test would hesitate on the one that is not. The script fails unless the delivered subject carries the prefix. The two LOCAL sends of 2026-11-04 (23:03Z and 23:11Z) went out before this change, with the unprefixed production subject and the marker only in the body.",
+        "verified": "tests/test_alert_delivery.py: 18 tests, adding the socket timeout on every session, the retry budget, a total (not per-thread) wait timeout, daemon send threads, a subprocess whose send hangs 600 s exiting within the bound and recording send_abandoned, and an abandoned send that completes retaking its reservation idempotently. Full suite 669 passed. A dry run with blank credentials produced the subject '[TEST - NOT A REAL ALERT] [ALERT] Frozen prompt drift: rendered prompt differs from reference', and the script exited 1 on the undelivered send, as designed."
       }
     ]
   }
