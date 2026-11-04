@@ -41,13 +41,14 @@
   },
   "daily": {
     "date": "2026-11-03",
-    "sent_count": 5,
+    "sent_count": 6,
     "dedup_keys": [
       "api_failure:deepseek",
       "completeness:deepseek:2026-11-03",
       "news:PG:bc3a70f7d5",
       "news:V:6a01aedd2a",
-      "news:MA:6a01aedd2a"
+      "news:MA:6a01aedd2a",
+      "macro_event:Macro crisis"
     ],
     "overflow": [],
     "digest_sent": true,
@@ -85,6 +86,13 @@
         "severity": "WARN",
         "title": "Very Positive news on MA (held by 5)",
         "timestamp": "2026-11-03T22:16:34.134644+00:00",
+        "disposition": "sent"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-04T00:54:02.587791+00:00",
         "disposition": "sent"
       }
     ]
