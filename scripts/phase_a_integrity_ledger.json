@@ -2100,6 +2100,19 @@
         },
         "test_subject": "The CI delivery test's subject is now prefixed '[TEST - NOT A REAL ALERT] ' by wrapping the send_email name that dispatch_event calls. Detection, dispatch, threading, retry and SMTP are unchanged. Delivery is under test, not the subject string, and an inbox that learns the real subject is sometimes a test would hesitate on the one that is not. The script fails unless the delivered subject carries the prefix. The two LOCAL sends of 2026-11-04 (23:03Z and 23:11Z) went out before this change, with the unprefixed production subject and the marker only in the body.",
         "verified": "tests/test_alert_delivery.py: 18 tests, adding the socket timeout on every session, the retry budget, a total (not per-thread) wait timeout, daemon send threads, a subprocess whose send hangs 600 s exiting within the bound and recording send_abandoned, and an abandoned send that completes retaking its reservation idempotently. Full suite 669 passed. A dry run with blank credentials produced the subject '[TEST - NOT A REAL ALERT] [ALERT] Frozen prompt drift: rendered prompt differs from reference', and the script exited 1 on the undelivered send, as designed."
+      },
+      {
+        "id": "critical_alert_delivery_ci_observed",
+        "date": "2026-11-04",
+        "type": "infrastructure",
+        "scope": ".github/workflows/alert_delivery_test.yml, scripts/alert_delivery_test.py; closes ci_gap in critical_alert_delivery_proven",
+        "authority": "Hub dispatch 2026-11-04 late evening: push of edec51000..5be809beb approved, CI result to be ledgered.",
+        "trigger": "Push edec51000..5be809beb at 2026-11-04T23:22:10Z. GitHub Actions run 41933166293 ('Alert delivery test', event push, head 5be809beb) was created at 23:22:12Z. Job 'deliver': conclusion success, 23:22:14Z to 23:23:11Z. Step 'Fire controlled CRITICAL' succeeded at 23:23:09Z.",
+        "what_success_means": "scripts/alert_delivery_test.py exits 0 only if the background send thread drained, the email log recorded status 'sent', the fired_log disposition settled to 'sent', and the delivered subject carried the '[TEST - NOT A REAL ALERT] ' prefix. The CRITICAL was raised by CI code, using CI's GMAIL_ADDRESS, GMAIL_APP_PASSWORD and ALERT_RECIPIENTS secrets, through the bounded-retry, background-send path of fc7626e18 and c76879adf.",
+        "mailbox": "Observed in the PI's mailbox. Received 2026-11-04T23:23:06Z; labels INBOX, UNREAD. Subject '[TEST - NOT A REAL ALERT] [ALERT] Frozen prompt drift: rendered prompt differs from reference'. To: the same two recipients as the local sends. The body names 'CONTROLLED-DELIVERY-TEST from GitHub Actions run 41933166293 (attempt 1)'.",
+        "not_observable": "The attempt count and the CI-side recipients fingerprint. The run commits nothing, and Actions logs are 403 without a token (CI log access gap). The job success proves the subject check passed. The recipient fingerprint is not independently read here, but the delivery went to the same two addresses as the registered 3d5874821739 sends.",
+        "gmail_threading": "Gmail filed this email into the SAME conversation as the two unprefixed local test sends (23:03Z, 23:11Z): one thread, 3 messages. Its subject threading ignores the bracketed prefix. A genuine 'Frozen prompt drift' CRITICAL would likely join that conversation too and sit beside three tests. This is a mailbox matter, not a delivery defect. Deleting that conversation after reading makes a real one open its own thread.",
+        "gate": "Alerting proven end to end from CI, with bounded retry and a bounded exit wait. This closes the gate list for the Thursday 2026-11-05 pre-market flip."
       }
     ]
   }
