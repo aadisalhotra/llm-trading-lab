@@ -2058,6 +2058,33 @@
           "provenance_note": "config/settings.json _unallocated_cash_provenance.broker_paper amended with this verification. The value is unchanged and the key is not among the prompt render's keys_read_by_render, so the edit is prompt-neutral by construction."
         },
         "next": "Thursday 2026-11-05: the mode flip, already shown prompt-neutral by prompt_cutover_delta_precomputed_2026_11_03."
+      },
+      {
+        "id": "critical_alert_delivery_proven",
+        "date": "2026-11-04",
+        "type": "infrastructure",
+        "scope": "src/alerts/email_alerts.py (send_email), src/alerts/events.py (dispatch_event, _deliver), scripts/alert_delivery_test.py, .github/workflows/alert_delivery_test.yml",
+        "authority": "Hub dispatch 2026-11-04 evening: delivery proof (queued 2026-11-02, raised in priority by Thursday's flip); retry fix ranked first.",
+        "commit": "fc7626e18",
+        "delivery_proof_local": {
+          "method": "Production prompt_integrity.evaluate and _alert, unmodified, run against a copy of the frozen reference with one component hash (decision_system) zeroed. The copy's frozen_commit carried a CONTROLLED-DELIVERY-TEST marker, which the alert body quotes. The tracked alert log, alert state and email log were redirected to a scratch directory, so today's dedup keys and cap were untouched and nothing was committed.",
+          "result": "CRITICAL 'Frozen prompt drift: rendered prompt differs from reference' accepted by Gmail SMTP for 2 recipients and observed in the PI's mailbox: INBOX, UNREAD, received 2026-11-04T23:03:24Z.",
+          "recipients_fingerprint": "3d5874821739 (the registered production fingerprint; the same value CI's email_log records).",
+          "honest_scope": "This send came from the LOCAL MACHINE using local .env credentials, not from a CI run. The alert code is identical. CI's transport was evidenced separately by data/alerts/email_log.jsonl: 76 of 76 sends since 2026-10-20 recorded sent with this fingerprint, the latest at 2026-11-04T22:08Z, and none failed. A CRITICAL raised inside CI with CI's secrets was still untested. See ci_gap.",
+          "line_null_is_correct": "The alert body reported first_difference line null. That is correct for this induction: zeroing a reference hash leaves no differing rendered line to name."
+        },
+        "retry_gap_found_and_fixed": {
+          "found": "The first controlled send failed with WinError 10051 (network unreachable) and logged send_failed. A retry a minute later delivered. send_email made exactly one attempt. A failed send left the dedup key unmarked, so a PERSISTENT condition re-fires next cycle and self-heals. A ONE-OFF event (a G-EXEC failure, a reconciliation that could not run, a thread error) does not re-fire and would have been lost.",
+          "fix": "send_email retries up to 3 attempts, backoff 2 s then 5 s. Only transient failures are retried: OSError, dropped connections, SMTP 4xx. Auth failures, 5xx and refused recipients fail at once. An error after the server accepted the message (for example in QUIT) counts as sent and is never resent, so a retry cannot duplicate. A send that fails every attempt logs one send_failed record exactly as before, now with an attempt count.",
+          "dispatch_premise_corrected": "The dispatch asked to confirm the alert path was already off the critical path. It was not. dispatch_event called send_email inline, on the calling model thread, while holding the dispatch lock. The position-stop and model-failed alerts fire in the model thread BEFORE that book registers at the cross-book barrier. One stalled SMTP send (20 s timeout per socket operation) could already delay every book's release, and three inline attempts would approach the 300 s barrier registration timeout.",
+          "off_critical_path": "dispatch_event now reserves the cap slot and dedup key under the lock, returns 'queued', and sends on a non-daemon thread. _deliver settles the record to sent or send_failed, and a failure gives back the slot and the key (the old semantics). Non-daemon means the interpreter waits for the send before exiting, so the intraday workflow's commit step, which runs after the process exits, captures the final disposition.",
+          "verified": "tests/test_alert_delivery.py, 12 tests: retry until delivered, attempts bounded at 3, permanent errors not retried, no resend after acceptance, caller returns in under 1 s while the send blocks, failure gives back slot and key, concurrent dispatches respect the cap, and a subprocess that exits without waiting still settles to sent. Full suite 663 passed. scripts/alert_delivery_test.py run locally on the new path delivered on attempt 1 (2026-11-04T23:11:33Z, fingerprint 3d5874821739)."
+        },
+        "ci_gap": {
+          "test": ".github/workflows/alert_delivery_test.yml runs scripts/alert_delivery_test.py with CI's GMAIL_ADDRESS, GMAIL_APP_PASSWORD and ALERT_RECIPIENTS secrets. It fails the job unless the email log records 'sent'. Triggers: a push to main changing the workflow or the script, or manual dispatch. No schedule, no commit, not in the intraday concurrency group.",
+          "status": "Fires on the push that lands fc7626e18. Its result is NOT recorded here and must be ledgered as its own entry once observed in the mailbox: the body names 'GitHub Actions run <id>'."
+        },
+        "render_side_diff": "Already exercised in part: test_config_change_is_detected (since the v4 freeze) asserts first_difference names the differing line on a real render drift. Added test_real_render_drift_names_the_line_in_the_critical_body, which pins that the line number and both line texts reach the CRITICAL body."
       }
     ]
   }
