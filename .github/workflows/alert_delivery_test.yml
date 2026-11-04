@@ -1,6 +1,6 @@
 name: Alert delivery test
 
-# Fires ONE controlled CRITICAL from inside a GitHub Actions run, through the
+# Fires ONE controlled CRITICAL (subject prefixed "[TEST - NOT A REAL ALERT]") from inside a GitHub Actions run, through the
 # production alert path, to the production recipients (ALERT_RECIPIENTS). It
 # closes the one link the 2026-11-04 local test could not reach: a CRITICAL
 # raised by CI code using CI's own secrets. See scripts/alert_delivery_test.py.

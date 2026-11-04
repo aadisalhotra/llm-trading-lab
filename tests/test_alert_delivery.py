@@ -220,3 +220,100 @@ def test_process_exit_waits_for_an_in_flight_send(tmp_path):
     daily = json.loads(state.read_text(encoding="utf-8"))["daily"]
     assert daily["fired_log"][-1]["disposition"] == "sent"
     assert daily["sent_count"] == 1
+
+
+# ------------------------------------------------------------------ bounds --
+# Hub ruling 2026-11-04: a send that HANGS must not make the exit wait
+# unbounded. A cycle job that never exits is worse than the stall removed.
+
+def test_every_smtp_session_carries_the_socket_timeout(monkeypatch):
+    seen = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, **kwargs):
+            seen.update(kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def login(self, *a):
+            pass
+
+        def sendmail(self, *a):
+            pass
+    monkeypatch.setattr(email_alerts.smtplib, "SMTP_SSL", FakeSMTP)
+    email_alerts._smtp_send_once("s", "p", ["r"], "payload")
+    assert seen["timeout"] == email_alerts.SMTP_TIMEOUT == 20
+
+
+def test_no_new_attempt_after_the_retry_budget(smtp_env, monkeypatch):
+    tmp_path, sleeps = smtp_env
+    monkeypatch.setattr(email_alerts, "SEND_BUDGET_SECONDS", 1.0)   # < the 2 s backoff
+    calls = _script(monkeypatch, [OSError("down")] * 3)
+    assert _send() is False
+    assert len(calls) == 1 and sleeps == []
+    assert _log(tmp_path)[0]["attempts"] == 1
+
+
+def test_wait_for_pending_sends_timeout_is_total_not_per_thread(state_file, monkeypatch):
+    release = threading.Event()
+    monkeypatch.setattr(events, "send_email", lambda *a, **k: release.wait(30) or True)
+    for i in range(3):
+        assert _dispatch(key=f"k{i}") == "queued"
+    t0 = time.monotonic()
+    assert events.wait_for_pending_sends(timeout=1.0) is False
+    assert time.monotonic() - t0 < 2.0       # 1 s in total, not 1 s x 3 threads
+    release.set()
+
+
+def test_send_threads_are_daemons(state_file, monkeypatch):
+    release = threading.Event()
+    monkeypatch.setattr(events, "send_email", lambda *a, **k: release.wait(10) or True)
+    _dispatch()
+    with events._PENDING_LOCK:
+        assert all(t.daemon for t in events._PENDING)
+    release.set()
+
+
+def test_hung_send_cannot_hold_the_process_open(tmp_path):
+    """A send blocked for 10 minutes; the process still exits within the drain
+    bound, records send_abandoned, and gives back the cap slot and dedup key."""
+    state = tmp_path / "state.json"
+    code = textwrap.dedent(f"""
+        import time
+        from pathlib import Path
+        from src.alerts import alert_state, events
+        alert_state.STATE_FILE = Path({str(state)!r})
+        events.EXIT_WAIT_SECONDS = 1.0
+        events.send_email = lambda *a, **k: time.sleep(600) or True
+        assert events.dispatch_event("x", "CRITICAL", "t", "b", dedup_key="k",
+            settings={{"alerts": {{"enabled": True}}}}) == "queued"
+    """)
+    t0 = time.monotonic()
+    subprocess.run([sys.executable, "-c", code], cwd=REPO, check=True, timeout=60)
+    assert time.monotonic() - t0 < 30
+    daily = json.loads(state.read_text(encoding="utf-8"))["daily"]
+    assert daily["fired_log"][-1]["disposition"] == "send_abandoned"
+    assert daily["sent_count"] == 0 and "k" not in daily["dedup_keys"]
+
+
+def test_send_completing_after_abandonment_retakes_the_reservation(state_file, monkeypatch):
+    monkeypatch.setattr(events, "ASYNC_SEND", False)
+    monkeypatch.setattr(events, "send_email", lambda *a, **k: True)
+    # Reserve by hand (as dispatch_event does), abandon, then complete.
+    st = alert_state.load_state()
+    d = alert_state.ensure_daily(st, events.session_date())
+    d["sent_count"] = 1
+    d["dedup_keys"].append("k")
+    d["fired_log"].append({"kind": "x", "disposition": "queued", "dispatch_id": "abc"})
+    alert_state.save_state(st)
+    events._settle(d["date"], "abc", "k", "send_abandoned", None)
+    assert _daily()["sent_count"] == 0 and "k" not in _daily()["dedup_keys"]
+    events._settle(d["date"], "abc", "k", "send_abandoned", None)   # idempotent
+    assert _daily()["sent_count"] == 0
+    events._settle(d["date"], "abc", "k", "sent", None)
+    assert _daily()["sent_count"] == 1 and "k" in _daily()["dedup_keys"]
+    assert _daily()["fired_log"][-1]["disposition"] == "sent"

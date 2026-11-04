@@ -52,6 +52,10 @@ SMTP_TIMEOUT = 20  # seconds — keep tight so a stalled connection can't hang a
 # delays a trading cycle.
 SEND_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (2.0, 5.0)
+# No new attempt starts once this much wall time has passed since the first.
+# Each attempt is itself bounded per socket operation by SMTP_TIMEOUT. The
+# process-level bound on a send that hangs mid-attempt is events.EXIT_WAIT_SECONDS.
+SEND_BUDGET_SECONDS = 90.0
 FROM_NAME = "LLM Trading Lab"
 
 
@@ -211,6 +215,7 @@ def send_email(
     payload = msg.as_string()
     attempts = 0
     last_error: Exception | None = None
+    started = time.monotonic()
     for attempts in range(1, SEND_ATTEMPTS + 1):
         try:
             if _smtp_send_once(sender, password, recipients, payload):
@@ -228,7 +233,12 @@ def send_email(
             if not transient:
                 break
             if attempts < SEND_ATTEMPTS:
-                time.sleep(RETRY_BACKOFF_SECONDS[min(attempts - 1, len(RETRY_BACKOFF_SECONDS) - 1)])
+                backoff = RETRY_BACKOFF_SECONDS[min(attempts - 1, len(RETRY_BACKOFF_SECONDS) - 1)]
+                if time.monotonic() - started + backoff >= SEND_BUDGET_SECONDS:
+                    logger.warning("Email retry budget (%.0fs) spent after attempt %d",
+                                   SEND_BUDGET_SECONDS, attempts)
+                    break
+                time.sleep(backoff)
     logger.error("Email send failed [%s] '%s' after %d attempt(s): %s",
                  alert_type, subject, attempts, last_error)
     _log_email({**base_record, "status": "failed", "attempts": attempts,

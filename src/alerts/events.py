@@ -22,12 +22,14 @@ same `dispatch_event()` via `alerter.send_alert()` as they happen.
 """
 from __future__ import annotations
 
+import atexit
 import functools
 import hashlib
 import json
 import logging
 import re
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -343,35 +345,67 @@ def dispatch_event(
                             reserved_date, dispatch_id, dedup_key, mark_milestones)
     if not ASYNC_SEND:
         return job()
-    t = threading.Thread(target=job, name=f"alert-send-{dispatch_id}", daemon=False)
+    t = threading.Thread(target=job, name=f"alert-send-{dispatch_id}", daemon=True)
     with _PENDING_LOCK:
-        _PENDING[:] = [p for p in _PENDING if p.is_alive()]
-        _PENDING.append(t)
+        for p in [p for p in _PENDING if not p.is_alive()]:
+            del _PENDING[p]
+        _PENDING[t] = (reserved_date, dispatch_id, dedup_key)
     t.start()
     return "queued"
 
 
-# Event emails are sent on their own non-daemon thread (hub dispatch
-# 2026-11-04). send_email retries up to three times, and a stalled SMTP server
-# can hold each attempt for SMTP_TIMEOUT per socket operation. Done inline, that
-# wait would land on the calling model thread. The position-stop and
-# model-failure alerts fire there BEFORE the book registers at the cross-book
-# barrier, so one slow send would delay every book's release. Non-daemon means
-# the interpreter waits for the thread before exiting, so the CI commit step,
-# which runs after the process exits, still captures the final disposition.
+# Event emails are sent on their own thread (hub dispatch 2026-11-04).
+# send_email retries up to three times, and a stalled SMTP server can hold each
+# attempt for SMTP_TIMEOUT per socket operation. Done inline, that wait would
+# land on the calling model thread. The position-stop and model-failure alerts
+# fire there BEFORE the book registers at the cross-book barrier, so one slow
+# send would delay every book's release.
+#
+# Both waits are BOUNDED. The socket: SMTP_SSL(timeout=SMTP_TIMEOUT) on every
+# blocking operation, and send_email starts no new attempt past
+# SEND_BUDGET_SECONDS. Process exit: the thread is a daemon, so the interpreter
+# does not wait on it unboundedly, and _drain_at_exit (atexit) gives in-flight
+# sends at most EXIT_WAIT_SECONDS in total. A send still running after that is
+# recorded as send_abandoned and its cap slot and dedup key are given back, so
+# a hung socket can never keep a cycle job alive. (The intraday workflow sets
+# no timeout-minutes, so an unbounded wait would hold the job for GitHub's
+# 6-hour default.) The CI commit step runs after the process exits, so it
+# captures whatever disposition the drain settled.
 # ASYNC_SEND = False runs the identical job inline (tests).
 ASYNC_SEND = True
-_PENDING: list[threading.Thread] = []
+EXIT_WAIT_SECONDS = 120.0
+_PENDING: dict[threading.Thread, tuple[str, str, str]] = {}
 _PENDING_LOCK = threading.Lock()
 
 
 def wait_for_pending_sends(timeout: float | None = None) -> bool:
-    """Join every in-flight event send. True when none is left running."""
+    """Join in-flight event sends within `timeout` seconds IN TOTAL (None:
+    unbounded, tests only). True when none is left running."""
     with _PENDING_LOCK:
         threads = list(_PENDING)
+    deadline = None if timeout is None else time.monotonic() + timeout
     for t in threads:
-        t.join(timeout)
+        t.join(None if deadline is None else max(0.0, deadline - time.monotonic()))
     return not any(t.is_alive() for t in threads)
+
+
+def _drain_at_exit() -> None:
+    """Bounded wait for in-flight sends at interpreter exit; abandon the rest."""
+    try:
+        if wait_for_pending_sends(timeout=EXIT_WAIT_SECONDS):
+            return
+        with _PENDING_LOCK:
+            stuck = [(t, meta) for t, meta in _PENDING.items() if t.is_alive()]
+        for t, (reserved_date, dispatch_id, dedup_key) in stuck:
+            logger.error("Alert send %s still in flight after %.0fs at exit; abandoned "
+                         "(recorded send_abandoned, cap slot and dedup key given back)",
+                         t.name, EXIT_WAIT_SECONDS)
+            _settle(reserved_date, dispatch_id, dedup_key, "send_abandoned", None)
+    except Exception:  # noqa: BLE001 -- never block or crash interpreter exit
+        logger.exception("Alert drain at exit failed")
+
+
+atexit.register(_drain_at_exit)
 
 
 def _deliver(subject: str, html: str, text_body: str, kind: str,
@@ -385,22 +419,40 @@ def _deliver(subject: str, html: str, text_body: str, kind: str,
         logger.exception("Event send raised unexpectedly: %s", subject)
         ok = False
     disposition = "sent" if ok else "send_failed"
+    _settle(reserved_date, dispatch_id, dedup_key, disposition, mark_milestones if ok else None)
+    if not ok:
+        logger.error("Event email NOT delivered after retries: %s", subject)
+    return disposition
+
+
+def _settle(reserved_date: str, dispatch_id: str, dedup_key: str, disposition: str,
+            mark_milestones: tuple[str, list[int]] | None) -> None:
+    """Record a reserved send's outcome. The reservation (cap slot + dedup key)
+    is held exactly while the fired_log entry reads 'queued': a failed or
+    abandoned send gives it back, and a send that completes after being
+    abandoned takes it again. Never raises."""
     try:
         with _DISPATCH_LOCK:
             state = load_state()
             daily = state.get("daily") or {}
             if daily.get("date") == reserved_date:
-                for entry in daily.get("fired_log", []):
-                    if entry.get("dispatch_id") == dispatch_id:
-                        entry["disposition"] = disposition
-                        break
-                if not ok:
-                    # A failed send does NOT consume the cap or the dedup key,
-                    # so a later tick can fire it again.
-                    daily["sent_count"] = max(0, int(daily.get("sent_count", 0)) - 1)
-                    if dedup_key in daily.get("dedup_keys", []):
-                        daily["dedup_keys"].remove(dedup_key)
-            if ok and mark_milestones:
+                entry = next((e for e in daily.get("fired_log", [])
+                              if e.get("dispatch_id") == dispatch_id), None)
+                if entry is not None:
+                    held = entry.get("disposition") == "queued"
+                    entry["disposition"] = disposition
+                    keys = daily.setdefault("dedup_keys", [])
+                    if disposition == "sent" and not held:
+                        daily["sent_count"] = int(daily.get("sent_count", 0)) + 1
+                        if dedup_key not in keys:
+                            keys.append(dedup_key)
+                    elif disposition != "sent" and held:
+                        # Not delivered: give back the cap slot and the dedup
+                        # key, so a later tick can fire it again.
+                        daily["sent_count"] = max(0, int(daily.get("sent_count", 0)) - 1)
+                        if dedup_key in keys:
+                            keys.remove(dedup_key)
+            if mark_milestones:
                 mk, thresholds = mark_milestones
                 existing = set(state["milestones_fired"].get(mk, []))
                 existing.update(int(t) for t in thresholds)
@@ -408,9 +460,6 @@ def _deliver(subject: str, html: str, text_body: str, kind: str,
             save_state(state)
     except Exception:  # noqa: BLE001
         logger.exception("Could not settle alert state for %s (%s)", dispatch_id, disposition)
-    if not ok:
-        logger.error("Event email NOT delivered after retries: %s", subject)
-    return disposition
 
 
 def _compact(event_record: dict[str, Any]) -> dict[str, Any]:

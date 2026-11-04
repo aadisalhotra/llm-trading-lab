@@ -10,9 +10,11 @@ unless the email was accepted for delivery:
 Only the INPUT is controlled. The check runs against a copy of the frozen
 reference with one component hash zeroed, so the real render reports a
 mismatch. The copy's `frozen_commit` is replaced with a CONTROLLED-DELIVERY-TEST
-marker naming where the test ran. The alert body quotes that field, so the
-recipient can tell the email is a test. The subject is the production subject,
-unchanged.
+marker naming where the test ran, which the alert body quotes. The SUBJECT is
+prefixed with SUBJECT_PREFIX (hub ruling 2026-11-04), by wrapping the
+send_email name that events.dispatch_event calls. Delivery is what is under
+test, not the subject string. An inbox that learns "Frozen prompt drift" is
+sometimes a test would hesitate on the one that is not.
 
 Nothing is written to a tracked path. The alert log, alert state and email log
 are redirected to a temporary directory, so today's dedup keys and daily cap
@@ -39,6 +41,7 @@ sys.path.insert(0, str(REPO))
 from src.config_loader import force_utf8_console, load_env  # noqa: E402
 
 logger = logging.getLogger("llmlab.alert_delivery_test")
+SUBJECT_PREFIX = "[TEST - NOT A REAL ALERT] "
 WAIT_SECONDS = 180   # 3 attempts x up to ~3 x SMTP_TIMEOUT each, plus backoff
 
 
@@ -64,6 +67,12 @@ def main() -> int:
     email_alerts.ALERTS_DIR = scratch
     email_alerts.EMAIL_LOG = scratch / "email_log.jsonl"
     from src.logging import prompt_integrity as pi
+
+    real_send = email_alerts.send_email
+
+    def marked_send(subject, *args, **kwargs):
+        return real_send(SUBJECT_PREFIX + subject, *args, **kwargs)
+    events.send_email = marked_send
 
     recipients = email_alerts.get_recipients()
     reference = json.loads(pi.REFERENCE_PATH.read_text(encoding="utf-8"))
@@ -108,7 +117,8 @@ def main() -> int:
         "timestamp": last.get("timestamp"),
     }
     print("ALERT_DELIVERY_TEST " + json.dumps(summary, sort_keys=True))
-    ok = drained and last.get("status") == "sent" and summary["disposition"] == "sent"
+    ok = (drained and last.get("status") == "sent" and summary["disposition"] == "sent"
+          and str(last.get("subject", "")).startswith(SUBJECT_PREFIX))
     if not ok:
         logger.error("CRITICAL was NOT accepted for delivery: %s", summary)
     return 0 if ok else 1
