@@ -153,6 +153,17 @@
         "recommended_procedure": "Force-cover every open short immediately before the prompt_version flip, at live prices, logged with a distinct reason code (BOUNDARY_ADMIN -> order_id FORCED_BOUNDARY_ADMIN; not RISK_STOP -- these are regime-boundary closes, and mislabeling them would contaminate the short stop-loss statistics). Ordering: cover under v3 (where the models' own rule set still explains the short book), then flip prompt_version to v4 and shorting_enabled to false. Realized P&L from a boundary force-cover is regime-attributable to v3 and is tagged as such for RQ2/RQ3 direction segmentation. Executed by scripts/boundary_force_cover.py, which re-reads the book at execution rather than accepting a position list. The general form is registered at operational_events.2026-10[v4_boundary_force_cover_2026_10_23].general_form. (The staged draft scheduled this as the first step of a 2026-09-01 pre-market activation; the procedure stood, the date did not.)",
         "alternative_considered": "Let the shorts run off under the automatic stop. Rejected as a recommendation: it leaves an unmanageable position open for an unbounded time under a prompt that no longer describes it, and the resulting P&L would straddle the regime boundary."
       }
+    },
+
+    "broker_paper_epoch": {
+      "date": "2026-11-05",
+      "first_effective_session": "2026-11-06",
+      "first_effective_time": "2026-11-06 09:35 ET",
+      "type": "execution_epoch_boundary",
+      "change": "paper simulator -> broker_paper; cohort books re-incepted fresh at $2,000 each, nothing carried",
+      "scope": "the five live-cohort books; deepseek stays on its paper epoch",
+      "registered": "the 2026-11-06 epoch boundary is a hard homogeneous-window boundary for all regime maps and window starts; no estimand window spans it.",
+      "event_ref": "operational_events.2026-11[paper_epoch_closure_and_broker_paper_cutover]"
     }
   },
 
@@ -2113,6 +2124,207 @@
         "not_observable": "The attempt count and the CI-side recipients fingerprint. The run commits nothing, and Actions logs are 403 without a token (CI log access gap). The job success proves the subject check passed. The recipient fingerprint is not independently read here, but the delivery went to the same two addresses as the registered 3d5874821739 sends.",
         "gmail_threading": "Gmail filed this email into the SAME conversation as the two unprefixed local test sends (23:03Z, 23:11Z): one thread, 3 messages. Its subject threading ignores the bracketed prefix. A genuine 'Frozen prompt drift' CRITICAL would likely join that conversation too and sit beside three tests. This is a mailbox matter, not a delivery defect. Deleting that conversation after reading makes a real one open its own thread.",
         "gate": "Alerting proven end to end from CI, with bounded retry and a bounded exit wait. This closes the gate list for the Thursday 2026-11-05 pre-market flip."
+      },
+      {
+        "id": "paper_epoch_closure_and_broker_paper_cutover",
+        "date": "2026-11-05",
+        "type": "epoch_boundary",
+        "scope": "The five cohort books (claude, claude_opus, gpt, gemini, grok). deepseek is excluded: its state stays live and its series continues uninterrupted.",
+        "authority": "Hub dispatch 2026-11-05 ('the cutover, Thursday 2026-11-05'). Procedure: Research ruling 2026-11-04.",
+        "governing": {
+          "retirement_procedure": {
+            "path": "docs/registrations/paper_epoch_retirement.md",
+            "commit": "820fd0502"
+          },
+          "cutover_finding": {
+            "path": "docs/registrations/cutover_reinception_finding_2026-11-04.md",
+            "commit": "daa38e631"
+          },
+          "surface_sweep": {
+            "path": "docs/registrations/cutover_surface_sweep_2026-11-05.md"
+          },
+          "routing_note": "paper_epoch_retirement.md section 4 requires this entry to cite that file by path and by the commit that landed it. This is that citation, and item (6)'s completion record."
+        },
+        "boundary": {
+          "landing_date": "2026-11-05",
+          "final_paper_session": "2026-11-05",
+          "first_effective_session": "2026-11-06",
+          "first_effective_time": "2026-11-06 09:35 ET",
+          "landing_vs_first_effective": "Landed after the 2026-11-05 close, so every 2026-11-05 record is paper-epoch and the first broker_paper decision cycle is 2026-11-06. Same two-date convention as regime_boundaries.phase_b_long_only.",
+          "validation_sessions_to_floor": "2026-11-06 through 2026-11-30 is 16 NYSE sessions (Thanksgiving 11-26 closed; 11-27 counts), against the S1 floor of 15: one session of margin."
+        },
+        "series_closure": {
+          "note": "Item (1). Each cohort book's paper-epoch series terminates at its final paper session. Values are the 2026-11-05 EOD performance rows, written by the primary EOD run (commit 85883c74e, 22:07:46Z). Each book has exactly one row for that date, and its row cash and position count equal the archived state file.",
+          "final_session": "2026-11-05",
+          "books": {
+            "claude": {
+              "terminal_equity_usd": 120352.73236676959,
+              "cumulative_return_vs_100000": 0.203527323667696,
+              "cash_usd": 7691.203539087673,
+              "positions": 15
+            },
+            "claude_opus": {
+              "terminal_equity_usd": 116995.41984070552,
+              "cumulative_return_vs_100000": 0.16995419840705517,
+              "cash_usd": 18822.376855860522,
+              "positions": 17
+            },
+            "gpt": {
+              "terminal_equity_usd": 116834.07913687958,
+              "cumulative_return_vs_100000": 0.16834079136879576,
+              "cash_usd": 11875.615914062524,
+              "positions": 16
+            },
+            "gemini": {
+              "terminal_equity_usd": 134833.17117235434,
+              "cumulative_return_vs_100000": 0.3483317117235434,
+              "cash_usd": 35469.00953567297,
+              "positions": 8
+            },
+            "grok": {
+              "terminal_equity_usd": 114433.07654647731,
+              "cumulative_return_vs_100000": 0.1443307654647732,
+              "cash_usd": 9055.265954739934,
+              "positions": 18
+            }
+          }
+        },
+        "archive": {
+          "note": "Items (2) and (3). git mv, nothing edited: five R100 renames.",
+          "path": "data/state_archive/paper_epoch_2026-11-05/",
+          "pre_archive_commit": "894b1ea37bf32bd7477b2091ffdeee86ee795ad7",
+          "archive_commit": "144c82c81b97288f60d7e4a57a400e0f23093ecd",
+          "state_source": "The archived blobs are the ones the 2026-11-05 EOD run committed at 85883c74e. pre_archive_commit carries the same blobs.",
+          "blobs": {
+            "claude": "d8ac39f9761f863dde6b13ad6c5da76230954ded",
+            "claude_opus": "782a787ffbbab014f0c459f544a211769b95303f",
+            "gpt": "0465186b2967e8aa23a52a005431cef4acbf2187",
+            "gemini": "e97c7a878bb003e55cd2c832d10d37fd681e6285",
+            "grok": "229511e9b348faf4643ac48161cad7999d795cbb"
+          },
+          "left_in_place": {
+            "data/state/deepseek.json": "dee75e67a1f312aa9bebec48233aead74c183d83",
+            "data/state/handled_boundaries.json": "c451d6c12dbca1653b3102a75e414405fe83a125",
+            "data/state/spacing_guard_skips.jsonl": "ad07dcb37236fa0599f02f4e5729f7843078c7f8"
+          }
+        },
+        "guard_semantics": "Item (5). _assert_epoch and InceptionEpochError are unchanged. The guard is satisfied by the archive, not bypassed: a file left in data/state would still raise.",
+        "sandbox_proof": {
+          "construction": "Throwaway git worktree of 144c82c81 with the one-line flip applied, on the real clock after the 2026-11-05 close. Each book created by load_portfolio, as the pipeline will create it.",
+          "cohort_books": {
+            "claude": {
+              "inception_epoch": "broker_paper",
+              "cash": 2000.0,
+              "inception_value": 2000.0,
+              "holdings": 0,
+              "inception_date": "2026-11-06"
+            },
+            "claude_opus": {
+              "inception_epoch": "broker_paper",
+              "cash": 2000.0,
+              "inception_value": 2000.0,
+              "holdings": 0,
+              "inception_date": "2026-11-06"
+            },
+            "gpt": {
+              "inception_epoch": "broker_paper",
+              "cash": 2000.0,
+              "inception_value": 2000.0,
+              "holdings": 0,
+              "inception_date": "2026-11-06"
+            },
+            "gemini": {
+              "inception_epoch": "broker_paper",
+              "cash": 2000.0,
+              "inception_value": 2000.0,
+              "holdings": 0,
+              "inception_date": "2026-11-06"
+            },
+            "grok": {
+              "inception_epoch": "broker_paper",
+              "cash": 2000.0,
+              "inception_value": 2000.0,
+              "holdings": 0,
+              "inception_date": "2026-11-06"
+            }
+          },
+          "deepseek": {
+            "inception_epoch": "paper",
+            "inception_date": "2026-04-09",
+            "inception_value": 100000.0,
+            "holdings": 16,
+            "state_bytes_unchanged": true
+          },
+          "experiment_start_date": "2026-04-09",
+          "reconciliation_params": {
+            "cash_tolerance_usd": 1.0,
+            "unallocated_cash_usd": 89999.99
+          }
+        },
+        "reproducibility_invariant": {
+          "note": "Item (4).",
+          "result": "tests/test_reproduce_may_data_layer.py: 3 passed, on the archive commit in paper mode and in the sandbox with the flip applied. Reproduce-May is an exact match locally.",
+          "what_it_proves": "That the archive cannot orphan the layer. The build was instrumented: it opens 109 files, from data/trades, data/performance, data/factors and data/regime_snapshots, and none under data/state or data/state_archive. So the regression is independent of where the state files live rather than a replay of them. The state-side proof is the blob identity above, plus row cash and position count matching each archived file."
+        },
+        "flip": {
+          "commit": "ddd2e1cc73d9773f7e2961f2fcf10bb9610a6fa8",
+          "change": "config/settings.json \"mode\": \"paper\" -> \"broker_paper\", one line",
+          "cutover_delta": {
+            "verdict": "MATCH on all four hashes, both controls passing",
+            "reference": "data/pre_registration/prompt_golden_reference_v4.json, frozen_commit 00557e557",
+            "settings_sha256_lf": "fd73663bae3bdb278f65c61ecc02db762058ad611f84be805ebba51ddd1cec4d",
+            "combined": "b415afcb588792873743df073fac242f642a60f19508d4a414add356c87e38b7",
+            "components": {
+              "decision_system": "4ab16655364c4d2a91f8e7559e8058f83fda82a79f8fb2b20a72330a61aa9d91",
+              "decision_user": "7cabfd2f484e90ff57a5c4cd71ad4cdaf1fa09dd50857a97ab7d05e3507a9723",
+              "screening_system": "98f906d7da41b6507790db8c2288fbedc1ee855f6088fa8de1303c7a831f83e0",
+              "screening_user": "aadf3685498ff81a60c9148b26c5ff3a42b9973df79a8c6f6d8b4285cf9b6303"
+            }
+          }
+        },
+        "gate_late_eod_runs": {
+          "question": "Are the late backup EOD runs true no-ops once the day's row exists? (2026-11-03's fired at 22:16Z, 00:54Z and 01:52Z.)",
+          "finding": "NO, read from the code and confirmed in the commits. run_one_model called load_portfolio before log_daily_snapshot's duplicate check, so each late run rewrote all six state files (041f4878c: runs_today 14 to 15, last_updated) and re-ran the position-stop sweep. After an archive, that load would have created fresh books early.",
+          "resolution": "pipeline._eod_skip_reason runs ahead of the first load and skips when every enabled book has the day's row, or when the session has not closed. The structural guard: log_daily_snapshot refuses a row that predates the book's own inception_date. Proved by a real --end-of-day run in a worktree with the books archived: it logged the skip, exited 0, and created no state file.",
+          "commit": "679d3c7cd"
+        },
+        "reporting_status": {
+          "publish_pause": "ON (settings publish.dashboard_paused, c3106bf51). The build continues. Lifts only once R1, R2 and R3 are fixed.",
+          "R1": "FIXED (9ad8a2d79): each book's own inception_value and epoch start, through book_epoch(). Taken in preference to leaving it behind the pause, because the pause covers Pages only and reports/daily is committed to a public repo.",
+          "R2": "PARTIAL: the seam is fixed inside compute_metrics, the detectors, the digest and the daily report. Dashboard curves stay behind the pause.",
+          "R3": "OPEN, behind the pause. alpha_vs_spy is None for a re-incepted book until SPY is anchored per epoch.",
+          "R4": "FIXED (679d3c7cd).",
+          "R5": "OPEN, before the November layer.",
+          "R6": "FIXED, not suppressed (9ad8a2d79). Declared behaviour: negative_return needs a crossing between two rows of the epoch, so a book that closes its FIRST session down does not fire for that episode. It fires the first time it crosses from non-negative to negative after that.",
+          "R7": "Verified: published months unaffected (reproducibility_invariant above)."
+        },
+        "rolling_memory": "Found in the sweep (5e1a89636). read_recent_decisions and read_last_action_per_ticker now stop at the book's inception_date, so a fresh book's first prompt renders the existing empty-memory text rather than the closed paper book's trades. No template change; inert for deepseek.",
+        "boundary_artifact": {
+          "name": "paper_epoch_tail_2026_11_02_to_05",
+          "sessions": [
+            "2026-11-02",
+            "2026-11-03",
+            "2026-11-04",
+            "2026-11-05"
+          ],
+          "session_count": 4,
+          "classification": "Paper-epoch tail segment under the frozen v4 prompt: neither outgoing pilot (closed Oct 31) nor broker-paper validation. Descriptive only, insufficient_n.",
+          "provenance": "Research named the sliver as Nov 2-4; the hub extended it to Nov 2-5 because 11-05 also ran paper-epoch books (paper_epoch_retirement.md section 2). That section records the four-session extension as pending Research confirmation, and no confirmation is in the repo. Entered here on the hub's dispatch."
+        },
+        "registered": {
+          "homogeneous_window_boundary": "the 2026-11-06 epoch boundary is a hard homogeneous-window boundary for all regime maps and window starts; no estimand window spans it.",
+          "epoch_reanchor": "every equity and cumulative-return series re-anchors at its epoch’s inception; no surface computes a return across an epoch boundary.",
+          "epoch_reanchor_note": "Registered whether or not R1 is implemented. Implementation status is in reporting_status: R1 is done, and the remaining surfaces carry the rule as an open obligation."
+        },
+        "completion_record": {
+          "note": "Item (6). The human step's completion record; per the undifferentiated-failure principle a deliberate step that completes silently is indistinguishable from one that did not happen.",
+          "per_book_terminal_values": "series_closure.books",
+          "archive_path": "data/state_archive/paper_epoch_2026-11-05/",
+          "commit": "144c82c81b97288f60d7e4a57a400e0f23093ecd",
+          "pre_archive_commit": "894b1ea37bf32bd7477b2091ffdeee86ee795ad7",
+          "operator": "Operations lane (Claude Code session) on the hub's dispatch, pushed on PI sign-off",
+          "date": "2026-11-05"
+        }
       }
     ]
   }
