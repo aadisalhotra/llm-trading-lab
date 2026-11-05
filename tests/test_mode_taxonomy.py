@@ -83,11 +83,12 @@ def test_simulator_mode_cannot_construct_a_broker_client():
         BrokerClient(MODE_SIMULATOR)
 
 
-def test_committed_settings_still_run_the_simulator():
-    # P0 adds the capability; it does not flip the running mode. Phase A must
-    # keep running on the simulator until the Oct 1 cutover.
+def test_committed_settings_run_broker_paper():
+    # The cutover landed 2026-11-05, first effective session 2026-11-06 09:35 ET.
+    # Reads the file itself: the suite's default is the simulator whatever is
+    # committed (tests/conftest.py), so load_settings would not show this.
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
-    assert settings["mode"] == MODE_SIMULATOR
+    assert settings["mode"] == MODE_BROKER_PAPER
 
 
 # --------------------------------------------------------------------------
