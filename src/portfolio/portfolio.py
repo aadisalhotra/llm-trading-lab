@@ -354,6 +354,22 @@ def _state_path(model_key: str) -> Path:
     return STATE_DIR / f"{model_key}.json"
 
 
+def read_book_inception(model_key: str) -> tuple[str, float] | None:
+    """(inception_date, inception_value) from the book's state file, or None.
+
+    Strictly a read, for the reporting path. Unlike load_portfolio it never
+    creates a book and never raises InceptionEpochError, so a dashboard build or
+    alert sweep can ask where a book's epoch begins without being able to incept
+    one. None means no readable state file, i.e. the book has not incepted.
+    """
+    try:
+        with open(_state_path(model_key), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return str(data["inception_date"]), float(data["inception_value"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
     """Create a fresh portfolio for a model. Used at each book's inception.
 

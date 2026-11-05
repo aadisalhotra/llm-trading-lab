@@ -15,8 +15,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, load_settings,
+from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, effective_mode, load_settings,
                              starting_capital as _starting_capital_guarded)
+from ..portfolio.portfolio import read_book_inception
 
 
 def load_performance_history(model_key: str) -> pd.DataFrame:
@@ -114,24 +115,53 @@ def _experiment_inception(settings: dict[str, Any] | None = None) -> str | None:
     return settings.get("experiment_start_date")
 
 
+def book_epoch(
+    model_key: str, settings: dict[str, Any] | None = None
+) -> tuple[str, float]:
+    """(start_date, inception_value) of this book's CURRENT epoch.
+
+    Registered at the 2026-11-06 cutover: every equity and cumulative-return
+    series re-anchors at its epoch's inception, and no surface computes a return
+    across an epoch boundary. One lab-wide anchor cannot express that once the
+    cohort is a $2,000 broker-paper book and DeepSeek is still a $100,000 paper
+    book, so the anchor is read per book from its own state file.
+
+    A book with no state file has not incepted. In paper mode that is the
+    pre-launch case and the lab figures apply. In a venue mode its epoch is the
+    coming session, so a paper-epoch row can never be measured against it.
+    The start date never precedes the experiment's.
+    """
+    settings = settings or load_settings()
+    start = _experiment_inception(settings) or ""
+    book = read_book_inception(model_key)
+    if book is not None:
+        return max(book[0], start), book[1]
+    mode = effective_mode(model_key, settings)
+    capital = _starting_capital_guarded(settings, mode)
+    if mode == "paper":
+        return start, capital
+    from ..data.market_data import inception_session_date  # heavy; only this path needs it
+    return inception_session_date(), capital
+
+
 def canonical_perf_frame(
     model_key: str, settings: dict[str, Any] | None = None
 ) -> pd.DataFrame:
     """A model's perf history collapsed to one EOD row per trading date and
-    sliced to >= the canonical inception.
+    sliced to >= the start of the book's current epoch.
 
     The single basis every display metric is computed from. Duplicate dates are
     resolved by the registered EOD_DEDUP_RULE (keep the last row per date), like
-    every other reader; the inception slice drops pre-inception rows (e.g. the 2026-04-08
-    launch-day shakedown rows) from the COMPUTATION only — the raw logs are
-    never touched.
+    every other reader; the slice drops pre-inception rows (e.g. the 2026-04-08
+    launch-day shakedown rows) and closed-epoch rows from the COMPUTATION only —
+    the raw logs are never touched.
     """
     df = load_eod_history(model_key)
     if df.empty:
         return df
     df = df.copy()
     df["date_str"] = df["date"].dt.strftime("%Y-%m-%d")
-    inception = _experiment_inception(settings)
+    inception = book_epoch(model_key, settings)[0]
     if inception:
         df = df[df["date_str"] >= inception].reset_index(drop=True)
     return df
@@ -245,11 +275,16 @@ def compute_metrics(
     spy_return: Any = _UNSET,
 ) -> dict[str, Any]:
     settings = settings or load_settings()
-    starting_capital = _starting_capital(settings)
+    epoch_start, starting_capital = book_epoch(model_key, settings)
     if spy_return is _UNSET:
         spy_return = canonical_spy_return(settings)
+    # The canonical SPY return runs from the experiment's start. Set against a
+    # book that re-incepted later, it would be a return computed across an epoch
+    # boundary, so alpha is None until SPY is anchored per epoch (finding R3).
+    if epoch_start > (_experiment_inception(settings) or ""):
+        spy_return = None
 
-    # Canonical basis: one EOD row per date, sliced to >= inception.
+    # Canonical basis: one EOD row per date, sliced to the book's current epoch.
     df = canonical_perf_frame(model_key, settings)
 
     def _last_api_success(frame: pd.DataFrame) -> bool:
@@ -283,9 +318,9 @@ def compute_metrics(
 
     values = df["total_value"].astype(float).values
     daily_returns = np.diff(values) / values[:-1]
-    # Cumulative return anchored to the initial deployed capital from config
-    # (the clean $100k) — identical anchor in the leaderboard and the
-    # performance table so the two can never disagree.
+    # Cumulative return anchored to this book's own inception value — identical
+    # anchor in the leaderboard and the performance table so the two can never
+    # disagree.
     cumulative_return = (values[-1] / starting_capital - 1.0) if starting_capital > 0 else (values[-1] / values[0] - 1.0)
 
     # Today's % change vs the prior EOD row

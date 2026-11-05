@@ -7,6 +7,7 @@ from .performance import (
     load_eod_history,
     dedupe_eod,
     EOD_DEDUP_RULE,
+    book_epoch,
     canonical_perf_frame,
     canonical_spy_series,
     canonical_spy_return,

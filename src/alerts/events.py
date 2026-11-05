@@ -500,14 +500,20 @@ def _eod_history(model_key: str):
     day-over-day transitions reads through this instead. Mirrors the
     dashboard's correlation-matrix dedupe -- both now apply the registered
     EOD_DEDUP_RULE (analytics.performance.dedupe_eod).
+
+    Sliced to the book's current epoch, for the same reason: at a re-inception
+    the row before a $2,000 book's first close is the paper book's last close,
+    which is not a prior session of this book. A transition read across that
+    seam is false in both directions (a +20% "prior session" for a fresh book,
+    and a peak no new book could ever beat).
     """
-    from ..analytics.performance import dedupe_eod
+    from ..analytics.performance import book_epoch, dedupe_eod
     df = _perf_history(model_key)
     if df.empty or "date" not in df.columns:
         return df
     df = dedupe_eod(df).copy()
     df["_d"] = df["date"].astype(str).str[:10]
-    return df
+    return df[df["_d"] >= book_epoch(model_key)[0]].reset_index(drop=True)
 
 
 def _read_today_trade_records(model_key: str, date_str: str) -> list[dict[str, Any]]:
@@ -720,7 +726,14 @@ def detect_milestones(settings: dict[str, Any]) -> list[dict[str, Any]]:
 
 def detect_negative_crossings(settings: dict[str, Any]) -> list[dict[str, Any]]:
     """Fire when a model crosses from non-negative into negative cumulative
-    return (a transition, not every day it stays underwater)."""
+    return (a transition, not every day it stays underwater).
+
+    Needs two rows of the book's current epoch. A first close has no prior
+    session to cross from: every book opens at exactly zero, so a one-cent loss
+    on day one is not an event, and at a re-inception it would fire for each
+    book that closed its first session down. Registered in the ledger with the
+    2026-11-06 epoch boundary (finding R6).
+    """
     specs: list[dict[str, Any]] = []
     for key in _enabled_model_keys(settings):
         df = _eod_history(key)
@@ -729,9 +742,10 @@ def detect_negative_crossings(settings: dict[str, Any]) -> list[dict[str, Any]]:
         today_cum = float(df["cumulative_return"].iloc[-1])
         if today_cum >= 0:
             continue
-        prev_cum = float(df["cumulative_return"].iloc[-2]) if len(df) >= 2 else None
-        crossed = prev_cum is None or prev_cum >= 0
-        if not crossed:
+        if len(df) < 2:
+            continue
+        prev_cum = float(df["cumulative_return"].iloc[-2])
+        if prev_cum < 0:
             continue
         name = _display_name(settings, key)
         specs.append({
@@ -739,14 +753,13 @@ def detect_negative_crossings(settings: dict[str, Any]) -> list[dict[str, Any]]:
             "severity": "WARN",
             "title": f"{name} went negative",
             "body": f"{name}'s cumulative return has dropped below zero to "
-                    f"<b>{_fmt_pct(today_cum)}</b>"
-                    + (f" (from {_fmt_pct(prev_cum)} the prior session)." if prev_cum is not None else "."),
+                    f"<b>{_fmt_pct(today_cum)}</b> (from {_fmt_pct(prev_cum)} the prior session).",
             "context": {
                 "model": key,
                 "models": [name],
                 "numbers": {
                     "Cumulative return": _fmt_pct(today_cum),
-                    "Prior session": _fmt_pct(prev_cum) if prev_cum is not None else "—",
+                    "Prior session": _fmt_pct(prev_cum),
                     "Portfolio value": _fmt_money(float(df["total_value"].iloc[-1])),
                 },
             },

@@ -60,13 +60,19 @@ def _color(x: float | None) -> str:
 # ---- data helpers ---------------------------------------------------------
 
 def _daily_pnl_dollars(model_key: str) -> float | None:
-    """Today minus prior-session total value, from the EOD performance log."""
-    from ..analytics.performance import load_eod_history
-    df = load_eod_history(model_key)
+    """Today minus prior-session total value, within the book's current epoch.
+
+    Reads the epoch-sliced frame: the raw log's prior row is the closed paper
+    book at a re-inception, which would report a fresh book's first day as a
+    six-figure loss. An epoch's first close is measured against the inception
+    value, which is the book's real prior value.
+    """
+    from ..analytics.performance import book_epoch, canonical_perf_frame
+    df = canonical_perf_frame(model_key)
     if df.empty:
         return None
     if len(df) == 1:
-        return 0.0
+        return float(df["total_value"].iloc[-1]) - book_epoch(model_key)[1]
     try:
         return float(df["total_value"].iloc[-1]) - float(df["total_value"].iloc[-2])
     except (KeyError, IndexError, ValueError):

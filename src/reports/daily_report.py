@@ -23,6 +23,7 @@ import pandas as pd
 
 from ..analytics import (
     build_leaderboard,
+    book_epoch,
     canonical_perf_frame,
     canonical_spy_return,
     compute_api_cost_summary,
@@ -267,7 +268,10 @@ def _daily_pnl(model_key: str) -> tuple[float | None, float | None]:
     if df.empty:
         return None, None
     if len(df) == 1:
-        return 0.0, 0.0
+        # An epoch's first close: the prior value is the book's inception value.
+        inception_value = book_epoch(model_key)[1]
+        delta = float(df["total_value"].iloc[-1]) - inception_value
+        return delta, (delta / inception_value) if inception_value else 0.0
     today_val = float(df["total_value"].iloc[-1])
     prev_val = float(df["total_value"].iloc[-2])
     delta = today_val - prev_val
