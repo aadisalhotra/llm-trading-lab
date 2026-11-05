@@ -11,7 +11,7 @@ Two things this checklist depends on rest on a **hub relay and nothing else**. T
 
 | item | what rests on the relay | where it is used |
 |---|---|---|
-| Phase B boundary amendment | Research's text was delivered governing-inline; the hub relay is the faithful transcription (hub, 2026-10-05). Recorded in ledger `operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]` as a relay. | the new dates throughout |
+| Phase B boundary amendment | Research's text was delivered governing-inline; the hub relay is the faithful transcription (hub, 2026-10-05). Recorded in ledger `operational_events.2026-10[phase_b_boundary_moved_to_2026_12_01]` as a relay. *Superseded 2026-11-04 by `docs/amendments/phase_b_boundary_amendment_2026-12-01.md`; the relay-only record above stands as the record as of its date.* | the new dates throughout |
 | EXECUTION MODE removal | A Research ruling delivered inline **2026-09-11**; the hub relay is the only record (hub, 2026-10-05). *Superseded 2026-11-01 by `docs/registrations/v4_verification_rule.md`; the relay-only status above stands as the record as of its date.* | Step 3 |
 
 This repo has already had phantom ruling citations (class 1 below). A ruling with no artifact is the shape one takes.
