@@ -123,6 +123,32 @@ def session_bounds(reference: datetime | None = None) -> tuple[dtime, dtime] | N
             row["market_close"].tz_convert(EASTERN).time())
 
 
+def inception_session_date(reference: datetime | None = None) -> str:
+    """The NYSE session a book created at `reference` belongs to (YYYY-MM-DD).
+
+    The current session if the market is open or has yet to open today,
+    otherwise the next one. Sourced from the calendar and never the wall clock:
+    a book created after Thursday's close opens its life on Friday, and a
+    weekend, holiday or post-19:00 ET creation (when the UTC date has already
+    rolled over) cannot record a day with no session.
+
+    Deliberately has no weekday fallback, unlike session_bounds. A book's
+    inception date is permanent state, so a missing calendar raises rather than
+    writing a guess into it. pandas_market_calendars is in the production lock.
+    """
+    import pandas_market_calendars as mcal
+
+    now = reference or datetime.now(EASTERN)
+    now = now.replace(tzinfo=EASTERN) if now.tzinfo is None else now.astimezone(EASTERN)
+    # Fourteen days clears any run of NYSE closures on record.
+    sched = mcal.get_calendar("NYSE").schedule(
+        start_date=now.date(), end_date=now.date() + timedelta(days=14))
+    for session, row in sched.iterrows():
+        if row["market_close"].tz_convert(EASTERN) > now:
+            return session.strftime("%Y-%m-%d")
+    raise RuntimeError(f"No NYSE session within 14 days of {now.isoformat()}")
+
+
 def is_market_open_today(reference: datetime | None = None) -> bool:
     """True if today is a US trading day (NYSE)."""
     try:

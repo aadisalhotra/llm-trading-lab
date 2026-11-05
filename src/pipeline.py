@@ -67,10 +67,12 @@ from .data import (
     is_market_open_now,
     is_market_open_today,
 )
+from .data.market_data import session_bounds
 from .data.sentiment import compute_sentiment_dict
 from .logging import (
     log_decision_run,
     log_daily_snapshot,
+    eod_row_exists,
     log_intraday_snapshot,
     read_recent_decisions,
     read_last_action_per_ticker,
@@ -338,7 +340,7 @@ def run_one_model(
             portfolio_snapshot_after=portfolio.snapshot(prices),
             prompt_version=prompt_version, data_inputs_hash=data_hash,
             execution_mode=effective_mode(model_key, settings),
-            inception_date=portfolio.inception_date,
+            inception_date=settings["experiment_start_date"],
             news_headlines_hash=news_hash,
             news_sentiment=sentiment_data or {},
             agreement_counts=_compute_agreement_counts(model_key, forced_results, settings),
@@ -431,7 +433,7 @@ def run_one_model(
         portfolio_snapshot_after=snapshot_after,
         prompt_version=prompt_version, data_inputs_hash=data_hash,
         execution_mode=effective_mode(model_key, settings),
-            inception_date=portfolio.inception_date,
+            inception_date=settings["experiment_start_date"],
         news_headlines_hash=news_hash,
         news_sentiment=sentiment_data or {},
         agreement_counts=_compute_agreement_counts(model_key, all_exec, settings),
@@ -478,6 +480,36 @@ def run_one_model(
         "total_value": snapshot_after["total_value"],
         "cumulative_return": snapshot_after["cumulative_return"],
     }
+
+
+def _eod_skip_reason(settings: dict[str, Any], run_date: datetime) -> str | None:
+    """Why this EOD pass must do nothing, or None if it should run.
+
+    The EOD backup is bare cron, and GitHub delays it by hours: on 2026-11-03 it
+    fired at 22:16Z, 00:54Z and 01:52Z. Each late run used to reload every book,
+    rewrite all six state files, re-run the position-stop sweep and rebuild the
+    report. log_daily_snapshot's own duplicate check only stops the row; by then
+    the book is already loaded, and a load after the epoch archive CREATES a
+    fresh book, early, on a run that decides nothing.
+
+    So both checks sit ahead of the first load.
+
+      * The day's rows all exist: the work is done. The rows land in the same
+        commit as the report and the digest marker, and that commit runs only
+        after the pipeline exits 0, so their presence in this checkout means the
+        whole primary pass finished.
+      * The session has not closed: a cron delayed past midnight ET reaches
+        here carrying the NEXT session's date, before that session has opened.
+        It would book a row of stale closes for a day that has not traded.
+    """
+    bounds = session_bounds(run_date)
+    if bounds is not None and run_date.timetz().replace(tzinfo=None) < bounds[1]:
+        return f"session has not closed ({bounds[1]} ET)"
+    day = run_date.strftime("%Y-%m-%d")
+    enabled = [mk for mk, cfg in settings["models"].items() if cfg.get("enabled", True)]
+    if enabled and all(eod_row_exists(mk, day) for mk in enabled):
+        return f"every enabled book already has its {day} row"
+    return None
 
 
 def run_pipeline(mode: str = "intraday", force: bool = False,
@@ -532,6 +564,11 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         if not is_market_open_today(run_date) and not force_trade:
             logger.info("Not a trading day — skipping EOD pass (use --force-trade to override)")
             return 0
+        if not force_trade:
+            eod_skip = _eod_skip_reason(settings, run_date)
+            if eod_skip:
+                logger.info("Skipping EOD pass: %s (no book loaded)", eod_skip)
+                return 0
     else:
         if not is_market_open_now(run_date) and not force_trade:
             logger.info("Market closed (or outside today's NYSE session) — skipping intraday tick (use --force-trade to override)")
@@ -544,10 +581,10 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # the same boundary. Checked BEFORE the data fetch and the model loop, so a
     # duplicate exits having done nothing.
     #
-    # EOD is intentionally NOT guarded: it executes no trades (run_one_model's
-    # is_eod early-return is snapshot/report only), so it has no double-trade
-    # risk, and it keeps its own per-day idempotency (log_daily_snapshot, digest)
-    # plus its deliberate two-trigger redundancy (chain handoff + 21:00 cron).
+    # EOD is not guarded HERE: it places no model trades (run_one_model's is_eod
+    # early-return is snapshot/report only), and its per-day idempotency is
+    # _eod_skip_reason above, which runs ahead of the first book load, plus its
+    # deliberate two-trigger redundancy (chain handoff + 22:00 UTC cron).
     #
     # RACE-FREEDOM DEPENDS ON THE intraday-pipeline CONCURRENCY GROUP in
     # .github/workflows/intraday.yml (cancel-in-progress: false): it serializes

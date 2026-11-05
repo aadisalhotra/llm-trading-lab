@@ -355,12 +355,15 @@ def _state_path(model_key: str) -> Path:
 
 
 def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
-    """Create a fresh portfolio for a model. Used on first run only.
+    """Create a fresh portfolio for a model. Used at each book's inception.
 
-    Inception date is the experiment start (from settings), not the wall-clock
-    date the state file happens to be created. This keeps the inception
-    pinned to the configured Phase A start even if the pipeline runs earlier
-    for build/test purposes.
+    Inception date is the book's own first session, from the NYSE calendar: the
+    current session if the market is open, otherwise the next one. It is never
+    the wall clock, and it is never settings.experiment_start_date, which stays
+    a lab-level constant (the experiment's start, not any one book's). Until the
+    2026-11-06 cutover this read the lab constant, which was correct only while
+    every book had incepted on the experiment's first day; a book incepted at
+    the cutover would have recorded April 9.
 
     Capital comes from the guarded lookup, so a mode whose per-book figure has
     not been confirmed raises instead of seeding six books at a stale default.
@@ -368,8 +371,11 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
     settings = load_settings()
     mode = mode or effective_mode(model_key, settings)
     capital = starting_capital(settings, mode)
+    # Local import: the market-data module pulls in yfinance and pandas, which
+    # nothing else in this module needs.
+    from ..data.market_data import inception_session_date
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    inception_date = settings.get("experiment_start_date", today)
+    inception_date = inception_session_date()
     p = Portfolio(
         model_key=model_key,
         cash=capital,

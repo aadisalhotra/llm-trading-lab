@@ -28,7 +28,12 @@ def _inception_date() -> str | None:
 
 
 def _month_tag(d: datetime, inception_date: str) -> str:
-    """Convert a date to an experiment month tag like M1, M2, ..."""
+    """Convert a date to an experiment month tag like M1, M2, ...
+
+    `inception_date` here is the EXPERIMENT's start, a lab-level constant. Pass
+    settings["experiment_start_date"], never a book's own inception_date: a book
+    incepted at a later epoch is not in its experiment's first month.
+    """
     if not inception_date:
         return ""
     try:
@@ -241,6 +246,26 @@ def log_decision_run(
         f.write(json.dumps(record) + "\n")
 
 
+def eod_row_exists(model_key: str, date_str: str) -> bool:
+    """True iff the model's performance log already holds a row for `date_str`.
+
+    Read-only, and touches no book. False on an unreadable log: the caller then
+    runs the EOD pass, which is the fail-safe direction for a backup trigger.
+    """
+    path = PERFORMANCE_DIR / f"{model_key}.jsonl"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    if json.loads(line).get("date") == date_str:
+                        return True
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return False
+    return False
+
+
 def log_daily_snapshot(
     model_key: str,
     run_date: datetime,
@@ -254,6 +279,12 @@ def log_daily_snapshot(
       * Pre-inception rows are refused with a hard raise — the launch window
         seeded 2026-04-08 rows that contaminated the SPY inception anchor, and a
         pre-inception EOD snapshot is never valid.
+      * So are rows that predate the BOOK's own inception_date, read from the
+        snapshot. Registered at the 2026-11-06 cutover: a row for a day before a
+        book existed would sit inside an epoch that had not begun. The lab-wide
+        check above cannot see this, because experiment_start_date predates
+        every later inception. A raise, not a skip: the pipeline's EOD guard
+        stops the known path first, so reaching this line is a defect.
       * Duplicate-date rows are refused via an idempotent no-op (below), NOT a
         raise: the EOD pipeline has two trigger paths — the intraday chain's
         post-close handoff (primary) and the 21:00 UTC cron (backup) — and both
@@ -270,6 +301,12 @@ def log_daily_snapshot(
         raise ValueError(
             f"refusing pre-inception EOD snapshot for {model_key} on {today_str} "
             f"(inception {inception}); a pre-inception benchmark row is never valid"
+        )
+    book_inception = snapshot.get("inception_date")
+    if book_inception and today_str < book_inception:
+        raise ValueError(
+            f"refusing EOD snapshot for {model_key} on {today_str}: it predates the "
+            f"book's own inception {book_inception}"
         )
 
     if path.exists():

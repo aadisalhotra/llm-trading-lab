@@ -200,7 +200,7 @@ def run(book: str, tickers: list[str] | None, prices: dict[str, float] | None,
         accepted_decisions=[], violations=[], execution_results=results,
         portfolio_snapshot_after=post, prompt_version=settings["prompt_version"],
         data_inputs_hash="", execution_mode=mode,
-        inception_date=portfolio.inception_date, cycle_id=executor.cycle_id)
+        inception_date=settings["experiment_start_date"], cycle_id=executor.cycle_id)
     log_intraday_snapshot(
         model_key=book, run_timestamp=when, snapshot=post,
         benchmark_value=prices.get(settings["benchmark_ticker"]),
