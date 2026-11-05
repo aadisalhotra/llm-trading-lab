@@ -559,6 +559,19 @@ jobs:
           ref: main
       # Ensure we have the latest main (run job just pushed new data)
       - run: git pull origin main
+      # Publish pause (config/settings.json publish.dashboard_paused). It stops
+      # the deploy, never the build: the run job keeps writing data/dashboard.json
+      # because three alert detectors read it. check_dashboard_staleness.py reads
+      # the same flag, so a deliberate pause is not paged as a Pages outage.
+      # FAILS CLOSED: a settings file that cannot be read fails this step, every
+      # later step is skipped, and nothing publishes. The job is
+      # continue-on-error, so that cannot red the run or touch the chain.
+      - name: Read publish pause
+        id: publish
+        run: |
+          PAUSED=$(python3 -c "import json; print('true' if json.load(open('config/settings.json', encoding='utf-8'))['publish']['dashboard_paused'] else 'false')")
+          echo "paused=${PAUSED}" >> "$GITHUB_OUTPUT"
+          if [ "$PAUSED" = "true" ]; then echo "::notice::Publish pause is on: building, not deploying."; fi
       - name: Copy data into dashboard artifact
         run: |
           mkdir -p dashboard/data
@@ -580,8 +593,10 @@ jobs:
           # commit for the underlying data).
           find reports/monthly -type f -name '*.pdf' -print -exec cp --parents {} dashboard/ \;
       - name: Setup Pages
+        if: steps.publish.outputs.paused != 'true'
         uses: actions/configure-pages@v5
       - name: Upload dashboard artifact
+        if: steps.publish.outputs.paused != 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard
@@ -596,6 +611,7 @@ jobs:
       # the tick cadence is unchanged.
       - name: Deploy
         id: deployment
+        if: steps.publish.outputs.paused != 'true'
         continue-on-error: true
         uses: actions/deploy-pages@v4
         with:

@@ -100,6 +100,10 @@
       "deepseek":   8.00
     }
   },
+  "publish": {
+    "_note": "dashboard_paused stops the DEPLOY steps of the pages job in .github/workflows/intraday.yml; it does not stop the build. data/dashboard.json keeps being written and committed because three alert detectors read it (weight-cap, macro positioning, digest MVP). scripts/check_dashboard_staleness.py reads the same flag, so a deliberate pause is not reported as a Pages outage. Research ruling 2026-11-04: the dashboard's next refresh is held across the broker-paper cutover until its rendering is epoch-aware. The pause lifts only once R1, R2 and R3 of docs/registrations/cutover_reinception_finding_2026-11-04.md are fixed.",
+    "dashboard_paused": true
+  },
   "alert_recipients_source": "env:ALERT_RECIPIENTS (comma-separated). Moved out of this file 2026-08-14 - the repo is public. Nothing reads a recipient list from settings.json; see src/alerts/email_alerts.get_recipients.",
   "alerts": {
     "enabled": true,

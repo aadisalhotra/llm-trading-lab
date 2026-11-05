@@ -28,6 +28,12 @@ Contract (mirrors the alerting layer's "never crash a tick" rule):
     because the ``chain`` job runs no ``pip install``: a calendar import would
     silently degrade to a weekday-only check and reintroduce the very holiday
     false positive this guard exists to kill.
+  * Pause-aware: while ``publish.dashboard_paused`` is set in
+    config/settings.json the pages job builds and does not deploy, so the live
+    artifact falls behind committed data on purpose. The monitor reports that as
+    a pause, not an outage. An unreadable settings file reads as NOT paused: the
+    monitor stays armed, and the worst case is a visible alert, never a silent
+    one.
 
 Dependencies are stdlib only (plus ``src.config_loader`` for recipients/paths),
 so the ``chain`` job needs no ``pip install``.
@@ -68,6 +74,8 @@ DASHBOARD_URL = "https://llmtradinglab.ai/data/dashboard.json"
 # holiday-safe without any market calendar. Present in every checkout because
 # it is committed by the `run` job.
 LOCAL_DASHBOARD = ROOT / "data" / "dashboard.json"
+# Read directly, stdlib only: the `chain` job has no pip install.
+SETTINGS_PATH = ROOT / "config" / "settings.json"
 STALE_THRESHOLD_HOURS = 3.0
 FETCH_TIMEOUT_SECONDS = 15
 
@@ -119,14 +127,18 @@ def in_alert_window(now: datetime) -> bool:
 
 def decide(generated_at: datetime, now: datetime,
            threshold: float = STALE_THRESHOLD_HOURS,
-           expected_generated_at: datetime | None = None) -> dict:
+           expected_generated_at: datetime | None = None,
+           paused: bool = False) -> dict:
     """Decide whether to alert. Pure: same inputs → same output.
 
     ``generated_at`` is the LIVE public dashboard's timestamp, ``now`` is
     wall-clock, and ``expected_generated_at`` is the locally-committed build's
     timestamp — the freshness we expect to be live (see module docstring).
 
-    An alert requires all three of:
+    ``paused`` is the settings publish pause: the deploy is deliberately held,
+    so nothing failed to publish and the monitor never alerts.
+
+    An alert requires all of these, and no publish pause:
       1. ``in_window``       — inside an established trading session.
       2. ``is_stale``        — the public artifact trails wall-clock by > threshold.
       3. ``behind_expected`` — the public artifact ALSO trails the locally-built
@@ -156,8 +168,10 @@ def decide(generated_at: datetime, now: datetime,
         behind_expected_h = None
         behind_expected = is_stale
 
-    alert = bool(windowed and is_stale and behind_expected)
-    if not windowed:
+    alert = bool(windowed and is_stale and behind_expected and not paused)
+    if paused:
+        reason = "publish pause is on (settings publish.dashboard_paused): deploy held on purpose"
+    elif not windowed:
         reason = "outside alert window (not an established session)"
     elif not is_stale:
         reason = f"fresh enough ({stale_h:.2f}h <= {threshold:.0f}h)"
@@ -177,6 +191,7 @@ def decide(generated_at: datetime, now: datetime,
         "is_stale": is_stale,
         "behind_expected": behind_expected,
         "hours_behind_expected": behind_expected_h,
+        "paused": bool(paused),
         "reason": reason,
         "generated_at": generated_at.isoformat(),
         "expected_generated_at": (expected_generated_at.isoformat()
@@ -241,6 +256,22 @@ def read_local_generated_at(path: Path = LOCAL_DASHBOARD) -> datetime | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("Could not parse local generated_at %r: %s", raw, e)
         return None
+
+
+def read_publish_pause(path: Path = SETTINGS_PATH) -> bool:
+    """True iff settings carries ``publish.dashboard_paused: true``.
+
+    Unreadable or absent reads as not paused. This is the opposite of the pages
+    job, which fails closed, on purpose: there the safe outcome is not
+    publishing, here it is staying armed. A wrong "paused" would silence the
+    only control on a real Pages outage.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload["publish"]["dashboard_paused"] is True
+    except Exception as e:  # noqa: BLE001 — a read blip must not crash the monitor
+        logger.warning("Could not read publish pause (%s): %s; treating as not paused", path, e)
+        return False
 
 
 def _build_alert(decision: dict) -> tuple[str, str, str]:
@@ -348,7 +379,8 @@ def run_monitor() -> int:
 
     expected = read_local_generated_at()
     now = datetime.now(timezone.utc)
-    decision = decide(generated_at, now, expected_generated_at=expected)
+    decision = decide(generated_at, now, expected_generated_at=expected,
+                      paused=read_publish_pause())
     logger.info("Dashboard staleness: %s", decision["reason"])
     if decision["alert"]:
         send_staleness_alert(decision)
@@ -420,6 +452,16 @@ def _self_test() -> int:
         print(f"         alert={d['alert']} expected={expect} "
               f"({d['hours_stale']:.2f}h stale, in_window={d['in_window']}, "
               f"behind_expected={d['hours_behind_expected']})")
+    # A genuine-outage shape with the publish pause on stays quiet, and the same
+    # inputs with it off alert. The pair is what proves the pause is the reason.
+    outage = (now_mid - timedelta(hours=6), now_mid)
+    fresh_local = now_mid - timedelta(minutes=20)
+    for name, paused, expect in (("outage shape, publish paused -> quiet", True, False),
+                                 ("outage shape, not paused -> ALERT", False, True)):
+        d = decide(*outage, expected_generated_at=fresh_local, paused=paused)
+        ok = d["alert"] is expect
+        all_ok = all_ok and ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name} ({d['reason']})")
     print("-" * 60)
     print("RESULT:", "ALL PASS" if all_ok else "FAILURES PRESENT")
     return 0 if all_ok else 1
