@@ -2325,6 +2325,49 @@
           "operator": "Operations lane (Claude Code session) on the hub's dispatch, pushed on PI sign-off",
           "date": "2026-11-05"
         }
+      },
+      {
+        "id": "cutover_entry_closeouts_2026_11_05",
+        "date": "2026-11-05",
+        "type": "ledger_followup",
+        "scope": "Closes the open items in operational_events.2026-11[paper_epoch_closure_and_broker_paper_cutover] on the hub's sign-off of that package.",
+        "authority": "Hub dispatch 2026-11-05 evening ('push approved'). The package landed at origin as 85883c74e..3fbd64c94.",
+        "boundary_artifact_closed": {
+          "supersedes": "The 'pending Research confirmation' clause in boundary_artifact.provenance of the cutover entry, and in paper_epoch_retirement.md section 2.",
+          "research_confirmation": {
+            "quotation": "Nov 2–5 sliver — confirmed, classification carries unchanged to four sessions (paper-epoch tail under frozen v4; descriptive only; insufficient_n; ledgered with the epoch boundary — the count changes, nothing else).",
+            "date": "2026-11-04",
+            "source": "Research's message of 2026-11-04, relayed by the hub in its dispatch of 2026-11-05. This quotation is the repo's record of it; no standalone artifact exists or is required."
+          }
+        },
+        "rolling_memory_classification": {
+          "commit": "5e1a89636",
+          "ruling": "Code correcting to registration, not a treatment change. Hub, 2026-11-05.",
+          "primary_authority": {
+            "ruling": "The 2026-08-29 no-carry ruling, which is the capital registration and governs validation inception directly.",
+            "recorded_at": "src/portfolio/portfolio.py:91-92",
+            "quotation": [
+              "both phase boundaries re-incept fresh and nothing carries",
+              "validation books incept in broker-paper at registered capital"
+            ],
+            "dates_note": "The ruling's Oct 1 date for validation books was moved by the 2026-09-30 boundary move and then to this cutover. The same comment records that the no-carry rule itself is unchanged."
+          },
+          "secondary_authority": {
+            "role": "The same principle applied at the Phase B live boundary. It describes the Phase B design, not the validation boundary, so it is supporting and does not govern here.",
+            "path": "docs/registrations/rossi_review_rulings.md",
+            "section": "4. Memory context and entry attribution",
+            "quotation": "the cohort refreshes at the boundary with fresh re-inception (no positions or history carries)"
+          },
+          "prompt_effect": "The commit governs which records feed the memory section, not the template. The four rendered-prompt hashes match the frozen reference at 00557e557 with the commit in the tree.",
+          "deepseek_window_unchanged": "Confirmed on the real logs at 3fbd64c94. For deepseek (inception 2026-04-09), read_recent_decisions returns the same 10 rows with and without since, newest 2026-11-05, and read_last_action_per_ticker the same 35 tickers. Its epoch continues, so its history carries.",
+          "cohort_control": "Same check on the five cohort books with since=2026-11-06: 10 rows unfiltered, 0 filtered, and 0 last-action tickers."
+        },
+        "cohort_alpha_rendering": "Confirmed in a sandbox report for a simulated 2026-11-06 close at 3fbd64c94. Every cohort row's Alpha vs SPY cell renders as an em dash, the head-to-head row likewise, and deepseek keeps its value. Suppressed until R3 re-anchors SPY at inception.",
+        "reproducibility_proof_split": "Ratified as the cutover entry states it. Reproduce-May proves the archive cannot orphan a layer. Blob identity plus row-to-state cash and position agreement carry the state-side proof. Together they satisfy item (4) in substance.",
+        "queued": {
+          "monday_triage": "Stop-loss orders placed on the EOD pass after the close reach the venue in broker-paper mode. run_one_model runs check_position_stops before its is_eod return. Named in the sweep, predates the package, does not gate the flip.",
+          "follow_audit": "R3, R5, the cross-epoch leaderboard ranking and the Phase A label. The publish pause stays on."
+        }
       }
     ]
   }
