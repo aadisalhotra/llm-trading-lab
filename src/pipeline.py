@@ -252,7 +252,8 @@ def run_one_model(
     # so there is no cross-model contamination and no shared state with the
     # other parallel model threads.
     try:
-        recent_decisions = read_recent_decisions(model_key, limit=10, now=run_date)
+        recent_decisions = read_recent_decisions(model_key, limit=10, now=run_date,
+                                                 since=portfolio.inception_date)
         logger.info("[%s] memory: loaded %d recent decisions",
                     model_key, len(recent_decisions))
     except Exception as e:
@@ -269,7 +270,8 @@ def run_one_model(
     last_actions: dict[str, Any] = {}
     if uses_per_ticker_last_action(settings.get("prompt_version", "")):
         try:
-            last_actions = read_last_action_per_ticker(model_key, shortlisted, now=run_date)
+            last_actions = read_last_action_per_ticker(model_key, shortlisted, now=run_date,
+                                                       since=portfolio.inception_date)
             logger.info("[%s] memory: per-ticker last-action resolved for %d/%d shortlisted",
                         model_key, len(last_actions), len(shortlisted))
         except Exception as e:

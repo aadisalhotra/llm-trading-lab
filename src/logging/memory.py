@@ -56,6 +56,7 @@ def read_recent_decisions(
     model_key: str,
     limit: int = 10,
     now: datetime | None = None,
+    since: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the last N executed BUY/SELL decisions for `model_key`, newest first.
 
@@ -70,6 +71,10 @@ def read_recent_decisions(
     Walks the monthly log files in reverse chronological order until it
     has `limit` entries or runs out of history. Failures reading any file
     are logged and swallowed — memory is best-effort, never blocking.
+
+    `since` (YYYY-MM-DD, the book's inception_date) ends the walk at the book's
+    own epoch. Nothing carries across a re-inception, so a fresh book is not
+    shown a closed book's trades as its own decisions.
     """
     if limit <= 0:
         return []
@@ -106,6 +111,10 @@ def read_recent_decisions(
             except json.JSONDecodeError:
                 continue
             rec_ts = rec.get("timestamp", "")
+            # Append-only chronological, walked newest-first: the first record
+            # before the epoch means everything left is older too.
+            if since and str(rec.get("date") or rec_ts)[:10] < since:
+                return out
             # Each record can contain multiple executions. Iterate them in
             # reverse so the last action in a tick comes first.
             for ex in reversed(rec.get("executions") or []):
@@ -143,6 +152,7 @@ def read_last_action_per_ticker(
     tickers: Iterable[str],
     now: datetime | None = None,
     max_lookback_days: int = 60,
+    since: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Most-recent executed BUY/SELL per requested ticker, for this model only.
 
@@ -157,7 +167,8 @@ def read_last_action_per_ticker(
     Bounded work: it early-exits as soon as every requested ticker is resolved,
     and stops once it crosses ``max_lookback_days`` before ``now`` (default 60).
     A ticker with no executed trade in that window is simply absent from the
-    result — the caller renders that as "(no prior trade)".
+    result — the caller renders that as "(no prior trade)". `since` is the book's
+    inception_date and stops the walk at its epoch, as in read_recent_decisions.
 
     Returns ``{TICKER: {action, timestamp, date, shares, price, confidence}}``.
     Best-effort: read failures are logged and swallowed, never raised.
@@ -204,6 +215,8 @@ def read_last_action_per_ticker(
             # the first record older than the lookback cutoff means everything
             # remaining is older too — stop entirely.
             if cutoff_str and rec_date and rec_date < cutoff_str:
+                return result
+            if since and str(rec_date or rec.get("timestamp", ""))[:10] < since:
                 return result
             rec_ts = rec.get("timestamp", "")
             for ex in reversed(rec.get("executions") or []):
