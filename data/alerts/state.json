@@ -41,12 +41,20 @@
   },
   "daily": {
     "date": "2026-11-06",
-    "sent_count": 1,
+    "sent_count": 9,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "oversized:gemini:PG:2026-11-06T14:36:19.029458",
+      "oversized:gemini:WMT:2026-11-06T14:36:19.029479",
+      "oversized:gemini:EOG:2026-11-06T14:36:19.029485",
+      "oversized:grok:PG:2026-11-06T14:35:04.365688",
+      "oversized:grok:KO:2026-11-06T15:04:41.131643",
+      "oversized:grok:WMT:2026-11-06T15:34:11.698045",
+      "oversized:grok:NVDA:2026-11-06T17:34:55.517051",
+      "news:PG:310cc3eabd"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -55,6 +63,70 @@
         "timestamp": "2026-11-06T15:02:45.556499+00:00",
         "disposition": "sent",
         "dispatch_id": "d750959fbaf7"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Gemini 3.1 Pro: 20.1% order in PG",
+        "timestamp": "2026-11-06T22:07:47.576127+00:00",
+        "disposition": "queued",
+        "dispatch_id": "922332d43d3c"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Gemini 3.1 Pro: 20.0% order in WMT",
+        "timestamp": "2026-11-06T22:07:47.577819+00:00",
+        "disposition": "queued",
+        "dispatch_id": "498c48ed7c59"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Gemini 3.1 Pro: 15.2% order in EOG",
+        "timestamp": "2026-11-06T22:07:47.578908+00:00",
+        "disposition": "queued",
+        "dispatch_id": "ffc5e0e2e19c"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Grok 4.20 (Reasoning): 15.1% order in PG",
+        "timestamp": "2026-11-06T22:07:47.580339+00:00",
+        "disposition": "queued",
+        "dispatch_id": "99f7ea8cff02"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Grok 4.20 (Reasoning): 15.0% order in KO",
+        "timestamp": "2026-11-06T22:07:47.581916+00:00",
+        "disposition": "queued",
+        "dispatch_id": "c5838a6c9625"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Grok 4.20 (Reasoning): 15.0% order in WMT",
+        "timestamp": "2026-11-06T22:07:47.586129+00:00",
+        "disposition": "queued",
+        "dispatch_id": "5e1877658320"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "Grok 4.20 (Reasoning): 15.0% order in NVDA",
+        "timestamp": "2026-11-06T22:07:47.587608+00:00",
+        "disposition": "queued",
+        "dispatch_id": "dbe1c9ca5bcd"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PG (held by 5)",
+        "timestamp": "2026-11-06T22:07:47.653926+00:00",
+        "disposition": "queued",
+        "dispatch_id": "57d8761f1896"
       }
     ]
   }
