@@ -223,14 +223,27 @@ class Portfolio:
         }
 
     # ----- mutations -----
-    def buy(self, ticker: str, shares: float, price: float) -> None:
+    def buy(self, ticker: str, shares: float, price: float,
+            *, venue_confirmed: bool = False) -> None:
+        """Add `shares` to the book at `price`.
+
+        `venue_confirmed` marks a fill the venue has already executed. Those
+        always book, even past cash: an order capped at exact cash is sized at
+        the reference price and can fill a little above it, and raising then
+        would leave a real position out of the book, a G-BOOK halt for every
+        book. The overrun stays visible as negative cash, which the state audit
+        reports. An intent, the simulator's case, still cannot overdraw.
+        """
         if ticker in self.holdings and self.holdings[ticker].is_short:
             # A name held short must be covered (not bought) — mixing both
             # directions in one holding would make avg_cost meaningless.
             raise ValueError(f"Cannot BUY {ticker}: position is short — COVER it first")
         cost = shares * price
         if cost > self.cash + 1e-6:
-            raise ValueError(f"Insufficient cash for {ticker}: need {cost:.2f}, have {self.cash:.2f}")
+            if not venue_confirmed:
+                raise ValueError(f"Insufficient cash for {ticker}: need {cost:.2f}, have {self.cash:.2f}")
+            logger.warning("[%s] confirmed fill on %s overran book cash: cost %.4f, cash %.4f",
+                           self.model_key, ticker, cost, self.cash)
         if ticker in self.holdings:
             h = self.holdings[ticker]
             new_shares = h.shares + shares

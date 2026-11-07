@@ -72,6 +72,8 @@ KIND_LABELS: dict[str, str] = {
     "news_impact": "High-impact news on held stock",
     "macro_event": "Major market event",
     "state_anomaly": "State integrity anomaly",
+    "unclassified_skip": "Unclassified execution skip",
+    "descriptor_failure": "Execution descriptor failure",
     "missed_run": "Missed scheduled run",
     "pipeline_error": "Pipeline error",
     "market_data_failure": "Market data failure",

@@ -47,6 +47,7 @@ from .alerts import scan_macro_events, send_alert, send_daily_summary, send_hear
 from .alerts import preflight
 from .alerts.preflight import assert_configured as alert_preflight
 from .analytics import build_leaderboard, compute_budget_status
+from .analytics.intended_vs_expressed import write_session_descriptor
 from .config_loader import (
     configure_logging,
     effective_mode,
@@ -94,6 +95,7 @@ from .portfolio import (
     validate_decisions,
 )
 from .execution import CycleBarrier, Executor
+from .execution.executor import alarm_unclassified_skips
 from .execution.barrier import rotation_tick
 from .execution.reconciliation import run_post_cycle_reconciliation
 from .prompt_builder import (
@@ -419,6 +421,10 @@ def run_one_model(
              "detail": "; ".join(f"{e.ticker}: {e.error or e.constraint}"
                                  for e in unprotected)[:500]},
             kind="stop_unprotected", dedup_key=f"stop_unprotected:{model_key}")
+
+    # A skip with no registered class is an execution failure and an alarm, so
+    # the next silent suppression fails loudly on first firing (ruling 5.3).
+    alarm_unclassified_skips(model_key, all_exec, send_alert, cycle_id=executor.cycle_id)
 
     # Update intraday counters with this run's trade count. Shorts and covers
     # are trades too and count toward the daily cap.
@@ -804,6 +810,17 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                       str(e), {"cycle_id": executor.cycle_id},
                       kind="gbook_reconciliation_error",
                       dedup_key=f"gbook_reconciliation_error:{executor.cycle_id}")
+
+    # The standing intended-vs-expressed descriptor (ruling 5.4). Recomputed
+    # from the decision logs every cycle, so it is current whenever the run ends.
+    try:
+        write_session_descriptor(now_et().strftime("%Y-%m-%d"),
+                                 [mk for mk, _ in enabled_models])
+    except Exception as e:
+        logger.exception("Intended-vs-expressed descriptor failed: %s", e)
+        send_alert("WARN", "Intended-vs-expressed descriptor failed", str(e),
+                   {"cycle_id": executor.cycle_id}, kind="descriptor_failure",
+                   dedup_key=f"descriptor_failure:{executor.cycle_id}")
 
     # Mark this intraday boundary handled now that every model's decisions are
     # made. The workflow commits this in the SAME commit as the decision logs +

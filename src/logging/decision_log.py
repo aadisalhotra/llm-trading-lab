@@ -213,6 +213,11 @@ def log_decision_run(
                 # execution itself so the condition is visible in the committed
                 # record and not only in an alert that may not have been read.
                 "stop_unprotected": bool(getattr(e, "stop_unprotected", False)),
+                # Which decision this was, and what it asked for before any cap
+                # (executor_sizing_floor_ruling.md sections 5.1 and 5.4). A
+                # pre-submission skip has no order id, so this is its identity.
+                "decision_id": getattr(e, "decision_id", ""),
+                "intended_notional": getattr(e, "intended_notional", None),
                 "timestamp": e.timestamp,
                 "decision": e.decision,
                 # How many models (including this one) hold this ticker at

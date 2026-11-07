@@ -27,6 +27,10 @@ Design rules this module holds to:
   * Cycles whose model call produced no decision (`api_success` false) are
     EXCLUDED, not failed: no order was intended, and Gate 1 already owns that
     failure. They are counted so the exclusion is visible.
+  * Pre-submission suppression has no third state (ruling 2026-11-06,
+    docs/registrations/executor_sizing_floor_ruling.md section 3): a skip is a
+    registered, tagged constraint event or an execution failure. An untagged
+    skip is the second, whatever its `error` says.
   * An un-mediated WASH_TRADE_BLOCK is a FAILURE. The 2026-09-15 landing note
     files only the POST-barrier case as a success class; the un-mediated
     collision stays unfiled until its class is ruled.
@@ -45,13 +49,7 @@ from typing import Any, Iterable
 
 from ..config_loader import RECONCILIATION_DIR, TRADES_DIR
 from ..execution.broker import TERMINAL_STATES
-from ..execution.executor import (
-    CONSTRAINT_BELOW_VENUE_MINIMUM,
-    CONSTRAINT_UNSETTLED_FUNDS,
-    CONSTRAINT_UNSETTLED_FUNDS_CAPPED,
-    CONSTRAINT_WASH_REJECT_POST_BARRIER,
-    CONSTRAINT_WASH_TRADE_BLOCK,
-)
+from ..execution.executor import CONSTRAINT_WASH_TRADE_BLOCK, REGISTERED_SKIP_CLASSES
 
 logger = logging.getLogger("llmlab.analytics.execution_metrics")
 
@@ -61,14 +59,9 @@ EXECUTION_SUCCESS_THRESHOLD = 0.80
 BROKER_MODES = frozenset({"broker_paper", "live"})
 
 # Constraint classes that are execution-SUCCESSFUL when no broker order exists:
-# the linkage worked and the venue/our rules declined. Buying-power analogues
-# (settled funds, venue minimum) plus the registered post-barrier wash class.
-_LEGIT_CONSTRAINTS = frozenset({
-    CONSTRAINT_UNSETTLED_FUNDS,
-    CONSTRAINT_UNSETTLED_FUNDS_CAPPED,
-    CONSTRAINT_BELOW_VENUE_MINIMUM,
-    CONSTRAINT_WASH_REJECT_POST_BARRIER,
-})
+# the linkage worked and the venue/our rules declined. This is the executor's
+# closed set, so the alarm and this gate cannot accept different things.
+_LEGIT_CONSTRAINTS = REGISTERED_SKIP_CLASSES
 
 # Outcome labels. Success labels start "ok:", failures "fail:".
 NO_ORDER = "no_order"
@@ -98,7 +91,12 @@ def classify_execution(e: dict[str, Any]) -> str:
 
     order_id = str(e.get("order_id") or "")
     synthetic = order_id.startswith("EXEC_CONSTRAINT_")
-    if e.get("side") == "HOLD" or not order_id or synthetic:
+    if e.get("side") == "HOLD":
+        return NO_ORDER
+    if e.get("side") == "SKIP" and (not order_id or synthetic):
+        # Nothing was sent and no registered class says why.
+        return "fail:unclassified_skip"
+    if not order_id or synthetic:
         return NO_ORDER
     # An order id was minted, no venue order came back, no constraint explains
     # it: the submission itself failed.

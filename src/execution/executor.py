@@ -46,7 +46,12 @@ logger = logging.getLogger("llmlab.execution")
 # registered censoring principle a blocked intention enters no behavioral
 # outcome metric — which it cannot, since every behavioral reader filters on
 # `executed`, and a blocked purchase is never executed.
-CONSTRAINT_UNSETTLED_FUNDS = "UNSETTLED_FUNDS"        # blocked outright
+#
+# The purchase rule (docs/registrations/executor_sizing_floor_ruling.md section
+# 1): a BUY is capped at available settled cash and sent. CAPPED is that order.
+# The plain tag is left for the one case with no order to send: the cap computes
+# under the $1 minimum and unsettled proceeds are what is holding it there.
+CONSTRAINT_UNSETTLED_FUNDS = "UNSETTLED_FUNDS"        # nothing left to send
 CONSTRAINT_UNSETTLED_FUNDS_CAPPED = "UNSETTLED_FUNDS_CAPPED"  # filled, but smaller
 
 # Venue minimum order size ($1 cost basis, verified 2026-08-29). Fractional
@@ -82,6 +87,22 @@ CONSTRAINT_WASH_TRADE_BLOCK = "WASH_TRADE_BLOCK"
 # barrier-implementation signal, not a routine venue collision.
 CONSTRAINT_WASH_REJECT_POST_BARRIER = "WASH_REJECT_POST_BARRIER"
 
+# The closed set of legal skip classes (executor_sizing_floor_ruling.md section
+# 5.2). A new class must be registered before it can exist here. Gate 4's scorer
+# reads this same set, so what the alarm accepts and what the gate accepts
+# cannot drift apart.
+REGISTERED_SKIP_CLASSES = frozenset({
+    CONSTRAINT_UNSETTLED_FUNDS,
+    CONSTRAINT_UNSETTLED_FUNDS_CAPPED,
+    CONSTRAINT_BELOW_VENUE_MINIMUM,
+    CONSTRAINT_WASH_REJECT_POST_BARRIER,
+})
+
+# NOT a class. The marker a skip carries when no registered class explains it.
+# By the no-third-state clause (ruling section 3) that makes it an execution
+# failure, and it raises the alarm below (ruling section 5.3).
+CONSTRAINT_UNCLASSIFIED_SKIP = "UNCLASSIFIED_SKIP"
+
 # Broker-side mapping (verified against the actual submission calls below,
 # not assumed): BUY and COVER both submit as a broker "buy"; SELL and SHORT
 # both submit as a broker "sell". This is also the wash-trade contention
@@ -112,6 +133,47 @@ class ExecutionResult:
     # correctly left unchanged, which means the position is STILL OPEN — the
     # loudest possible failure in the system, and the pipeline alerts on it.
     stop_unprotected: bool = False
+    # Identifies this decision within its book and cycle. Every skip carries
+    # one, because a pre-submission skip has no order id, and without this the
+    # event would name nothing.
+    decision_id: str = ""
+    # What the decision asked for, in dollars, before any cap: the intended side
+    # of the intended-vs-expressed descriptor (ruling section 5.4). None when it
+    # could not be computed, so a missing value never reads as zero.
+    intended_notional: float | None = None
+
+
+def requires_skip_alarm(result: ExecutionResult) -> bool:
+    """True for a skip no registered class explains (ruling section 5.3).
+
+    A skip holding a broker order reached a terminal venue state, so the venue
+    explains it. An unprotected stop has its own CRITICAL and is not repeated.
+    """
+    if result.side != "SKIP" or result.stop_unprotected or result.broker_order:
+        return False
+    return result.constraint not in REGISTERED_SKIP_CLASSES
+
+
+def alarm_unclassified_skips(model_key: str, results: list[ExecutionResult],
+                             send_alert_fn, cycle_id: str = "") -> int:
+    """Raise one CRITICAL for this book's unclassified skips. Returns the count.
+
+    `send_alert_fn` is passed in, the same seam reconciliation uses, so this
+    module does not import the alerting stack.
+    """
+    failed = [r for r in results if requires_skip_alarm(r)]
+    if failed:
+        send_alert_fn(
+            "CRITICAL", f"UNCLASSIFIED SKIP: {model_key}",
+            "An intended order was suppressed with no registered constraint "
+            "class. Under Gate 4's no-third-state clause this is an execution "
+            "failure, not a clean cycle.",
+            {"model": model_key, "count": str(len(failed)),
+             "detail": "; ".join(f"{r.decision_id or r.ticker}: {r.error or r.constraint}"
+                                 for r in failed)[:500]},
+            kind="unclassified_skip",
+            dedup_key=f"unclassified_skip:{model_key}:{cycle_id}")
+    return len(failed)
 
 
 @dataclass
@@ -320,10 +382,9 @@ class Executor:
         `barrier` is the P1 cross-book submission barrier (see .barrier),
         shared by reference across every book's thread for this cycle. It is
         used only in broker modes — the simulator has no venue to collide on,
-        so paper-mode behavior below is byte-for-byte unchanged from before
-        P1 (same loop, same `_execute_one`, no reservation accounting, no
-        barrier registration), which is deliberate: Phase A's reproducibility
-        depends on the simulator path never changing shape.
+        so paper mode keeps the same loop, `_execute_one`, no reservation
+        accounting and no barrier registration. Its sizing changed once, on
+        2026-11-06: the one-share floor came out of both paths by ruling.
         """
         # Mature settled proceeds before anything is priced against them, so a
         # cycle never blocks a purchase on funds that settled this morning.
@@ -332,7 +393,10 @@ class Executor:
             return self._execute_decisions_via_broker(portfolio, decisions, prices,
                                                        run_date, barrier)
         results: list[ExecutionResult] = []
+        intended: list[float | None] = []
         for d in decisions:
+            # Read before the call: on this path each fill moves the book.
+            intended.append(self._intended_notional(portfolio, d, prices))
             try:
                 r = self._execute_one(portfolio, d, prices, run_date)
             except Exception as e:
@@ -343,7 +407,97 @@ class Executor:
                     error=str(e),
                 )
             results.append(r)
+        return self._finalize(portfolio.model_key, results, intended)
+
+    # ----- skip classification and the intended side of the descriptor -----
+
+    def _intended_notional(self, portfolio: Portfolio, decision: dict[str, Any],
+                           prices: dict[str, float]) -> float | None:
+        """Dollars this decision asked to move, before any cap.
+
+        Mirrors the delta each sizing branch starts from. Floored at zero: an
+        at-target decision intends no order. None if it cannot be computed.
+        """
+        try:
+            action = decision["action"]
+            if action == "HOLD":
+                return 0.0
+            ticker = decision["ticker"]
+            target = portfolio.total_value(prices) * float(decision.get("target_weight", 0))
+            price = prices.get(ticker)
+            h = portfolio.holdings.get(ticker)
+            current = abs(h.market_value(price)) if (h and price) else 0.0
+            delta = (target - current) if action in ("BUY", "SHORT") else (current - target)
+            return max(delta, 0.0)
+        except Exception as e:
+            logger.warning("Could not compute intended notional for %s: %s", decision, e)
+            return None
+
+    def _finalize(self, book: str, results: list[ExecutionResult],
+                  intended: list[float | None]) -> list[ExecutionResult]:
+        """Stamp every result and emit the classified event for every skip.
+
+        This is the single exit of both paths, so no skip can leave untagged: one
+        with no class gets the failure marker here, whichever line produced it.
+        """
+        for idx, r in enumerate(results):
+            r.decision_id = f"{book}-{self.cycle_id}-d{idx:02d}"
+            r.intended_notional = intended[idx]
+            if r.side != "SKIP":
+                continue
+            if not r.constraint and not r.broker_order:
+                r.constraint = CONSTRAINT_UNCLASSIFIED_SKIP
+            log = logger.error if requires_skip_alarm(r) else logger.info
+            log("SKIP [%s] %s %s constraint=%s: %s", r.decision_id,
+                r.decision.get("action"), r.ticker, r.constraint, r.error)
         return results
+
+    def _size_buy(
+        self,
+        portfolio: Portfolio,
+        decision: dict[str, Any],
+        ticker: str,
+        price: float,
+        delta_notional: float,
+        spendable: float,
+        available: float,
+    ) -> tuple[float, str] | ExecutionResult:
+        """Cap a BUY at deployable cash and size it. Both paths come here.
+
+        Returns (shares, constraint), or a tagged skip when no order can exist.
+        The floor is the registered $1 venue minimum and nothing else (ruling
+        section 1). This logic used to exist in two copies, which is how the
+        one-share floor came to have two sites.
+
+        Sized fractionally to 4 dp, truncated rather than rounded so that
+        shares * price stays within the cap. The minimum is tested on that
+        truncated notional, since that is the order the venue would see.
+        """
+        settlement_bound = spendable < min(delta_notional, available)
+        capped = spendable < delta_notional
+        order_usd = min(delta_notional, max(spendable, 0.0))
+        shares = int(order_usd / price * 10000) / 10000
+        if shares * price < MIN_ORDER_NOTIONAL:
+            if settlement_bound and available >= MIN_ORDER_NOTIONAL:
+                # Unsettled proceeds are all that stands between this book and a
+                # sendable order: it has cash, just none deployable today.
+                return ExecutionResult(
+                    decision=decision, executed=False, side="SKIP",
+                    ticker=ticker, shares=0, fill_price=price, notional=0,
+                    order_id="EXEC_CONSTRAINT_UNSETTLED_FUNDS",
+                    constraint=CONSTRAINT_UNSETTLED_FUNDS,
+                    error=(f"Blocked at submission: settled cap computes under the "
+                           f"${MIN_ORDER_NOTIONAL:.2f} minimum; settled {spendable:.2f}, "
+                           f"unsettled {portfolio.unsettled_cash():.2f}"),
+                )
+            return ExecutionResult(
+                decision=decision, executed=False, side="SKIP",
+                ticker=ticker, shares=0, fill_price=price, notional=0,
+                constraint=CONSTRAINT_BELOW_VENUE_MINIMUM,
+                error=(f"Order notional {shares * price:.2f} is below the venue "
+                       f"minimum of {MIN_ORDER_NOTIONAL:.2f}"),
+            )
+        return shares, (CONSTRAINT_UNSETTLED_FUNDS_CAPPED if capped else "")
 
     # ----- broker-mode execution (P1: submit-all-then-poll-all, barrier-gated) -----
 
@@ -376,6 +530,7 @@ class Executor:
         # subtracted from spendable at sizing time only, never touches
         # `portfolio.cash` itself, which still moves only on a confirmed fill.
         reserved = 0.0
+        intended = [self._intended_notional(portfolio, d, prices) for d in decisions]
         for idx, d in enumerate(decisions):
             try:
                 outcome = self._size_for_broker(portfolio, d, prices, run_date, reserved)
@@ -403,7 +558,7 @@ class Executor:
             # Nothing to submit this cycle, but the other books still need
             # this book's (empty) registration to complete the rendezvous.
             barrier.register(portfolio.model_key, [])
-        return slots
+        return self._finalize(portfolio.model_key, slots, intended)
 
     def _size_for_broker(
         self,
@@ -444,34 +599,14 @@ class Executor:
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_AT_TARGET")
             spendable = self._spendable_cash(portfolio, run_date) - reserved
-            constrained_by_settlement = spendable < min(delta_notional, portfolio.cash - reserved)
-            delta_notional = min(delta_notional, max(spendable, 0.0))
-            if delta_notional < price:
-                if constrained_by_settlement and portfolio.cash - reserved >= price:
-                    logger.info(
-                        "[%s] BUY %s blocked: settled cash %.2f (reserved %.2f) < price %.2f",
-                        portfolio.model_key, ticker, spendable, reserved, price)
-                    return ExecutionResult(
-                        decision=decision, executed=False, side="SKIP",
-                        ticker=ticker, shares=0, fill_price=price, notional=0,
-                        order_id="EXEC_CONSTRAINT_UNSETTLED_FUNDS",
-                        constraint=CONSTRAINT_UNSETTLED_FUNDS,
-                        error=(f"Blocked at submission: purchase requires settled funds; "
-                               f"settled {spendable:.2f} after reservations, "
-                               f"unsettled {portfolio.unsettled_cash():.2f}"),
-                    )
-                return ExecutionResult(decision=decision, executed=False, side="SKIP",
-                                       ticker=ticker, shares=0, fill_price=price, notional=0,
-                                       error="Insufficient cash for meaningful position")
-            shares = int(delta_notional / price * 10000) / 10000
-            if shares <= 0:
-                return ExecutionResult(decision=decision, executed=False, side="SKIP",
-                                       ticker=ticker, shares=0, fill_price=price, notional=0,
-                                       error="Computed share quantity rounded to zero")
+            sized = self._size_buy(portfolio, decision, ticker, price, delta_notional,
+                                   spendable, portfolio.cash - reserved)
+            if isinstance(sized, ExecutionResult):
+                return sized
+            shares, constraint = sized
             return _SizedOrder(decision=decision, action="BUY", ticker=ticker,
                                shares=shares, price=price, broker_side="buy",
-                               constraint=(CONSTRAINT_UNSETTLED_FUNDS_CAPPED
-                                           if constrained_by_settlement else ""))
+                               constraint=constraint)
 
         if action == "SELL":
             if ticker not in portfolio.holdings:
@@ -506,6 +641,7 @@ class Executor:
             if shares <= 0:
                 return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       constraint=CONSTRAINT_BELOW_VENUE_MINIMUM,
                                        error="Computed short quantity rounded to zero")
             return _SizedOrder(decision=decision, action="SHORT", ticker=ticker,
                                shares=shares, price=price, broker_side="sell")
@@ -678,7 +814,7 @@ class Executor:
         broker_order = placement.order.to_dict() if placement.order else None
 
         if s.action == "BUY":
-            portfolio.buy(s.ticker, shares, price)
+            portfolio.buy(s.ticker, shares, price, venue_confirmed=True)
             if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
                 logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
                             portfolio.model_key, s.ticker, shares)
@@ -768,6 +904,10 @@ class Executor:
                     shares=0, fill_price=0, notional=0, error=str(e),
                     stop_unprotected=True,
                 ))
+        for r in results:
+            r.decision_id = f"{portfolio.model_key}-{self.cycle_id}-stop-{r.ticker}"
+            if r.side == "SKIP" and not r.constraint and not r.broker_order:
+                r.constraint = CONSTRAINT_UNCLASSIFIED_SKIP
         return results
 
     def _force_close_via_venue(
@@ -876,43 +1016,13 @@ class Executor:
             # constraint that is the SETTLED balance, not total cash: proceeds
             # from a sale earlier in the session are in the account but are not
             # deployable until T+1.
-            spendable = self._spendable_cash(portfolio, run_date)
-            constrained_by_settlement = spendable < min(delta_notional, portfolio.cash)
-            delta_notional = min(delta_notional, spendable)
-            if delta_notional < price:  # can't even buy 1 fractional share meaningfully
-                if constrained_by_settlement and portfolio.cash >= price:
-                    # Blocked at submission, never sent. The linkage worked; the
-                    # constraint is the venue's. Logged as an execution-constraint
-                    # event, and — being unexecuted — it enters no behavioral
-                    # outcome metric, per the registered censoring principle.
-                    logger.info(
-                        "[%s] BUY %s blocked: settled cash %.2f < price %.2f "
-                        "(unsettled %.2f of %.2f total)",
-                        portfolio.model_key, ticker, spendable, price,
-                        portfolio.unsettled_cash(), portfolio.cash,
-                    )
-                    return ExecutionResult(
-                        decision=decision, executed=False, side="SKIP",
-                        ticker=ticker, shares=0, fill_price=price, notional=0,
-                        order_id="EXEC_CONSTRAINT_UNSETTLED_FUNDS",
-                        constraint=CONSTRAINT_UNSETTLED_FUNDS,
-                        error=(f"Blocked at submission: purchase requires settled funds; "
-                               f"settled {spendable:.2f}, unsettled {portfolio.unsettled_cash():.2f}"),
-                    )
-                return ExecutionResult(decision=decision, executed=False, side="SKIP",
-                                       ticker=ticker, shares=0, fill_price=price, notional=0,
-                                       error="Insufficient cash for meaningful position")
-            # Truncate (not round) to 4 decimal places so shares * price is
-            # guaranteed <= delta_notional. round() can round up and trip the
-            # insufficient-cash check on the very last buy in a sequence.
-            shares = int(delta_notional / price * 10000) / 10000
-            if shares <= 0:
-                return ExecutionResult(decision=decision, executed=False, side="SKIP",
-                                       ticker=ticker, shares=0, fill_price=price, notional=0,
-                                       error="Computed share quantity rounded to zero")
+            sized = self._size_buy(portfolio, decision, ticker, price, delta_notional,
+                                   self._spendable_cash(portfolio, run_date), portfolio.cash)
+            if isinstance(sized, ExecutionResult):
+                return sized
+            shares, constraint = sized
             return self._do_buy(portfolio, ticker, shares, price, decision,
-                                constraint=(CONSTRAINT_UNSETTLED_FUNDS_CAPPED
-                                            if constrained_by_settlement else ""))
+                                constraint=constraint)
 
         if action == "SELL":
             if ticker not in portfolio.holdings:
@@ -949,6 +1059,7 @@ class Executor:
             if shares <= 0:
                 return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
+                                       constraint=CONSTRAINT_BELOW_VENUE_MINIMUM,
                                        error="Computed short quantity rounded to zero")
             return self._do_short(portfolio, ticker, shares, price, decision, run_date)
 
@@ -1000,7 +1111,7 @@ class Executor:
             broker_order = placement.order.to_dict() if placement.order else None
         else:
             order_id = f"PAPER_BUY_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        portfolio.buy(ticker, shares, price)
+        portfolio.buy(ticker, shares, price, venue_confirmed=broker_order is not None)
         if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
             logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
                         portfolio.model_key, ticker, shares)

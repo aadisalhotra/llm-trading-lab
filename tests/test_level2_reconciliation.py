@@ -236,7 +236,9 @@ def fill(status="filled", **kw):
     ({"side": "BUY", "order_id": "LLM-s", "stop_unprotected": True,
       "broker_order": None}, "fail:stop_unprotected"),
     ({"side": "HOLD", "order_id": ""}, "no_order"),
-    ({"side": "SKIP", "order_id": "", "constraint": "", "error": "sizing"}, "no_order"),
+    # No third state (ruling 2026-11-06): an untagged skip is an execution failure.
+    ({"side": "SKIP", "order_id": "", "constraint": "", "error": "sizing"},
+     "fail:unclassified_skip"),
 ])
 def test_classify_execution(execution, expected):
     assert em.classify_execution(execution) == expected

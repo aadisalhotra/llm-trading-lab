@@ -8,8 +8,8 @@ What these tests pin:
   * the gate is doubly conditional — flag AND date — so the machinery ships now
     and binds only at the branch;
   * settled = cash - unsettled, with sale proceeds unsettled until T+1;
-  * purchases cap at the settled balance, and a purchase that cannot be met
-    from settled funds is blocked at submission rather than sent;
+  * purchases cap at the settled balance, and a purchase whose cap computes
+    under the $1 minimum is blocked at submission rather than sent;
   * a blocked purchase enters no behavioral outcome metric;
   * stops stay unconditional — the property that makes the cash branch the
     registered venue shape in the first place.
@@ -244,14 +244,16 @@ def test_no_enforcement_when_the_branch_flag_is_off():
                                 run_date="2026-12-01")[0].executed is True
 
 
-def test_genuine_insufficient_cash_is_not_labelled_a_settlement_block():
+def test_cash_below_one_share_buys_fractionally_and_no_settlement_tag_appears():
+    """Was a silent skip labelled "Insufficient cash" until the 2026-11-06 ruling:
+    $10 buys $10 of a $100 name. Nothing capped it, so nothing is tagged."""
     ex = _executor()
     p = _book(cash=10.0)
     res = ex.execute_decisions(p, [_buy("MSFT", 1.0)], {"MSFT": 100.0},
                                run_date=ACTIVE)[0]
-    assert res.executed is False
+    assert res.executed is True
     assert res.constraint == ""
-    assert "Insufficient cash" in res.error
+    assert res.shares == pytest.approx(0.1)
 
 
 def test_stops_stay_unconditional_under_the_constraint():
