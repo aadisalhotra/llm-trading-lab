@@ -1,0 +1,127 @@
+{
+  "annotation_file": "data/annotations/executor_defect_2026-11-06.jsonl",
+  "basis": "Ruling section 3: all 140 suppressed BUYs are untagged skips, and an untagged skip is by definition an execution failure. The 12 cash-below-one-share cases are failures as recorded; their counterfactual is in the annotation file as disclosure, not as a reclassification.",
+  "books": {
+    "claude": {
+      "orders": {
+        "filled": 4,
+        "suppressed_untagged_skips": 40
+      },
+      "original": {
+        "cycles": 13,
+        "execution_success_rate": 1.0,
+        "scorer": "src/analytics/execution_metrics.py at 98f36b8b9",
+        "successes": 13
+      },
+      "recomputed": {
+        "cycles": 13,
+        "execution_success_rate": 0.0,
+        "failure_cycles_by_reason": {
+          "unclassified_skip": 13
+        },
+        "scorer": "src/analytics/execution_metrics.py at bbee5da1f",
+        "successes": 0
+      },
+      "session_classification": "decision-estimable (execution-impaired)"
+    },
+    "claude_opus": {
+      "orders": {
+        "filled": 3,
+        "suppressed_untagged_skips": 51
+      },
+      "original": {
+        "cycles": 13,
+        "execution_success_rate": 1.0,
+        "scorer": "src/analytics/execution_metrics.py at 98f36b8b9",
+        "successes": 13
+      },
+      "recomputed": {
+        "cycles": 13,
+        "execution_success_rate": 0.0,
+        "failure_cycles_by_reason": {
+          "unclassified_skip": 13
+        },
+        "scorer": "src/analytics/execution_metrics.py at bbee5da1f",
+        "successes": 0
+      },
+      "session_classification": "decision-estimable (execution-impaired)"
+    },
+    "gemini": {
+      "orders": {
+        "filled": 4,
+        "suppressed_untagged_skips": 28
+      },
+      "original": {
+        "cycles": 13,
+        "execution_success_rate": 1.0,
+        "scorer": "src/analytics/execution_metrics.py at 98f36b8b9",
+        "successes": 13
+      },
+      "recomputed": {
+        "cycles": 13,
+        "execution_success_rate": 0.0,
+        "failure_cycles_by_reason": {
+          "unclassified_skip": 13
+        },
+        "scorer": "src/analytics/execution_metrics.py at bbee5da1f",
+        "successes": 0
+      },
+      "session_classification": "decision-estimable (execution-impaired)"
+    },
+    "gpt": {
+      "orders": {
+        "filled": 6,
+        "suppressed_untagged_skips": 14
+      },
+      "original": {
+        "cycles": 13,
+        "execution_success_rate": 1.0,
+        "scorer": "src/analytics/execution_metrics.py at 98f36b8b9",
+        "successes": 13
+      },
+      "recomputed": {
+        "cycles": 13,
+        "execution_success_rate": 0.230769,
+        "failure_cycles_by_reason": {
+          "unclassified_skip": 10
+        },
+        "scorer": "src/analytics/execution_metrics.py at bbee5da1f",
+        "successes": 3
+      },
+      "session_classification": "decision-estimable (execution-impaired)"
+    },
+    "grok": {
+      "orders": {
+        "filled": 7,
+        "suppressed_untagged_skips": 7
+      },
+      "original": {
+        "cycles": 13,
+        "execution_success_rate": 1.0,
+        "scorer": "src/analytics/execution_metrics.py at 98f36b8b9",
+        "successes": 13
+      },
+      "recomputed": {
+        "cycles": 13,
+        "execution_success_rate": 0.538462,
+        "failure_cycles_by_reason": {
+          "unclassified_skip": 6
+        },
+        "scorer": "src/analytics/execution_metrics.py at bbee5da1f",
+        "successes": 7
+      },
+      "session_classification": "decision-estimable (execution-impaired)"
+    }
+  },
+  "correlation_disclosure": "One defect event, correlated across five books by construction: the same executor code path deleted the orders on every book. These are not five independent execution failures.",
+  "date": "2026-11-06",
+  "failures_total": 140,
+  "gate": "Gate 4 (G-EXEC), docs/prereg/tier2_novel_sections.md",
+  "ledger": "scripts/phase_a_integrity_ledger.json operational_events['2026-11'].executor_floor_defect_2026_11_06",
+  "ruling": {
+    "path": "docs/registrations/executor_sizing_floor_ruling.md",
+    "sha256": "34eb21268de60a6d7eba2f7eda142bf9120e226c024db886b7f24f2f6da5024c"
+  },
+  "threshold": 0.8,
+  "unit": "cycle: a cycle succeeds only if every intended order reached a terminal, broker-reconciled state and the level-2 reconciliation was clean"
+}
