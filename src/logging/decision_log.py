@@ -218,6 +218,10 @@ def log_decision_run(
                 # pre-submission skip has no order id, so this is its identity.
                 "decision_id": getattr(e, "decision_id", ""),
                 "intended_notional": getattr(e, "intended_notional", None),
+                # settled_usd / unsettled_usd / cap_usd on the settled-funds tags.
+                "constraint_detail": getattr(e, "constraint_detail", None),
+                # The classified FILL_OVERRUN event, when this fill made one.
+                "fill_overrun": getattr(e, "fill_overrun", None),
                 "timestamp": e.timestamp,
                 "decision": e.decision,
                 # How many models (including this one) hold this ticker at

@@ -100,6 +100,12 @@ class Portfolio:
     # the Phase A simulator era.
     inception_epoch: str = ""
 
+    # Slippage accounting for a negative balance left by FILL_OVERRUN events.
+    # While cash is below zero this is what the state audit compares it to: an
+    # overrun it covers is a WARN, a balance it does not cover is a CRITICAL.
+    # Cleared by save_portfolio once cash is back at or above zero.
+    fill_overrun_usd: float = 0.0
+
     # ----- settled-cash helpers -----
     def settled_cash(self) -> float:
         """Deployable cash: total cash minus anything still unsettled."""
@@ -496,11 +502,14 @@ def load_portfolio(model_key: str) -> Portfolio:
         # a book that has never run under the constraint.
         settlement=SettlementLedger.from_list(data.get("unsettled_cash")),
         inception_epoch=data.get("inception_epoch") or "paper",
+        fill_overrun_usd=float(data.get("fill_overrun_usd", 0.0)),
     )
 
 
 def save_portfolio(p: Portfolio) -> None:
     p.last_updated = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    if p.cash >= -1e-6:
+        p.fill_overrun_usd = 0.0
     out = {
         "model_key": p.model_key,
         "cash": p.cash,
@@ -521,6 +530,9 @@ def save_portfolio(p: Portfolio) -> None:
         # InceptionEpochError.
         "inception_epoch": p.inception_epoch or effective_mode(p.model_key),
     }
+    # Present only while a book carries one, so an ordinary state file is unchanged.
+    if p.fill_overrun_usd:
+        out["fill_overrun_usd"] = p.fill_overrun_usd
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(_state_path(p.model_key), "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)

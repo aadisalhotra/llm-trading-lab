@@ -88,6 +88,7 @@ from .logging import (
 from .reports import generate_daily_report
 from .model_versions import detect_version_transition, record_observation
 from .portfolio import (
+    RiskViolation,
     check_portfolio_stop,
     check_position_stops,
     load_portfolio,
@@ -95,7 +96,7 @@ from .portfolio import (
     validate_decisions,
 )
 from .execution import CycleBarrier, Executor
-from .execution.executor import alarm_unclassified_skips
+from .execution.executor import alarm_fill_overruns, alarm_unclassified_skips
 from .execution.barrier import rotation_tick
 from .execution.reconciliation import run_post_cycle_reconciliation
 from .prompt_builder import (
@@ -383,6 +384,10 @@ def run_one_model(
         prices,
         trades_already_executed_today=portfolio.intraday.trades_executed_today,
     )
+    # Decisions the adapter's parser could not read never reach the validator.
+    # Their named reasons join its violations, so the record holds both.
+    violations = [RiskViolation(d["index"], d["rule"], d["detail"])
+                  for d in (decision_result.metadata or {}).get("parse_drops", [])] + violations
 
     # Execute. The run date drives T+1 settlement under the cash branch's
     # settled-funds constraint; pass the pipeline's own date rather than letting
@@ -425,6 +430,7 @@ def run_one_model(
     # A skip with no registered class is an execution failure and an alarm, so
     # the next silent suppression fails loudly on first firing (ruling 5.3).
     alarm_unclassified_skips(model_key, all_exec, send_alert, cycle_id=executor.cycle_id)
+    alarm_fill_overruns(model_key, all_exec, send_alert, cycle_id=executor.cycle_id)
 
     # Update intraday counters with this run's trade count. Shorts and covers
     # are trades too and count toward the daily cap.

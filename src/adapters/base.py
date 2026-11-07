@@ -305,6 +305,8 @@ class BaseAdapter(ABC):
                     metadata={**last_metadata, "attempt": attempt},
                 )
 
+            if parsed.get("parse_drops"):
+                last_metadata = {**last_metadata, "parse_drops": parsed["parse_drops"]}
             latency = time.perf_counter() - start
             if attempt > 1:
                 logger.info(
@@ -389,8 +391,14 @@ class BaseAdapter(ABC):
 
         # Light coercion + validation per decision
         normalized: list[dict[str, Any]] = []
-        for d in data["decisions"]:
+        # What this step could not turn into a decision, each with a named
+        # reason. The pipeline logs these with the validator's violations, so a
+        # decision the model wrote never disappears without one.
+        parse_drops: list[dict[str, Any]] = []
+        for i, d in enumerate(data["decisions"]):
             if not isinstance(d, dict):
+                parse_drops.append({"index": i, "rule": "MALFORMED_DECISION",
+                                    "detail": f"Entry is not an object: {str(d)[:80]}"})
                 continue
             action = str(d.get("action", "")).upper()
             # SHORT/COVER are parsed unconditionally so the short-side direction
@@ -399,9 +407,13 @@ class BaseAdapter(ABC):
             # shorting_enabled is FALSE). Under the v2 prompt the models never
             # emit them, so this is inert in production until v3 ships.
             if action not in ("BUY", "SELL", "HOLD", "SHORT", "COVER"):
+                parse_drops.append({"index": i, "rule": "UNKNOWN_ACTION",
+                                    "detail": f"Unrecognized action: {action[:40]}"})
                 continue
             ticker = str(d.get("ticker", "")).upper().strip()
             if not ticker:
+                parse_drops.append({"index": i, "rule": "MISSING_TICKER",
+                                    "detail": f"{action} decision names no ticker"})
                 continue
             try:
                 target_weight = float(d.get("target_weight", 0))
@@ -461,6 +473,7 @@ class BaseAdapter(ABC):
 
         return {
             "decisions": normalized,
+            "parse_drops": parse_drops,
             "overall_reasoning": str(data.get("overall_reasoning", "")).strip(),
             # v2 period-level reasoning fields (absent under v1 -> None/[]).
             "cash_rationale": _str_or_none(data.get("cash_rationale")),

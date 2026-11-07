@@ -98,7 +98,7 @@ def test_deepseek_buy_never_touches_the_venue_but_a_cohort_buy_does():
     assert r.executed and fb.submissions == [], "DeepSeek must run on the simulator"
     assert ds.holdings["AAPL"].shares == 5.0 and ds.cash == 9_500.0
     gk = book("grok")
-    e._do_buy(gk, "AAPL", 5.0, 100.0, DECISION)
+    e.execute_decisions(gk, [DECISION], {"AAPL": 100.0})
     assert [s["client_order_id"].split("-")[0:1] for s in fb.submissions] and len(fb.submissions) == 1
 
 

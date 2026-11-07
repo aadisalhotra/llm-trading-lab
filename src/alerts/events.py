@@ -73,6 +73,7 @@ KIND_LABELS: dict[str, str] = {
     "macro_event": "Major market event",
     "state_anomaly": "State integrity anomaly",
     "unclassified_skip": "Unclassified execution skip",
+    "fill_overrun": "Fill overrun",
     "descriptor_failure": "Execution descriptor failure",
     "missed_run": "Missed scheduled run",
     "pipeline_error": "Pipeline error",
@@ -1107,9 +1108,16 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
 
         # Negative cash / non-positive value (data integrity)
         if p.cash < -1e-6:
+            # A FILL_OVERRUN that slippage explains is a truthful record, so it
+            # must not read as a balance-integrity failure. Anything it does
+            # not explain still does.
+            explained = round(-p.cash, 2) <= round(p.fill_overrun_usd, 2)
             specs.append(_state_spec(
-                "state_cash", "CRITICAL", key, name,
-                f"{name} has <b>negative cash</b> of {_fmt_money(p.cash)} — a balance-integrity failure.",
+                "state_cash", "WARN" if explained else "CRITICAL", key, name,
+                (f"{name} has negative cash of {_fmt_money(p.cash)}, explained by "
+                 f"recorded fill slippage of {_fmt_money(p.fill_overrun_usd)}."
+                 if explained else
+                 f"{name} has <b>negative cash</b> of {_fmt_money(p.cash)} — a balance-integrity failure."),
                 {"Cash": _fmt_money(p.cash)},
             ))
 

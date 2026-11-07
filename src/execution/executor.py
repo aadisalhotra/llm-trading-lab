@@ -103,6 +103,13 @@ REGISTERED_SKIP_CLASSES = frozenset({
 # failure, and it raises the alarm below (ruling section 5.3).
 CONSTRAINT_UNCLASSIFIED_SKIP = "UNCLASSIFIED_SKIP"
 
+# A classified event, not a skip class: a venue-confirmed BUY took the book's cash
+# below zero. An order capped at exact cash is sized at the reference price and
+# sent as a share quantity, so a fill above reference can overrun by cents. The
+# record is truthful, so it is a WARN when slippage explains it. Anything
+# slippage does not explain stays CRITICAL (hub ruling 2026-11-06).
+EVENT_FILL_OVERRUN = "FILL_OVERRUN"
+
 # Broker-side mapping (verified against the actual submission calls below,
 # not assumed): BUY and COVER both submit as a broker "buy"; SELL and SHORT
 # both submit as a broker "sell". This is also the wash-trade contention
@@ -141,6 +148,11 @@ class ExecutionResult:
     # of the intended-vs-expressed descriptor (ruling section 5.4). None when it
     # could not be computed, so a missing value never reads as zero.
     intended_notional: float | None = None
+    # On the settled-funds tags: settled_usd, unsettled_usd and cap_usd, which is
+    # what tells a cap caused by settlement from one caused by plain cash.
+    constraint_detail: dict[str, Any] | None = None
+    # The FILL_OVERRUN event, when this fill took the book's cash below zero.
+    fill_overrun: dict[str, Any] | None = None
 
 
 def requires_skip_alarm(result: ExecutionResult) -> bool:
@@ -176,6 +188,30 @@ def alarm_unclassified_skips(model_key: str, results: list[ExecutionResult],
     return len(failed)
 
 
+def alarm_fill_overruns(model_key: str, results: list[ExecutionResult],
+                        send_alert_fn, cycle_id: str = "") -> int:
+    """WARN on an overrun slippage explains, CRITICAL on one it does not."""
+    events = [r.fill_overrun for r in results if r.fill_overrun]
+    for ev in events:
+        explained = ev["explained"]
+        send_alert_fn(
+            "WARN" if explained else "CRITICAL",
+            f"{EVENT_FILL_OVERRUN}: {model_key} {ev['ticker']}",
+            ("A confirmed fill above the reference price took book cash below "
+             "zero. Slippage on the order accounts for the balance."
+             if explained else
+             "Book cash is below zero and slippage does not account for it. "
+             "This is a balance-integrity failure until explained."),
+            {"model": model_key, "order_id": ev["order_id"],
+             "reference_price": str(ev["reference_price"]),
+             "fill_price": str(ev["fill_price"]),
+             "amount_usd": f"{ev['amount_usd']:.4f}",
+             "book_cash_after": f"{ev['book_cash_after']:.4f}"},
+            kind="fill_overrun",
+            dedup_key=f"fill_overrun:{model_key}:{cycle_id}:{ev['order_id']}")
+    return len(events)
+
+
 @dataclass
 class _Placement:
     """What the venue actually did with one order."""
@@ -208,6 +244,7 @@ class _SizedOrder:
     price: float            # reference price the size was computed against
     broker_side: str        # "buy" / "sell"
     constraint: str = ""    # pre-submission constraint, e.g. UNSETTLED_FUNDS_CAPPED
+    constraint_detail: dict[str, Any] | None = None
 
 
 class Executor:
@@ -461,10 +498,12 @@ class Executor:
         delta_notional: float,
         spendable: float,
         available: float,
-    ) -> tuple[float, str] | ExecutionResult:
+    ) -> tuple[float, str, dict[str, Any] | None] | ExecutionResult:
         """Cap a BUY at deployable cash and size it. Both paths come here.
 
-        Returns (shares, constraint), or a tagged skip when no order can exist.
+        Returns (shares, constraint, detail), or a tagged skip when no order can
+        exist. Every settled-funds tag carries the detail, so a cap from plain
+        cash (unsettled_usd 0) reads differently from a cap from settlement.
         The floor is the registered $1 venue minimum and nothing else (ruling
         section 1). This logic used to exist in two copies, which is how the
         one-share floor came to have two sites.
@@ -477,6 +516,9 @@ class Executor:
         capped = spendable < delta_notional
         order_usd = min(delta_notional, max(spendable, 0.0))
         shares = int(order_usd / price * 10000) / 10000
+        detail = {"settled_usd": portfolio.settled_cash(),
+                  "unsettled_usd": portfolio.unsettled_cash(),
+                  "cap_usd": max(spendable, 0.0)}
         if shares * price < MIN_ORDER_NOTIONAL:
             if settlement_bound and available >= MIN_ORDER_NOTIONAL:
                 # Unsettled proceeds are all that stands between this book and a
@@ -485,7 +527,7 @@ class Executor:
                     decision=decision, executed=False, side="SKIP",
                     ticker=ticker, shares=0, fill_price=price, notional=0,
                     order_id="EXEC_CONSTRAINT_UNSETTLED_FUNDS",
-                    constraint=CONSTRAINT_UNSETTLED_FUNDS,
+                    constraint=CONSTRAINT_UNSETTLED_FUNDS, constraint_detail=detail,
                     error=(f"Blocked at submission: settled cap computes under the "
                            f"${MIN_ORDER_NOTIONAL:.2f} minimum; settled {spendable:.2f}, "
                            f"unsettled {portfolio.unsettled_cash():.2f}"),
@@ -497,7 +539,9 @@ class Executor:
                 error=(f"Order notional {shares * price:.2f} is below the venue "
                        f"minimum of {MIN_ORDER_NOTIONAL:.2f}"),
             )
-        return shares, (CONSTRAINT_UNSETTLED_FUNDS_CAPPED if capped else "")
+        if capped:
+            return shares, CONSTRAINT_UNSETTLED_FUNDS_CAPPED, detail
+        return shares, "", None
 
     # ----- broker-mode execution (P1: submit-all-then-poll-all, barrier-gated) -----
 
@@ -569,9 +613,8 @@ class Executor:
         reserved: float,
     ) -> ExecutionResult | _SizedOrder:
         """Same sizing math as `_execute_one`, minus the submission call, plus
-        the reservation offset on BUY's spendable-cash cap. Kept as a separate
-        method (not shared with `_execute_one`) so the simulator's sizing path
-        is provably untouched by the reservation accounting added here.
+        the reservation offset on BUY's spendable-cash cap. BUY's cap itself is
+        shared, in `_size_buy`.
         """
         action = decision["action"]
         ticker = decision["ticker"]
@@ -603,10 +646,10 @@ class Executor:
                                    spendable, portfolio.cash - reserved)
             if isinstance(sized, ExecutionResult):
                 return sized
-            shares, constraint = sized
+            shares, constraint, detail = sized
             return _SizedOrder(decision=decision, action="BUY", ticker=ticker,
                                shares=shares, price=price, broker_side="buy",
-                               constraint=constraint)
+                               constraint=constraint, constraint_detail=detail)
 
         if action == "SELL":
             if ticker not in portfolio.holdings:
@@ -719,8 +762,17 @@ class Executor:
             for fut in as_completed(futures):
                 placements[futures[fut]] = fut.result()
 
-        return [(sized[i][0], self._apply_placement(portfolio, sized[i][1], placements[i], run_date))
-                for i in range(n)]
+        # Applied one at a time: an earlier fill's slippage uses headroom a later
+        # order was sized against, so explaining an overrun takes the batch's sum.
+        applied: list[tuple[int, ExecutionResult]] = []
+        batch_slippage = 0.0
+        for i in range(n):
+            result = self._apply_placement(portfolio, sized[i][1], placements[i], run_date,
+                                           batch_slippage)
+            if result.executed and result.side == "BUY":
+                batch_slippage += (result.fill_price - sized[i][1].price) * result.shares
+            applied.append((sized[i][0], result))
+        return applied
 
     def _submit_one(
         self, book: str, s: _SizedOrder, client_order_id: str,
@@ -792,12 +844,10 @@ class Executor:
 
     def _apply_placement(
         self, portfolio: Portfolio, s: _SizedOrder, placement: _Placement,
-        run_date: str | None,
+        run_date: str | None, prior_slippage: float = 0.0,
     ) -> ExecutionResult:
-        """Mutate the book from a terminal broker placement. Same mutation
-        calls as `_do_buy`/`_do_sell`/`_do_short`/`_do_cover` (kept separate
-        from those methods rather than shared, since they also carry the
-        simulator's non-broker branch that this path must never touch).
+        """Mutate the book from a terminal broker placement. The venue
+        counterpart of the simulator's `_do_buy`/`_do_sell`/`_do_short`/`_do_cover`.
         """
         if not placement.moved:
             logger.info("[%s] %s not executed: %s", s.action, s.ticker,
@@ -812,9 +862,14 @@ class Executor:
         shares, price = placement.filled_qty, placement.fill_price
         constraint = s.constraint or placement.constraint
         broker_order = placement.order.to_dict() if placement.order else None
+        overrun = None
 
         if s.action == "BUY":
+            cash_before = portfolio.cash
             portfolio.buy(s.ticker, shares, price, venue_confirmed=True)
+            if portfolio.cash < -1e-6:
+                overrun = self._fill_overrun(portfolio, s, placement, cash_before,
+                                             prior_slippage)
             if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
                 logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
                             portfolio.model_key, s.ticker, shares)
@@ -836,7 +891,35 @@ class Executor:
         return ExecutionResult(decision=s.decision, executed=True, side=s.action,
                                ticker=s.ticker, shares=shares, fill_price=price,
                                notional=shares * price, order_id=placement.order_id,
-                               constraint=constraint, broker_order=broker_order)
+                               constraint=constraint, broker_order=broker_order,
+                               constraint_detail=s.constraint_detail, fill_overrun=overrun)
+
+    def _fill_overrun(self, portfolio: Portfolio, s: _SizedOrder, placement: _Placement,
+                      cash_before: float, prior_slippage: float) -> dict[str, Any]:
+        """Build the FILL_OVERRUN event and carry its explanation on the book.
+
+        Explained means slippage covers the whole negative balance, compared to
+        the cent: this order's (fill - reference) x quantity, plus the batch's
+        earlier fills, plus whatever earlier overrun is still on the book. It can
+        exceed the balance, because the 4 dp truncation leaves the capped order a
+        little under the cap, so the test is "accounts for", not equality.
+        """
+        shares, price = placement.filled_qty, placement.fill_price
+        deficit = -portfolio.cash
+        slippage = (price - s.price) * shares + prior_slippage + portfolio.fill_overrun_usd
+        explained = round(deficit, 2) <= round(slippage, 2)
+        if explained:
+            portfolio.fill_overrun_usd = slippage
+        event = {
+            "event": EVENT_FILL_OVERRUN,
+            "order_id": placement.order_id, "ticker": s.ticker,
+            "reference_price": s.price, "fill_price": price, "quantity": shares,
+            "amount_usd": deficit - max(-cash_before, 0.0),
+            "book_cash_after": portfolio.cash, "slippage_usd": slippage,
+            "explained": explained,
+        }
+        (logger.warning if explained else logger.critical)("%s %s", EVENT_FILL_OVERRUN, event)
+        return event
 
     def force_liquidate(
         self,
@@ -1020,9 +1103,9 @@ class Executor:
                                    self._spendable_cash(portfolio, run_date), portfolio.cash)
             if isinstance(sized, ExecutionResult):
                 return sized
-            shares, constraint = sized
+            shares, constraint, detail = sized
             return self._do_buy(portfolio, ticker, shares, price, decision,
-                                constraint=constraint)
+                                constraint=constraint, constraint_detail=detail)
 
         if action == "SELL":
             if ticker not in portfolio.holdings:
@@ -1083,58 +1166,32 @@ class Executor:
                                ticker=ticker, shares=0, fill_price=price, notional=0,
                                error=f"Unknown action: {action}")
 
-    def _rejected(self, decision: dict[str, Any], ticker: str, side: str,
-                  placement: _Placement) -> ExecutionResult:
-        """A venue order that moved nothing. The book is not touched."""
-        logger.info("[%s] %s not executed: %s", side, ticker,
-                    placement.error or "no fill")
-        return ExecutionResult(
-            decision=decision, executed=False, side="SKIP", ticker=ticker,
-            shares=0, fill_price=0, notional=0, order_id=placement.order_id,
-            error=placement.error, constraint=placement.constraint,
-            broker_order=placement.order.to_dict() if placement.order else None,
-        )
+    # The simulator's fills. A venue book never reaches these: execute_decisions
+    # sends it down the broker path, and a fill made here would be invented.
+
+    def _assert_simulator(self, book: str) -> None:
+        if self.on_venue(book):
+            raise RuntimeError(f"{book} trades on the venue and reached a simulated fill")
 
     def _do_buy(self, portfolio: Portfolio, ticker: str, shares: float,
-                price: float, decision: dict[str, Any],
-                constraint: str = "") -> ExecutionResult:
-        broker_order = None
-        if self.on_venue(portfolio.model_key):
-            placement = self._place(portfolio.model_key, ticker, shares, "buy", price)
-            if not placement.moved:
-                return self._rejected(decision, ticker, "BUY", placement)
-            # Fill facts replace intent: a partial fill buys less than asked,
-            # and the fill price is the venue's, not the pre-trade mark.
-            shares, price = placement.filled_qty, placement.fill_price
-            order_id = placement.order_id
-            constraint = constraint or placement.constraint
-            broker_order = placement.order.to_dict() if placement.order else None
-        else:
-            order_id = f"PAPER_BUY_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        portfolio.buy(ticker, shares, price, venue_confirmed=broker_order is not None)
+                price: float, decision: dict[str, Any], constraint: str = "",
+                constraint_detail: dict[str, Any] | None = None) -> ExecutionResult:
+        self._assert_simulator(portfolio.model_key)
+        order_id = f"PAPER_BUY_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        portfolio.buy(ticker, shares, price)
         if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
             logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
                         portfolio.model_key, ticker, shares)
         return ExecutionResult(decision=decision, executed=True, side="BUY",
                                ticker=ticker, shares=shares, fill_price=price,
                                notional=shares * price, order_id=order_id,
-                               constraint=constraint, broker_order=broker_order)
+                               constraint=constraint, constraint_detail=constraint_detail)
 
     def _do_sell(self, portfolio: Portfolio, ticker: str, shares: float,
                  price: float, decision: dict[str, Any],
                  run_date: str | None = None) -> ExecutionResult:
-        broker_order = None
-        constraint = ""
-        if self.on_venue(portfolio.model_key):
-            placement = self._place(portfolio.model_key, ticker, shares, "sell", price)
-            if not placement.moved:
-                return self._rejected(decision, ticker, "SELL", placement)
-            shares, price = placement.filled_qty, placement.fill_price
-            order_id = placement.order_id
-            constraint = placement.constraint
-            broker_order = placement.order.to_dict() if placement.order else None
-        else:
-            order_id = f"PAPER_SELL_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        self._assert_simulator(portfolio.model_key)
+        order_id = f"PAPER_SELL_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         proceeds = portfolio.sell(ticker, shares, price)
         self._record_proceeds(portfolio, proceeds, run_date)
         # Sweep any dust left over from this or earlier fractional sells
@@ -1144,25 +1201,13 @@ class Executor:
             logger.info("Swept ghost positions after %s sell: %s", ticker, swept)
         return ExecutionResult(decision=decision, executed=True, side="SELL",
                                ticker=ticker, shares=shares, fill_price=price,
-                               notional=shares * price, order_id=order_id,
-                               constraint=constraint, broker_order=broker_order)
+                               notional=shares * price, order_id=order_id)
 
     def _do_short(self, portfolio: Portfolio, ticker: str, shares: float,
                   price: float, decision: dict[str, Any],
                   run_date: str | None = None) -> ExecutionResult:
-        # Opening/adding a short submits a SELL order on the broker side.
-        broker_order = None
-        constraint = ""
-        if self.on_venue(portfolio.model_key):
-            placement = self._place(portfolio.model_key, ticker, shares, "sell", price)
-            if not placement.moved:
-                return self._rejected(decision, ticker, "SHORT", placement)
-            shares, price = placement.filled_qty, placement.fill_price
-            order_id = placement.order_id
-            constraint = placement.constraint
-            broker_order = placement.order.to_dict() if placement.order else None
-        else:
-            order_id = f"PAPER_SHORT_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        self._assert_simulator(portfolio.model_key)
+        order_id = f"PAPER_SHORT_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         proceeds = portfolio.short(ticker, shares, price)
         # A short sale is a sale: its proceeds are unsettled like any other.
         # Unreachable on the cash branch (a cash account cannot short), but
@@ -1170,29 +1215,16 @@ class Executor:
         self._record_proceeds(portfolio, proceeds, run_date)
         return ExecutionResult(decision=decision, executed=True, side="SHORT",
                                ticker=ticker, shares=shares, fill_price=price,
-                               notional=shares * price, order_id=order_id,
-                               constraint=constraint, broker_order=broker_order)
+                               notional=shares * price, order_id=order_id)
 
     def _do_cover(self, portfolio: Portfolio, ticker: str, shares: float,
                   price: float, decision: dict[str, Any]) -> ExecutionResult:
-        # Covering a short submits a BUY order on the broker side.
-        broker_order = None
-        constraint = ""
-        if self.on_venue(portfolio.model_key):
-            placement = self._place(portfolio.model_key, ticker, shares, "buy", price)
-            if not placement.moved:
-                return self._rejected(decision, ticker, "COVER", placement)
-            shares, price = placement.filled_qty, placement.fill_price
-            order_id = placement.order_id
-            constraint = placement.constraint
-            broker_order = placement.order.to_dict() if placement.order else None
-        else:
-            order_id = f"PAPER_COVER_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        self._assert_simulator(portfolio.model_key)
+        order_id = f"PAPER_COVER_{ticker}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         portfolio.cover(ticker, shares, price)
         swept = portfolio.sweep_ghost_positions()
         if swept:
             logger.info("Swept ghost positions after %s cover: %s", ticker, swept)
         return ExecutionResult(decision=decision, executed=True, side="COVER",
                                ticker=ticker, shares=shares, fill_price=price,
-                               notional=shares * price, order_id=order_id,
-                               constraint=constraint, broker_order=broker_order)
+                               notional=shares * price, order_id=order_id)

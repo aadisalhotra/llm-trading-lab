@@ -63,22 +63,33 @@ class FakeBroker:
         self.hit_deadline = hit_deadline
         self.submissions: list[dict] = []
 
-    def place_and_confirm(self, *, ticker, shares, side, client_order_id,
-                          deadline_seconds=None):
+    def submit_market_order(self, *, ticker, shares, side, client_order_id):
         self.submissions.append({"ticker": ticker, "shares": shares,
                                  "side": side, "client_order_id": client_order_id})
         if self.raise_error is not None:
             raise self.raise_error
-        filled = shares * self.fill_ratio
-        price = self.fill_price if self.fill_price is not None else 100.0
-        order = BrokerOrder(
+        return BrokerOrder(
             client_order_id=client_order_id, broker_order_id="brk-1",
             symbol=to_venue_symbol(ticker), ticker=ticker, side=side,
-            requested_qty=shares,
+            requested_qty=shares, status="pending_new",
+            filled_qty=0.0, filled_avg_price=0.0)
+
+    def await_terminal(self, order, deadline_seconds=None):
+        filled = order.requested_qty * self.fill_ratio
+        price = self.fill_price if self.fill_price is not None else 100.0
+        return BrokerOrder(
+            client_order_id=order.client_order_id, broker_order_id=order.broker_order_id,
+            symbol=order.symbol, ticker=order.ticker, side=order.side,
+            requested_qty=order.requested_qty,
             status="filled" if self.fill_ratio >= 1.0 else "canceled",
             filled_qty=filled, filled_avg_price=price if filled else 0.0,
-        )
-        return order, self.hit_deadline
+        ), self.hit_deadline
+
+    def place_and_confirm(self, *, ticker, shares, side, client_order_id,
+                          deadline_seconds=None):
+        order = self.submit_market_order(ticker=ticker, shares=shares, side=side,
+                                         client_order_id=client_order_id)
+        return self.await_terminal(order)
 
 
 def _executor(broker, mode="broker_paper"):
@@ -99,6 +110,20 @@ def _executor(broker, mode="broker_paper"):
 def _book(cash=10_000.0, holdings=None):
     return Portfolio(model_key="grok", cash=cash, holdings=holdings or {},
                      inception_value=10_000.0, inception_date="2026-04-09")
+
+
+def _buy(e, p, ticker, shares, price):
+    """A BUY sized to `shares`, through the path a venue book actually takes."""
+    weight = shares * price / p.total_value({ticker: price})
+    return e.execute_decisions(p, [{"action": "BUY", "ticker": ticker,
+                                    "target_weight": weight}], {ticker: price})[0]
+
+
+def _sell(e, p, ticker, shares, price):
+    held = p.holdings[ticker].shares
+    weight = (held - shares) * price / p.total_value({ticker: price})
+    return e.execute_decisions(p, [{"action": "SELL", "ticker": ticker,
+                                    "target_weight": weight}], {ticker: price})[0]
 
 
 def _long(ticker="AAPL", shares=10.0, cost=100.0):
@@ -161,7 +186,7 @@ def test_rejected_buy_does_not_move_the_book():
     broker = FakeBroker(raise_error=BrokerAPIError("nope", status=422, code=42210000))
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 10.0, 100.0)
     assert r.executed is False
     assert p.cash == 10_000.0          # untouched
     assert "AAPL" not in p.holdings
@@ -171,7 +196,7 @@ def test_zero_fill_does_not_move_the_book():
     broker = FakeBroker(fill_ratio=0.0)
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 10.0, 100.0)
     assert r.executed is False
     assert p.cash == 10_000.0
     assert "AAPL" not in p.holdings
@@ -181,7 +206,7 @@ def test_partial_fill_moves_the_book_by_the_filled_quantity_only():
     broker = FakeBroker(fill_ratio=0.4, fill_price=100.0)
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 10.0, 100.0)
     assert r.executed is True
     assert r.shares == pytest.approx(4.0)
     assert p.holdings["AAPL"].shares == pytest.approx(4.0)
@@ -195,7 +220,7 @@ def test_book_uses_the_venue_fill_price_not_the_pre_trade_mark():
     broker = FakeBroker(fill_price=103.25)
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 10.0, 100.0)
     assert r.fill_price == 103.25
     assert p.holdings["AAPL"].avg_cost == 103.25
     assert p.cash == pytest.approx(10_000.0 - 1_032.50)
@@ -205,7 +230,7 @@ def test_sub_dollar_order_is_blocked_before_submission():
     broker = FakeBroker()
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 0.001, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 0.001, 100.0)
     assert r.executed is False
     assert r.constraint == CONSTRAINT_BELOW_VENUE_MINIMUM
     assert broker.submissions == []       # never reached the venue
@@ -216,7 +241,7 @@ def test_unfilled_at_deadline_is_flagged_on_a_partial_fill():
     broker = FakeBroker(fill_ratio=0.5, hit_deadline=True)
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    r = e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
+    r = _buy(e, p, "AAPL", 10.0, 100.0)
     assert r.executed is True
     assert r.constraint == CONSTRAINT_UNFILLED_AT_DEADLINE
     assert r.shares == pytest.approx(5.0)
@@ -230,7 +255,7 @@ def test_wash_trade_rejection_is_classified_distinctly():
     assert err.is_wash_trade is True
     e = _executor(FakeBroker(raise_error=err))
     p = _book(cash=10_000.0, holdings=_long())
-    r = e._do_sell(p, "AAPL", 5.0, 100.0, {"action": "SELL", "ticker": "AAPL"})
+    r = _sell(e, p, "AAPL", 5.0, 100.0)
     assert r.executed is False
     assert r.constraint == CONSTRAINT_WASH_TRADE_BLOCK
     assert p.holdings["AAPL"].shares == 10.0     # book untouched
@@ -240,8 +265,8 @@ def test_orders_carry_the_book_tag_and_increment_per_book():
     broker = FakeBroker()
     e = _executor(broker)
     p = _book(cash=10_000.0)
-    e._do_buy(p, "AAPL", 10.0, 100.0, {"action": "BUY", "ticker": "AAPL"})
-    e._do_buy(p, "MSFT", 10.0, 100.0, {"action": "BUY", "ticker": "MSFT"})
+    _buy(e, p, "AAPL", 10.0, 100.0)
+    _buy(e, p, "MSFT", 10.0, 100.0)
     ids = [s["client_order_id"] for s in broker.submissions]
     assert ids == ["grok-20261006T1430Z-00-a0", "grok-20261006T1430Z-01-a0"]
     assert all(book_from_order_id(i) == "grok" for i in ids)
