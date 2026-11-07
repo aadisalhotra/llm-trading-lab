@@ -322,3 +322,38 @@ def test_a_clean_response_has_no_drops():
     parsed = BaseAdapter._parse_response(
         '{"overall_reasoning": "x", "decisions": [{"action": "HOLD", "ticker": "AAPL"}]}')
     assert parsed["parse_drops"] == []
+
+
+# --------------------------------------------------------------------------- #
+# Names that only fail at runtime
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("module", [
+    "src.pipeline", "src.execution.executor", "src.analytics.intended_vs_expressed",
+    "src.analytics.execution_metrics", "src.portfolio.portfolio", "src.adapters.base",
+])
+def test_every_global_a_module_reads_exists(module):
+    """A misspelled call inside a guarded block raises nothing until it runs, and
+    then the guard swallows it. That is how the descriptor's first call shipped
+    calling a function pipeline.py never had: every test passed, and a dry cycle
+    was what found it. This reads the bytecode, so it needs no cycle."""
+    import builtins
+    import dis
+    import importlib
+    import types
+
+    mod = importlib.import_module(module)
+    known = set(vars(mod)) | set(vars(builtins))
+
+    def walk(code):
+        for ins in dis.get_instructions(code):
+            if ins.opname in ("LOAD_GLOBAL", "LOAD_NAME"):
+                yield ins.argval
+        for const in code.co_consts:
+            if isinstance(const, types.CodeType):
+                yield from walk(const)
+
+    source = Path(mod.__file__).read_text(encoding="utf-8")
+    missing = set(walk(compile(source, mod.__file__, "exec"))) - known
+    # Names bound inside a function by a local import resolve as locals there;
+    # __annotations__-style module dunders are set by the import system.
+    assert not {n for n in missing if not n.startswith("__")}, missing

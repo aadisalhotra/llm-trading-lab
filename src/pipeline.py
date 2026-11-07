@@ -820,7 +820,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # The standing intended-vs-expressed descriptor (ruling 5.4). Recomputed
     # from the decision logs every cycle, so it is current whenever the run ends.
     try:
-        write_session_descriptor(now_et().strftime("%Y-%m-%d"),
+        write_session_descriptor(run_date.strftime("%Y-%m-%d"),
                                  [mk for mk, _ in enabled_models])
     except Exception as e:
         logger.exception("Intended-vs-expressed descriptor failed: %s", e)
