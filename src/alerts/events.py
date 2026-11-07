@@ -663,7 +663,12 @@ def _models_positioning(settings: dict[str, Any]) -> dict[str, Any]:
         cash_pct = None
 
     most_held = sorted(holders.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
-    return {"n_models": n_models, "total_cash_pct": cash_pct, "most_held": most_held}
+    # Ruling 4.4: if any summed book's cash is defect-flagged (dashboard.json
+    # attaches the flag), the total inherits it. Only the payload path can carry
+    # one; the fallback path reports no cash figure at all.
+    cash_flag = next((s["cash_defect_flag"] for s in snaps if s.get("cash_defect_flag")), None)
+    return {"n_models": n_models, "total_cash_pct": cash_pct, "most_held": most_held,
+            "cash_defect_flag": cash_flag}
 
 
 def _fmt_pct(x: float | None) -> str:
@@ -977,6 +982,9 @@ def detect_macro_market_events(
     n_models = pos["n_models"]
     cash_pct = pos["total_cash_pct"]
     cash_str = f"{cash_pct * 100:.1f}%" if cash_pct is not None else "—"
+    flag = pos.get("cash_defect_flag")
+    if flag and cash_pct is not None:
+        cash_str += f" (defect flag, {flag['date']} cash: {flag['text']})"
     most_held = pos["most_held"]
     most_held_str = (
         ", ".join(f"{t} ({c}/{n_models})" for t, c in most_held) if most_held else "none"

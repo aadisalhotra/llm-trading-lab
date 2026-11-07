@@ -45,6 +45,7 @@ from ..config_loader import (
 )
 from ..data.sentiment import score_headline, sentiment_label
 from ..portfolio import load_portfolio
+from .cash_defect_flag import FLAG_CODE, FLAG_TEXT, MARKER as CASH_FLAG_MARKER, cash_flag, footnote
 
 logger = logging.getLogger("llmlab.reports")
 
@@ -541,6 +542,8 @@ def _build_performance_table(
             "alpha": m["alpha_vs_spy"],
             "trades": n_trades,
             "cash_pct": m["current_cash_pct"],
+            # Ruling 4.4: a defect-dominated cash level is never shown bare.
+            "cash_flag": cash_flag(key, run_date.strftime("%Y-%m-%d")),
             "api_success": api_success,
         })
 
@@ -574,10 +577,13 @@ def _build_performance_table(
             _pct(r["cum_return"]),
             _pct(r["alpha"]) if r["alpha"] is not None else "—",
             str(r["trades"]),
-            _pct(r["cash_pct"], sign=False),
+            _pct(r["cash_pct"], sign=False) + (f" {CASH_FLAG_MARKER}" if r["cash_flag"] else ""),
         ])
 
     table = _format_table(headers, rows, aligns=["R", "L", "C", "R", "R", "R", "R", "R", "R", "R"])
+    flagged_dates = {r["cash_flag"]["date"] for r in rows_data if r["cash_flag"]}
+    if flagged_dates:
+        table += "\n\n" + footnote(flagged_dates)
     return table, rows_data
 
 
@@ -678,11 +684,16 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
             f"with {cash_pct_val*100:.1f}% cash; largest weight is "
             f"{top_h.get('ticker','?')} at {top_h.get('weight',0)*100:.1f}%."
         )
+    # Ruling 4.4: this day's cash is defect-dominated. Say so, and do not go on
+    # to read it as a behavior ("defensive cash positioning") below.
+    flag = cash_flag(model_key, run_date.strftime("%Y-%m-%d"))
+    if flag:
+        s3 += f" {CASH_FLAG_MARKER} Cash level is defect-flagged: {FLAG_TEXT}."
 
     # Sentence 4 — notable behavior flag
     s4 = ""
     if cash_pct_val > 0.50:
-        s4 = "Notable: heavy defensive cash positioning."
+        s4 = "" if flag else "Notable: heavy defensive cash positioning."
     elif n_pos == 1:
         s4 = "Notable: single-name concentration."
     elif holdings:
@@ -1395,6 +1406,7 @@ def generate_daily_report(
                 "alpha": r["alpha"],
                 "trades": r["trades"],
                 "cash_pct": r["cash_pct"],
+                **({"cash_flag": FLAG_CODE} if r.get("cash_flag") else {}),
             }
             for r in perf_rows
         ],

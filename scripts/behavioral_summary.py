@@ -65,6 +65,7 @@ from src.config_loader import (  # noqa: E402
     force_utf8_console,
     load_settings,
 )
+from src.reports.cash_defect_flag import MARKER as CASH_FLAG_MARKER, footnote, window_flags  # noqa: E402
 
 logger = logging.getLogger("llmlab.behavioral_summary")
 
@@ -284,14 +285,21 @@ def render_window(res: WindowResult, settings: dict) -> list[str]:
     out.append("| Model | Trades/day | Avg cash % | Min cash % | Max cash % | "
                "Avg hold (cal. days) | Median hold | Same-day exits | Flip rate |")
     out.append("|---|--:|--:|--:|--:|--:|--:|--:|--:|")
+    # Ruling 4.4: cash statistics over a window that contains a defect-flagged
+    # day (2026-11-06, cohort books) carry the flag.
+    flags = window_flags(res.rows, w.start, w.end)
     for k in res.rows:
         r = res.rows[k]
         fr = f"{r['fr'] * 100:.0f}%" if r["fr"] is not None else "—"
+        m = f" {CASH_FLAG_MARKER}" if k in flags else ""
         out.append(
-            f"| {_display(settings, k)} | {_num(r['tpd'])} | {_num(r['cavg'])} | "
-            f"{_num(r['cmin'])} | {_num(r['cmax'])} | {_num(r['hold_mean'])} | "
+            f"| {_display(settings, k)} | {_num(r['tpd'])} | {_num(r['cavg'])}{m} | "
+            f"{_num(r['cmin'])}{m} | {_num(r['cmax'])}{m} | {_num(r['hold_mean'])} | "
             f"{_num(r['hold_med'])} | {r['same_day']}/{r['n_closed']} | {fr} |"
         )
+    if flags:
+        out.append("")
+        out.append(footnote(next(iter(flags.values()))["dates"]))
     out.append("")
 
     # Table 2 — confidence distribution

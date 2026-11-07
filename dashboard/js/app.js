@@ -746,7 +746,7 @@ function renderLeaderboard(d) {
     const positionsCell = cohort === "benchmark" ? "—" : (row.num_positions ?? "—");
     const cashCell = cohort === "benchmark"
       ? "—"
-      : (row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) : "—");
+      : (row.current_cash_pct != null ? fmtPct(row.current_cash_pct, false) + cashFlagMark(row) : "—");
     const rankCell = cohort === "benchmark" ? "—" : row.rank;
 
     // Streak badge
@@ -860,7 +860,7 @@ function renderPortfolios(d) {
       <div class="summary">
         <span class="k">VALUE</span><span class="v">${fmtMoney(p.total_value)}</span>
         <span class="k">RETURN</span><span class="v ${colorClass(p.cumulative_return)}">${fmtPct(p.cumulative_return)}</span>
-        <span class="k">CASH</span><span class="v">${fmtMoney(p.cash)} (${fmtPct(p.cash_pct, false)})</span>
+        <span class="k">CASH</span><span class="v">${fmtMoney(p.cash)} (${fmtPct(p.cash_pct, false)})${cashFlagMark(p)}</span>
         <span class="k">POSITIONS</span><span class="v">${(p.holdings || []).length} / ${maxPositions}</span>
       </div>
       ${holdingsTbl}
@@ -907,6 +907,16 @@ function escapeHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Day-one cash defect flag (executor sizing-floor ruling, section 4.4).
+// dashboard.json attaches `cash_defect_flag` to any leaderboard row or portfolio
+// whose cash is as of a defect-flagged session; that cash is never shown bare.
+function cashFlagMark(obj) {
+  const f = obj && obj.cash_defect_flag;
+  if (!f) return "";
+  const tip = `Defect flag (${f.date} cash): ${f.text} (${f.ledger_ref})`;
+  return ` <span class="cash-defect-flag" title="${escapeHtml(tip)}">‡ ${escapeHtml(f.text)}</span>`;
 }
 
 // ===== Leaderboard hover tooltip — shows last 3 trade summaries =====
@@ -1277,7 +1287,7 @@ function renderHeadToHead(d) {
     { label: "TRADES / DAY", a: fmtNum(tradesPerDayA, 1), b: fmtNum(tradesPerDayB, 1), aWin: false, bWin: false },
     { label: "AVG CONFIDENCE", a: avgConfA != null ? fmtNum(avgConfA, 1) + "/10" : "—", b: avgConfB != null ? fmtNum(avgConfB, 1) + "/10" : "—",
       aWin: (avgConfA || 0) > (avgConfB || 0), bWin: (avgConfB || 0) > (avgConfA || 0) },
-    { label: "CASH %", a: fmtPct(rowA.current_cash_pct, false), b: fmtPct(rowB.current_cash_pct, false), aWin: false, bWin: false },
+    { label: "CASH %", a: fmtPct(rowA.current_cash_pct, false) + cashFlagMark(rowA), b: fmtPct(rowB.current_cash_pct, false) + cashFlagMark(rowB), aWin: false, bWin: false },
     { label: "TOTAL API COST", a: "$" + fmtNum(costA.cost_total_usd || 0), b: "$" + fmtNum(costB.cost_total_usd || 0),
       aWin: (costA.cost_total_usd || 0) < (costB.cost_total_usd || 0), bWin: (costB.cost_total_usd || 0) < (costA.cost_total_usd || 0) },
   ];

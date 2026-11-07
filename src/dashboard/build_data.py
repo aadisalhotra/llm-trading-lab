@@ -32,10 +32,39 @@ from ..config_loader import (
 )
 from ..data.market_data import fetch_universe_data, INDEX_SYMBOLS
 from ..portfolio import load_portfolio
+from ..reports.cash_defect_flag import cash_flag
 
 EASTERN = ZoneInfo("America/New_York")
 
 logger = logging.getLogger(__name__)
+
+
+def _state_session_date(last_updated: str) -> str | None:
+    """ET calendar date of a state file's `last_updated` (naive UTC,
+    "YYYY-MM-DD HH:MM:SS"), i.e. the session whose cash the snapshot shows."""
+    try:
+        ts = datetime.strptime(last_updated[:19], "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return None
+    return ts.replace(tzinfo=timezone.utc).astimezone(EASTERN).strftime("%Y-%m-%d")
+
+
+def annotate_cash_flags(leaderboard: list[dict[str, Any]],
+                        portfolios: list[dict[str, Any]],
+                        eod_dates: dict[str, str | None],
+                        state_dates: dict[str, str | None]) -> None:
+    """Attach the ruling 4.4 day-one cash flag, in place, to every row whose cash
+    is as of a flagged session. Each surface is dated by its own source: a
+    leaderboard row's current_cash_pct is the last EOD row (so on Monday morning it
+    is still Friday's), a portfolio snapshot's cash is the live state file."""
+    for row in leaderboard:
+        flag = cash_flag(row.get("model_key", ""), eod_dates.get(row.get("model_key", "")))
+        if flag:
+            row["cash_defect_flag"] = flag
+    for snap in portfolios:
+        flag = cash_flag(snap.get("model_key", ""), state_dates.get(snap.get("model_key", "")))
+        if flag:
+            snap["cash_defect_flag"] = flag
 
 
 def _recent_trades(model_keys: list[str], limit: int = 50) -> list[dict[str, Any]]:
@@ -1130,8 +1159,10 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         leaderboard.append(spy_metrics)
 
     portfolios: list[dict[str, Any]] = []
+    state_dates: dict[str, str | None] = {}
     for key in model_keys:
         p = load_portfolio(key)
+        state_dates[key] = _state_session_date(p.last_updated)
         snap = p.snapshot(prices or {})
         cfg = settings["models"][key]
         snap["provider"] = cfg["provider"]
@@ -1140,6 +1171,14 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
         snap["cohort"] = cfg.get("cohort", "core")
         snap["display_name"] = cfg.get("display_name", key.upper())
         portfolios.append(snap)
+
+    # Ruling 4.4: 2026-11-06 cohort cash is defect-dominated; flag it wherever
+    # this payload (and the leaderboard snapshot written from it) shows it.
+    eod_dates: dict[str, str | None] = {}
+    for key in model_keys:
+        hist = load_eod_history(key)
+        eod_dates[key] = hist["date"].iloc[-1].strftime("%Y-%m-%d") if not hist.empty else None
+    annotate_cash_flags(leaderboard, portfolios, eod_dates, state_dates)
 
     equity_curves = {key: _equity_curve(key) for key in model_keys}
     # Synthetic SPY buy-and-hold equity curve for the leaderboard sparkline.

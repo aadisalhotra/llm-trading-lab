@@ -90,6 +90,7 @@ from src.config_loader import (  # noqa: E402
     load_settings,
 )
 from src.portfolio.portfolio import Portfolio  # noqa: E402
+from src.reports.cash_defect_flag import window_flags  # noqa: E402
 
 logger = logging.getLogger("llmlab.data_layer")
 
@@ -2689,7 +2690,42 @@ def build(month: str) -> dict:
                                             month, win_start)
     _apply_integrity(layer, ledger, gates, model_keys, win_start, win_end, month,
                      spy_clean_value, spy_descriptive_sharpe, audit_block)
+    _apply_cash_defect_flags(layer, model_keys, win_start, win_end,
+                             rq5.get("pilot_window_start") or RQ5_PHASE_A_PILOT_START)
     return layer
+
+
+def _apply_cash_defect_flags(layer, model_keys, win_start, win_end, rq5_start):
+    """Executor sizing-floor ruling 4.4: any rendering of 2026-11-06 cohort cash
+    carries the defect flag. Two figures in this layer include that day's cash:
+    the month's cash_pct_mean_daily per profile, and RQ5's accumulating cash_pct
+    (pilot start .. month-end). Month-gated by construction: window_flags is empty
+    unless the window covers a flagged date, so every month before November 2026,
+    reproduce-May included, is byte-unchanged."""
+    month_flags = window_flags(model_keys, win_start, win_end)
+    rq5_flags = window_flags(model_keys, rq5_start, win_end)
+    if not month_flags and not rq5_flags:
+        return
+    fields = []
+    for prof in layer["profiles"]:
+        flag = month_flags.get(prof["model"])
+        if flag:
+            prof["evidence_metrics"]["cash_pct_mean_daily_defect_flag"] = flag
+            fields.append(f"profiles[{prof['model']}].evidence_metrics.cash_pct_mean_daily")
+    rq5 = layer["methodology_data_integrity_rq"]["rq_update"]["accumulating_inputs"]["RQ5"]
+    if rq5_flags:
+        rq5["cash_pct_defect_flag"] = {k: v for k, v in sorted(rq5_flags.items())}
+        fields.extend(f"methodology_data_integrity_rq.rq_update.accumulating_inputs.RQ5"
+                      f".behavioral_metrics cash_pct [{k}]" for k in sorted(rq5_flags))
+    any_flag = next(iter((month_flags or rq5_flags).values()))
+    layer["cash_defect_flags"] = {
+        "code": any_flag["code"],
+        "text": any_flag["text"],
+        "ledger_ref": any_flag["ledger_ref"],
+        "dates": any_flag["dates"],
+        "books": sorted(set(month_flags) | set(rq5_flags)),
+        "flagged_fields": fields,
+    }
 
 
 def main() -> int:
