@@ -164,6 +164,47 @@
       "scope": "the five live-cohort books; deepseek stays on its paper epoch",
       "registered": "the 2026-11-06 epoch boundary is a hard homogeneous-window boundary for all regime maps and window starts; no estimand window spans it.",
       "event_ref": "operational_events.2026-11[paper_epoch_closure_and_broker_paper_cutover]"
+    },
+    "deepseek_executor_floor_removal": {
+      "date": "2026-11-07",
+      "first_effective_session": "2026-11-09",
+      "first_effective_cycle": "the first cycle run on bbee5da1f: Monday 2026-11-09, the 09:35 ET slot",
+      "type": "execution_regime_boundary",
+      "series": "deepseek exploratory series (paper simulator; same executor as the cohort)",
+      "authority": {
+        "path": "docs/registrations/executor_sizing_floor_ruling.md",
+        "sha256": "34eb21268de60a6d7eba2f7eda142bf9120e226c024db886b7f24f2f6da5024c",
+        "section": "header: 'The fix also changes the DeepSeek arm's execution (paper-only, same executor): that is a regime boundary for the DeepSeek exploratory series, ledgered as such at the push.'"
+      },
+      "changes_that_affect_fills": {
+        "the $1 minimum": "The one-share floor is replaced by the registered $1 venue minimum, tested on the truncated order in _size_buy, which both paths share. A BUY whose deployable amount is at least $1 is now sent, capped at deployable cash; before, it was skipped whenever the capped amount was under one share's price. The settled-funds block shared that threshold, so settled cash between $1 and one share's price now gives a capped order instead of an UNSETTLED_FUNDS skip. Paper-era exposure for this book: 46 hits, 26 of them $1 or more, $10,134.44 (phase_a_executor_floor_exposure)."
+      },
+      "changes_that_do_not_affect_fills": {
+        "cap tag on plain cash caps": "UNSETTLED_FUNDS_CAPPED now tags any BUY capped below target by deployable cash, including plain cash with no unsettled balance. A tag only.",
+        "decision-ID and balance stamps": "Every execution carries a decision id (159e907e4), and settled-funds tags carry the settled, unsettled and cap balances (28db69a03). Logging only.",
+        "removal of the on-venue code paths": "_rejected and the on-venue branches of _do_buy, _do_sell, _do_short and _do_cover are removed (28db69a03). A simulator book never took them; the simulator methods now refuse a venue book."
+      },
+      "pre_boundary_snapshot": {
+        "as_of": "2026-11-06 end of day: EOD tick 98f36b8b9 (2026-11-06T22:07:52Z), state last_updated 2026-11-06 22:07:30",
+        "path": "data/state/deepseek.json",
+        "blob": "02c024680e4c40c87742ac21e0a3304e504217ee",
+        "sha256": "877135e0d9b649466f7fcb00eb8bfd2d891d613a56c12ed6e3188a27bd5cf140",
+        "unchanged_through": "bbee5da1f",
+        "cash_usd": 48.864593,
+        "unsettled_cash_usd": [],
+        "positions": 18,
+        "nav_eod_usd": 124173.8,
+        "nav_source": "data/performance/deepseek.jsonl, 2026-11-06 EOD row",
+        "inception": "2026-04-09, paper epoch, $100,000",
+        "friday_floor_hits": 0,
+        "decision_log_blob": {
+          "path": "data/trades/deepseek_2026-11.jsonl",
+          "blob_at_bbee5da1f": "b79a058fa372cd33a5e8a009ebc6c7329f9ac137"
+        },
+        "reading": "Cash is $48.86 on $124,173.80. Under the old executor any BUY needing more than one share's worth of that cash was skipped; under the new one, a BUY of $1 or more is sent capped at it."
+      },
+      "post_boundary_snapshot": "Recorded in a follow-up ledger entry, under its own sign-off, after the first cycle run on bbee5da1f on 2026-11-09. Not taken at this landing.",
+      "event_ref": "operational_events.2026-11[executor_floor_defect_2026_11_06]"
     }
   },
 
@@ -2368,6 +2409,410 @@
           "monday_triage": "Stop-loss orders placed on the EOD pass after the close reach the venue in broker-paper mode. run_one_model runs check_position_stops before its is_eod return. Named in the sweep, predates the package, does not gate the flip.",
           "follow_audit": "R3, R5, the cross-epoch leaderboard ranking and the Phase A label. The publish pause stays on."
         }
+      },
+      {
+        "id": "executor_floor_defect_2026_11_06",
+        "date": "2026-11-07",
+        "event_date": "2026-11-06",
+        "type": "execution_defect_disclosure",
+        "scope": "The five broker-paper cohort books (claude, claude_opus, gemini, gpt, grok), session 2026-11-06, the first live-path validation day. deepseek ran on the paper simulator that day and hit the floor zero times; its exposure is in phase_a_executor_floor_exposure and its regime boundary in regime_boundaries.deepseek_executor_floor_removal.",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/executor_sizing_floor_ruling.md",
+            "sha256": "34eb21268de60a6d7eba2f7eda142bf9120e226c024db886b7f24f2f6da5024c",
+            "sections": "1 (floor removed), 2 (Friday stays), 3 (G-EXEC recompute), 4.1-4.4 (disclosure)"
+          },
+          "dispatch": "Hub to Operations, Push 2 (disclosure), relayed inline 2026-11-07.",
+          "fix": {
+            "range": "98f36b8b9..bbee5da1f",
+            "commits": [
+              "c48d83f78 ruling + Gate 4 no-third-state line",
+              "159e907e4 floor removed at both sites; every skip classified or a failure; descriptor",
+              "28db69a03 FILL_OVERRUN, cap detail, _rejected removed, parser drops named",
+              "7a98c7e2b descriptor call fix; module-global guard",
+              "bbee5da1f executor skip-path and validator drop sweep"
+            ],
+            "ci": "Tests run 42339867008, green on 3.11"
+          }
+        },
+        "defect": {
+          "condition": "A BUY whose amount, after capping at deployable cash, was below one share's price (delta_notional < price) was skipped with error 'Insufficient cash for meaningful position': no constraint tag, no order id, no event.",
+          "sites": {
+            "executor.py:449": "_size_for_broker, the broker path. Every 2026-11-06 suppression came from here.",
+            "executor.py:882": "_execute_one, the simulator path. Hit zero times on 2026-11-06 (deepseek); the source of the paper-era hits."
+          },
+          "line_numbers_at": "98f36b8b9",
+          "why_nothing_saw_it": "classify_execution read an untagged SKIP with no order id as no_order, so Gate 4 read 1.0 on every book and BELOW_VENUE_MINIMUM read zero. The intended-vs-expressed gap is what caught it.",
+          "mislabel": "The label claimed insufficient cash; cash was available on 128 of the 140."
+        },
+        "failures": {
+          "total": 140,
+          "classification": "All 140 are execution failures (ruling section 3): an untagged skip is by definition the second state. The split below is not a classification.",
+          "per_book": {
+            "claude": 40,
+            "claude_opus": 51,
+            "gemini": 28,
+            "gpt": 14,
+            "grok": 7
+          },
+          "cash_available_decomposition": {
+            "note": "Descriptive decomposition only, not a classification split. 'Cash available' means the book's cash after the batch's earlier reservations was at least one share's price.",
+            "cash_available": 128,
+            "cash_below_one_share": 12,
+            "per_book": {
+              "claude": {
+                "cash_available": 40,
+                "cash_below_one_share": 0
+              },
+              "claude_opus": {
+                "cash_available": 51,
+                "cash_below_one_share": 0
+              },
+              "gemini": {
+                "cash_available": 23,
+                "cash_below_one_share": 5
+              },
+              "gpt": {
+                "cash_available": 11,
+                "cash_below_one_share": 3
+              },
+              "grok": {
+                "cash_available": 3,
+                "cash_below_one_share": 4
+              }
+            }
+          },
+          "reconstruction": "Exact, not approximate: day one had no SELL, SHORT or COVER. Every filled BUY's recomputed quantity equals the venue's requested_qty (24 of 24); every skip satisfies capped delta < price (140 of 140). scripts/executor_defect_disclosure.py rebuilds it from the logs; --check verifies the committed files byte for byte."
+        },
+        "intended_vs_expressed": {
+          "role": "The spine of this entry (ruling 4.1). Per book, session 2026-11-06.",
+          "units": "cycle1_* are percent of the $2,000 inception NAV in the first cycle (20261106T143249Z): sum of BUY target weights vs filled notional. Session columns are repeat-counting by construction: a decision re-issued in later cycles intends again, so suppressed_intended_usd is a rate of suppression, never a dollar shortfall in the book.",
+          "suppressed_intended_usd_basis": "Exact pre-cap delta (target minus current holding) at each skip, from the reconstruction.",
+          "standing_descriptor_basis": "src/analytics/intended_vs_expressed.session_row, the registered descriptor (ruling 5.4). Friday predates intended_notional, so it falls back to target weight x NAV (intended_source) and differs from the exact column by cents.",
+          "per_book": {
+            "claude": {
+              "cycle1_intended_deployment_pct": 50.0,
+              "cycle1_expressed_deployment_pct": 0.0,
+              "orders_intended": 44,
+              "orders_expressed": 4,
+              "orders_suppressed": 40,
+              "suppressed_intended_usd": 7208.09,
+              "expressed_usd": 800.49,
+              "eod_cash_usd": 1199.51,
+              "eod_cash_pct": 59.96,
+              "standing_descriptor": {
+                "intended_usd": 8008.3,
+                "expressed_usd": 800.49,
+                "gap_usd": 7207.81,
+                "expressed_pct_of_intended": 0.1,
+                "intended_source": "target_weight_x_nav"
+              }
+            },
+            "claude_opus": {
+              "cycle1_intended_deployment_pct": 50.0,
+              "cycle1_expressed_deployment_pct": 19.03,
+              "orders_intended": 54,
+              "orders_expressed": 3,
+              "orders_suppressed": 51,
+              "suppressed_intended_usd": 6597.39,
+              "expressed_usd": 380.55,
+              "eod_cash_usd": 1619.45,
+              "eod_cash_pct": 80.77,
+              "standing_descriptor": {
+                "intended_usd": 6977.11,
+                "expressed_usd": 380.55,
+                "gap_usd": 6596.56,
+                "expressed_pct_of_intended": 0.0545,
+                "intended_source": "target_weight_x_nav"
+              }
+            },
+            "gemini": {
+              "cycle1_intended_deployment_pct": 90.0,
+              "cycle1_expressed_deployment_pct": 55.22,
+              "orders_intended": 32,
+              "orders_expressed": 4,
+              "orders_suppressed": 28,
+              "suppressed_intended_usd": 6440.51,
+              "expressed_usd": 1306.65,
+              "eod_cash_usd": 693.35,
+              "eod_cash_pct": 34.46,
+              "standing_descriptor": {
+                "intended_usd": 7738.24,
+                "expressed_usd": 1306.65,
+                "gap_usd": 6431.59,
+                "expressed_pct_of_intended": 0.1689,
+                "intended_source": "target_weight_x_nav"
+              }
+            },
+            "gpt": {
+              "cycle1_intended_deployment_pct": 35.0,
+              "cycle1_expressed_deployment_pct": 20.03,
+              "orders_intended": 20,
+              "orders_expressed": 6,
+              "orders_suppressed": 14,
+              "suppressed_intended_usd": 2768.05,
+              "expressed_usd": 1202.99,
+              "eod_cash_usd": 797.01,
+              "eod_cash_pct": 39.77,
+              "standing_descriptor": {
+                "intended_usd": 3970.42,
+                "expressed_usd": 1202.99,
+                "gap_usd": 2767.43,
+                "expressed_pct_of_intended": 0.303,
+                "intended_source": "target_weight_x_nav"
+              }
+            },
+            "grok": {
+              "cycle1_intended_deployment_pct": 60.0,
+              "cycle1_expressed_deployment_pct": 30.04,
+              "orders_intended": 14,
+              "orders_expressed": 7,
+              "orders_suppressed": 7,
+              "suppressed_intended_usd": 1837.62,
+              "expressed_usd": 1990.4,
+              "eod_cash_usd": 9.6,
+              "eod_cash_pct": 0.48,
+              "standing_descriptor": {
+                "intended_usd": 3825.62,
+                "expressed_usd": 1990.4,
+                "gap_usd": 1835.21,
+                "expressed_pct_of_intended": 0.5203,
+                "intended_source": "target_weight_x_nav"
+              }
+            }
+          }
+        },
+        "g_exec": {
+          "file": {
+            "path": "data/annotations/g_exec_recompute_2026-11-06.json",
+            "sha256": "fa8abc186e9cf670bae18e91600fea54364e7e64723b0e2bfb128ce3b3bf0352"
+          },
+          "unit": "cycle, per the registered Gate 4 predicate; threshold 0.80",
+          "per_book": {
+            "claude": {
+              "original": 1.0,
+              "recomputed": 0.0,
+              "successful_cycles": "0/13",
+              "session_classification": "decision-estimable (execution-impaired)"
+            },
+            "claude_opus": {
+              "original": 1.0,
+              "recomputed": 0.0,
+              "successful_cycles": "0/13",
+              "session_classification": "decision-estimable (execution-impaired)"
+            },
+            "gemini": {
+              "original": 1.0,
+              "recomputed": 0.0,
+              "successful_cycles": "0/13",
+              "session_classification": "decision-estimable (execution-impaired)"
+            },
+            "gpt": {
+              "original": 1.0,
+              "recomputed": 0.230769,
+              "successful_cycles": "3/13",
+              "session_classification": "decision-estimable (execution-impaired)"
+            },
+            "grok": {
+              "original": 1.0,
+              "recomputed": 0.538462,
+              "successful_cycles": "7/13",
+              "session_classification": "decision-estimable (execution-impaired)"
+            }
+          },
+          "original_reading": "1.0 on every book, as recorded: the 98f36b8b9 scorer, which read the untagged skips as no_order.",
+          "correlation_disclosure": "One defect event, correlated across five books by construction: the same executor code path deleted the orders on every book. These are not five independent execution failures."
+        },
+        "annotation": {
+          "file": {
+            "path": "data/annotations/executor_defect_2026-11-06.jsonl",
+            "sha256": "6a3372f6d82e42d72be78b904c67e156d9056932ade8d5f134a94606cc6063c2"
+          },
+          "records": 140,
+          "label": "EXECUTOR_DEFECT_SUPPRESSED on all 140",
+          "counterfactual": "The 12 cash-below-one-share records also carry: 'a correct executor would have produced a cash-capped order and a tagged constraint event', as disclosure only.",
+          "key": "Composite book|cycle_id|execution_index|ticker on all 140, stated in each record's key_type. No 2026-11-06 execution carries a decision id; the stamp landed in 159e907e4, after the session.",
+          "decision_logs_untouched": {
+            "note": "Disclosed, never rewritten. Friday's decision logs are not edited; their blobs at bbee5da1f:",
+            "blobs": {
+              "data/trades/claude_2026-11.jsonl": "1a2b5d32615c1f8d6ad500397ffbecb5a63b58c7",
+              "data/trades/claude_opus_2026-11.jsonl": "71d1c2a9a4177e08503d63d0b452b01193eef27b",
+              "data/trades/gemini_2026-11.jsonl": "5d36e6158be595d1e5e54668418b1eff7cced662",
+              "data/trades/gpt_2026-11.jsonl": "4fb4a853e0fc8b80eb8520820cde4be07dc49b55",
+              "data/trades/grok_2026-11.jsonl": "11126470d70c5706bd7e1c4f584cad52abcab7f8"
+            }
+          }
+        },
+        "validation_window": "Friday stays in the window (ruling section 2): 16 live-path sessions, 15 on the corrected executor (2026-11-09..2026-11-30; 11-26 closed; 11-27 a half-session that counts). The >=15 floor is met on either reading; on the corrected-executor count the margin is zero, so any further executor-class mid-window fix enters S1's conditional branch.",
+        "carry_forward": {
+          "ruling": "Monday's books open on states reached under the defect. That is their disclosed starting point, the initial condition of the corrected-executor segment: no re-inception, no restatement (ruling 4.3).",
+          "starting_states": {
+            "as_of": "2026-11-06 end of day, EOD tick 98f36b8b9; unchanged at bbee5da1f",
+            "blobs": {
+              "data/state/claude.json": "811db4b958ceababb2a55a19f9374588c58a5405",
+              "data/state/claude_opus.json": "b5d8eecff7e94e3635c4f7a13b24b3412a1581f8",
+              "data/state/gemini.json": "aae9b035d79bafcf9714df956747ae15131e67ab",
+              "data/state/gpt.json": "4abc1bc2ba20a6a4fb628e0950639f7390805cd7",
+              "data/state/grok.json": "a54135c5407fe50027627fe2f5ed56c92808ab9d"
+            }
+          }
+        },
+        "surface_flag": {
+          "ruling": "4.4: any rendering of 2026-11-06 cohort cash carries the flag.",
+          "text": "figures dominated by orders suppressed by an executor defect; see ledger",
+          "single_source": "src/reports/cash_defect_flag.py (cohort books, 2026-11-06 only)",
+          "flagged": [
+            "src/reports/daily_report.py: performance-table Cash % cell, footnote, METADATA cash_flag, and the breakdown's positioning sentence (the 'heavy defensive cash positioning' note is not emitted for a flagged book)",
+            "reports/daily/2026-11-06.md: the committed day-one report, patched to the renderer's output",
+            "src/dashboard/build_data.py -> data/dashboard.json: cash_defect_flag on leaderboard rows (dated by the last EOD row) and portfolio snapshots (dated by the state file); the leaderboard snapshot data/leaderboard/<date>.json inherits it from the same rows",
+            "dashboard/js/app.js: leaderboard Cash %, portfolio card CASH, head-to-head CASH %",
+            "src/alerts/events.py: the macro-event alert's total cash across models",
+            "scripts/build_monthly_data_layer.py: profiles cash_pct_mean_daily and RQ5's accumulating cash_pct, plus a top-level cash_defect_flags block; month-gated, so every month before November is byte-unchanged",
+            "scripts/behavioral_summary.py: Avg/Min/Max cash % over a window that includes the day"
+          ],
+          "not_flagged": {
+            "src/prompt_builder.py": "Model-facing. The cash the models saw was truly there (ruling 4.3) and the prompt is frozen under the v4 hash check.",
+            "data/dashboard.json as committed at 98f36b8b9": "Built before the flag existed and not deployed (publish pause on). The next build regenerates it.",
+            "data/leaderboard/2026-11-06.json": "Archival data, not a rendering; its only reader takes rank arrows, not cash. Not rewritten.",
+            "src/alerts/events.py state_cash alarm": "Fires only on negative cash; an integrity alarm, not a cash level."
+          },
+          "test": "tests/test_cash_defect_flag.py"
+        }
+      },
+      {
+        "id": "phase_a_executor_floor_exposure",
+        "date": "2026-11-07",
+        "type": "phase_a_exposure_disclosure",
+        "scope": "Every one-share-floor hit in the paper era: decision records dated before 2026-11-06 with execution_mode paper, all six books, via the simulator path (executor.py:882 at 98f36b8b9).",
+        "authority": {
+          "path": "docs/registrations/executor_sizing_floor_ruling.md",
+          "sha256": "34eb21268de60a6d7eba2f7eda142bf9120e226c024db886b7f24f2f6da5024c",
+          "section": "header: 'The Phase A exposure is disclosed in the fix's ledger entry (Push 2)'"
+        },
+        "hits": 1084,
+        "split": {
+          "target_below_one_share": 26,
+          "cash_limited": 1058,
+          "definition": "target_below_one_share: the position target itself (target_weight x NAV) was under one share's price. cash_limited: every other hit, where the target exceeded one share and the BUY was cut below one share by the book's deployable cash or by a sub-share top-up.",
+          "cash_limited_decomposition": {
+            "full_delta_cash_below_price": 966,
+            "subshare_topup_cash_below_price": 60,
+            "subshare_topup_cash_at_or_above_price": 32,
+            "note": "Descriptive. 'Cash-limited' is exact for the first two counts. The third, a sub-share top-up while the book had at least one share of cash, was floored by the add's size, not by cash; the ruling's label covers it only loosely. Under the replay's NAV approximation (post-cycle total_value) the sub-share top-up counts move by at most 2 at a 0.1%-of-NAV error; the 26/1,058 split does not move."
+          }
+        },
+        "first_hit": "2026-04-08",
+        "last_hit": "2026-10-29",
+        "per_book": {
+          "claude": {
+            "hits": 390,
+            "target_below_one_share": 11,
+            "cash_limited": 379,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 356,
+              "subshare_topup_cash_below_price": 21,
+              "subshare_topup_cash_at_or_above_price": 2
+            },
+            "first_date": "2026-04-13",
+            "last_date": "2026-10-19",
+            "hits_a_1usd_floor_would_have_sent": 22,
+            "suppressed_notional_usd": 6213.79,
+            "largest_single_usd": 1146.13,
+            "hits_under_1usd_deployable": 368
+          },
+          "claude_opus": {
+            "hits": 23,
+            "target_below_one_share": 0,
+            "cash_limited": 23,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 21,
+              "subshare_topup_cash_below_price": 0,
+              "subshare_topup_cash_at_or_above_price": 2
+            },
+            "first_date": "2026-04-22",
+            "last_date": "2026-08-28",
+            "hits_a_1usd_floor_would_have_sent": 4,
+            "suppressed_notional_usd": 2604.01,
+            "largest_single_usd": 936.81,
+            "hits_under_1usd_deployable": 19
+          },
+          "deepseek": {
+            "hits": 46,
+            "target_below_one_share": 3,
+            "cash_limited": 43,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 32,
+              "subshare_topup_cash_below_price": 1,
+              "subshare_topup_cash_at_or_above_price": 10
+            },
+            "first_date": "2026-04-08",
+            "last_date": "2026-10-29",
+            "hits_a_1usd_floor_would_have_sent": 26,
+            "suppressed_notional_usd": 10134.44,
+            "largest_single_usd": 1309.95,
+            "hits_under_1usd_deployable": 20
+          },
+          "gemini": {
+            "hits": 31,
+            "target_below_one_share": 10,
+            "cash_limited": 21,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 10,
+              "subshare_topup_cash_below_price": 0,
+              "subshare_topup_cash_at_or_above_price": 11
+            },
+            "first_date": "2026-04-10",
+            "last_date": "2026-10-19",
+            "hits_a_1usd_floor_would_have_sent": 23,
+            "suppressed_notional_usd": 4333.31,
+            "largest_single_usd": 926.97,
+            "hits_under_1usd_deployable": 8
+          },
+          "gpt": {
+            "hits": 300,
+            "target_below_one_share": 0,
+            "cash_limited": 300,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 285,
+              "subshare_topup_cash_below_price": 11,
+              "subshare_topup_cash_at_or_above_price": 4
+            },
+            "first_date": "2026-04-08",
+            "last_date": "2026-10-21",
+            "hits_a_1usd_floor_would_have_sent": 48,
+            "suppressed_notional_usd": 14409.18,
+            "largest_single_usd": 1059.64,
+            "hits_under_1usd_deployable": 252
+          },
+          "grok": {
+            "hits": 294,
+            "target_below_one_share": 2,
+            "cash_limited": 292,
+            "cash_limited_decomposition": {
+              "full_delta_cash_below_price": 262,
+              "subshare_topup_cash_below_price": 27,
+              "subshare_topup_cash_at_or_above_price": 3
+            },
+            "first_date": "2026-04-10",
+            "last_date": "2026-10-19",
+            "hits_a_1usd_floor_would_have_sent": 59,
+            "suppressed_notional_usd": 13072.17,
+            "largest_single_usd": 1095.23,
+            "hits_under_1usd_deployable": 235
+          }
+        },
+        "suppressed_notional": {
+          "total_usd": 50766.9,
+          "definition": "Descriptive, repeat-counting: per hit, min(uncapped delta, deployable cash), the dollars a $1-floor executor would have sent, summed over the hits where that is at least $1. The hits below $1 deployable would have been a registered BELOW_VENUE_MINIMUM under the corrected executor too.",
+          "hits_a_1usd_floor_would_have_sent": 182,
+          "hits_under_1usd_deployable": 902,
+          "reading": "Frequent but small in dollars: 902 of 1,084 hits had under $1 deployable, and the largest single hit would have sent $1,309.95 (deepseek, 2026-10-29, about 1.0% of its NAV). At $100k books the floor was cheap; at $2,000 it removed 140 orders in one session."
+        },
+        "parser_silent_drops": {
+          "what": "Before 28db69a03 the adapter parser (src/adapters/base.py) dropped decision entries that were not objects, carried an unknown action, or named no ticker, with no reason logged. They now reach the decision log as MALFORMED_DECISION, UNKNOWN_ACTION and MISSING_TICKER.",
+          "historical_count": "Unmeasurable. The raw model text is persisted only when a call fails to parse (raw_response_on_failure), and raw_decisions is the post-parse list, so a dropped entry left no trace in any paper-era record."
+        },
+        "reproduce": "python scripts/executor_defect_disclosure.py --exposure"
       }
     ]
   }
