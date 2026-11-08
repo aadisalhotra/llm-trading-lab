@@ -385,6 +385,8 @@ Shared-restriction-fate disclosure. Restriction status is account-level: a venue
 
 Fee-attribution rule (registered before first incurrence). Per-book costs are deterministic and order-anchored: order-attached fees (SEC, TAF) attribute via the order's book tag; commissions are zero on this venue; any account-level fee not attached to an order allocates pro-rata by book equity at assessment date. No allocation judgment is applied after costs are observed.
 
+**Amendment 2026-11-07.** Activity-independent account fees (the daily CAT/REG charges) are charged to the reserve ledger; the equity-pro-rata driver is retained for activity-dependent fees not attached to an order; the fee taxonomy is closed at three classes — docs/registrations/account_level_fee_allocation.md.
+
 G-EXEC and reconciliation semantics (single-account form). G-EXEC evaluates per book over the book's tagged orders: submission success, terminal broker-reconciled state, and the book's ledger reconciling within the two-level audit. A venue-wide failure (account-level outage, auth failure) is one event correlated across all six books and is disclosed as such; per-book G-EXEC rates are registered with that correlation stated.
 
 Validation gate. The October validation month must adversarially demonstrate the partition: a test order for one book exceeding that book's settled cash but within account-level cash must block pre-submission; the per-book and aggregate reconciliations must run clean at full six-book load for the month. Partition validation is a branch-gate for Phase B launch on this structure, at equal standing with the G-EXEC induced-failure demonstration.
