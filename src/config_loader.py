@@ -263,7 +263,8 @@ def reconciliation_params(settings: dict[str, Any] | None = None,
                           mode: str | None = None) -> dict[str, float]:
     """Level-2 reconciliation parameters for `mode`.
 
-    Returns `cash_tolerance_usd` and `unallocated_cash_usd`. For `live` the
+    Returns `cash_tolerance_usd`, `position_tolerance_usd` and
+    `unallocated_cash_usd`. For `live` the
     unallocated cash is `reserve_master()` by construction; for `broker_paper`
     it must be set explicitly in `reconciliation.unallocated_cash_usd`, else
     `PendingReconciliationBaselineError`.
@@ -274,6 +275,9 @@ def reconciliation_params(settings: dict[str, Any] | None = None,
     if "cash_tolerance_usd" not in rec:
         raise PendingReconciliationBaselineError(
             "reconciliation.cash_tolerance_usd is not set in config/settings.json")
+    if "position_tolerance_usd" not in rec:
+        raise PendingReconciliationBaselineError(
+            "reconciliation.position_tolerance_usd is not set in config/settings.json")
     if mode == "live":
         unallocated = reserve_master(settings)
     else:
@@ -286,7 +290,23 @@ def reconciliation_params(settings: dict[str, Any] | None = None,
                 f"the difference in config/settings.json.")
         unallocated = float(configured)
     return {"cash_tolerance_usd": float(rec["cash_tolerance_usd"]),
+            "position_tolerance_usd": float(rec["position_tolerance_usd"]),
             "unallocated_cash_usd": float(unallocated)}
+
+
+def book_aggregate_bound_usd(settings: dict[str, Any] | None = None) -> float:
+    """The per-book level-1 aggregate alert bound, in dollars.
+
+    `reconciliation.book_aggregate_bound_pct` of the registered per-book capital.
+    Every book uses this one figure, DeepSeek included, because the bound is tied
+    to the registered capital and not to each book's own size.
+    """
+    settings = settings if settings is not None else load_settings()
+    rec = settings.get("reconciliation", {}) or {}
+    if "book_aggregate_bound_pct" not in rec:
+        raise PendingReconciliationBaselineError(
+            "reconciliation.book_aggregate_bound_pct is not set in config/settings.json")
+    return float(rec["book_aggregate_bound_pct"]) * starting_capital(settings)
 
 
 def load_universe() -> dict[str, Any]:

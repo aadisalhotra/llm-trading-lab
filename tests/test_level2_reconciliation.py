@@ -65,7 +65,7 @@ def book(key, cash, **holdings):
 
 def run(portfolios, broker, unallocated=500.0, tol=TOL):
     return rec.reconcile(portfolios, broker, "cyc1", cash_tolerance_usd=tol,
-                         unallocated_cash_usd=unallocated)
+                         unallocated_cash_usd=unallocated, position_tolerance_usd=1.00)
 
 
 # ------------------------------------------------------------------ reconcile
@@ -92,7 +92,7 @@ def test_cash_within_tolerance_is_clean_beyond_is_event():
 
 def test_position_the_venue_holds_that_no_book_claims():
     r = run([book("a", 1000.0)], FakeBroker(1500.0, [("TSLA", 3.0)]))
-    assert [(e.kind, e.ticker, e.delta) for e in r.events] == [("position", "TSLA", -3.0)]
+    assert [(e.kind, e.ticker, e.delta) for e in r.events] == [("orphan", "TSLA", -3.0)]
 
 
 def test_position_a_book_claims_that_the_venue_lacks():
@@ -110,9 +110,9 @@ def test_short_signs_match_and_signed_shares_net_across_books():
     assert r2.events[0].delta == pytest.approx(-4.0)
 
 
-def test_dust_below_ghost_epsilon_is_not_a_position():
+def test_small_difference_under_the_dollar_bound_is_clean():
     ps = [book("a", 1000.0, AAPL=0.004), book("b", 1000.0, AAPL=0.004)]
-    assert run(ps, FakeBroker(2500.0)).clean   # 0.008 < GHOST_SHARES_EPSILON
+    assert run(ps, FakeBroker(2500.0)).clean   # 0.008 shares x $100 = $0.80
 
 
 def test_share_class_ticker_maps_from_venue_spelling():
@@ -159,7 +159,7 @@ def test_post_cycle_hook_reloads_books_and_uses_config_baseline(tmp_path, monkey
     monkeypatch.setattr(rec, "RECONCILIATION_DIR", tmp_path)
     monkeypatch.setattr(config_loader, "load_settings", lambda: {
         "mode": "live", "capital_structure": {"reserve_master_usd": 500},
-        "reconciliation": {"cash_tolerance_usd": 1.0}})
+        "reconciliation": {"cash_tolerance_usd": 1.0, "position_tolerance_usd": 1.0}})
     r = rec.run_post_cycle_reconciliation(FakeBroker(2500.0), "cyc9", ["a", "b"])
     assert r.clean and r.unallocated_cash == 500.0
     assert (tmp_path / f"{r.timestamp[:7]}.jsonl").exists()
@@ -168,7 +168,8 @@ def test_post_cycle_hook_reloads_books_and_uses_config_baseline(tmp_path, monkey
 # ------------------------------------------------------------ config baseline
 def test_broker_paper_baseline_unset_raises_rather_than_guessing():
     s = {"mode": "broker_paper", "reconciliation": {
-        "cash_tolerance_usd": 1.0, "unallocated_cash_usd": {"broker_paper": None}}}
+        "cash_tolerance_usd": 1.0, "position_tolerance_usd": 1.0,
+        "unallocated_cash_usd": {"broker_paper": None}}}
     with pytest.raises(config_loader.PendingReconciliationBaselineError):
         config_loader.reconciliation_params(s)
     s["reconciliation"]["unallocated_cash_usd"]["broker_paper"] = 90000
@@ -177,14 +178,15 @@ def test_broker_paper_baseline_unset_raises_rather_than_guessing():
 
 def test_live_baseline_is_derived_from_the_reserve_not_configurable():
     s = {"mode": "live", "capital_structure": {"reserve_master_usd": 500},
-         "reconciliation": {"cash_tolerance_usd": 1.0,
+         "reconciliation": {"cash_tolerance_usd": 1.0, "position_tolerance_usd": 1.0,
                             "unallocated_cash_usd": {"live": 12345}}}
     assert config_loader.reconciliation_params(s)["unallocated_cash_usd"] == 500.0
 
 
 def test_shipped_settings_resolve_for_live():
     p = config_loader.reconciliation_params(config_loader.load_settings(), "live")
-    assert p == {"cash_tolerance_usd": 1.0, "unallocated_cash_usd": 500.0}
+    assert p == {"cash_tolerance_usd": 1.0, "position_tolerance_usd": 1.0,
+                 "unallocated_cash_usd": 500.0}
 
 
 def test_shipped_broker_paper_baseline_resolves_and_is_dated():
@@ -314,7 +316,7 @@ def test_record_names_each_term_and_sums_them_explicitly():
     broker = FakeBroker(1000.0 + 1500.0 + 500.0 - 1.25,
                         [("AAPL", 3.0), ("MSFT", -3.0), ("F", 7.0)])
     r = rec.reconcile(ps, broker, "cyc1", cash_tolerance_usd=TOL, unallocated_cash_usd=500.0,
-                      probe_cash_usd=-1.25, probe_positions={"F": 7.0})
+                      position_tolerance_usd=1.0, probe_cash_usd=-1.25, probe_positions={"F": 7.0})
     assert r.clean, [e.to_dict() for e in r.events]
     d = r.to_dict()
     assert d["book_cash"] == 2500.0                      # the books alone
@@ -332,7 +334,8 @@ def test_record_names_each_term_and_sums_them_explicitly():
 
 def test_cash_event_carries_the_expected_side():
     r = rec.reconcile([book("a", 1000.0)], FakeBroker(1400.0), "cyc1", cash_tolerance_usd=TOL,
-                      unallocated_cash_usd=500.0, probe_cash_usd=-0.5)
+                      unallocated_cash_usd=500.0, position_tolerance_usd=1.0,
+                      probe_cash_usd=-0.5)
     (e,) = r.events
     assert e.to_dict()["expected_value"] == 1499.5 and "ledger_value" not in e.to_dict()
     assert e.delta == 1499.5 - 1400.0

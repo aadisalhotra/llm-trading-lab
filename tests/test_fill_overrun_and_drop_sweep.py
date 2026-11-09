@@ -187,7 +187,8 @@ def test_next_cycle_reconciliation_stays_clean():
         def get_positions(self):
             return [{"symbol": t, "qty": str(h.shares)} for t, h in book.holdings.items()]
 
-    result = reconcile([book], Venue(), "c2", cash_tolerance_usd=1.0, unallocated_cash_usd=0.0)
+    result = reconcile([book], Venue(), "c2", cash_tolerance_usd=1.0, unallocated_cash_usd=0.0,
+                       position_tolerance_usd=1.0)
     assert result.clean, result.events
 
 

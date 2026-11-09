@@ -35,7 +35,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..config_loader import RECONCILIATION_DIR
+from ..config_loader import RECONCILIATION_DIR, TRADES_DIR
+from ..portfolio.audit import book_fill_differences
 from ..portfolio.portfolio import Portfolio, save_portfolio
 from .broker import BrokerClient, from_venue_symbol
 
@@ -66,10 +67,12 @@ logger = logging.getLogger("llmlab.execution.reconciliation")
 #   expected_cash      = book_cash + unallocated_cash + probe_cash
 #   expected_positions = book_positions + probe_positions   (per ticker, dusted)
 
-# Position tolerance reuses the ledger's own dust threshold rather than
-# inventing a second one -- level 1 and level 2 agree on what "no position"
-# means.
-POSITION_TOLERANCE_SHARES = Portfolio.GHOST_SHARES_EPSILON
+# Level 1 and level 2 agree on what "no position" means:
+# Portfolio.no_position_shares(), venue precision. Whether two non-zero
+# quantities diverge is a dollar question, judged per name at the current mark
+# (config reconciliation.position_tolerance_usd), because a fixed share count
+# means $0.29 on PFE and $13.93 on LLY.
+LEVEL1_BASELINE_FILE = "level1_baselines.json"
 
 
 @dataclass
@@ -81,12 +84,17 @@ class GBookEvent:
     expected_value: float = 0.0
     broker_value: float = 0.0
     delta: float = 0.0          # expected_value - broker_value
-    tolerance: float = 0.0
+    tolerance: float = 0.0      # dollars, for every kind
+    # Position and orphan events only. None means no mark could be found, and
+    # an unpriced difference is always an event.
+    mark: float | None = None
+    delta_usd: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"kind": self.kind, "ticker": self.ticker,
                "expected_value": self.expected_value, "broker_value": self.broker_value,
-               "delta": self.delta, "tolerance": self.tolerance}
+               "delta": self.delta, "tolerance": self.tolerance,
+               "mark": self.mark, "delta_usd": self.delta_usd}
 
 
 @dataclass
@@ -111,6 +119,12 @@ class ReconciliationResult:
     # Probe positions its committed records account for (hub ruling
     # 2026-11-02 ②: attributable, not exempt).
     probe_positions: dict[str, float] = field(default_factory=dict)
+    # Broker positions no book and no probe record owns. Empty is expected.
+    # ticker -> {shares, mark, usd}.
+    orphan_positions: dict[str, dict[str, float | None]] = field(default_factory=dict)
+    # Level 1: book -> summed dollar difference between its holdings and its own
+    # fills. Compared at book level because the broker side is one account.
+    book_fill_aggregate_usd: dict[str, float] | None = None
 
     @property
     def expected_cash(self) -> float:
@@ -140,20 +154,34 @@ class ReconciliationResult:
             "book_positions": self.book_positions, "probe_positions": self.probe_positions,
             "expected_positions": self.expected_positions,
             "broker_positions": self.broker_positions,
+            "orphan_positions": self.orphan_positions,
+            "book_fill_aggregate_usd": self.book_fill_aggregate_usd,
             "events": [e.to_dict() for e in self.events],
         }
 
 
 def _dust(positions: dict[str, float]) -> dict[str, float]:
-    """Drop |qty| below the ledger's dust threshold, as
+    """Drop |qty| at or below venue precision, as
     Portfolio.sweep_ghost_positions does at the book level, so summing several
     books' fractional shares doesn't fail on float noise around a flat position."""
-    return {t: q for t, q in positions.items() if abs(q) >= POSITION_TOLERANCE_SHARES}
+    limit = Portfolio.no_position_shares()
+    return {t: q for t, q in positions.items() if abs(q) > limit}
+
+
+def _broker_mark(position: dict[str, Any]) -> float | None:
+    """The venue's current price for one of its positions, or None."""
+    price = float(position.get("current_price") or 0.0)
+    if price > 0:
+        return price
+    qty = float(position.get("qty") or 0.0)
+    value = float(position.get("market_value") or 0.0)
+    return abs(value / qty) if qty and value else None
 
 
 def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
              cycle_id: str, *, cash_tolerance_usd: float,
              unallocated_cash_usd: float,
+             position_tolerance_usd: float,
              probe_cash_usd: float = 0.0,
              probe_positions: dict[str, float] | None = None,
              ) -> ReconciliationResult:
@@ -178,8 +206,14 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
     pinned by tests/test_barrier_probe.py), so no ticker carries both terms
     and this cannot change an outcome; it is what makes the recorded terms
     sum exactly to expected_positions.
+
+    A position difference is an event at `position_tolerance_usd` or more, per
+    name, at the venue's current price (a book's average cost when the venue
+    holds none of the name). A broker position nothing owns goes on the orphan
+    line: an event at the same dollar bound, a warning below it.
     """
     book_positions: dict[str, float] = {}
+    book_marks: dict[str, float] = {}
     for p in portfolios:
         for ticker, h in p.holdings.items():
             # Constant-price-mark convention reused from level 1: a
@@ -187,15 +221,20 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
             # signed share counts across books, not valuing them, is what
             # makes this comparable to the venue's own signed qty.
             book_positions[ticker] = book_positions.get(ticker, 0.0) + h.shares
+            book_marks.setdefault(ticker, h.avg_cost)
 
     account = broker.get_account()
     broker_positions: dict[str, float] = {}
+    broker_marks: dict[str, float] = {}
     for bp in broker.get_positions():
         ticker = from_venue_symbol(str(bp.get("symbol") or ""))
         # Alpaca reports a short position's qty already negative on a margin
         # account (verified 2026-08-29 spike) -- no separate side lookup
         # needed against this venue.
         broker_positions[ticker] = float(bp.get("qty") or 0.0)
+        mark = _broker_mark(bp)
+        if mark is not None:
+            broker_marks[ticker] = mark
 
     result = ReconciliationResult(
         cycle_id=cycle_id, timestamp=datetime.now(timezone.utc).isoformat(),
@@ -217,15 +256,90 @@ def reconcile(portfolios: list[Portfolio], broker: BrokerClient,
                                         tolerance=cash_tolerance_usd))
 
     expected_positions = result.expected_positions
+    no_position = Portfolio.no_position_shares()
     for ticker in sorted(set(expected_positions) | set(broker_positions)):
         ev = expected_positions.get(ticker, 0.0)
         bv = broker_positions.get(ticker, 0.0)
         delta = ev - bv
-        if abs(delta) > POSITION_TOLERANCE_SHARES:
-            result.events.append(GBookEvent(kind="position", ticker=ticker,
-                                            expected_value=ev, broker_value=bv, delta=delta,
-                                            tolerance=POSITION_TOLERANCE_SHARES))
+        if abs(delta) <= no_position:
+            continue
+        mark = broker_marks.get(ticker) or book_marks.get(ticker)
+        delta_usd = abs(delta) * mark if mark else None
+        orphan = ticker not in expected_positions
+        if orphan:
+            result.orphan_positions[ticker] = {"shares": bv, "mark": mark, "usd": delta_usd}
+        # The small allowance keeps a difference of exactly the bound from
+        # falling under it on float noise.
+        if delta_usd is None or delta_usd >= position_tolerance_usd - 1e-9:
+            result.events.append(GBookEvent(
+                kind="orphan" if orphan else "position", ticker=ticker,
+                expected_value=ev, broker_value=bv, delta=delta,
+                tolerance=position_tolerance_usd, mark=mark, delta_usd=delta_usd))
     return result
+
+
+def _book_fills(book: str, since_date: str, exclusive: bool,
+                trades_dir: Path) -> list[tuple[str, float, float]]:
+    """(ticker, signed shares, price) for each of a book's executed fills."""
+    fills: list[tuple[str, float, float]] = []
+    for path in sorted(trades_dir.glob(f"{book}_20*.jsonl")):
+        with open(path, encoding="utf-8") as f:
+            for n, line in enumerate(f, 1):
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    # A torn line must not silently shrink the fill history.
+                    raise ValueError(f"{path.name}:{n} is not valid JSON: {exc}") from exc
+                date = rec.get("date", "")
+                if date < since_date or (exclusive and date == since_date):
+                    continue
+                for e in rec.get("executions") or []:
+                    if not e.get("executed"):
+                        continue
+                    sign = {"BUY": 1.0, "COVER": 1.0, "SELL": -1.0, "SHORT": -1.0}.get(e.get("side"))
+                    if sign is not None:
+                        fills.append((e["ticker"], sign * float(e["shares"]),
+                                      float(e["fill_price"])))
+    return fills
+
+
+def book_fill_aggregates(portfolios: list[Portfolio],
+                         broker_marks: dict[str, float],
+                         trades_dir: Path | None = None,
+                         baseline_path: Path | None = None) -> dict[str, float]:
+    """Level 1: for each book, the summed dollar difference between its holdings
+    and what its own fills say it should hold.
+
+    A book with a baseline entry starts from those positions and counts fills
+    after `as_of_date`. That exists for DeepSeek, whose paper-era book does not
+    equal the sum of its logged fills (launch-window positions and the old
+    0.01-share deletions), so its history would alert on the first cycle.
+    """
+    trades_dir = trades_dir or TRADES_DIR
+    baseline_path = baseline_path or (RECONCILIATION_DIR / LEVEL1_BASELINE_FILE)
+    baselines: dict[str, Any] = {}
+    if baseline_path.exists():
+        with open(baseline_path, encoding="utf-8") as f:
+            baselines = json.load(f)
+    out: dict[str, float] = {}
+    for p in portfolios:
+        entry = baselines.get(p.model_key)
+        since = entry["as_of_date"] if entry else p.inception_date
+        fills = _book_fills(p.model_key, since, bool(entry), trades_dir)
+        holdings = {t: h.shares for t, h in p.holdings.items()}
+        diffs = book_fill_differences(holdings, fills,
+                                      (entry or {}).get("positions"))
+        last_fill = {t: px for t, _, px in fills}
+        total = 0.0
+        for ticker, diff in diffs.items():
+            held = p.holdings.get(ticker)
+            mark = (broker_marks.get(ticker) or last_fill.get(ticker)
+                    or (held.avg_cost if held else 0.0))
+            total += abs(diff) * mark
+        out[p.model_key] = total
+    return out
 
 
 def record_reconciliation(result: ReconciliationResult,
@@ -252,19 +366,38 @@ def handle_reconciliation_result(result: ReconciliationResult,
     to disagree with the venue is the risk this exists to remove), and save.
     Never adjusts a book's own cash or holdings to match the broker.
 
+    An orphan under the position tolerance is a warning and halts nothing.
+
     `send_alert_fn` is injectable for tests; defaults to the real alerter.
     """
-    if result.clean:
+    event_tickers = {e.ticker for e in result.events if e.kind == "orphan"}
+    small_orphans = {t: o for t, o in result.orphan_positions.items()
+                     if t not in event_tickers}
+    if result.clean and not small_orphans:
         return
     if send_alert_fn is None:
         from ..alerts.alerter import send_alert as send_alert_fn
+    for ticker, orphan in small_orphans.items():
+        logger.warning("Orphan broker position in cycle %s: %s %s", result.cycle_id,
+                       ticker, orphan)
+        send_alert_fn(
+            "WARN", f"Orphan broker position: {ticker}",
+            f"Cycle {result.cycle_id}: the broker holds {orphan['shares']:g} {ticker} "
+            f"(${orphan['usd']:.2f}) that no book owns.",
+            {"cycle_id": result.cycle_id, "ticker": ticker},
+            kind="orphan_position", dedup_key=f"orphan_position:{ticker}",
+        )
+    if result.clean:
+        return
     logger.critical("G-BOOK: reconciliation diverged for cycle %s: %s",
                     result.cycle_id, [e.to_dict() for e in result.events])
     send_alert_fn(
         "CRITICAL", f"G-BOOK reconciliation divergence — {len(result.events)} event(s)",
         f"Cycle {result.cycle_id}: " + "; ".join(
             f"{e.kind}{(' ' + e.ticker) if e.ticker else ''} expected={e.expected_value:.4f} "
-            f"broker={e.broker_value:.4f} delta={e.delta:.4f} (tolerance {e.tolerance:.4f})"
+            f"broker={e.broker_value:.4f} delta={e.delta:.4f}"
+            f"{f' (${e.delta_usd:.2f})' if e.delta_usd is not None else ''} "
+            f"(tolerance ${e.tolerance:.2f})"
             for e in result.events),
         {"cycle_id": result.cycle_id, "books": result.books},
         kind="gbook_divergence", dedup_key=f"gbook_divergence:{result.cycle_id}",
@@ -273,6 +406,42 @@ def handle_reconciliation_result(result: ReconciliationResult,
         if not p.halted:
             p.halted = True
             save_portfolio(p)
+
+
+def _check_book_fill_aggregates(result: ReconciliationResult, settings: dict[str, Any],
+                                broker: BrokerClient, send_alert_fn=None) -> None:
+    """Compute and alert on the per-book level-1 aggregate, for every enabled
+    book including paper-only ones. Alerts and records; halts nothing. A failure
+    here must not cost the cycle its reconciliation record, so it alerts instead
+    of raising."""
+    from ..alerts.events import _enabled_model_keys
+    from ..config_loader import book_aggregate_bound_usd
+    from ..portfolio.portfolio import load_portfolio
+    if send_alert_fn is None:
+        from ..alerts.alerter import send_alert as send_alert_fn
+    try:
+        bound = book_aggregate_bound_usd(settings)
+        marks = {from_venue_symbol(str(bp.get("symbol") or "")): _broker_mark(bp)
+                 for bp in broker.get_positions()}
+        portfolios = [load_portfolio(k) for k in _enabled_model_keys(settings)]
+        aggregates = book_fill_aggregates(portfolios, {t: m for t, m in marks.items() if m})
+    except Exception as exc:
+        logger.exception("Per-book fill aggregate failed for cycle %s", result.cycle_id)
+        send_alert_fn("CRITICAL", "Per-book fill aggregate could not run", str(exc),
+                      {"cycle_id": result.cycle_id}, kind="book_fill_aggregate_error",
+                      dedup_key=f"book_fill_aggregate_error:{result.cycle_id}")
+        return
+    result.book_fill_aggregate_usd = aggregates
+    for book, usd in aggregates.items():
+        if usd >= bound:
+            send_alert_fn(
+                "CRITICAL", f"Book differs from its own fills: {book}",
+                f"Cycle {result.cycle_id}: {book}'s holdings differ from its fills by "
+                f"${usd:.2f} in aggregate (bound ${bound:.2f}).",
+                {"cycle_id": result.cycle_id, "model": book},
+                kind="book_fill_aggregate",
+                dedup_key=f"book_fill_aggregate:{book}:{result.cycle_id}",
+            )
 
 
 def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
@@ -294,6 +463,7 @@ def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
     result = reconcile(portfolios, broker, cycle_id, **params,
                        probe_cash_usd=administrative_cash_usd(mode),
                        probe_positions=administrative_positions(mode))
+    _check_book_fill_aggregates(result, settings, broker)
     record_reconciliation(result)
     handle_reconciliation_result(result, portfolios)
     return result

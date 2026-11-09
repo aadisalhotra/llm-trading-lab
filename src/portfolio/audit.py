@@ -21,7 +21,7 @@ re-implementation) and reports any step whose equity jumped at constant price.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable
 
 from .portfolio import Portfolio
 
@@ -143,6 +143,30 @@ def audit_trade_sequence(
     report.final_cash = p.cash
     report.final_equity = p.total_value(last_prices)
     return report
+
+
+def book_fill_differences(
+    holdings: dict[str, float],
+    fills: Iterable[tuple[str, float, float]],
+    baseline: dict[str, float] | None = None,
+) -> dict[str, float]:
+    """Per ticker, (baseline + signed fills) minus what the book holds.
+
+    `fills` are (ticker, signed shares, price). Only differences above venue
+    precision are returned, so float noise from summing fractional fills drops
+    out. This is the one comparison a book can make against itself without the
+    broker, whose positions are a single account across books.
+    """
+    expected: dict[str, float] = dict(baseline or {})
+    for ticker, shares, _price in fills:
+        expected[ticker] = expected.get(ticker, 0.0) + shares
+    limit = Portfolio.no_position_shares()
+    out: dict[str, float] = {}
+    for ticker in set(expected) | set(holdings):
+        diff = expected.get(ticker, 0.0) - holdings.get(ticker, 0.0)
+        if abs(diff) > limit:
+            out[ticker] = diff
+    return out
 
 
 def _ticker_mv(p: Portfolio, ticker: str, price: float) -> float:
