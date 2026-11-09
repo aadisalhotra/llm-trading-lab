@@ -301,14 +301,24 @@ class Portfolio:
         cost = shares * price
         h.shares += shares  # toward zero
         self.cash -= cost
-        if abs(h.shares) < self.GHOST_SHARES_EPSILON:
+        if abs(h.shares) <= self.no_position_shares():
             del self.holdings[ticker]
         return cost
 
-    # Ghost-position threshold: any residual smaller than this gets swept
-    # off the books after a sell. Catches dust like 0.0001 shares left
-    # behind by float rounding in fractional executions.
-    GHOST_SHARES_EPSILON = 0.01
+    @staticmethod
+    def no_position_shares() -> float:
+        """The largest share count that means "no position": venue precision.
+
+        Derived from the venue's own QTY_DECIMALS, not chosen. A remainder above
+        this is shares the broker still holds, so the book keeps it exactly as
+        booked. The 0.01-share threshold this replaces could delete up to $13.93
+        of LLY from a book while the broker kept the shares.
+
+        Imported here, not at module level: the execution package imports this
+        module while it initializes.
+        """
+        from ..execution.broker import QTY_DECIMALS
+        return 10.0 ** -QTY_DECIMALS
 
     def sell(self, ticker: str, shares: float, price: float) -> float:
         if ticker not in self.holdings:
@@ -323,21 +333,23 @@ class Portfolio:
         proceeds = shares * price
         h.shares -= shares
         self.cash += proceeds
-        if h.shares < self.GHOST_SHARES_EPSILON:
+        # Signed on purpose: the 1e-6 oversell allowance above can leave a tiny
+        # negative remainder, which must close the position, not open a short.
+        if h.shares <= self.no_position_shares():
             del self.holdings[ticker]
         return proceeds
 
     def sweep_ghost_positions(self) -> list[str]:
-        """Drop any holding with fewer than GHOST_SHARES_EPSILON shares.
+        """Drop any holding at or below venue precision (float residue only).
 
-        These are dust positions left behind by fractional rounding — they
-        clutter the dashboard and confuse the model. Returns the list of
-        ticker symbols that were swept (for logging).
+        Runs across the whole book after every sell and cover, so it must never
+        remove a real position: a small holding in another name is shares the
+        broker holds. Returns the list of ticker symbols swept (for logging).
         """
         # Compare on magnitude so live shorts (negative shares) are never
-        # mistaken for dust — only positions within ±EPSILON of flat are swept.
-        ghosts = [t for t, h in self.holdings.items()
-                  if abs(h.shares) < self.GHOST_SHARES_EPSILON]
+        # mistaken for residue.
+        limit = self.no_position_shares()
+        ghosts = [t for t, h in self.holdings.items() if abs(h.shares) <= limit]
         for t in ghosts:
             del self.holdings[t]
         return ghosts

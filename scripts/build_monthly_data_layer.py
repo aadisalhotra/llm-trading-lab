@@ -1408,7 +1408,7 @@ def _conservation_audit_block(ledger, full_records, month_records, month, win_st
     the build month are seeding only (infeasible steps and discontinuities there
     are logged as warnings — those months are certified by their registered
     blocks, not re-certified here). A fill that sweeps a sub-epsilon residual
-    (GHOST_SHARES_EPSILON dust, e.g. a 4-dp-rounded sell leaving 0.0001 shares)
+    (at or below venue precision, Portfolio.no_position_shares)
     discards |residual| * price by design; a step is clean if its discontinuity
     is within that intended sweep allowance.
     """
@@ -1436,7 +1436,7 @@ def _conservation_audit_block(ledger, full_records, month_records, month, win_st
     month_runs = next(iter(counts.values()))
 
     # ---- conservation replay ----
-    eps = Portfolio.GHOST_SHARES_EPSILON
+    eps = Portfolio.no_position_shares()
     violations: list[str] = []
     seed_warnings = 0
     dust_sweeps = 0
