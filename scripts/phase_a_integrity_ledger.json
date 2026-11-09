@@ -205,6 +205,46 @@
       },
       "post_boundary_snapshot": "Recorded in a follow-up ledger entry, under its own sign-off, after the first cycle run on bbee5da1f on 2026-11-09. Not taken at this landing.",
       "event_ref": "operational_events.2026-11[executor_floor_defect_2026_11_06]"
+    },
+    "deepseek_ghost_position_fix": {
+      "date": "2026-11-09",
+      "first_effective_cycle": "the first cycle run on the pushed ghost-position package; planned as Tuesday 2026-11-10, the 09:35 ET slot",
+      "type": "execution_regime_boundary",
+      "series": "deepseek exploratory series (paper simulator; same Portfolio booking as the cohort)",
+      "authority": {
+        "hub": "HUB -> OPERATIONS 2026-11-09, delivered inline: 'ghost-position ruling ratified; stage the fix after the close', its answers message, and 'Monday close: day report, DeepSeek baseline, staging, then halt'.",
+        "ruling": {
+          "path": "docs/registrations/ghost_position_ruling.md",
+          "status": "Ratified by the hub 2026-11-09. The file had not been delivered when this entry was written, so no sha256 is recorded here; the commit that lands the file records it."
+        }
+      },
+      "changes_that_affect_booking": {
+        "no_position_at_venue_precision": "Portfolio.sell, Portfolio.cover and Portfolio.sweep_ghost_positions now remove a holding only at or below 1e-9 shares (10**-QTY_DECIMALS). Before, they removed any holding under 0.01 share. The simulator books through the same Portfolio, so this changes DeepSeek's booking.",
+        "what_the_series_will_show": "Sizing at executor.py:1123 is unchanged (held by the hub 2026-11-09: order path). It truncates a full exit one 0.0001-share tick short in about 9.8% of full exits (300,000-case simulation, float32 prices). Before this boundary that remainder was deleted; after it, the remainder stays as a holding. It renders in the prompt's holdings table, counts toward max_positions (50), and cannot be sold: a SELL of it is under the $1 minimum and becomes a BELOW_VENUE_MINIMUM skip. Paper-era frequency for this book: 67 such deletions, 2026-04-13 to 2026-11-05."
+      },
+      "changes_that_do_not_affect_fills": {
+        "orders": "No order quantity, sizing line or submission path changes. executor.py is untouched.",
+        "level_1_check": "A per-book aggregate of book against own fills now alerts at $2.00, for this book from its baseline (operational_events.2026-11[deepseek_level1_baseline_2026_11_09]). It alerts only."
+      },
+      "pre_boundary_snapshot": {
+        "as_of": "2026-11-09 end of day: EOD tick 019dad3e9 (2026-11-09T22:08:01Z), state last_updated 2026-11-09 22:07:30",
+        "path": "data/state/deepseek.json",
+        "blob": "5e191edd9e2a1e63d96369d2cf00bd35bb65c2f6",
+        "sha256": "736409d557112a0465d73dce8a2b4a5c7ad830f92fbd7c209fbb8304ca9b6db1",
+        "cash_usd": 4641.80313,
+        "settled_cash_usd": 48.864593,
+        "unsettled_cash_usd": [
+          {
+            "amount": 4592.938537,
+            "trade_date": "2026-11-09",
+            "settles_on": "2026-11-10"
+          }
+        ],
+        "positions": 17,
+        "nav_eod_usd": 125945.76,
+        "nav_source": "data/performance/deepseek.jsonl, 2026-11-09 EOD row"
+      },
+      "event_ref": "operational_events.2026-11[ghost_position_defect_2026_11_09]"
     }
   },
 
@@ -2813,6 +2853,165 @@
           "historical_count": "Unmeasurable. The raw model text is persisted only when a call fails to parse (raw_response_on_failure), and raw_decisions is the post-parse list, so a dropped entry left no trace in any paper-era record."
         },
         "reproduce": "python scripts/executor_defect_disclosure.py --exposure"
+      },
+      {
+        "id": "ghost_position_defect_2026_11_09",
+        "date": "2026-11-09",
+        "event_date": "2026-11-09",
+        "type": "book_record_defect_and_fix",
+        "scope": "All six books' booking (Portfolio is shared by the venue path and the simulator), level-2 reconciliation, and the state-anomaly alert.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-09, delivered inline: 'ghost-position ruling ratified; stage the fix after the close', its answers message, and 'Monday close: day report, DeepSeek baseline, staging, then halt'.",
+          "ruling": {
+            "path": "docs/registrations/ghost_position_ruling.md",
+            "status": "Ratified by the hub 2026-11-09. The file had not been delivered when this entry was written, so no sha256 is recorded here; the commit that lands the file records it."
+          }
+        },
+        "class": "Book-record class (hub 2026-11-09). The corrected-executor session count stays at 15.",
+        "defect": "Portfolio deleted any holding under 0.01 share (GHOST_SHARES_EPSILON) at portfolio.py:304 (cover), :326 (sell) and :340 (the sweep run across the whole book after every sell and cover), while the broker kept the shares. Level-2 reconciliation used the same constant as its position tolerance and also dropped book positions under it before comparing, so it could not see the result.",
+        "found": "2026-11-09, first corrected-executor cycle (20261109T143327Z). Grok's target-0 exit of 1.6081 NVDA was sized 1.608 at executor.py:667: shares * price / price * 10000 evaluates to 16080.999999999998 at the price 173.44000244140625, and int() truncates it. The book booked the 1.608 fill, then deleted the 0.0001 remainder at portfolio.py:327. The broker kept 0.0001 NVDA ($0.0174). All 14 reconciliation records that day read clean.",
+        "reach": "Up to 0.01 share per name: LLY $13.93, 0.70% of a $2,000 book, at 2026-11-09 marks. Reachable that day by a cash-capped BUY: Grok's $9.60 of settled cash buys about 0.0069 LLY, which the next SELL of any name in that book would have deleted.",
+        "watch_2026_11_09": "Every intraday tick 09:35 to 15:35 ET was read: no holding under 0.01 share appeared in any book, and no SELL was placed by a book holding one.",
+        "fix": {
+          "booking": "5f89c03cc2fa56d5f2a897b6b88eb66976104251: no position means at or below 1e-9 shares, derived from QTY_DECIMALS. Every other remainder stays as booked. The five sweep call sites (executor.py 879, 887, 1026, 1199, 1225) are unchanged and inherit it.",
+          "alerts": "65b9df9f3cf8d464ea3e3f5aa9425e114fe6560b: the state-anomaly ghost check flags only a holding at or below venue precision, which the book removes on every sell or cover, so one surviving means state was written outside that path. The macro alert record now keeps its trigger.",
+          "reconciliation": "0946f7cc890b22352183f990904568779c0a5d0d: a position divergence is an event at $1 or more per name at the current mark; a broker position no book owns goes on an orphan line (G-BOOK at $1 or more, warning below); each book is compared against its own fills every cycle and alerts at $2.00.",
+          "held": "Full-quantity exits at executor.py:667 and the truncate_qty change both touch the order path and are held (hub 2026-11-09).",
+          "not_touched": "research_metrics.py:83-84 SHARES_EPSILON = 0.01 is a measurement definition and awaits Research."
+        },
+        "phase_a_exposure": {
+          "deepseek": "67 deletions of exactly 0.0001 share, 2026-04-13 to 2026-11-05, net -$2.17 at each day's marks (-$2.20 at 2026-11-09 marks). Every one falls on a SELL or COVER of the same name in the same cycle that removed the holding.",
+          "broker_paper_epoch": "One: Grok NVDA 0.0001 on 2026-11-09, re-attributed (operational_events.2026-11[grok_nvda_reattribution_2026_11_09]).",
+          "cohort_paper_epoch": "Not measured in this entry. Those books were archived at the 2026-11-06 re-inception and do not enter the broker-paper series."
+        },
+        "reproduce": "Replay each book's executed fills record by record against the holdings each decision record logged (portfolio_after); every change in the difference is a dated jump."
+      },
+      {
+        "id": "grok_nvda_reattribution_2026_11_09",
+        "date": "2026-11-09",
+        "type": "one_off_book_correction",
+        "scope": "grok, data/state/grok.json, one holding.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-09, delivered inline: 'ghost-position ruling ratified; stage the fix after the close', its answers message, and 'Monday close: day report, DeepSeek baseline, staging, then halt'.",
+          "ruling": {
+            "path": "docs/registrations/ghost_position_ruling.md",
+            "status": "Ratified by the hub 2026-11-09. The file had not been delivered when this entry was written, so no sha256 is recorded here; the commit that lands the file records it."
+          }
+        },
+        "what": "The 0.0001 NVDA the broker still holds is restored to Grok's book: 0.0001 shares at average cost $187.93, with zero cash. The share was never sold, so no cash moved; the book stops treating as deleted a share the broker holds.",
+        "basis": "Grok's only NVDA fills: BUY 1.6081 at 187.93 (cycle 20261106T173302Z) and SELL 1.608 at 173.84 (20261109T143327Z); net 0.0001.",
+        "evidence": "Every 2026-11-09 reconciliation record (14) shows the broker at NVDA 0.0001 and the books at none.",
+        "method": "One byte insertion into the file as committed at the EOD tick 019dad3e9, after the last write of the day, with three proofs: reparse, deep-equal outside the insertion, byte survival. cash, unsettled_cash and every other field are unchanged.",
+        "blobs": {
+          "before": "117f802e498eab464e3606e142743d19b5ee81bf",
+          "after": "c7949887ee949573af373776a69030e871f355ec"
+        },
+        "level_1_check": "Grok's book against its own fills: $0.017384 before, $0.00 after.",
+        "ordering": "Lands in the same push as the reconciliation change and before its first cycle, so the new tolerance never arms against an unattributed position.",
+        "not_a_mechanism": "Reconciliation still never adjusts a book to match the broker. This is a ledgered one-off under the ruling."
+      },
+      {
+        "id": "deepseek_post_boundary_snapshot_2026_11_09",
+        "date": "2026-11-09",
+        "type": "regime_boundary_follow_up",
+        "completes": "regime_boundaries.deepseek_executor_floor_removal.post_boundary_snapshot",
+        "first_session": "2026-11-09, all 13 cycles run on bbee5da1f",
+        "cycles": 13,
+        "api_success": "13/13",
+        "prompt_hash": "13/13 match (combined b415afcb...)",
+        "decisions": "One: SELL XOM, target weight 0. Every other cycle returned no trade. Zero validator violations.",
+        "fills": [
+          {
+            "cycle": "20261109T160229Z",
+            "side": "SELL",
+            "ticker": "XOM",
+            "shares": 27.885,
+            "price": 164.7100067138672,
+            "notional_usd": 4592.94,
+            "full_exit": true
+          }
+        ],
+        "floor_fix_exercised": "No. The new $1 minimum acts on BUYs, and DeepSeek issued none: settled cash was $48.86 all session. Zero skips, zero caps.",
+        "cash": {
+          "start_usd": 48.864593,
+          "end_usd": 4641.80313,
+          "settled_end_usd": 48.864593,
+          "unsettled_end_usd": 4592.938537,
+          "settles_on": "2026-11-10"
+        },
+        "positions": {
+          "start": 18,
+          "end": 17
+        },
+        "nav_eod_usd": 125945.76,
+        "nav_source": "data/performance/deepseek.jsonl, 2026-11-09 EOD row",
+        "state_at_eod": {
+          "blob": "5e191edd9e2a1e63d96369d2cf00bd35bb65c2f6",
+          "sha256": "736409d557112a0465d73dce8a2b4a5c7ad830f92fbd7c209fbb8304ca9b6db1",
+          "commit": "019dad3e9a1d18f7c4aa42d76f0007e9ed346fd2"
+        }
+      },
+      {
+        "id": "deepseek_level1_baseline_2026_11_09",
+        "date": "2026-11-09",
+        "type": "disclosed_initial_condition",
+        "scope": "deepseek, the per-book level-1 check (book against its own fills).",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-09, delivered inline: 'ghost-position ruling ratified; stage the fix after the close', its answers message, and 'Monday close: day report, DeepSeek baseline, staging, then halt'.",
+          "ruling": {
+            "path": "docs/registrations/ghost_position_ruling.md",
+            "status": "Ratified by the hub 2026-11-09. The file had not been delivered when this entry was written, so no sha256 is recorded here; the commit that lands the file records it."
+          }
+        },
+        "what": "DeepSeek's level-1 check starts from its 2026-11-09 end-of-day positions and counts only fills dated after 2026-11-09. Same treatment as the cohort's carry-forward: a disclosed initial condition, not an offset.",
+        "file": {
+          "path": "data/reconciliation/level1_baselines.json",
+          "sha256": "0199566a742f9b745cdc1429aff84c706b37b78831a6d98bef3db6a403a4e9ee", "blob": "69b9c1fbcc603939f70f63257b339a438f8d84b9", "hash_of": "the committed (LF) content"
+        },
+        "why_not_the_inception_window": "DeepSeek's opening buys ($99,999.85, ten names) are in four records dated 2026-04-08, the evening before its registered inception_date of 2026-04-09. Counted from inception_date the check reads $120,218.29, all of it from that window. No record lacks a date field.",
+        "decomposition": {
+          "method": "Replay of all 1,905 decision records' executed fills against the holdings each record logged. Every change in the difference is listed; the total is the absolute dollar sum at last marks.",
+          "total_abs_usd_at_last_marks": 7409.86,
+          "components": [
+            {
+              "what": "Launch-day clobber: holdings with no originating fill",
+              "when": "2026-04-09 22:34:57",
+              "shares": {
+                "AMZN": 19.2812,
+                "AVGO": 8.6349
+              },
+              "usd_at_that_day": 7569.66,
+              "usd_at_last_marks": 7407.66,
+              "ledger": "integrity_events.launch_window_corruption: bugs.launch_day_clobber (fix d2e862ca) and per_model_fabrication.deepseek {count 1, gross_usd 7570}. Matches."
+            },
+            {
+              "what": "Deletions under the old 0.01-share rule",
+              "when": "2026-04-13 to 2026-11-05",
+              "count": 67,
+              "usd_at_each_day": -2.17,
+              "usd_at_last_marks": -2.2,
+              "ledger": "operational_events.2026-11[ghost_position_defect_2026_11_09].phase_a_exposure, in this package. No earlier entry records it; the mechanism is proven record by record."
+            }
+          ],
+          "zero_contribution": "The identity splice (2026-04-24, 2026-05-21; integrity_events.deepseek_identity_splice), the shorting period (2026-07-01 to 2026-10-23), boundary administration, and state seeding or restoration produce no jump. DeepSeek was not archived at the 2026-11-06 re-inception."
+        },
+        "cohort": "The five broker-paper books reconcile to their own fills exactly from inception (2026-11-06) with no baseline: $0.00 each, Grok after the NVDA re-attribution."
+      },
+      {
+        "id": "book_capital_phase_b_substitution_2026_11_09",
+        "date": "2026-11-09",
+        "type": "parameter_substitution",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-09, delivered inline: 'ghost-position ruling ratified; stage the fix after the close', its answers message, and 'Monday close: day report, DeepSeek baseline, staging, then halt'.",
+          "ruling": {
+            "path": "docs/registrations/ghost_position_ruling.md",
+            "status": "Ratified by the hub 2026-11-09. The file had not been delivered when this entry was written, so no sha256 is recorded here; the commit that lands the file records it."
+          }
+        },
+        "what": "The ruling bounds the per-book aggregate at 0.1% of BOOK_CAPITAL_PHASE_B. No such name exists in src/ or config/. The hub approved config_loader.starting_capital() for broker_paper, $2,000, so the bound is $2.00.",
+        "applies_to": "All six books, DeepSeek included at about $126k NAV, because the ruling ties the bound to the registered book capital, not each book's own size (hub 2026-11-09).",
+        "config": "reconciliation.book_aggregate_bound_pct = 0.001, read by config_loader.book_aggregate_bound_usd().",
+        "follow_up": "Research notes that the registered name maps to this value."
       }
     ]
   }
