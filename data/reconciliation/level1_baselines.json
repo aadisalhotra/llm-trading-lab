@@ -1,0 +1,35 @@
+{
+  "_note": "Level-1 baselines: a book listed here starts the per-book fill aggregate from these positions and counts only fills dated after as_of_date. A book not listed starts from zero at its inception_date. Read only by src/execution/reconciliation.py book_fill_aggregates. Each entry is a disclosed initial condition with its ledger entry, never an offset.",
+  "deepseek": {
+    "as_of_date": "2026-11-09",
+    "as_of": "2026-11-09 end of day: EOD tick 019dad3e9 (2026-11-09T22:08:01Z)",
+    "state_path": "data/state/deepseek.json",
+    "state_blob_at_as_of": "5e191edd9e2a1e63d96369d2cf00bd35bb65c2f6",
+    "positions": {
+      "PM": 39.7723,
+      "V": 23.5394,
+      "MA": 13.321199999999997,
+      "MSFT": 9.8584,
+      "DIS": 83.4239,
+      "TMO": 11.096499999999999,
+      "ABBV": 43.8172,
+      "SLB": 136.63979999999998,
+      "RTX": 45.855599999999995,
+      "UNP": 16.713500000000003,
+      "BLK": 4.3871,
+      "PFE": 166.9905,
+      "LLY": 4.5554,
+      "PG": 48.806700000000006,
+      "TMUS": 14.3388,
+      "AXP": 20.0524,
+      "COST": 3.8913
+    },
+    "ledger_ref": "operational_events.2026-11[deepseek_level1_baseline_2026_11_09]",
+    "why": "DeepSeek's paper-era book does not equal the sum of its logged fills, so counted from inception the aggregate would alert on its first cycle. The difference is two dated, ledgered components; see the ledger entry.",
+    "decomposition_summary": {
+      "total_abs_usd_at_last_marks": 7409.86,
+      "launch_day_clobber": "AMZN +19.2812, AVGO +8.6349 sh, 2026-04-09 22:34:57; $7,569.66 at that day's marks, $7,407.66 at last marks",
+      "old_0_01_share_deletions": "67 x -0.0001 sh, 2026-04-13 to 2026-11-05; -$2.17 at the day's marks, -$2.20 at last marks"
+    }
+  }
+}
