@@ -41,12 +41,15 @@
   },
   "daily": {
     "date": "2026-11-09",
-    "sent_count": 1,
+    "sent_count": 4,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "oversized:gpt:AMZN:2026-11-09T14:36:11.445378",
+      "news:PG:bac3fda171",
+      "news:LLY:2862597c9e"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -55,6 +58,30 @@
         "timestamp": "2026-11-09T14:33:27.135120+00:00",
         "disposition": "sent",
         "dispatch_id": "2cd204972ca7"
+      },
+      {
+        "kind": "oversized_trade",
+        "severity": "WARN",
+        "title": "GPT-5.4: 15.1% order in AMZN",
+        "timestamp": "2026-11-09T22:07:59.054940+00:00",
+        "disposition": "queued",
+        "dispatch_id": "545e7cfe8b6f"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on PG (held by 5)",
+        "timestamp": "2026-11-09T22:07:59.128975+00:00",
+        "disposition": "sent",
+        "dispatch_id": "91cb7a887ce9"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-11-09T22:07:59.131100+00:00",
+        "disposition": "queued",
+        "dispatch_id": "1bb6d1485fc5"
       }
     ]
   }
