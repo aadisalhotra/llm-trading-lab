@@ -149,6 +149,15 @@ _COMPILED_MACRO_PATTERNS: dict[str, list[re.Pattern]] = {
 }
 
 
+def _macro_matched_term(text: str, category: str) -> str | None:
+    """The text that made `category` match, so a stored alert can show why."""
+    for pat in _COMPILED_MACRO_PATTERNS.get(category, []):
+        m = pat.search(text or "")
+        if m:
+            return m.group(0)
+    return None
+
+
 def _match_macro_category(text: str) -> str | None:
     """Return the first market-wide event category whose keywords appear in
     `text`, or None. `text` is normally the headline title + summary."""
@@ -466,12 +475,16 @@ def _settle(reserved_date: str, dispatch_id: str, dedup_key: str, disposition: s
 
 
 def _compact(event_record: dict[str, Any]) -> dict[str, Any]:
-    return {
+    out = {
         "kind": event_record["kind"],
         "severity": event_record["severity"],
         "title": event_record["title"],
         "timestamp": event_record["timestamp"],
     }
+    trigger = (event_record.get("context") or {}).get("trigger")
+    if trigger:
+        out["trigger"] = trigger
+    return out
 
 
 # ===========================================================================
@@ -1014,6 +1027,17 @@ def detect_macro_market_events(
             ),
             "context": {
                 "models": ["All models"],
+                # Kept in the stored record (see _compact), so the trigger can be
+                # read without the email or the job log.
+                "trigger": {
+                    "headline": title,
+                    "source": src,
+                    "headline_time": ts,
+                    "category": category,
+                    "matched_term": _macro_matched_term(
+                        f"{title} {it.get('summary') or ''}", category),
+                    "score": round(score, 4),
+                },
                 "numbers": {
                     "Category": category,
                     "Sentiment": f"{score:+.2f} ({label})",
@@ -1079,7 +1103,7 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
     rules = settings.get("portfolio_rules", {}) or {}
     max_positions = int(rules.get("max_positions", 50))
     max_pos_pct = float(rules.get("max_position_pct", 0.20))
-    epsilon = float(getattr(Portfolio, "GHOST_SHARES_EPSILON", 0.01))
+    no_position = Portfolio.no_position_shares()
 
     specs: list[dict[str, Any]] = []
     keys = _enabled_model_keys(settings)
@@ -1094,14 +1118,18 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
         portfolios[key] = p
         name = _display_name(settings, key)
 
-        # Ghost positions — magnitude-based, so a live short (negative shares)
-        # is never mistaken for dust; mirrors Portfolio.sweep_ghost_positions.
-        ghosts = [t for t, h in p.holdings.items() if abs(h.shares) < epsilon]
+        # A holding at or below venue precision is one the book should already
+        # have removed, so seeing one means state was written outside the normal
+        # path. A small real position is not a ghost: magnitude-based, and the
+        # same limit as Portfolio.sweep_ghost_positions.
+        ghosts = [t for t, h in p.holdings.items() if abs(h.shares) <= no_position]
         if ghosts:
             specs.append(_state_spec(
                 "state_ghost", "WARN", key, name,
-                f"{name} is carrying ghost position(s) under {epsilon} shares: "
-                f"<b>{', '.join(ghosts)}</b>. These should have been swept after a fractional sell.",
+                f"{name} is carrying position(s) at or below venue precision "
+                f"({no_position:g} shares): <b>{', '.join(ghosts)}</b>. The book "
+                f"removes these on every sell or cover, so one surviving means "
+                f"state was written outside that path.",
                 {"Ghost tickers": ", ".join(ghosts)},
             ))
 

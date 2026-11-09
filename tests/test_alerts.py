@@ -323,7 +323,8 @@ def test_digest_send_is_idempotent(iso, monkeypatch):
 
 def test_state_anomalies_short_aware(iso, monkeypatch):
     """The state-integrity sweep must be direction-aware (shorting live 7/01):
-    a live short is NOT a ghost position; sub-epsilon dust of EITHER sign is;
+    a live short is NOT a ghost position; residue at venue precision of EITHER
+    sign is, and a small real position is not;
     and the 2x-weight-cap anomaly check sees shorts by gross weight (the
     signed weight is negative, which previously made shorts invisible)."""
     import pandas as pd
@@ -339,8 +340,9 @@ def test_state_anomalies_short_aware(iso, monkeypatch):
         model_key="gpt", cash=50_000.0,
         holdings={
             "NVDA": Holding(ticker="NVDA", shares=-29.7937, avg_cost=194.42),  # live short
-            "AAPL": Holding(ticker="AAPL", shares=0.005, avg_cost=300.0),      # long dust
-            "META": Holding(ticker="META", shares=-0.004, avg_cost=530.0),     # short dust
+            "AAPL": Holding(ticker="AAPL", shares=5e-10, avg_cost=300.0),      # long residue
+            "META": Holding(ticker="META", shares=-4e-10, avg_cost=530.0),     # short residue
+            "LLY": Holding(ticker="LLY", shares=0.0069, avg_cost=1393.0),      # small, real
             "MSFT": Holding(ticker="MSFT", shares=10.0, avg_cost=400.0),       # normal long
         },
         inception_value=100_000.0, inception_date="2026-04-09",
@@ -366,6 +368,7 @@ def test_state_anomalies_short_aware(iso, monkeypatch):
     flagged = ghosts[0]["context"]["numbers"]["Ghost tickers"]
     assert "AAPL" in flagged and "META" in flagged   # dust, both signs
     assert "NVDA" not in flagged                     # live short is not dust
+    assert "LLY" not in flagged                      # shares the broker holds
 
     caps = [s for s in specs if s["dedup_key"] == "state_weightcap:gpt"]
     assert len(caps) == 1
