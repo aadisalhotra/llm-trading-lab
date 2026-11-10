@@ -183,10 +183,11 @@ def _results(win_status="filled", win_filled="2026-11-03T15:38:05.100Z",
 
 
 TERMINAL_RELEASE = [{"book": bp.BUY_BOOK, "action": "BUY", "ticker": "F", "how": "terminal"}]
+T = 1234   # any rotation tick: with one book per side the rule's winner is the seller
 
 
 def test_clears_on_the_registered_path():
-    ev = bp.evaluate(_plan(), _results(), TERMINAL_RELEASE)
+    ev = bp.evaluate(_plan(), _results(), TERMINAL_RELEASE, T)
     assert ev["verdict"].startswith("CLEARS")
     assert ev["engaged"] and ev["ordering_as_registered"]
     assert ev["winner_terminal_state"] == "filled"
@@ -194,33 +195,121 @@ def test_clears_on_the_registered_path():
 
 
 def test_not_engaged_fails():
-    assert bp.evaluate({}, _results(), [])["verdict"].startswith("FAILED")
+    assert bp.evaluate({}, _results(), [], T)["verdict"].startswith("FAILED")
 
 
 def test_wrong_winner_fails():
-    ev = bp.evaluate(_plan(winner_book=bp.BUY_BOOK), _results(), TERMINAL_RELEASE)
+    ev = bp.evaluate(_plan(winner_book=bp.BUY_BOOK), _results(), TERMINAL_RELEASE, T)
     assert ev["verdict"].startswith("FAILED") and not ev["ordering_as_registered"]
 
 
 def test_held_submitted_before_winner_terminal_fails():
-    ev = bp.evaluate(_plan(), _results(held_sub="2026-11-03T15:38:05.000Z"), TERMINAL_RELEASE)
+    ev = bp.evaluate(_plan(), _results(held_sub="2026-11-03T15:38:05.000Z"), TERMINAL_RELEASE, T)
     assert ev["verdict"].startswith("FAILED")
 
 
 def test_timeout_release_fails():
     rel = [dict(TERMINAL_RELEASE[0], how="timeout")]
-    assert bp.evaluate(_plan(), _results(), rel)["verdict"].startswith("FAILED")
+    assert bp.evaluate(_plan(), _results(), rel, T)["verdict"].startswith("FAILED")
 
 
 def test_post_barrier_wash_rejection_fails():
     ev = bp.evaluate(_plan(), _results(held_constraint="WASH_REJECT_POST_BARRIER"),
-                     TERMINAL_RELEASE)
+                     TERMINAL_RELEASE, T)
     assert ev["verdict"].startswith("FAILED")
 
 
 def test_winner_not_filled_is_inconclusive():
-    ev = bp.evaluate(_plan(), _results(win_status="rejected"), TERMINAL_RELEASE)
+    ev = bp.evaluate(_plan(), _results(win_status="rejected"), TERMINAL_RELEASE, T)
     assert ev["verdict"].startswith("INCONCLUSIVE")
+
+
+# ------------------------------------------------- expected winner (rev.4 rule)
+# The rule (docs/registrations/spike_rulings_parity_wash_barrier.md §1, rev. 4):
+# sell-side first; within a side, rotation of ALL sorted registered books by
+# t mod n. expected_winner() is written from that text, not from barrier.py.
+FIVE = ["claude", "claude_opus", "gemini", "gpt", "grok"]
+
+
+def test_expected_winner_with_one_book_per_side_is_the_seller_at_every_tick():
+    for t in range(12):
+        assert bp.expected_winner(bp.PROBE_INTENTS, bp.PROBE_REGISTERED, t) == (bp.SELL_BOOK, "SELL")
+
+
+def test_expected_winner_rotates_over_all_registered_books_within_a_side():
+    # Two sellers (gemini, grok) and a buyer (claude). Rotation base is the five
+    # sorted registered books; offset t mod 5. The buyer never wins.
+    intents = [("grok", "SELL"), ("gemini", "SHORT"), ("claude", "BUY")]
+    got = {t: bp.expected_winner(intents, FIVE, t) for t in range(5)}
+    # t=0: claude, claude_opus, gemini, gpt, grok -> gemini first among sellers
+    # t=3: gpt, grok, claude, claude_opus, gemini -> grok
+    # t=4: grok, ... -> grok
+    assert got == {0: ("gemini", "SHORT"), 1: ("gemini", "SHORT"), 2: ("gemini", "SHORT"),
+                   3: ("grok", "SELL"), 4: ("grok", "SELL")}
+    # Over all registered books, not the contending ones: rotating over only
+    # the two sellers would alternate 1:1, which this split (3:2) is not.
+    assert sum(1 for w in got.values() if w[0] == "gemini") == 3
+
+
+def test_expected_winner_is_none_for_an_uncontended_ticker():
+    assert bp.expected_winner([("gpt", "BUY"), ("grok", "COVER")], FIVE, 7) is None
+    assert bp.expected_winner([("gpt", "SELL"), ("grok", "SHORT")], FIVE, 7) is None
+
+
+def test_expected_winner_refuses_an_unregistered_book():
+    with pytest.raises(ValueError):
+        bp.expected_winner([("ghost", "SELL"), ("gpt", "BUY")], FIVE, 0)
+
+
+def test_expected_winner_agrees_with_the_real_cycle_barrier():
+    # The production CycleBarrier, five registered books, an opposing pair plus
+    # same-side siblings on one ticker: the derived rule must name its winner
+    # at every offset.
+    import threading
+    from src.execution.barrier import CycleBarrier, Intent
+    intents = [("grok", "SELL"), ("gemini", "SELL"), ("claude", "BUY"), ("gpt", "BUY")]
+    for t in range(10):
+        b = CycleBarrier(expected_books=set(FIVE), t=t, registration_timeout=5.0)
+        mine = {k: [] for k in FIVE}
+        for book, action in intents:
+            mine[book].append(Intent(book=book, ticker="F", action=action))
+        threads = [threading.Thread(target=b.register, args=(k, v)) for k, v in mine.items()]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(10)
+        w = b.plan()["F"]["winner"]
+        assert (w["book"], w["action"]) == bp.expected_winner(intents, FIVE, t), t
+
+
+def test_ordering_check_fails_when_the_wrong_seller_wins():
+    # The case the old hard-coded check could not see: a seller wins, but not
+    # the seller the rotation names. Registered: SELL_BOOK, a second seller and
+    # BUY_BOOK; pick t so the second seller ranks first, then present a plan in
+    # which SELL_BOOK won anyway.
+    other = bp.PROBE_BOOK_PREFIX + "SELL2"
+    registered = sorted([bp.SELL_BOOK, other, bp.BUY_BOOK])
+    intents = [(bp.SELL_BOOK, "SELL"), (other, "SELL"), (bp.BUY_BOOK, "BUY")]
+    t = next(t for t in range(3) if bp.expected_winner(intents, registered, t)[0] == other)
+    plan = {bp.SYMBOL: {"winner": {"book": bp.SELL_BOOK, "action": "SELL"},
+                        "held": [{"book": other, "action": "SELL", "released": True},
+                                 {"book": bp.BUY_BOOK, "action": "BUY", "released": True}]}}
+    ev = bp.evaluate(plan, _results(), TERMINAL_RELEASE, t,
+                     intents=intents, registered_books=registered)
+    assert ev["ordering_as_registered"] is False
+    assert ev["expected_winner"] == {"book": other, "action": "SELL"}
+    assert ev["verdict"].startswith("FAILED -- winner")
+    # Positive control: the same inputs with the rule's winner pass the check.
+    plan[bp.SYMBOL]["winner"] = {"book": other, "action": "SELL"}
+    ok = bp.evaluate(plan, _results(), TERMINAL_RELEASE, t,
+                     intents=intents, registered_books=registered)
+    assert ok["ordering_as_registered"] is True
+
+
+def test_ordering_check_fails_when_the_buyer_wins_at_every_tick():
+    for t in range(6):
+        ev = bp.evaluate(_plan(winner_book=bp.BUY_BOOK), _results(), TERMINAL_RELEASE, t)
+        assert ev["ordering_as_registered"] is False and ev["verdict"].startswith("FAILED")
 
 
 def test_completed_today_only_counts_completed_finished_records(tmp_path):

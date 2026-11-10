@@ -8,8 +8,10 @@ administrative books act in one cycle on one symbol: FORCED_PROBE_SELL
 intends a SELL, FORCED_PROBE_BUY intends a BUY. Each run records:
 
   * engaged         -- whether the barrier identified the ticker as contended
-  * ordering        -- the winner it chose, against the one rule 2 predicts
-                       (sell-side outranks buy-side)
+  * ordering        -- the winner it chose, against the one the registered
+                       rule predicts (spike rulings rev.4 §1: sell-side
+                       first, then t mod n over the sorted registered books),
+                       derived here independently of barrier.py
   * winner_terminal -- the terminal state the winner's order reached, from
                        the venue's own order record
   * release         -- whether the held intent released on the winner's
@@ -91,7 +93,7 @@ import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 from zoneinfo import ZoneInfo
 
 import requests
@@ -185,10 +187,42 @@ def submission_allowed(now: datetime) -> bool:
     return minute_in_slot(now.astimezone(ET)) < SUBMIT_CUTOFF_MIN
 
 
-def expected_winner() -> tuple[str, str]:
-    """Rule 2: sell-side always outranks buy-side, so with one book per side
-    the winner is the SELL book, whatever the rotation tick."""
-    return SELL_BOOK, "SELL"
+# The probe's own contention: one sell-side and one buy-side intent on SYMBOL,
+# both books registered with the barrier.
+PROBE_INTENTS: tuple[tuple[str, str], ...] = ((SELL_BOOK, "SELL"), (BUY_BOOK, "BUY"))
+PROBE_REGISTERED: tuple[str, ...] = (SELL_BOOK, BUY_BOOK)
+_BUY_SIDE = frozenset({"BUY", "COVER"})
+
+
+def expected_winner(intents: Iterable[tuple[str, str]],
+                    registered_books: Iterable[str],
+                    t: int) -> tuple[str, str] | None:
+    """The winner the registered rule predicts for one contended ticker.
+
+    docs/registrations/spike_rulings_parity_wash_barrier.md §1 (rev. 4):
+    a ticker is contended only when a buy-side intent (BUY, COVER) and a
+    sell-side intent (SELL, SHORT) meet on it; among its intents sell-side
+    ranks first, and within a side the book ranks by the rotation of ALL
+    registered books, sorted, offset by t mod n (n = number of registered
+    books). Returns None when the rule says the ticker is uncontended.
+
+    Written from the registration, not imported from src/execution/barrier.py,
+    so that the check can disagree with the code it is checking. (The previous
+    version returned the SELL book unconditionally -- the probe's sells-first
+    assumption -- and so could never test the rotation; CLAUDE.md rule 9.)
+    """
+    intents = [(str(b), str(a).upper()) for b, a in intents]
+    if not any(a in _BUY_SIDE for _, a in intents) or all(a in _BUY_SIDE for _, a in intents):
+        return None
+    base = sorted(registered_books)
+    if not base:
+        return None
+    offset = t % len(base)
+    rotation = base[offset:] + base[:offset]
+    unregistered = sorted({b for b, _ in intents} - set(rotation))
+    if unregistered:
+        raise ValueError(f"intents from unregistered books: {unregistered}")
+    return min(intents, key=lambda ba: (1 if ba[1] in _BUY_SIDE else 0, rotation.index(ba[0])))
 
 
 def production_busy(list_runs: Callable[[str], list[dict]],
@@ -234,21 +268,26 @@ def fill_cash_and_position(orders: list[dict]) -> tuple[float, float]:
     return round(cash, 6), round(shares, 9)
 
 
-def evaluate(plan: dict, results: dict[str, dict], release_log: list[dict]) -> dict:
+def evaluate(plan: dict, results: dict[str, dict], release_log: list[dict], t: int,
+             intents: Iterable[tuple[str, str]] = PROBE_INTENTS,
+             registered_books: Iterable[str] = PROBE_REGISTERED) -> dict:
     """Score the contention from the barrier plan, the venue order records
-    and the barrier's own release log lines. Mechanical; no judgement."""
+    and the barrier's own release log lines. Mechanical; no judgement.
+    `t` is the rotation tick the cycle's CycleBarrier was built with."""
     out: dict[str, Any] = {}
     entry = plan.get(SYMBOL)
     out["engaged"] = entry is not None
-    exp_book, exp_action = expected_winner()
-    out["expected_winner"] = {"book": exp_book, "action": exp_action}
+    out["rotation_tick"] = t
+    exp = expected_winner(intents, registered_books, t)
+    out["expected_winner"] = None if exp is None else {"book": exp[0], "action": exp[1]}
     if entry is None:
         out["verdict"] = ("FAILED -- the barrier did not identify the ticker as "
                           "contended; both intents submitted unmediated")
         return out
     out["winner"] = entry["winner"]
     out["held"] = entry["held"]
-    out["ordering_as_registered"] = (entry["winner"] == out["expected_winner"])
+    out["ordering_as_registered"] = (out["expected_winner"] is not None
+                                     and entry["winner"] == out["expected_winner"])
 
     w = results.get(entry["winner"]["book"], {})
     wo = w.get("broker_order") or {}
@@ -279,7 +318,8 @@ def evaluate(plan: dict, results: dict[str, dict], release_log: list[dict]) -> d
     out["held_results"] = held_out
 
     if not out["ordering_as_registered"]:
-        out["verdict"] = f"FAILED -- winner {entry['winner']} is not rule 2's {out['expected_winner']}"
+        out["verdict"] = (f"FAILED -- winner {entry['winner']} is not the registered "
+                          f"rule's {out['expected_winner']}")
     elif any(h["constraint"] in ("WASH_REJECT_POST_BARRIER", "WASH_TRADE_BLOCK") for h in held_out):
         out["verdict"] = "FAILED -- a held intent was rejected as a wash trade after release"
     elif any(h["released_on"] == "timeout" for h in held_out):
@@ -448,11 +488,13 @@ def _order_view(o: dict) -> dict:
 
 
 def run_contention(executor: Executor, seed_qty: float, price: float,
-                   cycle_dt: datetime) -> tuple[dict, dict, list[dict]]:
-    """One contended cycle through the production executor and barrier."""
+                   cycle_dt: datetime) -> tuple[dict, dict, list[dict], int]:
+    """One contended cycle through the production executor and barrier.
+    Returns (plan, results, release log, rotation tick t)."""
     exec_cfg = executor.settings.get("execution") or {}
+    t = rotation_tick(cycle_dt)
     barrier = CycleBarrier(
-        expected_books={SELL_BOOK, BUY_BOOK}, t=rotation_tick(cycle_dt),
+        expected_books=set(PROBE_REGISTERED), t=t,
         registration_timeout=float(exec_cfg.get("barrier_registration_timeout_seconds", 300.0)),
         release_timeout=float(exec_cfg.get("barrier_release_timeout_seconds", 120.0)))
     today = cycle_dt.astimezone(ET).strftime("%Y-%m-%d")
@@ -510,7 +552,7 @@ def run_contention(executor: Executor, seed_qty: float, price: float,
         bo = r.get("broker_order")
         if bo:
             bo.pop("broker_order_id", None)    # not needed; keep the record minimal
-    return barrier.plan(), results, capture.lines
+    return barrier.plan(), results, capture.lines, t
 
 
 def cleanup(client: BrokerClient, cycle_id: str, started: datetime,
@@ -736,10 +778,10 @@ def main(argv: list[str] | None = None) -> int:
                                  f"{seed.filled_qty:g}/{SEED_SHARES:g}); no contention possible")
             if not args.dry_run and not submission_allowed(datetime.now(timezone.utc)):
                 raise ProbeAbort("submission cutoff reached before the contended cycle")
-            plan, results, releases = run_contention(
+            plan, results, releases, t = run_contention(
                 executor, seed.filled_qty, seed.filled_avg_price, datetime.now(timezone.utc))
-            record.update(plan=plan, results=results, release_log=releases)
-            record["evaluation"] = evaluate(plan, results, releases)
+            record.update(plan=plan, results=results, release_log=releases, rotation_tick=t)
+            record["evaluation"] = evaluate(plan, results, releases, t)
             outcome = "COMPLETED"
             code = EXIT_OK if record["evaluation"]["verdict"].startswith("CLEARS") else EXIT_FAIL
     except ProbeAbort as e:
