@@ -53,6 +53,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 import requests
@@ -93,6 +94,7 @@ _CREDENTIALS = {
 # ---------------------------------------------------------------------------
 MAX_CLIENT_ORDER_ID = 128
 QTY_DECIMALS = 9
+_QTY_QUANTUM = Decimal(1).scaleb(-QTY_DECIMALS)   # 1E-9, for truncate_qty
 MIN_ORDER_NOTIONAL = 1.00
 DEFAULT_FILL_DEADLINE_SECONDS = 300      # registered 2026-08-29: 5 minutes
 DEFAULT_POLL_INTERVAL_SECONDS = 2.0
@@ -145,9 +147,16 @@ def truncate_qty(shares: float) -> float:
     Truncation, never rounding: rounding up can push the notional above the
     cash that was checked against it, which is the same reasoning behind the
     executor's existing 4-dp truncation.
+
+    Exact in decimal (ghost-position ruling §⑦): the float product
+    `shares * 10**9` misrepresents most decimals (1.043 * 1e9 is
+    1042999999.9999999), so `int()` of it cut 1.043 to 1.042999999. Truncating
+    the float's shortest decimal form instead keeps every quantity that already
+    fits in 9 dp unchanged. It still never rounds up: the result is at most
+    that decimal, which converts back to the input float itself.
     """
-    factor = 10 ** QTY_DECIMALS
-    return int(float(shares) * factor) / factor
+    q = Decimal(repr(float(shares))).quantize(_QTY_QUANTUM, rounding=ROUND_DOWN)
+    return float(q)
 
 
 def build_order_id(book: str, cycle_id: str, seq: int, attempt: int = 0) -> str:

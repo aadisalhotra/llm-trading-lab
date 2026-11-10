@@ -228,6 +228,27 @@ class _Placement:
         return self.filled_qty > 0 and self.fill_price > 0
 
 
+def _exit_quantity(delta_notional: float, price: float, held: float,
+                   target_notional: float) -> float:
+    """Shares to sell (or cover) for a reducing order on a held position.
+
+    A full exit -- the decision's target is zero, so nothing should remain --
+    sends the exact held quantity; the venue receives it at its 9-dp precision
+    (broker.truncate_qty), leaving at most 1e-9 share, which fix A's
+    no-position threshold deletes. Ghost-position ruling §⑦ (c),
+    docs/registrations/ghost_position_ruling.md: the 4-dp truncation below,
+    applied to a full exit, re-derived the holding through a float round-trip
+    (shares x price / price) and could fall 0.0001 short of it, leaving dust
+    the venue minimum then made unsellable (Grok NVDA, 2026-11-09).
+
+    A partial exit is unchanged: 4-dp truncation of the dollar delta, capped
+    at the holding.
+    """
+    if target_notional <= 0:
+        return held
+    return min(int(delta_notional / price * 10000) / 10000, held)
+
+
 @dataclass
 class _SizedOrder:
     """A decision sized into a concrete order, not yet submitted.
@@ -664,7 +685,7 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=True, side="HOLD",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_BELOW_TARGET")
-            shares = min(int(delta_notional / price * 10000) / 10000, h.shares)
+            shares = _exit_quantity(delta_notional, price, h.shares, target_notional)
             return _SizedOrder(decision=decision, action="SELL", ticker=ticker,
                                shares=shares, price=price, broker_side="sell")
 
@@ -702,7 +723,7 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=True, side="HOLD",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_BELOW_SHORT_TARGET")
-            shares = min(int(delta_notional / price * 10000) / 10000, abs(h.shares))
+            shares = _exit_quantity(delta_notional, price, abs(h.shares), target_notional)
             return _SizedOrder(decision=decision, action="COVER", ticker=ticker,
                                shares=shares, price=price, broker_side="buy")
 
@@ -1120,7 +1141,7 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=True, side="HOLD",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_BELOW_TARGET")
-            shares = min(int(delta_notional / price * 10000) / 10000, h.shares)
+            shares = _exit_quantity(delta_notional, price, h.shares, target_notional)
             return self._do_sell(portfolio, ticker, shares, price, decision, run_date)
 
         if action == "SHORT":
@@ -1159,7 +1180,7 @@ class Executor:
                 return ExecutionResult(decision=decision, executed=True, side="HOLD",
                                        ticker=ticker, shares=0, fill_price=price, notional=0,
                                        order_id="ALREADY_BELOW_SHORT_TARGET")
-            shares = min(int(delta_notional / price * 10000) / 10000, abs(h.shares))
+            shares = _exit_quantity(delta_notional, price, abs(h.shares), target_notional)
             return self._do_cover(portfolio, ticker, shares, price, decision)
 
         return ExecutionResult(decision=decision, executed=False, side="SKIP",
