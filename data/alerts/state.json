@@ -41,13 +41,15 @@
   },
   "daily": {
     "date": "2026-11-10",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "api_failure:gemini",
-      "macro_event:Severe economic data"
+      "macro_event:Severe economic data",
+      "news:AMZN:2bef589d67",
+      "news:RTX:8f5ccbb7ae"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "api_failure",
@@ -72,6 +74,22 @@
         },
         "disposition": "sent",
         "dispatch_id": "f6ebdf53ec0b"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AMZN (held by 5)",
+        "timestamp": "2026-11-10T22:07:35.004119+00:00",
+        "disposition": "queued",
+        "dispatch_id": "2d61c001800e"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on RTX (held by 5)",
+        "timestamp": "2026-11-10T22:07:35.005663+00:00",
+        "disposition": "queued",
+        "dispatch_id": "10f73b1b4a65"
       }
     ]
   }
