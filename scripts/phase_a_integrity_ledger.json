@@ -247,6 +247,24 @@
         "nav_source": "data/performance/deepseek.jsonl, 2026-11-09 EOD row"
       },
       "event_ref": "operational_events.2026-11[ghost_position_defect_2026_11_09]"
+    },
+    "deepseek_full_quantity_exits": {
+      "date": "2026-11-10",
+      "first_effective_cycle": "the first cycle run on the pushed executor change; planned as Wednesday 2026-11-11, the 09:35 ET slot",
+      "type": "execution_regime_boundary",
+      "ordinal": "third DeepSeek boundary in the exploratory series, after deepseek_executor_floor_removal (2026-11-07) and deepseek_ghost_position_fix (2026-11-09)",
+      "series": "deepseek exploratory series (paper simulator; same executor as the cohort)",
+      "authority": {
+        "ruling": {
+          "path": "docs/registrations/ghost_position_ruling.md",
+          "sha256": "3e15d30fc88678d648f17d584ae0b1a0d99436d9a351ceb581f852e92f4ff1b6",
+          "section": "§⑦ Dust positions in model-facing state — ruled (c), full-quantity exits at venue precision"
+        },
+        "hub": "HUB -> OPERATIONS 2026-11-10 'Tuesday follow-up', delivered inline: Research's dust ruling is (c); 'The hub ratifies it.' Push only on a hub sign-off naming the commits."
+      },
+      "commit": "e66710302 + 2cb205646",
+      "changes_that_affect_fills": "A full exit (target 0) on the simulator path (_execute_one SELL and COVER) now books the exact holding instead of a 4-dp re-derivation that could fall 0.0001 short. The simulator applies no venue minimum to sells (unchanged), so a pre-existing sub-$1 remainder also exits in full on a target-0 SELL. Partial sells and BUYs are unchanged.",
+      "cross_ref": "operational_events.2026-11[full_quantity_exits_executor_change_2026_11_10]"
     }
   },
 
@@ -3200,6 +3218,47 @@
           }
         },
         "consequence": "None to the cohort: the 2026-11-08 amendment pins the deployed snapshots regardless of what was available. This entry is the factual record the amendment's disclosure cites: a newer model was available for every one of the four provider slots on 2026-10-26."
+      },
+      {
+        "id": "full_quantity_exits_executor_change_2026_11_10",
+        "date": "2026-11-10",
+        "type": "executor_change",
+        "class": "executor-class (ghost-position ruling §①'s boundary: it alters the venue order a decision-and-state produces)",
+        "scope": "All six books' sizing: the five broker-paper books on the venue path, deepseek on the simulator (see regime_boundaries.deepseek_full_quantity_exits).",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/ghost_position_ruling.md",
+            "sha256": "3e15d30fc88678d648f17d584ae0b1a0d99436d9a351ceb581f852e92f4ff1b6",
+            "section": "§⑦ Dust positions in model-facing state — ruled (c), full-quantity exits at venue precision"
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-10 'Tuesday follow-up', delivered inline: Research's dust ruling is (c); 'The hub ratifies it.' Push only on a hub sign-off naming the commits."
+        },
+        "commit": "e66710302 + 2cb205646",
+        "effective_from": "The first intraday cycle run after the push: Wednesday 2026-11-11, 09:35 ET slot, if pushed inside the hub's window (before 09:15 ET). If the push slips, this entry is corrected before it lands.",
+        "change": {
+          "full_exits": "A SELL or COVER whose decision target is zero sends the held quantity rounded to the nearest 9-dp venue quantity (executor._exit_quantity -> broker.round_qty, Decimal ROUND_HALF_EVEN; hub ruling 2026-11-10), at all four sites: SELL venue (_size_for_broker) and simulator (_execute_one), COVER venue and simulator. A book holding is a float sum of 9-dp fills (error ~1e-17), so rounding recovers the venue's exact position; truncating would send 0.114799999 for Claude Opus's LLY 0.11479999999999999 and strand 1e-9 share at the venue. Oversell guard: if the rounded quantity exceeds the book's own value by more than FULL_EXIT_OVERSELL_GUARD = 1e-12, sizing raises and nothing is sent. force_liquidate already sent abs(h.shares) and is unchanged.",
+          "truncate_qty": "broker.truncate_qty truncates the float's shortest decimal form to 9 dp (Decimal, ROUND_DOWN) instead of int(x * 1e9) / 1e9, which cut 1.043 to 1.042999999 and a sized partial sell of 0.5215 to 0.521499999. Never rounds up.",
+          "unchanged": "Partial SELL and COVER sizing (4-dp truncation of the dollar delta, capped at the holding); BUY and SHORT sizing; the $1 venue minimum. Existing dust (Grok NVDA 0.0001) stays blocked as BELOW_VENUE_MINIMUM on the venue path."
+        },
+        "defect_replayed": "Grok NVDA 2026-11-09: 1.6081 held, full exit at 173.44000244140625; the old sizing sent 1.608 and left 0.0001 share ($0.02) that no order could sell. Gemini's 2026-10-23 boundary cover of ISRG -15.0428 at 452.875 is the same arithmetic on COVER (old sizing: 15.0427).",
+        "demonstrations": {
+          "tests": "tests/test_full_quantity_exits.py, 27 cases: NVDA replay; full exit of every current holding in all six books (data/state at origin 0f9eec117) at two marks, <= 1e-9 share left; ISRG cover; existing dust still BELOW_VENUE_MINIMUM; partial-sell grid equal to the old formula; BUY unchanged; truncate_qty exact (1.043 survives) and never rounding up over 20,000 random inputs; all 24 venue positions at the 2026-11-10 15:30 cycle (fixture tests/fixtures/full_exit_positions_2026_11_10.json): the full-exit order strings sent through the real BrokerClient sum to the venue quantity exactly, LLY included (0.1148 sent for 0.11479999999999999); the oversell guard raises above 1e-12 and, on the sizing path, refuses the order (nothing sent, unclassified-skip alarm).",
+          "re_inserted_defect": "Old exit sizing restored: 6 tests fail (NVDA replay x2, all-holdings x2, cover x2). Old truncate_qty restored: 2 fail (partial-sell grid on the venue path, 1.043). Truncation put back in place of rounding on full exits: the 24-position test fails on LLY (strings sent 0.1436 + 0.114799999 + 0.2175 + 0.1794 against the venue's 0.6553), as do the two guard tests. All restored: 27 pass.",
+          "dry_cycle": "Run on 2cb205646 (and earlier on e66710302, same result): src.pipeline.run_one_model with every socket refused (0 connection attempts recorded), stubbed model, real Executor and real BrokerClient over an injected fake Alpaca session. Grok (venue): full exit PG 1.8381 sent as qty '1.8381', holding 0 after; partial KO 3.1748 -> 1.042 (sold 2.1328, the old rule); NVDA 0.0001 blocked BELOW_VENUE_MINIMUM (grok-DRYGROK-d02). DeepSeek (simulator): full exit ABBV 43.8172, holding 0 after."
+        },
+        "validation_count": {
+          "before": 15,
+          "after": 13,
+          "basis": "Corrected-executor sessions remaining in the November validation month once the order path changes again: 2026-11-11 through 2026-11-30 (Nov 26 closed; Nov 27 a half-session that counts per the exchange calendar), registered in docs/registrations/executor_sizing_floor_ruling.md §'Registered count'. 13 is below the 15-session floor."
+        },
+        "s1_conditional_branch": {
+          "status": "INVOKED, formally, by this entry.",
+          "registered_conditions": "'all named demonstrations passed + zero unresolved organic G-BOOK/G-EXEC events + explicit hub sign-off' (executor_sizing_floor_ruling.md, Registered count).",
+          "record_at_entry": "Demonstrations: as listed above, all passed. G-EXEC by the production scorer (src/analytics/execution_metrics.score_cycles), successful cycles / scored cycles per broker-paper book. 2026-11-06: claude 0/13, claude_opus 0/13, gemini 0/13, gpt 3/13, grok 7/13 (the executor-floor defect, ledgered as executor_floor_defect_2026_11_06 and fixed). 2026-11-09: claude 13/13, claude_opus 13/13, gemini 13/13, gpt 13/13, grok 13/13. 2026-11-10: claude 13/13, claude_opus 13/13, gemini 12/12, gpt 13/13, grok 13/13. Gemini ran 13 cycles on 2026-11-10; the 10:33 ET cycle produced no decision after an API 504 (DEADLINE_EXCEEDED), so the scorer excludes it from the denominator rather than counting it as a success. Level-2 reconciliation: every November row clean; orphan line empty and every per-book aggregate $0.00 on all 13 cycles of 2026-11-10. Whether any event counts as unresolved is the hub's call.",
+          "hub_sign_off": "Pending: the hub reviews the executor diff line by line and signs off naming the commits. Without it the branch is not satisfied and nothing is pushed."
+        },
+        "known_residual": "An oversell rejected at submission. The venue's rejection text for a SELL above the held quantity is not established from primary sources (Alpaca docs: fractional sell orders are marked long; fractional shorts are unsupported). If one occurred, the executor would record a SKIP with no constraint, scored fail:submission_failed (a G-EXEC failure cycle) with a CRITICAL unclassified-skip alarm. With full-exit strings equal to the venue on all 24 positions and the 1e-12 guard, that path should not be reachable; it is recorded here, not assumed away.",
+        "existing_dust": "Ruling §⑦: if the venue's close-position endpoint accepts a sub-$1 position, existing dust is liquidated administratively; if not, it stays in the book. Alpaca's saved docs (2026-11-10) show DELETE /v2/positions/{symbol} accepts qty to 9 decimals but say nothing on a minimum or waiver for a sub-$1 close, so this is not established from primary sources. No order was placed. Until it is established, existing dust stays in the book per the ruling's default."
       }
     ]
   }
