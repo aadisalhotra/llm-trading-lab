@@ -3012,6 +3012,184 @@
         "applies_to": "All six books, DeepSeek included at about $126k NAV, because the ruling ties the bound to the registered book capital, not each book's own size (hub 2026-11-09).",
         "config": "reconciliation.book_aggregate_bound_pct = 0.001, read by config_loader.book_aggregate_bound_usd().",
         "follow_up": "Research notes that the registered name maps to this value."
+      },
+      {
+        "id": "cohort_as_run_2026_10_26",
+        "date": "2026-11-10",
+        "type": "cohort_as_run",
+        "scope": "the five confirmatory books (claude, claude_opus, gpt, grok, gemini); deepseek recorded for completeness (exploratory-only, live_cohort_composition_ruled)",
+        "authority": {
+          "registration": "docs/registrations/chain3_placeholder_resolutions.md Block 3 (re-issued 2026-11-08; file sha256 7ed28afb8e4cc76b7aee7b901f2645081286267fcaf072c05062800b50c542f3), spliced into docs/prereg/tier2_novel_sections.md T2.6 in the same commit as this entry.",
+          "dispatch": "Hub midweek manifest 2026-11-10 (MANIFEST.md sha256 795e17591ff1dc3cfd65588a2a96a998654d41f1e22d39176e761db67b22c984), item 2: entry written from (a) the config history and (b) primary dated provider pages only."
+        },
+        "registered_rule_not_executed": "The modified-refresh pin scheduled for 2026-10-26 was not executed. Operations found no record of a run in the repo, the ledger, logs/, memory or session transcripts (sweep 2026-11-08); the hub's ledger check of 2026-11-08 found the only 2026-10-26 reference at origin to be the scheduled date inside phase_b_boundary_moved_to_2026_12_01. Disclosed as a process failure of the registered calendar. The cohort is pinned to the deployed snapshots by the 2026-11-08 pre-deposit amendment (Chain 3 Block 3).",
+        "a_config_history": {
+          "method": "git log of config/settings.json, models.<book>.model at every commit since 2026-04-01 (author dates); cross-checked against model_id_returned in data/trades/*.jsonl.",
+          "changes_since_2026_04_09": [
+            {
+              "date": "2026-04-09",
+              "commit": "6fb70567e",
+              "change": "claude: claude-opus-4-6 -> claude-sonnet-4-6; claude_opus added as claude-opus-4-6"
+            },
+            {
+              "date": "2026-04-09",
+              "commit": "7830715a2",
+              "change": "grok: grok-4 -> grok-4.20-0309-reasoning; deepseek: deepseek-chat -> deepseek-reasoner"
+            },
+            {
+              "date": "2026-05-21",
+              "commit": "4353df0e3",
+              "change": "gpt: gpt-5.4 -> gpt-5.4-2026-03-05 (alias to dated snapshot); deepseek: deepseek-reasoner -> deepseek-v4-flash"
+            },
+            {
+              "date": "2026-05-21",
+              "commit": "4ee489278",
+              "change": "deepseek: deepseek-v4-flash -> deepseek-v4-pro"
+            }
+          ],
+          "deployed_ids": {
+            "claude": "claude-sonnet-4-6",
+            "claude_opus": "claude-opus-4-6",
+            "gpt": "gpt-5.4-2026-03-05",
+            "grok": "grok-4.20-0309-reasoning",
+            "gemini": "gemini-3.1-pro-preview",
+            "deepseek": "deepseek-v4-pro"
+          },
+          "at_2026_10_26": "Identical to deployed_ids at 35b2d544d (last commit before 2026-10-27 00:00 ET) and at origin 0f9eec117 (2026-11-10).",
+          "statement": "No model-ID change since 2026-05-21.",
+          "returned_ids_2026_10_26_to_2026_11_10": "data/trades: every record for each of the six books in this span (154 per book) carries model_id_returned equal to the deployed id; no other value occurs."
+        },
+        "b_newer_ga_flagship_on_2026_10_26": {
+          "rule": "Primary dated provider pages only (announcement, release notes, model list). Secondary sources were used only to locate pages, never as evidence. A slot not confirmable from a primary page reads 'not established from primary sources'.",
+          "retrieved": "2026-11-10, by HTTP GET of each URL (curl; pages stripped to text); quotes are verbatim from the fetched bytes.",
+          "ga_wording": "Only Google's release notes use the words 'generally available (GA)'. Anthropic ('now available on all platforms'), OpenAI ('Released ... to the Chat Completions and Responses API') and xAI ('available today ... through the Grok API') state availability without a preview or beta label; reading those as GA is Operations' interpretation, recorded as such. Which model counts as 'flagship' under the registered GA/flagship definitions is not decided here; the providers' own positioning is quoted.",
+          "slots": {
+            "anthropic": {
+              "deployed": [
+                "claude-sonnet-4-6",
+                "claude-opus-4-6"
+              ],
+              "hub_lead": "Sonnet 5.5 (2026-09-28), Opus 5.5 (2026-09-22)",
+              "verdict": "CONFIRMED: newer models available on all platforms before 2026-10-26.",
+              "sources": [
+                {
+                  "model": "claude-opus-5-5",
+                  "url": "https://www.anthropic.com/news/claude-opus-5-5",
+                  "page_date": "September 22, 2026",
+                  "quote": "Claude Opus 5.5 is now available on all platforms"
+                },
+                {
+                  "model": "claude-sonnet-5-5",
+                  "url": "https://www.anthropic.com/news/claude-sonnet-5-5",
+                  "page_date": "September 28, 2026",
+                  "quote": "Claude Sonnet 5.5 is now available on all platforms"
+                },
+                {
+                  "model": "claude-opus-5-5",
+                  "url": "https://platform.claude.com/docs/en/release-notes/overview",
+                  "page_date": "entry 'September 22, 2026'",
+                  "quote": "We’ve launched Claude Opus 5.5 ( claude-opus-5-5 )"
+                },
+                {
+                  "model": "claude-sonnet-5-5",
+                  "url": "https://platform.claude.com/docs/en/release-notes/overview",
+                  "page_date": "entry 'September 28, 2026'",
+                  "quote": "We’ve launched Claude Sonnet 5.5 ( claude-sonnet-5-5 )"
+                },
+                {
+                  "model": "claude-fable-5-1",
+                  "url": "https://platform.claude.com/docs/en/release-notes/overview",
+                  "page_date": "entry 'September 1, 2026'",
+                  "quote": "We’ve launched Claude Fable 5.1 ( claude-fable-5-1 ), the successor to"
+                }
+              ],
+              "note": "Anthropic's release notes also record a tier above Opus, Claude Fable 5.1 (claude-fable-5-1), launched 2026-09-01. Whether the registered flagship definition maps the Opus slot to Opus 5.5 or to that tier is for Research. Fable 5.2 is dated 2026-11-09, after the pin date."
+            },
+            "openai": {
+              "deployed": "gpt-5.4-2026-03-05",
+              "hub_lead": "GPT-5.5 (2026-04-23)",
+              "verdict": "CONFIRMED that newer models existed; the hub lead is true but not the newest. Newest by the provider's own positioning on 2026-10-26: GPT-6 Astra, released 2026-09-03.",
+              "sources": [
+                {
+                  "model": "gpt-5.5",
+                  "url": "https://developers.openai.com/api/docs/changelog",
+                  "page_date": "entry 'Apr 24' under 'April, 2026'",
+                  "quote": "Released [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5), a new frontier model for complex professional work, to the Chat Completions and Responses API"
+                },
+                {
+                  "model": "gpt-5.5",
+                  "url": "https://developers.openai.com/api/docs/models/gpt-5.5",
+                  "page_date": "undated model page",
+                  "quote": "gpt-5.5-2026-04-23"
+                },
+                {
+                  "model": "gpt-6-astra",
+                  "url": "https://developers.openai.com/api/docs/changelog",
+                  "page_date": "entry 'Sep 3' under 'September, 2026'",
+                  "quote": "Released [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), our most capable model, built for the hardest end-to-end work."
+                },
+                {
+                  "model": "gpt-6-astra",
+                  "url": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+                  "page_date": "undated model page",
+                  "quote": "GPT-6 Astra is our most capable model"
+                }
+              ],
+              "not_established": "The 2026-04-23 announcement date on openai.com: https://openai.com/index/introducing-gpt-5-5/ returned HTTP 403, so that page is not established from primary sources. The API release (Apr 24) and the snapshot id gpt-5.5-2026-04-23 are established from developers.openai.com.",
+              "note": "The changelog also records GPT-5.6 (Jul) and GPT-6 Sol/Luna (Sep 22) between the deployed model and the pin date."
+            },
+            "xai": {
+              "deployed": "grok-4.20-0309-reasoning",
+              "hub_lead": "Grok 4.7 (2026-09-21)",
+              "verdict": "CONFIRMED.",
+              "sources": [
+                {
+                  "model": "grok-4.7",
+                  "url": "https://x.ai/news/grok-4-7",
+                  "page_date": "Sep 21, 2026",
+                  "quote": [
+                    "Grok 4.7 is our most capable model for coding and knowledge work.",
+                    "Grok 4.7 is available today in Cursor and Grok Build . It is also available through the Grok API"
+                  ]
+                },
+                {
+                  "model": "grok-4.7",
+                  "url": "https://docs.x.ai/developers/models",
+                  "page_date": "Last updated: September 21, 2026",
+                  "quote": "Our flagship model for code and everything else"
+                }
+              ]
+            },
+            "google": {
+              "deployed": "gemini-3.1-pro-preview",
+              "hub_lead": "unresolved",
+              "verdict": "CONFIRMED (resolved): Gemini 4 Argon, generally available 2026-10-13, before the pin date.",
+              "sources": [
+                {
+                  "model": "gemini-4-argon",
+                  "url": "https://ai.google.dev/gemini-api/docs/changelog (served from aistudio.google.com/docs/changelog)",
+                  "page_date": "entry 'October 13, 2026'",
+                  "quote": "Gemini 4 Argon (`gemini-4-argon`) generally available (GA)"
+                },
+                {
+                  "model": "gemini-4-argon",
+                  "url": "https://aistudio.google.com/docs/models/gemini-4-argon",
+                  "page_date": "model page",
+                  "quote": "Stable: `gemini-4-argon`"
+                },
+                {
+                  "model": "gemini-3.1-pro-preview",
+                  "url": "https://aistudio.google.com/docs/deprecations",
+                  "page_date": "undated list",
+                  "quote": "gemini-3.1-pro-preview"
+                }
+              ],
+              "gemini_3_1_pro_ga": "not established from primary sources: no GA entry for gemini-3.1-pro in the changelog, the string 'gemini-3.1-pro' without '-preview' appears in neither the changelog nor the models page, and the deprecations page lists gemini-3.1-pro-preview under preview models. Absence of evidence, not a positive statement.",
+              "note": "Gemini 4 Carbon is dated 2026-11-10, after the pin date. T2.2's 'no generally-available pro-tier text model at gemini-3.x' remains true of 3.x; whether gemini-4-argon is a compliant migration target under the Gemini exception is for Research."
+            }
+          }
+        },
+        "consequence": "None to the cohort: the 2026-11-08 amendment pins the deployed snapshots regardless of what was available. This entry is the factual record the amendment's disclosure cites: a newer model was available for every one of the four provider slots on 2026-10-26."
       }
     ]
   }
