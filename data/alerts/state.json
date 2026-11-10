@@ -41,9 +41,10 @@
   },
   "daily": {
     "date": "2026-11-10",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "api_failure:gemini"
+      "api_failure:gemini",
+      "macro_event:Severe economic data"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -55,6 +56,22 @@
         "timestamp": "2026-11-10T15:38:23.384489+00:00",
         "disposition": "sent",
         "dispatch_id": "9b650793da39"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-10T16:32:55.385865+00:00",
+        "trigger": {
+          "headline": "Wall St opens lower after October's hot inflation print - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-10T14:35:04+00:00",
+          "category": "Severe economic data",
+          "matched_term": "hot inflation",
+          "score": -0.7506
+        },
+        "disposition": "sent",
+        "dispatch_id": "f6ebdf53ec0b"
       }
     ]
   }
