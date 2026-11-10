@@ -53,7 +53,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 import requests
@@ -158,6 +158,20 @@ def truncate_qty(shares: float) -> float:
     q = Decimal(repr(float(shares))).quantize(_QTY_QUANTUM, rounding=ROUND_DOWN)
     return float(q)
 
+
+def round_qty(shares: float) -> float:
+    """Round to the nearest 9-dp venue quantity (ROUND_HALF_EVEN). Full exits only.
+
+    A book holding is a sum of venue fills, each exact at 9 dp, carried in a
+    float: its error is ~1e-17, far below half a 9-dp unit, so rounding
+    recovers the venue's exact decimal (0.11479999999999999 -> 0.1148), where
+    truncate_qty would cut it to 0.114799999 and strand 1e-9 share at the venue.
+    Never use this for a BUY or a partial sell: those keep truncate_qty's
+    ROUND_DOWN, because rounding up there can exceed the cash or holding the
+    order was checked against. Hub ruling 2026-11-10 on ghost ruling §⑦.
+    """
+    q = Decimal(repr(float(shares))).quantize(_QTY_QUANTUM, rounding=ROUND_HALF_EVEN)
+    return float(q)
 
 def build_order_id(book: str, cycle_id: str, seq: int, attempt: int = 0) -> str:
     """Compose a `client_order_id` that carries book identity.

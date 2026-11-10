@@ -255,3 +255,99 @@ def test_truncate_qty_never_rounds_up():
         q = truncate_qty(x)
         assert q <= x
         assert x - q < 1e-9 + 1e-12
+
+
+# --------------------------------------------------------------------------- #
+# Full exits round to the venue's exact 9-dp quantity (hub ruling 2026-11-10)
+# --------------------------------------------------------------------------- #
+FIXTURE = ROOT / "tests" / "fixtures" / "full_exit_positions_2026_11_10.json"
+
+
+class _FakeAlpacaSession:
+    """Records the order body the real BrokerClient sends; fills it in full."""
+
+    def __init__(self):
+        self.bodies: list[dict] = []
+        self.orders: dict[str, dict] = {}
+
+    def request(self, method, url, headers=None, json=None, params=None, timeout=None):
+        class R:
+            def __init__(self, payload):
+                self.status_code, self._p, self.text = 200, payload, ""
+
+            def json(self):
+                return self._p
+
+        if method == "POST":
+            self.bodies.append(dict(json))
+            o = {"id": f"o{len(self.orders)}", "client_order_id": json["client_order_id"],
+                 "symbol": json["symbol"], "side": json["side"], "qty": json["qty"],
+                 "status": "filled", "filled_qty": json["qty"], "filled_avg_price": "100"}
+            self.orders[o["id"]] = o
+            return R(o)
+        return R(self.orders[url.rsplit("/", 1)[-1]])
+
+
+def _venue_exit_body(monkeypatch, book_key, ticker, shares_repr):
+    """Full exit of one book holding through the real venue path; the body sent."""
+    from src.execution.broker import BrokerClient
+    monkeypatch.setenv("ALPACA_PAPER_KEY", "TEST-NOT-A-KEY")
+    monkeypatch.setenv("ALPACA_PAPER_SECRET", "TEST-NOT-A-SECRET")
+    # A full exit's quantity does not depend on the mark; the mark only has to
+    # clear the $1 venue minimum (Grok's 0.0001 NVDA would not at $100).
+    px = max(100.0, 2.0 / float(shares_repr))
+    session = _FakeAlpacaSession()
+    ex = _executor("broker", {ticker: px}, book_key)
+    ex.broker = BrokerClient("broker_paper", session=session, poll_interval_seconds=0.0)
+    book = _book({ticker: Holding(ticker, float(shares_repr), px)}, key=book_key)
+    r = ex.execute_decisions(book, [_sell(ticker)], {ticker: px}, run_date=ACTIVE)[0]
+    assert r.executed is True, (book_key, ticker, r.error, r.constraint)
+    (body,) = session.bodies
+    return body["qty"]
+
+
+def test_full_exit_strings_equal_the_venue_on_all_24_positions(monkeypatch):
+    """For every venue position at the 2026-11-10 15:30 cycle, the full-exit
+    order strings of the books holding it sum to the venue's quantity exactly
+    (and equal it outright where one book holds the name). LLY is the case
+    truncation failed: Claude Opus books 0.11479999999999999."""
+    from decimal import Decimal
+    fx = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    venue = fx["venue_positions"]
+    assert len(venue) == 24 and "LLY" in venue
+    for ticker, venue_qty in venue.items():
+        holders = [(b, h[ticker]) for b, h in fx["book_holdings"].items() if ticker in h]
+        assert holders, ticker
+        sent = [_venue_exit_body(monkeypatch, b, ticker, s) for b, s in holders]
+        assert sum(Decimal(q) for q in sent) == Decimal(venue_qty), (ticker, holders, sent)
+        if len(holders) == 1:
+            assert sent[0] == venue_qty, (ticker, sent[0], venue_qty)
+    lly = dict(fx["book_holdings"]["claude_opus"])["LLY"]
+    assert lly == "0.11479999999999999"
+    assert _venue_exit_body(monkeypatch, "claude_opus", "LLY", lly) == "0.1148"
+
+
+def test_the_full_exit_oversell_guard_raises():
+    """If rounding ever lands above the book's own value by more than 1e-12,
+    sizing raises rather than sending an oversell."""
+    from src.execution import executor as exmod
+    # float error rounds up by ~1e-17: allowed
+    assert exmod._exit_quantity(1.0, 100.0, 0.11479999999999999, 0.0) == 0.1148
+    # a holding that is not a 9-dp quantity rounds up by 4e-10: refused
+    with pytest.raises(ValueError, match="refusing to oversell"):
+        exmod._exit_quantity(1.0, 100.0, 0.1234567895, 0.0)
+    assert exmod.FULL_EXIT_OVERSELL_GUARD == 1e-12
+
+
+def test_the_guard_is_on_the_sizing_path_and_alarms(monkeypatch):
+    """Through execute_decisions: a refused full exit is never sent; it lands
+    as a classified sizing failure that raises the unclassified-skip alarm."""
+    from src.execution import executor as exmod
+    from src.execution.executor import requires_skip_alarm
+    monkeypatch.setattr(exmod, "round_qty", lambda s: s + 1e-9)     # a broken rounder
+    ex = _executor("broker", {"LLY": 1370.0})
+    book = _book({"LLY": Holding("LLY", 0.1148, 1300.0)})
+    r = ex.execute_decisions(book, [_sell("LLY")], {"LLY": 1370.0}, run_date=ACTIVE)[0]
+    assert r.executed is False and requires_skip_alarm(r)
+    assert ex.broker.submissions == []
+    assert book.holdings["LLY"].shares == 0.1148

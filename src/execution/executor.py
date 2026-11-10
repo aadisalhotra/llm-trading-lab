@@ -36,6 +36,7 @@ from .broker import (
     BrokerClient,
     BrokerOrder,
     build_order_id,
+    round_qty,
 )
 
 logger = logging.getLogger("llmlab.execution")
@@ -228,14 +229,24 @@ class _Placement:
         return self.filled_qty > 0 and self.fill_price > 0
 
 
+# A full exit may round the book's float holding UP to the venue's 9-dp value
+# by its float error (~1e-17). Anything above this is not float error.
+FULL_EXIT_OVERSELL_GUARD = 1e-12
+
+
 def _exit_quantity(delta_notional: float, price: float, held: float,
                    target_notional: float) -> float:
     """Shares to sell (or cover) for a reducing order on a held position.
 
     A full exit -- the decision's target is zero, so nothing should remain --
-    sends the exact held quantity; the venue receives it at its 9-dp precision
-    (broker.truncate_qty), leaving at most 1e-9 share, which fix A's
-    no-position threshold deletes. Ghost-position ruling §⑦ (c),
+    sends the held quantity rounded to the nearest 9-dp venue quantity
+    (broker.round_qty, ROUND_HALF_EVEN). The book holding is a float sum of
+    9-dp fills, so rounding recovers the venue's exact position; truncating
+    0.11479999999999999 would send 0.114799999 and strand 1e-9 share at the
+    venue. Oversell guard: if rounding ever lands above the book's own value
+    by more than FULL_EXIT_OVERSELL_GUARD, the holding was not a 9-dp
+    quantity and the order is refused (raised, so the sizing failure is
+    classified and alarmed, never sent). Ghost-position ruling §⑦ (c),
     docs/registrations/ghost_position_ruling.md: the 4-dp truncation below,
     applied to a full exit, re-derived the holding through a float round-trip
     (shares x price / price) and could fall 0.0001 short of it, leaving dust
@@ -245,7 +256,12 @@ def _exit_quantity(delta_notional: float, price: float, held: float,
     at the holding.
     """
     if target_notional <= 0:
-        return held
+        qty = round_qty(held)
+        if qty - held > FULL_EXIT_OVERSELL_GUARD:
+            raise ValueError(
+                f"full-exit quantity {qty!r} exceeds the held {held!r} by "
+                f"{qty - held:.3e} share: not a 9-dp holding; refusing to oversell")
+        return qty
     return min(int(delta_notional / price * 10000) / 10000, held)
 
 

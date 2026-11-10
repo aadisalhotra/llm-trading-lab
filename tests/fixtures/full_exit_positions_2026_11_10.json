@@ -1,0 +1,93 @@
+{
+  "_source": "Venue positions: data/reconciliation/2026-11.jsonl row cycle_id 20261110T203222Z (broker_positions, read from the venue's position API; stored as floats, so each string is repr(float), which recovers the API's decimal string). Book holdings: data/state/<book>.json at origin 0f9eec117, as repr(float). The five broker-paper books only; deepseek is paper and holds nothing at the venue.",
+  "cycle_id": "20261110T203222Z",
+  "venue_positions": {
+    "AAPL": "0.4029",
+    "ADBE": "0.5894",
+    "AMD": "0.8169",
+    "AMZN": "3.4849",
+    "AVGO": "0.3137",
+    "AXP": "0.7409",
+    "BAC": "7.6445",
+    "CAT": "0.1692",
+    "DE": "0.2337",
+    "EOG": "0.6771",
+    "GOOGL": "0.2761",
+    "ISRG": "0.443",
+    "JNJ": "1.1047",
+    "JPM": "0.4103",
+    "KO": "8.8911",
+    "LLY": "0.6553",
+    "MA": "0.1842",
+    "MCD": "1.1077",
+    "NVDA": "0.6711",
+    "PFE": "3.4686",
+    "PG": "5.487",
+    "QCOM": "1.2089",
+    "RTX": "3.475299999",
+    "WMT": "9.1799"
+  },
+  "book_holdings": {
+    "claude": {
+      "KO": "2.1105",
+      "WMT": "1.5983",
+      "PG": "1.2036",
+      "LLY": "0.1436",
+      "RTX": "0.6262",
+      "AMZN": "0.6715",
+      "AXP": "0.4317",
+      "DE": "0.0892",
+      "ADBE": "0.5894",
+      "JPM": "0.4103"
+    },
+    "claude_opus": {
+      "KO": "1.4917",
+      "WMT": "1.1276",
+      "PFE": "3.4686",
+      "AAPL": "0.4029",
+      "AMD": "0.2549",
+      "AMZN": "0.5151",
+      "LLY": "0.11479999999999999",
+      "RTX": "0.5227",
+      "MA": "0.1842",
+      "DE": "0.1445",
+      "AXP": "0.3092",
+      "NVDA": "0.671",
+      "AVGO": "0.3137",
+      "CAT": "0.1692",
+      "ISRG": "0.1743",
+      "GOOGL": "0.2761"
+    },
+    "gemini": {
+      "PG": "1.2199",
+      "WMT": "2.4465",
+      "EOG": "0.6771",
+      "LLY": "0.21750000000000003",
+      "RTX": "1.2834",
+      "AMD": "0.3628",
+      "AMZN": "0.6072"
+    },
+    "gpt": {
+      "PG": "1.2254",
+      "WMT": "1.6108",
+      "KO": "2.1141",
+      "QCOM": "1.2089",
+      "BAC": "4.0077",
+      "AMZN": "1.1012",
+      "RTX": "1.042999999",
+      "LLY": "0.1794",
+      "AMD": "0.1992"
+    },
+    "grok": {
+      "PG": "1.8381",
+      "MCD": "1.1077",
+      "KO": "3.1748",
+      "WMT": "2.3967",
+      "JNJ": "1.1047",
+      "BAC": "3.6368",
+      "NVDA": "0.0001",
+      "AMZN": "0.5899",
+      "ISRG": "0.2687"
+    }
+  }
+}
