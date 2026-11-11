@@ -40,56 +40,38 @@
     ]
   },
   "daily": {
-    "date": "2026-11-10",
-    "sent_count": 4,
+    "date": "2026-11-11",
+    "sent_count": 2,
     "dedup_keys": [
-      "api_failure:gemini",
-      "macro_event:Severe economic data",
-      "news:AMZN:2bef589d67",
-      "news:RTX:8f5ccbb7ae"
+      "macro_event:Geopolitical shock",
+      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
-      {
-        "kind": "api_failure",
-        "severity": "WARN",
-        "title": "Model gemini failed",
-        "timestamp": "2026-11-10T15:38:23.384489+00:00",
-        "disposition": "sent",
-        "dispatch_id": "9b650793da39"
-      },
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
-        "timestamp": "2026-11-10T16:32:55.385865+00:00",
+        "timestamp": "2026-11-11T15:02:56.995969+00:00",
         "trigger": {
-          "headline": "Wall St opens lower after October's hot inflation print - Reuters",
+          "headline": "Gulf markets rise as investors assess Iran war, shipping risks - Reuters",
           "source": "Reuters",
-          "headline_time": "2026-11-10T14:35:04+00:00",
-          "category": "Severe economic data",
-          "matched_term": "hot inflation",
-          "score": -0.7506
+          "headline_time": "2026-11-11T13:27:41+00:00",
+          "category": "Geopolitical shock",
+          "matched_term": "war",
+          "score": -0.9042
         },
         "disposition": "sent",
-        "dispatch_id": "f6ebdf53ec0b"
+        "dispatch_id": "69dfef0bb910"
       },
       {
-        "kind": "news_impact",
+        "kind": "fill_overrun",
         "severity": "WARN",
-        "title": "Very Positive news on AMZN (held by 5)",
-        "timestamp": "2026-11-10T22:07:35.004119+00:00",
-        "disposition": "queued",
-        "dispatch_id": "2d61c001800e"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on RTX (held by 5)",
-        "timestamp": "2026-11-10T22:07:35.005663+00:00",
-        "disposition": "queued",
-        "dispatch_id": "10f73b1b4a65"
+        "title": "FILL_OVERRUN: gpt AVGO",
+        "timestamp": "2026-11-11T15:04:57.122576+00:00",
+        "disposition": "sent",
+        "dispatch_id": "3b58b9bd3b4d"
       }
     ]
   }
