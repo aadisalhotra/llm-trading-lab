@@ -1128,7 +1128,26 @@ def _build_market_brief(
     }
 
 
-def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str, Any]:
+def leaderboard_snapshot_name(run_date: datetime | None = None) -> str:
+    """File name for the archived leaderboard snapshot: the run's ET session date.
+
+    Never the wall clock. The 2026-11-11 end-of-day run fired after midnight
+    UTC and filed its leaderboard as 2026-11-12.json, a day the daily report
+    then read as the prior session. The pipeline passes its run date; any other
+    caller gets today's ET date. A naive run_date is taken as already ET.
+    """
+    et = ZoneInfo("America/New_York")
+    if run_date is None:
+        day = datetime.now(et)
+    elif run_date.tzinfo is None:
+        day = run_date
+    else:
+        day = run_date.astimezone(et)
+    return f"{day.strftime('%Y-%m-%d')}.json"
+
+
+def build_dashboard_payload(prices: dict[str, float] | None = None,
+                            run_date: datetime | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
     model_keys = list(settings["models"].keys())
@@ -1322,7 +1341,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None) -> dict[str,
 
     # Also drop a leaderboard-only snapshot for archival
     LEADERBOARD_DIR.mkdir(parents=True, exist_ok=True)
-    snap_path = LEADERBOARD_DIR / f"{today.strftime('%Y-%m-%d')}.json"
+    snap_path = LEADERBOARD_DIR / leaderboard_snapshot_name(run_date)
     with open(snap_path, "w", encoding="utf-8") as f:
         json.dump(leaderboard, f, indent=2, default=str)
 
