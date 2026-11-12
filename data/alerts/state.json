@@ -41,69 +41,13 @@
   },
   "daily": {
     "date": "2026-11-11",
-    "sent_count": 10,
+    "sent_count": 2,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0",
-      "state_cash:gpt",
-      "negative:claude",
-      "negative:gpt",
-      "negative:gemini",
-      "negative:grok",
-      "negative:deepseek",
-      "negative:claude_opus",
-      "ath:deepseek",
-      "news:AMD:fd3a01bd9e",
-      "news:LLY:42c4734389"
+      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0"
     ],
-    "overflow": [
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Negative news on AMD (held by 4)",
-        "body": "A <b>very negative</b> headline (sentiment -0.72) is affecting <b>AMD</b>, held by 4 models (Claude Opus 4.6, DeepSeek V4 Pro, GPT-5.4, Gemini 3.1 Pro):<br><i>&ldquo;More Bad News for NVIDIA. With Board Planning to Boot Jensen Huang, Sam Altman Reveals Master Plan to Stop Buying Their Chips&rdquo;</i> \u2014 Yahoo.",
-        "context": {
-          "models": [
-            "Claude Opus 4.6",
-            "DeepSeek V4 Pro",
-            "GPT-5.4",
-            "Gemini 3.1 Pro"
-          ],
-          "numbers": {
-            "Ticker": "AMD",
-            "Sentiment": "-0.72 (very negative)",
-            "Models holding": "4",
-            "Source": "Yahoo"
-          }
-        },
-        "fired_at_et": "2026-11-11 21:04 ET",
-        "timestamp": "2026-11-12T02:04:24.026812+00:00"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on LLY (held by 5)",
-        "body": "A <b>very positive</b> headline (sentiment +0.74) is affecting <b>LLY</b>, held by 5 models (Claude Opus 4.6, Claude Sonnet 4.6, DeepSeek V4 Pro, GPT-5.4, Gemini 3.1 Pro):<br><i>&ldquo;Eli Lilly Just Raised Its 2026 Sales Forecast to as Much as $92 Billion. But Is Viking Therapeutics the Next Big Obesity Winner?&rdquo;</i> \u2014 Yahoo.",
-        "context": {
-          "models": [
-            "Claude Opus 4.6",
-            "Claude Sonnet 4.6",
-            "DeepSeek V4 Pro",
-            "GPT-5.4",
-            "Gemini 3.1 Pro"
-          ],
-          "numbers": {
-            "Ticker": "LLY",
-            "Sentiment": "+0.74 (very positive)",
-            "Models holding": "5",
-            "Source": "Yahoo"
-          }
-        },
-        "fired_at_et": "2026-11-11 21:04 ET",
-        "timestamp": "2026-11-12T02:04:24.027610+00:00"
-      }
-    ],
-    "digest_sent": true,
+    "overflow": [],
+    "digest_sent": false,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -128,84 +72,6 @@
         "timestamp": "2026-11-11T15:04:57.122576+00:00",
         "disposition": "sent",
         "dispatch_id": "3b58b9bd3b4d"
-      },
-      {
-        "kind": "state_anomaly",
-        "severity": "WARN",
-        "title": "State anomaly (cash): GPT-5.4",
-        "timestamp": "2026-11-12T02:04:23.558397+00:00",
-        "disposition": "queued",
-        "dispatch_id": "705076aeb4d3"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Claude Sonnet 4.6 went negative",
-        "timestamp": "2026-11-12T02:04:23.961063+00:00",
-        "disposition": "queued",
-        "dispatch_id": "bd1629961afd"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "GPT-5.4 went negative",
-        "timestamp": "2026-11-12T02:04:23.962751+00:00",
-        "disposition": "queued",
-        "dispatch_id": "cfdcf79531d9"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Gemini 3.1 Pro went negative",
-        "timestamp": "2026-11-12T02:04:23.964329+00:00",
-        "disposition": "queued",
-        "dispatch_id": "ff59cf2392ea"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Grok 4.20 (Reasoning) went negative",
-        "timestamp": "2026-11-12T02:04:23.966229+00:00",
-        "disposition": "queued",
-        "dispatch_id": "958091398fcd"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "DeepSeek V4 Pro went negative",
-        "timestamp": "2026-11-12T02:04:23.968721+00:00",
-        "disposition": "queued",
-        "dispatch_id": "e626e79d9852"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Claude Opus 4.6 went negative",
-        "timestamp": "2026-11-12T02:04:23.973036+00:00",
-        "disposition": "queued",
-        "dispatch_id": "fd415a324a47"
-      },
-      {
-        "kind": "ath",
-        "severity": "INFO",
-        "title": "DeepSeek V4 Pro hit a new all-time high",
-        "timestamp": "2026-11-12T02:04:24.013631+00:00",
-        "disposition": "queued",
-        "dispatch_id": "a3bc8665caba"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Negative news on AMD (held by 4)",
-        "timestamp": "2026-11-12T02:04:24.026812+00:00",
-        "disposition": "overflow"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on LLY (held by 5)",
-        "timestamp": "2026-11-12T02:04:24.027610+00:00",
-        "disposition": "overflow"
       }
     ]
   }
