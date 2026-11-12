@@ -41,13 +41,17 @@
   },
   "daily": {
     "date": "2026-11-11",
-    "sent_count": 2,
+    "sent_count": 6,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0"
+      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0",
+      "state_cash:gpt",
+      "news:AMD:fd3a01bd9e",
+      "news:AMZN:3bcc3e56c2",
+      "news:LLY:42c4734389"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -72,6 +76,38 @@
         "timestamp": "2026-11-11T15:04:57.122576+00:00",
         "disposition": "sent",
         "dispatch_id": "3b58b9bd3b4d"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-12T02:41:16.030699+00:00",
+        "disposition": "queued",
+        "dispatch_id": "f87fd02f4a03"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Negative news on AMD (held by 4)",
+        "timestamp": "2026-11-12T02:41:16.263620+00:00",
+        "disposition": "queued",
+        "dispatch_id": "480d49288ba7"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on AMZN (held by 5)",
+        "timestamp": "2026-11-12T02:41:16.265167+00:00",
+        "disposition": "queued",
+        "dispatch_id": "5dccb23046b0"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-11-12T02:41:16.266309+00:00",
+        "disposition": "queued",
+        "dispatch_id": "790bcf8d4e5b"
       }
     ]
   }
