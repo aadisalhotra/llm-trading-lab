@@ -41,11 +41,12 @@
   },
   "daily": {
     "date": "2026-11-12",
-    "sent_count": 3,
+    "sent_count": 4,
     "dedup_keys": [
       "position_stop:grok",
       "stop_unprotected:grok",
-      "fill_overrun:grok:20261112T160243Z:grok-20261112T160243Z-01-a0"
+      "fill_overrun:grok:20261112T160243Z:grok-20261112T160243Z-01-a0",
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -73,6 +74,22 @@
         "timestamp": "2026-11-12T16:05:19.506812+00:00",
         "disposition": "sent",
         "dispatch_id": "aa93c35afa04"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-12T17:33:15.356709+00:00",
+        "trigger": {
+          "headline": "Saudi Arabia puts pressure on EU to label Yemen's Houthis a terrorist group - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-12T16:04:51+00:00",
+          "category": "Geopolitical shock",
+          "matched_term": "terrorist",
+          "score": -0.9217
+        },
+        "disposition": "sent",
+        "dispatch_id": "8bee6eed92a1"
       }
     ]
   }
