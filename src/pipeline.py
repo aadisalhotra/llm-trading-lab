@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -116,6 +117,22 @@ def _prices_from_data(data: dict) -> dict[str, float]:
     return out
 
 
+def _eod_unvaluable_closes(prices: dict[str, float], settings: dict[str, Any],
+                           model_keys: list[str]) -> list[str]:
+    """Closes the EOD valuation needs that are missing or non-finite.
+
+    The valuation set is every ticker any enabled book holds (long or short) plus
+    the benchmark. On 2026-11-11 the vendor served the day's daily bar with
+    Close = NaN and the EOD run wrote NaN rows, a NaN report and seven false
+    threshold alerts (reverted in c67c15418/ed7d825ce).
+    """
+    needed = {settings["benchmark_ticker"]}
+    for mk in model_keys:
+        needed.update(load_portfolio(mk).holdings)
+    return sorted(t for t in needed
+                  if not (isinstance(prices.get(t), float) and math.isfinite(prices[t])))
+
+
 def _compute_agreement_counts(
     model_key: str,
     execution_results: list[Any],
@@ -167,6 +184,7 @@ def run_one_model(
     ticker_order: list[dict[str, Any]] | None = None,
     barrier: CycleBarrier | None = None,
     fetch_started_at: datetime | None = None,
+    eod_valuation_ok: bool = True,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -203,6 +221,13 @@ def run_one_model(
         snapshot_after = snapshot_before
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
         save_portfolio(portfolio)
+        if not eod_valuation_ok:
+            # Housekeeping only: no intraday or performance row from a valuation
+            # built on a missing or non-finite close. run_pipeline has alerted.
+            return {"model_key": model_key, "status": "EOD_VALUATION_ABORTED",
+                    "trades_executed": 0,
+                    "trades_today": portfolio.intraday.trades_executed_today,
+                    "runs_today": portfolio.intraday.runs_today}
         log_intraday_snapshot(
             model_key=model_key, run_timestamp=run_date,
             snapshot=snapshot_after,
@@ -685,6 +710,27 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             send_heartbeat(success=False, settings=settings)
         return 1
 
+    # EOD valuation guard. A missing or non-finite close for any held name or
+    # the benchmark aborts the valuation outputs (performance and intraday rows,
+    # dashboard, daily report, leaderboard, digest and its threshold sweep) with
+    # one CRITICAL. Housekeeping still runs, and the run exits 0 so it commits.
+    eod_bad_closes: list[str] = []
+    if is_eod:
+        eod_bad_closes = _eod_unvaluable_closes(
+            prices, settings,
+            [mk for mk, c in settings["models"].items() if c.get("enabled", True)])
+        if eod_bad_closes:
+            day = run_date.strftime("%Y-%m-%d")
+            logger.critical("EOD valuation aborted for %s: non-finite closes for %d names: %s",
+                            day, len(eod_bad_closes), ", ".join(eod_bad_closes))
+            send_alert("CRITICAL",
+                       f"End-of-day valuation aborted: non-finite closes for {len(eod_bad_closes)} names",
+                       "The end-of-day run wrote no performance, intraday, leaderboard or "
+                       "daily-report rows and ran no threshold alerts. Housekeeping ran. "
+                       "The day's row is backfilled once real closes exist.",
+                       {"date": day, "names": ", ".join(eod_bad_closes)[:500]},
+                       kind="eod_valuation_aborted", dedup_key=f"eod_valuation_aborted:{day}")
+
     # Fetch news intelligence ONCE per pipeline tick — not per model — so all
     # 6 models see the same headline set on the same tick. The news module
     # caches to disk with a TTL so the actual provider call only fires when
@@ -770,6 +816,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 ticker_order=ticker_order,
                 barrier=barrier,
                 fetch_started_at=fetch_started_at,
+                eod_valuation_ok=not eod_bad_closes,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
@@ -859,16 +906,17 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
 
     # Build dashboard payload (intraday + EOD both refresh this — the dashboard
     # is always live)
-    logger.info("Building dashboard payload")
-    try:
-        build_dashboard_payload(prices=prices)
-    except Exception as e:
-        logger.exception("Dashboard build failed: %s", e)
-        send_alert("WARN", "Dashboard build failed", str(e),
-                   kind="dashboard_failure", dedup_key="dashboard_failure")
+    if not eod_bad_closes:
+        logger.info("Building dashboard payload")
+        try:
+            build_dashboard_payload(prices=prices)
+        except Exception as e:
+            logger.exception("Dashboard build failed: %s", e)
+            send_alert("WARN", "Dashboard build failed", str(e),
+                       kind="dashboard_failure", dedup_key="dashboard_failure")
 
-    # EOD-only: report + summary alert
-    if is_eod:
+    # EOD-only: report + summary alert (skipped when the valuation aborted)
+    if is_eod and not eod_bad_closes:
         # Index series for the daily prose — only fetched at EOD to keep
         # intraday ticks cheap
         logger.info("Fetching index data (S&P / Nasdaq / Dow) for daily report")
@@ -897,6 +945,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         }
         send_daily_summary(summary)
 
+    if is_eod:
         # Budget check — month-to-date spend per provider against the
         # configured monthly cap. Emits WARN at warn_threshold_pct (default
         # 80%) and CRITICAL at critical_threshold_pct (default 100%). Never
