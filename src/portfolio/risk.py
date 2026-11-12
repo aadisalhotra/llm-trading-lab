@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..config_loader import load_settings, universe_symbols
-from ..data.price_validity import is_finite_number, is_valid_price
+from ..price_checks import is_finite_number, is_valid_price
 from .portfolio import Portfolio
 
 logger = logging.getLogger("llmlab.risk")

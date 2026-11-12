@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import numbers
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -30,6 +28,9 @@ from typing import Any
 import pandas as pd
 
 from ..config_loader import DATA_DIR
+# The predicates live in a standard-library-only module so the alerting path
+# can use them without importing this package (pandas); re-exported here.
+from ..price_checks import is_finite_number, is_valid_price  # noqa: F401
 
 logger = logging.getLogger("llmlab.data.price_validity")
 
@@ -44,17 +45,6 @@ MARK_LAST_VALID_BAR = "last_valid_bar"   # an earlier bar of the same frame
 MARK_AVG_COST = "avg_cost"               # no valid bar at all in the frame
 
 DESCRIPTOR_DIR = DATA_DIR / "data_availability"
-
-
-def is_valid_price(x: Any) -> bool:
-    """A usable price: a real number, finite, and above zero."""
-    return (isinstance(x, numbers.Real) and not isinstance(x, bool)
-            and math.isfinite(x) and x > 0)
-
-
-def is_finite_number(x: Any) -> bool:
-    """A real, finite number (any sign). For values that may be zero or negative."""
-    return isinstance(x, numbers.Real) and not isinstance(x, bool) and math.isfinite(x)
 
 
 @dataclass

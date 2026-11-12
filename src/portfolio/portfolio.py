@@ -17,7 +17,7 @@ import pandas as pd
 
 from ..config_loader import STATE_DIR, effective_mode, load_settings, starting_capital
 from .settlement import SettlementLedger
-from ..data.price_validity import is_valid_price
+from ..price_checks import is_valid_price
 
 logger = logging.getLogger("llmlab.portfolio")
 

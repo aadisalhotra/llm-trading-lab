@@ -44,7 +44,7 @@ from ..config_loader import (
 )
 from .alert_state import ensure_daily, load_state, save_state
 from .email_alerts import send_email
-from ..data.price_validity import is_finite_number
+from ..price_checks import is_finite_number
 
 logger = logging.getLogger("llmlab.alerts.events")
 

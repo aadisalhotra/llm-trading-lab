@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR, load_settings
-from ..data.price_validity import is_finite_number
+from ..price_checks import is_finite_number
 
 _logger = logging.getLogger("llmlab.decision_log")
 
