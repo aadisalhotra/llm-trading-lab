@@ -41,10 +41,11 @@
   },
   "daily": {
     "date": "2026-11-12",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "position_stop:grok",
-      "stop_unprotected:grok"
+      "stop_unprotected:grok",
+      "fill_overrun:grok:20261112T160243Z:grok-20261112T160243Z-01-a0"
     ],
     "overflow": [],
     "digest_sent": false,
@@ -64,6 +65,14 @@
         "timestamp": "2026-11-12T14:35:06.305014+00:00",
         "disposition": "sent",
         "dispatch_id": "efde54d73d7b"
+      },
+      {
+        "kind": "fill_overrun",
+        "severity": "WARN",
+        "title": "FILL_OVERRUN: grok ORCL",
+        "timestamp": "2026-11-12T16:05:19.506812+00:00",
+        "disposition": "sent",
+        "dispatch_id": "aa93c35afa04"
       }
     ]
   }
