@@ -41,15 +41,17 @@
   },
   "daily": {
     "date": "2026-11-12",
-    "sent_count": 4,
+    "sent_count": 6,
     "dedup_keys": [
       "position_stop:grok",
       "stop_unprotected:grok",
       "fill_overrun:grok:20261112T160243Z:grok-20261112T160243Z-01-a0",
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "state_cash:gpt",
+      "news:RTX:d2684a1811"
     ],
     "overflow": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "position_stop",
@@ -90,6 +92,22 @@
         },
         "disposition": "sent",
         "dispatch_id": "8bee6eed92a1"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-12T22:07:53.015677+00:00",
+        "disposition": "queued",
+        "dispatch_id": "8387f3c4abbd"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on RTX (held by 5)",
+        "timestamp": "2026-11-12T22:07:53.433943+00:00",
+        "disposition": "queued",
+        "dispatch_id": "21af94ff824b"
       }
     ]
   }
