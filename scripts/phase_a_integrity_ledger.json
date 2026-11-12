@@ -3259,6 +3259,100 @@
         },
         "known_residual": "An oversell rejected at submission. The venue's rejection text for a SELL above the held quantity is not established from primary sources (Alpaca docs: fractional sell orders are marked long; fractional shorts are unsupported). If one occurred, the executor would record a SKIP with no constraint, scored fail:submission_failed (a G-EXEC failure cycle) with a CRITICAL unclassified-skip alarm. With full-exit strings equal to the venue on all 24 positions and the 1e-12 guard, that path should not be reachable; it is recorded here, not assumed away.",
         "existing_dust": "Ruling §⑦: if the venue's close-position endpoint accepts a sub-$1 position, existing dust is liquidated administratively; if not, it stays in the book. Alpaca's saved docs (2026-11-10) show DELETE /v2/positions/{symbol} accepts qty to 9 decimals but say nothing on a minimum or waiver for a sub-$1 close, so this is not established from primary sources. No order was placed. Until it is established, existing dust stays in the book per the ruling's default."
+      },
+      {
+        "id": "missed_cycle_github_incident_2026_11_11",
+        "date": "2026-11-11",
+        "type": "completeness_event",
+        "scope": "All six books: the 15:30 ET slot (15:35 cycle) of 2026-11-11 did not run.",
+        "cause": "GitHub incident, 2026-11-11 (githubstatus: Webhooks from 20:22Z; Actions, Pages, Webhooks and Copilot, critical, from 20:48Z). The chain job of run 43092431508 (the 15:00 ET cycle, committed 7f28429c3) dispatched the 15:30 slot at 20:30:30Z; that run, 43096464048, ended startup_failure with no jobs. The 20:00Z backup cron, delayed to 20:07Z (run 43093482647), waited in the concurrency queue and ended failure at 21:01Z with no gate or run job. The watchdog's 13:00Z cron fired seven hours late at 20:02Z (run 43092737480) and was cancelled in the queue. Step logs are not readable without a token (403), so the startup_failure cause is not confirmed beyond the incident's timing.",
+        "broker_check": "Read-only Alpaca read at 2026-11-12T02:05Z: 21 orders and 33 fills on 2026-11-11, the last submitted 19:05:01Z; none after 20:05Z. Broker cash $90,643.36 and 29 positions equal the 15:04 ET reconciliation row; every book's difference is zero. The cycle never traded: a completeness event, not a book-integrity event.",
+        "accounting": "Twelve of thirteen cycles ran on 2026-11-11 for every book. No state repair; no re-trigger."
+      },
+      {
+        "id": "nan_eod_run_and_partial_revert_2026_11_11",
+        "date": "2026-11-11",
+        "type": "invalid_write_reverted",
+        "scope": "The 2026-11-11 end-of-day run, all six books' valuation outputs.",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/price_validity_and_source_ruling.md",
+            "sha256_prefix": "3fed0a6be69b374e",
+            "section": "§1: the NaN rows are invalid writes replaced by valid rows from the §2 hierarchy, a data-validity correction, never a silent overwrite"
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-11 'Wednesday night repair' and its sign-off, delivered inline: revert as a new commit, keep the records of things that happened, push fast-forward."
+        },
+        "what_happened": "A delayed backup cron (run 43138148838, 01:58Z) found the market closed and chained the end-of-day run (43138455452), which committed 50b551ea9 at 02:04:27Z (21:03 ET). yfinance served the 2026-11-11 daily bar with Close = NaN for every name; get_latest_price and _prices_from_data took Close.iloc[-1] unchecked. Every book's 2026-11-11 performance and intraday row, the dashboard, reports/daily/2026-11-11.md and the leaderboard (misfiled as 2026-11-12.json) carried NaN. Pages did not deploy (publish pause).",
+        "revert": {
+          "commits": "c67c15418 (git revert of 50b551ea9, exact inverse, tree equal to 7f28429c3's 64722fea) + ed7d825ce (three files back to 50b551ea9's version). Pushed 50b551ea9..ed7d825ce, fast-forward; Tests run 43141268232 green.",
+          "kept_at_50b551ea9": "data/alerts/email_log.jsonl and logs/alerts.jsonl (the 9 emails were really sent); data/reconciliation/2026-11.jsonl (row 20261112T020350Z is a real level-2 reconciliation; every field finite, clean).",
+          "reverted_to_7f28429c3": "The other 24 of the commit's 27 paths, data/alerts/state.json included, so no NaN watermark or 'went negative' flag persists.",
+          "verification": "Blob hash per file against both commits; the six state files read back from origin equal 7f28429c3's. Book states matched the broker read: 29/29 symbols, cash gap -$0.1153 (the standing gap)."
+        },
+        "emails": "Nine sent at 02:04Z. Seven are instrument artifacts, not events (ruling §1b: an instrument reading NaN as signal): six 'went negative' (claude, claude_opus, gemini, gpt, grok, deepseek; NaN >= 0 is False) and 'DeepSeek V4 Pro hit a new all-time high' (NaN <= prior peak is False). The other two: the GPT cash anomaly (real: cash -$0.0105) and the daily digest, which carried NaN figures.",
+        "minimal_guard": "28ae61d01, pushed 2026-11-12 ~02:38Z (Tests run 43143005845 green): an end-of-day run with a missing or non-finite close for a held name or the benchmark writes no valuation output, runs no threshold sweep, emits one CRITICAL and keeps its housekeeping. Superseded in scope by the full guard (price_validity_guard_2026_11_12); its behaviour is preserved there."
+      },
+      {
+        "id": "eod_row_2026_11_11_from_backup_run",
+        "date": "2026-11-11",
+        "type": "row_source_record",
+        "scope": "The 2026-11-11 performance row of all six books, the leaderboard, the daily report.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-11 (late), delivered inline: '32fe61bf0 stands as the 2026-11-11 row ... No backfill tomorrow.'"
+        },
+        "written_by": "The delayed 22:00Z backup cron, run 43142879247, started 02:39Z on ed7d825ce, committed 32fe61bf0 at 02:41:18Z. The minimal guard (28ae61d01) was pushed during that run, so the run may have executed unguarded code; with every close finite the two behave identically.",
+        "source": "vendor (yfinance daily bar), the registered primary (ruling §2.1). The row predates the price_source tag, so the tag is absent from the row itself; this entry is its source record.",
+        "sip_spot_check": "Alpaca SIP daily bars for 2026-11-11 (feed=sip, end 2026-11-11T23:59Z): SPY 759.81, KO 97.57, WMT 125.67, NVDA 173.73, AAPL 355.63; the row's closes equal them to the cent, 5 of 5. SIP history is available to the account for bars older than 15 minutes (a request without an explicit past end returns 403 'subscription does not permit querying recent SIP data'). IEX for comparison: AAPL 355.78.",
+        "values": "Total value / cumulative return: claude $2,015.00 / +0.75%; claude_opus $2,044.96 / +2.25%; gemini $2,075.06 / +3.75%; gpt $2,039.39 / +1.97%; grok $2,002.07 / +0.10%; deepseek (paper-only) $126,753.08 / +26.75%.",
+        "deadline_branch": "Ruling §2 ties the deadline to the row's first consumer. The 2026-11-11 dry run established that the 09:35 intraday cycle reads no performance row (cumulative return, drawdown and the halt come from state inception_value and live prices; the only intraday reader is the dashboard build). The end-of-day branch applies: finalize before the 2026-11-12 end-of-day row. Met at 02:41Z on 2026-11-12.",
+        "emails": "Five sent at 02:41Z, none false: the GPT cash anomaly (real), Very Positive news on LLY and AMZN, Very Negative news on AMD, and the 2026-11-11 digest with finite figures."
+      },
+      {
+        "id": "leaderboard_snapshot_filename_2026_11_12",
+        "date": "2026-11-12",
+        "type": "derived_data_correction",
+        "scope": "data/leaderboard/2026-11-11.json and 2026-11-12.json.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-11 (late), delivered inline: name the file by the run date, move 2026-11-12.json to 2026-11-11.json in the same commit; if overwritten first, it is derived data, regenerable from the performance rows."
+        },
+        "defect": "build_dashboard_payload named the archived leaderboard by datetime.utcnow() on every cycle. The 2026-11-11 end-of-day runs fired after midnight UTC and filed the day's leaderboard as 2026-11-12.json, the file the daily report reads for prior-session ranks.",
+        "fix": "11d1a42c0: leaderboard_snapshot_name(run_date), the run's ET session date; the pipeline passes its run date (522bff16f).",
+        "move": "data/leaderboard/2026-11-11.json := 32fe61bf0:data/leaderboard/2026-11-12.json byte for byte (blob 8341277d), replacing the 2026-11-11 14:04 ET intraday snapshot (1c3e5347). 2026-11-12.json is not deleted: the 2026-11-12 session's ticks rewrite it with that session's own leaderboard, the correct content for the name, and a delete would collide with them at landing."
+      },
+      {
+        "id": "price_validity_guard_2026_11_12",
+        "date": "2026-11-12",
+        "type": "data_validity_change",
+        "class": "data-validity, not executor-class (ruling §1; the corrected-executor count is unaffected).",
+        "scope": "Every price read in the cycle, all six books; the alert sweep; end-of-day rows.",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/price_validity_and_source_ruling.md",
+            "sha256_prefix": "3fed0a6be69b374e",
+            "bytes": 4750,
+            "commit": "4bf728782 (blob equals the hub-verified file)"
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-11, delivered inline: full guard per 3fed0a6b, staged during 2026-11-12, landed after the close and before the end-of-day run; additions: numbers.Real finiteness, close the stop/drawdown and avg_cost holes, containment test."
+        },
+        "commits": "4bf728782 (ruling), 11d1a42c0 (leaderboard filename), 522bff16f (guard).",
+        "effective_from": "The first cycle after the push: the 2026-11-12 end-of-day run if pushed between the close and that run; the 2026-11-13 09:35 cycle for the intraday parts. If the push slips, this entry is corrected before it lands.",
+        "change": {
+          "ingestion": "A price is valid when it is a numbers.Real, finite and positive. A ticker whose last bar is invalid is unpriced for the cycle and its frame becomes empty, so the prompt shows it through the existing NO DATA / N/A rendering. All-valid frames pass through as the same objects: the frozen v4 golden fixture renders byte-identically (prompt_integrity.evaluate() == match).",
+          "validator": "PRICE_UNAVAILABLE added to the closed validator reason set: a BUY/SELL/SHORT/COVER on an unpriced ticker is dropped as a named-reason decision-record event. HOLD passes.",
+          "missing_price": "One MISSING_PRICE event per rejected ticker per cycle, with its reason (no_data | non_finite), the books holding it and the valuation mark used, in data/data_availability/YYYY-MM.jsonl: one line every cycle, clean cycles included.",
+          "valuation": "Portfolio.mark() replaces every prices.get(t, avg_cost). A held unpriced name is valued on a classified mark (last valid bar of the same frame, else average cost), named in its MISSING_PRICE event and in the intraday row's unpriced_holdings, so total value stays finite and the book's other orders size normally.",
+          "stops": "Position stops never test an unpriced name; it is named and alerted once per book per day (WARN 'Position stop unevaluable'). The drawdown halt is three-state: with every name priced it is unchanged; with an unpriced long it is evaluated on a floor that values it at zero, clear only if provably clear; otherwise, or with an unpriced short, unevaluable (CRITICAL 'Drawdown halt unevaluable', once per book per day). Never decided on a stand-in mark.",
+          "alerts": "Milestones, negative crossings, all-time highs, oversized trades and the weight anomaly check finiteness before their thresholds; a skip is logged as an instrument artifact.",
+          "eod": "The minimal guard's abort keeps its behaviour, now on the same validity predicate; an end-of-day pass with no valid price at all reaches it instead of the intraday no-prices abort. log_daily_snapshot refuses a non-finite value (CRITICAL log, no row) and tags every row price_source: vendor."
+        },
+        "demonstrations": {
+          "tests": "tests/test_price_validity_guard.py (45) and tests/test_eod_valuation_guard.py (6); full suite 946 passed.",
+          "class_check": "End-to-end dry run of the 09:35 cycle on live bars (sockets refused except Yahoo, fake broker, fake model): the guarded code sends the same nine orders, quantities identical, as the unguarded code on 2026-11-11.",
+          "containment": "Same run with KO's last close forced to NaN. Unguarded (2026-11-11): the four KO books (claude, claude_opus, gpt, grok) sent nothing; every order raised 'cannot convert float NaN to integer' (UNCLASSIFIED_SKIP CRITICAL x6); prompts showed '$nan'; total value NaN. Guarded: those books trade their other names (claude BUY MSFT; claude_opus SELL LLY, BUY MSFT; gpt SELL AMZN; grok SELL WMT, BUY MSFT); every KO decision drops as PRICE_UNAVAILABLE; no prompt contains 'nan'; total values finite with KO on its last valid bar (97.425); one MISSING_PRICE event; four WARN stop-unevaluable alerts; the drawdown halt provably clear.",
+          "eod": "End-of-day dry run with KO NaN: one CRITICAL, no performance, intraday, leaderboard, report or dashboard write; housekeeping ran."
+        },
+        "validation_count": "Unaffected (data-validity class).",
+        "open_items": "The closed validator reason set is listed in prose at docs/prereg/tier2_novel_sections.md:344 (the Gate 4 cross-reference); PRICE_UNAVAILABLE is not yet in that list and is added there only on a hub ruling. The venue fallback of §2.2 is not automated here; it is used by a backfill when the vendor bar stays invalid."
       }
     ]
   }
