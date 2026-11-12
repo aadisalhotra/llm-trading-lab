@@ -8,11 +8,20 @@ Three log streams:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR, load_settings
+from ..data.price_validity import is_finite_number
+
+_logger = logging.getLogger("llmlab.decision_log")
+
+# The only closing-valuation source the pipeline writes from. The SIP fallback
+# (`venue`) is written by the backfill path, never by the live run
+# (price_validity_and_source_ruling.md §2: one date, one source, tagged).
+PRICE_SOURCE_VENDOR = "vendor"
 
 
 def _inception_date() -> str | None:
@@ -281,8 +290,13 @@ def log_daily_snapshot(
     snapshot: dict[str, Any],
     benchmark_value: float | None,
     api_success: bool = True,
+    price_source: str = PRICE_SOURCE_VENDOR,
 ) -> None:
     """Append EOD portfolio value to /data/performance/{model}.jsonl.
+
+    Refuses (CRITICAL log, no row) a non-finite total value, cumulative return
+    or benchmark: the pipeline's EOD guard aborts first, so reaching that check
+    is a defect, and a NaN row is never written. Every row carries price_source.
 
     Writer invariants (the perf log is the source of the canonical SPY series):
       * Pre-inception rows are refused with a hard raise — the launch window
@@ -304,6 +318,15 @@ def log_daily_snapshot(
     PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
     path = PERFORMANCE_DIR / f"{model_key}.jsonl"
     today_str = run_date.strftime("%Y-%m-%d")
+
+    bad = [k for k, v in (("total_value", snapshot.get("total_value")),
+                          ("cumulative_return", snapshot.get("cumulative_return")),
+                          ("benchmark_value", benchmark_value))
+           if not is_finite_number(v)]
+    if bad:
+        _logger.critical("Refusing EOD row for %s on %s: non-finite %s",
+                         model_key, today_str, ", ".join(bad))
+        return
 
     inception = _inception_date()
     if inception and today_str < inception:
@@ -355,6 +378,7 @@ def log_daily_snapshot(
         "net_exposure_pct": snapshot.get("net_exposure_pct"),
         "short_utilization": snapshot.get("short_utilization", 0.0),
         "num_shorts": snapshot.get("num_shorts", 0),
+        "price_source": price_source,
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -401,5 +425,9 @@ def log_intraday_snapshot(
         "short_utilization": snapshot.get("short_utilization", 0.0),
         "num_shorts": snapshot.get("num_shorts", 0),
     }
+    # Held names valued on a classified fallback mark this cycle (MISSING_PRICE);
+    # present only when there are any, so ordinary rows are unchanged.
+    if snapshot.get("unpriced_holdings"):
+        record["unpriced_holdings"] = snapshot["unpriced_holdings"]
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")

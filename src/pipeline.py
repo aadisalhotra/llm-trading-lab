@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -88,13 +87,26 @@ from .logging import (
 )
 from .reports import generate_daily_report
 from .model_versions import detect_version_transition, record_observation
+from .data.price_validity import (
+    PriceIngestion,
+    holding_marks,
+    ingest_market_data,
+    is_valid_price,
+    missing_price_events,
+    record_data_availability,
+)
 from .portfolio import (
     RiskViolation,
-    check_portfolio_stop,
     check_position_stops,
     load_portfolio,
     save_portfolio,
     validate_decisions,
+)
+from .portfolio.risk import (
+    STOP_BREACH,
+    STOP_UNEVALUABLE,
+    evaluate_portfolio_stop,
+    position_stops_unevaluable,
 )
 from .execution import CycleBarrier, Executor
 from .execution.executor import alarm_fill_overruns, alarm_unclassified_skips
@@ -110,11 +122,8 @@ from .prompt_builder import (
 
 
 def _prices_from_data(data: dict) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for ticker, df in data.items():
-        if df is not None and not df.empty:
-            out[ticker] = float(df["Close"].iloc[-1])
-    return out
+    """Valid last-bar prices only (see src/data/price_validity.py)."""
+    return ingest_market_data(data).prices
 
 
 def _eod_unvaluable_closes(prices: dict[str, float], settings: dict[str, Any],
@@ -129,8 +138,7 @@ def _eod_unvaluable_closes(prices: dict[str, float], settings: dict[str, Any],
     needed = {settings["benchmark_ticker"]}
     for mk in model_keys:
         needed.update(load_portfolio(mk).holdings)
-    return sorted(t for t in needed
-                  if not (isinstance(prices.get(t), float) and math.isfinite(prices[t])))
+    return sorted(t for t in needed if not is_valid_price(prices.get(t)))
 
 
 def _compute_agreement_counts(
@@ -185,10 +193,21 @@ def run_one_model(
     barrier: CycleBarrier | None = None,
     fetch_started_at: datetime | None = None,
     eod_valuation_ok: bool = True,
+    ingestion: PriceIngestion | None = None,
+    marks_by_book: dict[str, dict[str, tuple[float, str]]] | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
     portfolio = load_portfolio(model_key)
+
+    # Held names without a valid price this cycle are valued on a classified
+    # fallback mark (src/data/price_validity.py) so the book's total value stays
+    # finite and its other orders size normally. Each is a MISSING_PRICE event;
+    # the pipeline records the marks in the data-availability descriptor.
+    if ingestion is not None:
+        portfolio.fallback_marks = holding_marks(portfolio.holdings, ingestion)
+        if marks_by_book is not None:
+            marks_by_book[model_key] = dict(portfolio.fallback_marks)
 
     # Reset the intraday counters at the start of a new ET trading day
     session_date_str = run_date.strftime("%Y-%m-%d")
@@ -199,8 +218,21 @@ def run_one_model(
         logger.warning("[%s] Portfolio HALTED — skipping", model_key)
         return {"model_key": model_key, "status": "HALTED"}
 
-    # Per-position stop-loss sweep BEFORE the model trades
-    triggered = check_position_stops(portfolio, prices)
+    # Per-position stop-loss sweep BEFORE the model trades. Skipped on an EOD
+    # pass whose valuation aborted: its one CRITICAL already names every
+    # missing close, and nothing is sized or valued.
+    valuation_aborted = is_eod and not eod_valuation_ok
+    triggered = [] if valuation_aborted else check_position_stops(portfolio, prices)
+    unevaluable = [] if valuation_aborted else position_stops_unevaluable(portfolio, prices)
+    if unevaluable:
+        # Can't evaluate is a classified state, never a quiet pass. Once per
+        # book per day: vendor gaps of a name or two per fetch are routine.
+        send_alert("WARN", f"Position stop unevaluable: {model_key}",
+                   "No valid price this cycle for held name(s); their per-position "
+                   "stops were not tested.",
+                   {"model": model_key, "tickers": ", ".join(unevaluable)},
+                   kind="stop_unevaluable",
+                   dedup_key=f"stop_unevaluable:{model_key}:{session_date_str}")
     forced_results = []
     if triggered:
         send_alert("WARN", f"Position stop on {model_key}",
@@ -423,7 +455,18 @@ def run_one_model(
     all_exec = forced_results + exec_results
 
     # Portfolio stop check AFTER execution
-    if check_portfolio_stop(portfolio, prices):
+    halt_verdict = evaluate_portfolio_stop(portfolio, prices)
+    if halt_verdict == STOP_UNEVALUABLE:
+        send_alert("CRITICAL", f"Drawdown halt unevaluable: {model_key}",
+                   "A held name has no valid price this cycle and the book is not "
+                   "provably clear of the drawdown stop with it valued at zero (or "
+                   "it is an unpriced short). The halt was neither triggered nor "
+                   "passed.",
+                   {"model": model_key,
+                    "unpriced": ", ".join(position_stops_unevaluable(portfolio, prices))},
+                   kind="drawdown_unevaluable",
+                   dedup_key=f"drawdown_unevaluable:{model_key}:{session_date_str}")
+    if halt_verdict == STOP_BREACH:
         send_alert("CRITICAL", f"Portfolio stop hit: {model_key}",
                    "Liquidating to cash and halting model", {"model": model_key},
                    kind="portfolio_halt", dedup_key=f"portfolio_halt:{model_key}")
@@ -698,8 +741,17 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     else:
         logger.info("Fetching intraday 30m bars for %d symbols", len(symbols))
         market_data = fetch_intraday_data(symbols=symbols, interval="30m")
-    prices = _prices_from_data(market_data)
-    if not prices:
+    # Price-validity guard at ingestion, before anything reads a price or the
+    # prompt sees a frame: a ticker without a valid last-bar price is not
+    # tradable this cycle and renders as NO DATA (price_validity_and_source_ruling.md).
+    ingestion = ingest_market_data(market_data)
+    market_data = ingestion.market_data
+    prices = ingestion.prices
+    marks_by_book: dict[str, dict[str, tuple[float, str]]] = {}
+    # An EOD pass with no valid price at all is the 2026-11-11 shape: it goes to
+    # the EOD valuation guard below (one CRITICAL, housekeeping, exit 0) rather
+    # than aborting before the housekeeping runs.
+    if not prices and not is_eod:
         logger.error("No prices fetched — aborting tick")
         send_alert("CRITICAL", "Market data failure", "No prices for any symbol",
                    kind="market_data_failure", dedup_key="market_data_failure")
@@ -817,6 +869,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 barrier=barrier,
                 fetch_started_at=fetch_started_at,
                 eod_valuation_ok=not eod_bad_closes,
+                ingestion=ingestion,
+                marks_by_book=marks_by_book,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
@@ -847,6 +901,20 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     models_elapsed = time.monotonic() - models_start
     logger.info("All %d models completed in %.2fs (parallel wall-clock)",
                 len(enabled_models), models_elapsed)
+
+    # MISSING_PRICE events, one per rejected ticker, as this cycle's
+    # data-availability descriptor (written every cycle, clean ones included).
+    held_by: dict[str, list[str]] = {}
+    for mk, _ in enabled_models:
+        try:
+            for t in load_portfolio(mk).holdings:
+                held_by.setdefault(t, []).append(mk)
+        except Exception as e:  # noqa: BLE001 — descriptor only
+            logger.warning("[%s] holdings unreadable for the descriptor: %s", mk, e)
+    record_data_availability(
+        cycle_id=executor.cycle_id, mode=mode, run_date=run_date,
+        n_expected=len(symbols),
+        events=missing_price_events(ingestion, held_by, marks_by_book))
 
     # Level-2 (broker-authoritative) reconciliation -- G-BOOK. Broker modes
     # only; every book's state is durably saved by this point (each thread
@@ -909,7 +977,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     if not eod_bad_closes:
         logger.info("Building dashboard payload")
         try:
-            build_dashboard_payload(prices=prices)
+            build_dashboard_payload(prices=prices, run_date=run_date)
         except Exception as e:
             logger.exception("Dashboard build failed: %s", e)
             send_alert("WARN", "Dashboard build failed", str(e),

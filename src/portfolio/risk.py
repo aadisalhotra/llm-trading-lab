@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..config_loader import load_settings, universe_symbols
+from ..data.price_validity import is_finite_number, is_valid_price
 from .portfolio import Portfolio
 
 logger = logging.getLogger("llmlab.risk")
@@ -27,6 +28,26 @@ _SHORT_ACTIONS = ("SHORT", "COVER")
 # Actions that increase exposure (and so can breach an exposure cap). SELL and
 # COVER only ever reduce exposure, so they never need a cap check.
 _EXPOSURE_INCREASING = ("BUY", "SHORT")
+
+# Validator drop for a decision on a ticker with no valid price this cycle
+# (price_validity_and_source_ruling.md §1a): added to the closed validator
+# reason set. Such a ticker is not presented as tradable; a decision on it
+# anyway is a named-reason decision-record event, never an order.
+PRICE_UNAVAILABLE = "PRICE_UNAVAILABLE"
+
+# Stop-evaluation outcomes. "Can't evaluate" is its own classified state: a
+# missing or non-finite price must never read as a quiet pass.
+STOP_BREACH = "breach"
+STOP_CLEAR = "clear"
+STOP_UNEVALUABLE = "unevaluable"
+
+
+def _price_unavailable(i: int, action: str, ticker: str,
+                       prices: dict[str, float]) -> RiskViolation | None:
+    if action == "HOLD" or is_valid_price(prices.get(ticker)):
+        return None
+    return RiskViolation(i, PRICE_UNAVAILABLE,
+                         f"{action} {ticker} dropped: no valid price this cycle (not tradable)")
 
 
 @dataclass
@@ -126,6 +147,11 @@ def _validate_long_only(
             violations.append(RiskViolation(i, "OFF_UNIVERSE", f"{ticker} not in universe"))
             continue
 
+        unpriced = _price_unavailable(i, action, ticker, prices)
+        if unpriced:
+            violations.append(unpriced)
+            continue
+
         if target_weight < 0 or target_weight > max_position_pct + 1e-9:
             violations.append(RiskViolation(
                 i, "MAX_POSITION_WEIGHT",
@@ -201,7 +227,7 @@ def _validate_with_shorting(
     # forward as we accept decisions. Seeded from the current book.
     proj_value: dict[str, float] = {}
     for t, h in portfolio.holdings.items():
-        proj_value[t] = h.market_value(prices.get(t, h.avg_cost))
+        proj_value[t] = h.market_value(portfolio.mark(t, prices))
 
     trades_today = max(0, int(trades_already_executed_today))
     initial_trades_today = trades_today
@@ -226,6 +252,11 @@ def _validate_with_shorting(
 
         if ticker not in universe:
             violations.append(RiskViolation(i, "OFF_UNIVERSE", f"{ticker} not in universe"))
+            continue
+
+        unpriced = _price_unavailable(i, action, ticker, prices)
+        if unpriced:
+            violations.append(unpriced)
             continue
 
         # Per-name weight cap — clamp/resize (longs and shorts alike).
@@ -356,26 +387,68 @@ def _validate_with_shorting(
     return accepted, violations
 
 
-def check_portfolio_stop(portfolio: Portfolio, prices: dict[str, float]) -> bool:
-    """Returns True if portfolio drawdown breaches the hard stop and trading should halt.
+def evaluate_portfolio_stop(portfolio: Portfolio, prices: dict[str, float]) -> str:
+    """The drawdown halt as a three-state verdict: breach, clear or unevaluable.
 
     Equity (total_value) already nets short liabilities, so a short that moves
     against the book pulls equity down and counts toward the drawdown halt with
     no special handling.
+
+    With every held name priced, this is the registered test on equity. When a
+    held name has no valid price this cycle (price_validity_and_source_ruling.md)
+    the halt is never decided on a stand-in mark. Instead the check is bounded:
+    unpriced longs are valued at zero, the least they can be worth. If the book
+    is clear of the stop even then, the result is proven and the verdict is
+    "clear". Otherwise -- or if any unpriced holding is a short, whose loss has
+    no bound -- the verdict is "unevaluable", which the caller alerts on. A NaN
+    must never read as a quiet pass, which is what `drawdown >= stop` did.
     """
     settings = load_settings()
     stop_pct = float(settings["risk_controls"]["stop_loss_portfolio_pct"])
     if not settings["risk_controls"]["halt_on_stop_loss"]:
-        return False
+        return STOP_CLEAR
     if portfolio.inception_value <= 0:
-        return False
-    current = portfolio.total_value(prices)
-    drawdown = 1.0 - (current / portfolio.inception_value)
-    if drawdown >= stop_pct:
-        logger.error("[%s] PORTFOLIO STOP TRIGGERED — drawdown %.2f%% ≥ %.2f%%",
-                     portfolio.model_key, drawdown * 100, stop_pct * 100)
-        return True
-    return False
+        return STOP_CLEAR
+    unpriced = [t for t in portfolio.holdings if not is_valid_price(prices.get(t))]
+    if not unpriced:
+        current = portfolio.total_value(prices)
+        if not is_finite_number(current):
+            return STOP_UNEVALUABLE
+        drawdown = 1.0 - (current / portfolio.inception_value)
+        if drawdown >= stop_pct:
+            logger.error("[%s] PORTFOLIO STOP TRIGGERED — drawdown %.2f%% ≥ %.2f%%",
+                         portfolio.model_key, drawdown * 100, stop_pct * 100)
+            return STOP_BREACH
+        return STOP_CLEAR
+    if any(portfolio.holdings[t].is_short for t in unpriced):
+        logger.error("[%s] Drawdown halt UNEVALUABLE: unpriced short(s) %s",
+                     portfolio.model_key, unpriced)
+        return STOP_UNEVALUABLE
+    floor = portfolio.cash + sum(h.market_value(float(prices[t]))
+                                 for t, h in portfolio.holdings.items() if t not in unpriced)
+    if not is_finite_number(floor):
+        return STOP_UNEVALUABLE
+    if 1.0 - (floor / portfolio.inception_value) < stop_pct:
+        return STOP_CLEAR
+    logger.error("[%s] Drawdown halt UNEVALUABLE: with unpriced %s at zero the book "
+                 "is not provably clear of the %.2f%% stop", portfolio.model_key,
+                 unpriced, stop_pct * 100)
+    return STOP_UNEVALUABLE
+
+
+def check_portfolio_stop(portfolio: Portfolio, prices: dict[str, float]) -> bool:
+    """True only on a proven breach. See evaluate_portfolio_stop for the
+    unevaluable state, which callers must handle; this wrapper keeps the
+    original boolean contract for existing callers."""
+    return evaluate_portfolio_stop(portfolio, prices) == STOP_BREACH
+
+
+def position_stops_unevaluable(portfolio: Portfolio, prices: dict[str, float]) -> list[str]:
+    """Held tickers whose per-position stop cannot be evaluated this cycle
+    because they have no valid price. Classified and alerted by the caller;
+    check_position_stops skips them rather than testing a stand-in mark."""
+    return sorted(t for t, h in portfolio.holdings.items()
+                  if h.avg_cost and not is_valid_price(prices.get(t)))
 
 
 def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list[str]:
@@ -385,6 +458,9 @@ def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list
     Short stop: price rises >= stop_loss_short_pct (10%) above entry — the same
     mechanism inverted, at the tighter short threshold. The executor decides
     whether to SELL (long) or COVER (short) from the holding's sign.
+
+    A held ticker without a valid price is not tested at all (a NaN compares
+    False, which used to pass silently): position_stops_unevaluable() names it.
     """
     settings = load_settings()
     rc = settings["risk_controls"]
@@ -393,7 +469,7 @@ def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list
     triggered: list[str] = []
     for ticker, h in portfolio.holdings.items():
         price = prices.get(ticker)
-        if price is None or not h.avg_cost:
+        if not is_valid_price(price) or not h.avg_cost:
             continue
         if h.is_short:
             gain_against = (price / h.avg_cost) - 1.0  # short loses as price rises

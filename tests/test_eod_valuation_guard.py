@@ -56,7 +56,8 @@ def eod(monkeypatch):
     def run(closes):
         calls = {k: [] for k in ("alerts", "daily_rows", "intraday_rows", "saved",
                                  "recon", "descriptor", "dashboard", "report",
-                                 "leaderboard", "summary", "budget", "index")}
+                                 "leaderboard", "summary", "budget", "index",
+                                 "availability")}
         books = {k: _book(k) for k in HOLDINGS}
 
         class Frozen(datetime):
@@ -102,6 +103,7 @@ def eod(monkeypatch):
         sp(pipeline, "venue_book_keys", lambda keys, s: keys)
         sp(pipeline, "run_post_cycle_reconciliation", lambda *a: calls["recon"].append(a[1]))
         sp(pipeline, "write_session_descriptor", lambda *a: calls["descriptor"].append(a[0]))
+        sp(pipeline, "record_data_availability", lambda **k: calls["availability"].append(k))
         sp(pipeline, "build_dashboard_payload", lambda **k: calls["dashboard"].append(1))
         sp(pipeline, "fetch_index_data", lambda **k: calls["index"].append(1) or {})
         sp(pipeline, "generate_daily_report", lambda **k: calls["report"].append(1))
@@ -136,6 +138,10 @@ def _assert_aborted(rc, calls, n_bad):
     assert calls["recon"] == ["cyc"]
     assert calls["descriptor"] == ["2026-11-12"]
     assert calls["budget"] == [1]
+    # Every rejected close is a MISSING_PRICE event in the descriptor
+    (avail,) = calls["availability"]
+    assert avail["mode"] == "end-of-day"
+    assert all(e["event"] == "MISSING_PRICE" for e in avail["events"])
 
 
 def test_nan_close_on_a_held_name_aborts_valuation_but_keeps_housekeeping(eod):

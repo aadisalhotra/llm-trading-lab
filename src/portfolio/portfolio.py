@@ -17,6 +17,7 @@ import pandas as pd
 
 from ..config_loader import STATE_DIR, effective_mode, load_settings, starting_capital
 from .settlement import SettlementLedger
+from ..data.price_validity import is_valid_price
 
 logger = logging.getLogger("llmlab.portfolio")
 
@@ -106,6 +107,30 @@ class Portfolio:
     # Cleared by save_portfolio once cash is back at or above zero.
     fill_overrun_usd: float = 0.0
 
+    # Per-cycle valuation marks for HELD tickers that have no valid price this
+    # cycle: {ticker: (mark, source)}, set by the pipeline from the ingestion
+    # guard (src/data/price_validity.py) and never persisted. Each one is a
+    # classified MISSING_PRICE event with its mark named; see mark().
+    fallback_marks: dict[str, tuple[float, str]] = field(default_factory=dict, repr=False,
+                                                          compare=False)
+
+    def mark(self, ticker: str, prices: dict[str, float]) -> float:
+        """The price this book values `ticker` at this cycle.
+
+        A valid price if there is one. Otherwise the cycle's classified fallback
+        mark (an earlier valid bar of the same session, or average cost), which
+        keeps total value finite so one unpriced name cannot freeze the book's
+        other orders. Average cost is reached unclassified only when a caller
+        passes a prices dict the ingestion guard did not build.
+        """
+        p = prices.get(ticker)
+        if is_valid_price(p):
+            return float(p)
+        fb = self.fallback_marks.get(ticker)
+        if fb is not None:
+            return fb[0]
+        return self.holdings[ticker].avg_cost
+
     # ----- settled-cash helpers -----
     def settled_cash(self) -> float:
         """Deployable cash: total cash minus anything still unsettled."""
@@ -137,7 +162,7 @@ class Portfolio:
     def total_value(self, prices: dict[str, float]) -> float:
         value = self.cash
         for ticker, h in self.holdings.items():
-            price = prices.get(ticker, h.avg_cost)
+            price = self.mark(ticker, prices)
             value += h.market_value(price)
         return value
 
@@ -154,7 +179,7 @@ class Portfolio:
         gross_long = 0.0
         gross_short = 0.0
         for ticker, h in self.holdings.items():
-            price = prices.get(ticker, h.avg_cost)
+            price = self.mark(ticker, prices)
             mv = h.market_value(price)
             if mv >= 0:
                 gross_long += mv
@@ -179,7 +204,7 @@ class Portfolio:
         total = self.total_value(prices)
         holdings_out = []
         for ticker, h in self.holdings.items():
-            price = prices.get(ticker, h.avg_cost)
+            price = self.mark(ticker, prices)
             mv = h.market_value(price)
             holdings_out.append({
                 "ticker": ticker,
@@ -196,7 +221,13 @@ class Portfolio:
                 "unrealized_pl_pct": h.unrealized_pl_pct(price),
             })
         exp = self.exposures(prices)
+        # Present only when a held name was valued on a fallback mark, so an
+        # ordinary snapshot (and every prompt built from one) is unchanged.
+        unpriced = {t: src for t, (_, src) in self.fallback_marks.items()
+                    if t in self.holdings and not is_valid_price(prices.get(t))}
+        extra = {"unpriced_holdings": unpriced} if unpriced else {}
         return {
+            **extra,
             "model_key": self.model_key,
             "total_value": total,
             "cash": self.cash,
@@ -372,7 +403,7 @@ class Portfolio:
                 "terminal fills before the book moves.")
         for ticker in list(self.holdings.keys()):
             h = self.holdings[ticker]
-            price = prices.get(ticker, h.avg_cost)
+            price = self.mark(ticker, prices)
             if h.is_short:
                 self.cover(ticker, abs(h.shares), price)
             else:

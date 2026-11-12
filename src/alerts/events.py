@@ -44,8 +44,21 @@ from ..config_loader import (
 )
 from .alert_state import ensure_daily, load_state, save_state
 from .email_alerts import send_email
+from ..data.price_validity import is_finite_number
 
 logger = logging.getLogger("llmlab.alerts.events")
+
+
+def _instrument_artifact(detector: str, key: str, detail: str) -> None:
+    """A threshold test skipped because its input is not a finite number.
+
+    price_validity_and_source_ruling.md §1b: the alerting path checks
+    finiteness before any threshold test. On 2026-11-11 a NaN close read as
+    signal -- NaN >= 0 is False, so six books "went negative"; NaN <= the prior
+    peak is False, so DeepSeek "hit an all-time high". Those are instrument
+    artifacts, not events, and so is anything this skips.
+    """
+    logger.warning("Instrument artifact: %s skipped %s (%s)", detector, key, detail)
 
 EASTERN = ZoneInfo("America/New_York")
 
@@ -711,6 +724,9 @@ def detect_milestones(settings: dict[str, Any]) -> list[dict[str, Any]]:
         if df.empty or "cumulative_return" not in df.columns:
             continue
         cum = float(df["cumulative_return"].iloc[-1])
+        if not is_finite_number(cum):
+            _instrument_artifact("milestones", key, f"cumulative_return={cum}")
+            continue
         cum_pct = cum * 100.0
         if cum_pct < step:
             continue
@@ -761,11 +777,17 @@ def detect_negative_crossings(settings: dict[str, Any]) -> list[dict[str, Any]]:
         if df.empty or "cumulative_return" not in df.columns:
             continue
         today_cum = float(df["cumulative_return"].iloc[-1])
+        if not is_finite_number(today_cum):
+            _instrument_artifact("negative_crossings", key, f"cumulative_return={today_cum}")
+            continue
         if today_cum >= 0:
             continue
         if len(df) < 2:
             continue
         prev_cum = float(df["cumulative_return"].iloc[-2])
+        if not is_finite_number(prev_cum):
+            _instrument_artifact("negative_crossings", key, f"prior cumulative_return={prev_cum}")
+            continue
         if prev_cum < 0:
             continue
         name = _display_name(settings, key)
@@ -799,7 +821,14 @@ def detect_new_ath(settings: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         values = df["total_value"].astype(float)
         today = float(values.iloc[-1])
-        prior_max = float(values.iloc[:-1].max())
+        if not is_finite_number(today):
+            _instrument_artifact("new_ath", key, f"total_value={today}")
+            continue
+        prior = values.iloc[:-1]
+        prior = prior[prior.map(is_finite_number).astype(bool)]
+        if prior.empty:
+            continue
+        prior_max = float(prior.max())
         if today <= prior_max:
             continue
         name = _display_name(settings, key)
@@ -834,6 +863,9 @@ def detect_oversized_trades(settings: dict[str, Any], date_str: str) -> list[dic
         name = _display_name(settings, key)
         for rec in _read_today_trade_records(key, date_str):
             pv = float((rec.get("portfolio_after") or {}).get("total_value") or 0.0)
+            if not is_finite_number(pv):
+                _instrument_artifact("oversized_trades", key, f"portfolio value={pv}")
+                continue
             if pv <= 0:
                 continue
             for ex in rec.get("executions", []):
@@ -845,6 +877,9 @@ def detect_oversized_trades(settings: dict[str, Any], date_str: str) -> list[dic
                 if not ex.get("executed") or ex.get("side") not in _TRADE_SIDES:
                     continue
                 notional = abs(float(ex.get("notional") or 0.0))
+                if not is_finite_number(notional):
+                    _instrument_artifact("oversized_trades", key, f"notional={notional}")
+                    continue
                 frac = notional / pv
                 if frac <= threshold:
                     continue
@@ -1177,7 +1212,8 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
         over = [
             (h.get("ticker", "?"), _holding_gross_weight(h))
             for h in snap.get("holdings", [])
-            if _holding_gross_weight(h) > weight_anomaly_pct
+            if is_finite_number(_holding_gross_weight(h))
+            and _holding_gross_weight(h) > weight_anomaly_pct
         ]
         if over:
             worst = max(over, key=lambda x: x[1])

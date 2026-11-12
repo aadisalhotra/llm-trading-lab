@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..config_loader import live_cohort_keys, load_settings
+from ..data.price_validity import is_valid_price
 from ..portfolio import Portfolio
 from ..portfolio.settlement import settlement_days, settlement_enforcement_active
 from .barrier import CycleBarrier, Intent
@@ -662,7 +663,7 @@ class Executor:
                                    order_id="HOLD")
 
         price = prices.get(ticker)
-        if price is None or price <= 0:
+        if not is_valid_price(price):
             return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                    ticker=ticker, shares=0, fill_price=0, notional=0,
                                    error="No price available")
@@ -989,7 +990,7 @@ class Executor:
             if ticker not in portfolio.holdings:
                 continue
             h = portfolio.holdings[ticker]
-            price = prices.get(ticker, h.avg_cost)
+            price = portfolio.mark(ticker, prices)
             # A short is closed by covering (buy-back); a long by selling.
             is_short = h.is_short
             shares = abs(h.shares)
@@ -1116,7 +1117,7 @@ class Executor:
                                    order_id="HOLD")
 
         price = prices.get(ticker)
-        if price is None or price <= 0:
+        if not is_valid_price(price):
             return ExecutionResult(decision=decision, executed=False, side="SKIP",
                                    ticker=ticker, shares=0, fill_price=0, notional=0,
                                    error="No price available")
