@@ -40,74 +40,30 @@
     ]
   },
   "daily": {
-    "date": "2026-11-11",
-    "sent_count": 6,
+    "date": "2026-11-12",
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "fill_overrun:gpt:20261111T150256Z:gpt-20261111T150256Z-00-a0",
-      "state_cash:gpt",
-      "news:AMD:fd3a01bd9e",
-      "news:AMZN:3bcc3e56c2",
-      "news:LLY:42c4734389"
+      "position_stop:grok",
+      "stop_unprotected:grok"
     ],
     "overflow": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
-        "kind": "macro_event",
+        "kind": "position_stop",
+        "severity": "WARN",
+        "title": "Position stop on grok",
+        "timestamp": "2026-11-12T14:33:14.166232+00:00",
+        "disposition": "sent",
+        "dispatch_id": "49d951d22951"
+      },
+      {
+        "kind": "stop_unprotected",
         "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-11-11T15:02:56.995969+00:00",
-        "trigger": {
-          "headline": "Gulf markets rise as investors assess Iran war, shipping risks - Reuters",
-          "source": "Reuters",
-          "headline_time": "2026-11-11T13:27:41+00:00",
-          "category": "Geopolitical shock",
-          "matched_term": "war",
-          "score": -0.9042
-        },
+        "title": "STOP UNPROTECTED: grok",
+        "timestamp": "2026-11-12T14:35:06.305014+00:00",
         "disposition": "sent",
-        "dispatch_id": "69dfef0bb910"
-      },
-      {
-        "kind": "fill_overrun",
-        "severity": "WARN",
-        "title": "FILL_OVERRUN: gpt AVGO",
-        "timestamp": "2026-11-11T15:04:57.122576+00:00",
-        "disposition": "sent",
-        "dispatch_id": "3b58b9bd3b4d"
-      },
-      {
-        "kind": "state_anomaly",
-        "severity": "WARN",
-        "title": "State anomaly (cash): GPT-5.4",
-        "timestamp": "2026-11-12T02:41:16.030699+00:00",
-        "disposition": "queued",
-        "dispatch_id": "f87fd02f4a03"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Negative news on AMD (held by 4)",
-        "timestamp": "2026-11-12T02:41:16.263620+00:00",
-        "disposition": "queued",
-        "dispatch_id": "480d49288ba7"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on AMZN (held by 5)",
-        "timestamp": "2026-11-12T02:41:16.265167+00:00",
-        "disposition": "queued",
-        "dispatch_id": "5dccb23046b0"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on LLY (held by 5)",
-        "timestamp": "2026-11-12T02:41:16.266309+00:00",
-        "disposition": "queued",
-        "dispatch_id": "790bcf8d4e5b"
+        "dispatch_id": "efde54d73d7b"
       }
     ]
   }
