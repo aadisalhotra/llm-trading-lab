@@ -41,9 +41,10 @@
   },
   "daily": {
     "date": "2026-11-13",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "fill_overrun:grok:20261113T153247Z:grok-20261113T153247Z-01-a0"
+      "fill_overrun:grok:20261113T153247Z:grok-20261113T153247Z-01-a0",
+      "macro_event:Severe economic data"
     ],
     "overflow": [],
     "continuing": [],
@@ -56,6 +57,22 @@
         "timestamp": "2026-11-13T15:34:44.294285+00:00",
         "disposition": "sent",
         "dispatch_id": "8a4042c980a3"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-13T16:02:53.586885+00:00",
+        "trigger": {
+          "headline": "Bessent, Fed's Goolsbee divided on role of energy shock in inflation - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-13T15:34:46+00:00",
+          "category": "Severe economic data",
+          "matched_term": "shock in inflation",
+          "score": -0.7003
+        },
+        "disposition": "sent",
+        "dispatch_id": "93620a81fbb3"
       }
     ]
   },
