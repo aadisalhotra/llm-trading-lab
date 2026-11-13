@@ -75,6 +75,7 @@ def log_decision_run(
     cycle_id: str = "",
     fetch_started_at: str = "",
     screening_latency_seconds: float | None = None,
+    stop_dust_exempt: list[dict[str, Any]] | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
@@ -258,6 +259,13 @@ def log_decision_run(
         # impact section so we can see whether the recent-decisions context
         # is actually shaping behavior.
         "memory_hit": bool(memory_hit),
+        # Ghost-position ruling §⑧: holdings the position stops did not
+        # evaluate because they are dust ({ticker, shares, mark, notional}).
+        # Always present on records from 2026-11-13 on ([] = no dust), so an
+        # absent key means a pre-§⑧ record, not "no dust". Deliberately not in
+        # `executions`: Gate 4 must never read it as an order or a skip. The
+        # per-book, per-day count is the stop_dust_exemptions descriptor.
+        "stop_dust_exempt": list(stop_dust_exempt or []),
     }
 
     with open(path, "a", encoding="utf-8") as f:

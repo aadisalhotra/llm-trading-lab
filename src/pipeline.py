@@ -107,6 +107,7 @@ from .portfolio.risk import (
     STOP_UNEVALUABLE,
     evaluate_portfolio_stop,
     position_stops_unevaluable,
+    stop_dust_holdings,
 )
 from .execution import CycleBarrier, Executor
 from .execution.executor import alarm_fill_overruns, alarm_unclassified_skips
@@ -176,6 +177,45 @@ def _compute_agreement_counts(
     return counts
 
 
+def _position_stop_sweep(
+    model_key: str, portfolio: Any, prices: dict[str, float], executor: Executor,
+    session_date_str: str, logger: logging.Logger,
+) -> tuple[list[Any], list[dict[str, Any]]]:
+    """The per-position stop sweep, run before the model trades.
+
+    Returns (forced exit results, §⑧ dust records). Dust -- notional below
+    BEHAVIOURAL_NOTIONAL_FLOOR at the stop-evaluation mark -- is not evaluated:
+    no forced order, no alert, and so never a STOP UNPROTECTED. Each dust
+    holding gets one log line here and one entry in the cycle's decision-log
+    `stop_dust_exempt`.
+    """
+    stop_dust_exempt = stop_dust_holdings(portfolio, prices)
+    for d in stop_dust_exempt:
+        logger.info("[%s] Position stop: %s is dust (%g sh x %.4f = $%.4f, below the $1 "
+                    "behavioural floor) -- not evaluated (ghost-position ruling §⑧)",
+                    model_key, d["ticker"], d["shares"], d["mark"], d["notional"])
+
+    triggered = check_position_stops(portfolio, prices)
+    unevaluable = position_stops_unevaluable(portfolio, prices)
+    if unevaluable:
+        # Can't evaluate is a classified state, never a quiet pass. Once per
+        # book per day: vendor gaps of a name or two per fetch are routine.
+        send_alert("WARN", f"Position stop unevaluable: {model_key}",
+                   "No valid price this cycle for held name(s); their per-position "
+                   "stops were not tested.",
+                   {"model": model_key, "tickers": ", ".join(unevaluable)},
+                   kind="stop_unevaluable",
+                   dedup_key=f"stop_unevaluable:{model_key}:{session_date_str}")
+    forced_results: list[Any] = []
+    if triggered:
+        send_alert("WARN", f"Position stop on {model_key}",
+                   f"Force-selling: {triggered}", {"model": model_key},
+                   kind="position_stop", dedup_key=f"position_stop:{model_key}")
+        forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP",
+                                                  run_date=session_date_str)
+    return forced_results, stop_dust_exempt
+
+
 def run_one_model(
     model_key: str,
     cfg: dict[str, Any],
@@ -222,24 +262,8 @@ def run_one_model(
     # pass whose valuation aborted: its one CRITICAL already names every
     # missing close, and nothing is sized or valued.
     valuation_aborted = is_eod and not eod_valuation_ok
-    triggered = [] if valuation_aborted else check_position_stops(portfolio, prices)
-    unevaluable = [] if valuation_aborted else position_stops_unevaluable(portfolio, prices)
-    if unevaluable:
-        # Can't evaluate is a classified state, never a quiet pass. Once per
-        # book per day: vendor gaps of a name or two per fetch are routine.
-        send_alert("WARN", f"Position stop unevaluable: {model_key}",
-                   "No valid price this cycle for held name(s); their per-position "
-                   "stops were not tested.",
-                   {"model": model_key, "tickers": ", ".join(unevaluable)},
-                   kind="stop_unevaluable",
-                   dedup_key=f"stop_unevaluable:{model_key}:{session_date_str}")
-    forced_results = []
-    if triggered:
-        send_alert("WARN", f"Position stop on {model_key}",
-                   f"Force-selling: {triggered}", {"model": model_key},
-                   kind="position_stop", dedup_key=f"position_stop:{model_key}")
-        forced_results = executor.force_liquidate(portfolio, triggered, prices, "POSITION_STOP",
-                                                  run_date=session_date_str)
+    forced_results, stop_dust_exempt = ([], []) if valuation_aborted else _position_stop_sweep(
+        model_key, portfolio, prices, executor, session_date_str, logger)
 
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
@@ -413,6 +437,7 @@ def run_one_model(
             cycle_id=executor.cycle_id,
             fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
             screening_latency_seconds=_scr_latency,
+            stop_dust_exempt=stop_dust_exempt,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -526,6 +551,7 @@ def run_one_model(
         cycle_id=executor.cycle_id,
         fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
         screening_latency_seconds=_scr_latency,
+        stop_dust_exempt=stop_dust_exempt,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])

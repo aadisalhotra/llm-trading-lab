@@ -443,12 +443,61 @@ def check_portfolio_stop(portfolio: Portfolio, prices: dict[str, float]) -> bool
     return evaluate_portfolio_stop(portfolio, prices) == STOP_BREACH
 
 
+def is_stop_exempt_dust(portfolio: Portfolio, ticker: str, prices: dict[str, float]) -> bool:
+    """True for dust: a holding whose notional at the stop-evaluation mark is
+    below BEHAVIOURAL_NOTIONAL_FLOOR ($1, the venue minimum).
+
+    Ghost-position ruling §⑧ (Research, delivered inline 2026-11-12): position
+    stops -- the 15% long stop and the 10% short stop -- evaluate only holdings
+    with notional >= the floor at the stop-evaluation mark. Dust is excluded
+    from stop evaluation and logged in the stop record (stop_dust_holdings ->
+    the decision log's `stop_dust_exempt`), so STOP UNPROTECTED can only fire
+    for an actionable position. The drawdown halt is unchanged: dust stays in
+    NAV. The case: Grok's 0.0001 NVDA ($0.02), 2026-11-12 09:33 ET, tripped the
+    15% stop, its forced SELL was refused as BELOW_VENUE_MINIMUM, and that
+    raised STOP UNPROTECTED and failed the cycle's Gate 4 score.
+
+    The threshold is MARK-based because the stop evaluates at the mark. It
+    deliberately differs from §⑤'s fill-price anchoring for metrics, where
+    reproducibility from the fill record governs; Research ruled the two must
+    not be aligned later. The mark is the book's own (portfolio.mark): the
+    cycle's valid price, or for an unpriced name its classified fallback mark,
+    which is also the price force_liquidate would size the exit at.
+    """
+    # Local import: src.execution imports src.portfolio, so a module-level
+    # import here would be a cycle (same pattern as Portfolio.no_position_shares).
+    from ..execution.broker import BEHAVIOURAL_NOTIONAL_FLOOR
+    h = portfolio.holdings[ticker]
+    mark = portfolio.mark(ticker, prices)
+    return is_finite_number(mark) and abs(h.shares) * float(mark) < BEHAVIOURAL_NOTIONAL_FLOOR
+
+
+def stop_dust_holdings(portfolio: Portfolio, prices: dict[str, float]) -> list[dict[str, Any]]:
+    """§⑧'s stop record: one {ticker, shares, mark, notional} per holding the
+    position stops did not evaluate because it is dust. Every dust holding is
+    listed, breached or not, since none is evaluated. Written to the cycle's
+    decision-log record as `stop_dust_exempt` (not to execution results, so the
+    Gate 4 scorer never reads it as an order or a skip); the per-book, per-day
+    count is the `stop_dust_exemptions` descriptor, derived by reporting."""
+    records: list[dict[str, Any]] = []
+    for ticker in sorted(portfolio.holdings):
+        if not is_stop_exempt_dust(portfolio, ticker, prices):
+            continue
+        shares = portfolio.holdings[ticker].shares
+        mark = float(portfolio.mark(ticker, prices))
+        records.append({"ticker": ticker, "shares": shares, "mark": mark,
+                        "notional": abs(shares) * mark})
+    return records
+
+
 def position_stops_unevaluable(portfolio: Portfolio, prices: dict[str, float]) -> list[str]:
     """Held tickers whose per-position stop cannot be evaluated this cycle
     because they have no valid price. Classified and alerted by the caller;
-    check_position_stops skips them rather than testing a stand-in mark."""
+    check_position_stops skips them rather than testing a stand-in mark.
+    Sub-$1 dust is stop-exempt, so it is never reported here either."""
     return sorted(t for t, h in portfolio.holdings.items()
-                  if h.avg_cost and not is_valid_price(prices.get(t)))
+                  if h.avg_cost and not is_valid_price(prices.get(t))
+                  and not is_stop_exempt_dust(portfolio, t, prices))
 
 
 def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list[str]:
@@ -461,6 +510,7 @@ def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list
 
     A held ticker without a valid price is not tested at all (a NaN compares
     False, which used to pass silently): position_stops_unevaluable() names it.
+    A holding under $1 notional is not tested either: is_stop_exempt_dust().
     """
     settings = load_settings()
     rc = settings["risk_controls"]
@@ -470,6 +520,8 @@ def check_position_stops(portfolio: Portfolio, prices: dict[str, float]) -> list
     for ticker, h in portfolio.holdings.items():
         price = prices.get(ticker)
         if not is_valid_price(price) or not h.avg_cost:
+            continue
+        if is_stop_exempt_dust(portfolio, ticker, prices):
             continue
         if h.is_short:
             gain_against = (price / h.avg_cost) - 1.0  # short loses as price rises

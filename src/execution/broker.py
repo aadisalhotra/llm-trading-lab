@@ -96,6 +96,11 @@ MAX_CLIENT_ORDER_ID = 128
 QTY_DECIMALS = 9
 _QTY_QUANTUM = Decimal(1).scaleb(-QTY_DECIMALS)   # 1E-9, for truncate_qty
 MIN_ORDER_NOTIONAL = 1.00
+# A behavioural position is notional >= this floor; below it is dust (ghost-
+# position ruling §⑤ for metrics, at the fill price; §⑧ for position stops, at
+# the stop-evaluation mark). Derived, not a new constant: it IS the venue
+# minimum, and it moves only if that does.
+BEHAVIOURAL_NOTIONAL_FLOOR = MIN_ORDER_NOTIONAL
 DEFAULT_FILL_DEADLINE_SECONDS = 300      # registered 2026-08-29: 5 minutes
 DEFAULT_POLL_INTERVAL_SECONDS = 2.0
 RATE_LIMIT_PER_MINUTE = 200
