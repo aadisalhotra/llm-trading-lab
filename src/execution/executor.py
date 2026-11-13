@@ -199,15 +199,16 @@ def alarm_fill_overruns(model_key: str, results: list[ExecutionResult],
         send_alert_fn(
             "WARN" if explained else "CRITICAL",
             f"{EVENT_FILL_OVERRUN}: {model_key} {ev['ticker']}",
-            ("A confirmed fill above the reference price took book cash below "
-             "zero. Slippage on the order accounts for the balance."
+            ("A confirmed fill above the reference price took the book's settled "
+             "cash below zero. Slippage on the order accounts for the balance."
              if explained else
-             "Book cash is below zero and slippage does not account for it. "
-             "This is a balance-integrity failure until explained."),
+             "The book's settled cash is below zero and slippage does not account "
+             "for it. This is a balance-integrity failure until explained."),
             {"model": model_key, "order_id": ev["order_id"],
              "reference_price": str(ev["reference_price"]),
              "fill_price": str(ev["fill_price"]),
              "amount_usd": f"{ev['amount_usd']:.4f}",
+             "settled_balance_after": f"{ev.get('settled_balance_after', ev['book_cash_after']):.4f}",
              "book_cash_after": f"{ev['book_cash_after']:.4f}"},
             kind="fill_overrun",
             dedup_key=f"fill_overrun:{model_key}:{cycle_id}:{ev['order_id']}")
@@ -903,10 +904,15 @@ class Executor:
         overrun = None
 
         if s.action == "BUY":
-            cash_before = portfolio.cash
+            # Measured on the SETTLED balance, not total cash: a capped BUY that
+            # fills above reference overspends settled funds while unsettled
+            # proceeds keep total cash positive (Sonnet ORCL 2026-11-11,
+            # -$0.2855 settled, +$60.73 total, no event). With no unsettled
+            # tranches the two are the same number, so nothing else changes.
+            settled_before = portfolio.settled_balance()
             portfolio.buy(s.ticker, shares, price, venue_confirmed=True)
-            if portfolio.cash < -1e-6:
-                overrun = self._fill_overrun(portfolio, s, placement, cash_before,
+            if portfolio.settled_balance() < -1e-6:
+                overrun = self._fill_overrun(portfolio, s, placement, settled_before,
                                              prior_slippage)
             if constraint == CONSTRAINT_UNSETTLED_FUNDS_CAPPED:
                 logger.info("[%s] BUY %s capped at the settled balance (%.4f shares filled)",
@@ -933,9 +939,11 @@ class Executor:
                                constraint_detail=s.constraint_detail, fill_overrun=overrun)
 
     def _fill_overrun(self, portfolio: Portfolio, s: _SizedOrder, placement: _Placement,
-                      cash_before: float, prior_slippage: float) -> dict[str, Any]:
+                      settled_before: float, prior_slippage: float) -> dict[str, Any]:
         """Build the FILL_OVERRUN event and carry its explanation on the book.
 
+        The balance is the unclamped settled balance (cash minus unsettled
+        proceeds), which equals total cash when nothing is unsettled.
         Explained means slippage covers the whole negative balance, compared to
         the cent: this order's (fill - reference) x quantity, plus the batch's
         earlier fills, plus whatever earlier overrun is still on the book. It can
@@ -943,7 +951,7 @@ class Executor:
         little under the cap, so the test is "accounts for", not equality.
         """
         shares, price = placement.filled_qty, placement.fill_price
-        deficit = -portfolio.cash
+        deficit = -portfolio.settled_balance()
         slippage = (price - s.price) * shares + prior_slippage + portfolio.fill_overrun_usd
         explained = round(deficit, 2) <= round(slippage, 2)
         if explained:
@@ -952,8 +960,9 @@ class Executor:
             "event": EVENT_FILL_OVERRUN,
             "order_id": placement.order_id, "ticker": s.ticker,
             "reference_price": s.price, "fill_price": price, "quantity": shares,
-            "amount_usd": deficit - max(-cash_before, 0.0),
-            "book_cash_after": portfolio.cash, "slippage_usd": slippage,
+            "amount_usd": deficit - max(-settled_before, 0.0),
+            "book_cash_after": portfolio.cash,
+            "settled_balance_after": -deficit, "slippage_usd": slippage,
             "explained": explained,
         }
         (logger.warning if explained else logger.critical)("%s %s", EVENT_FILL_OVERRUN, event)

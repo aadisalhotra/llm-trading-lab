@@ -139,6 +139,19 @@ class Portfolio:
     def unsettled_cash(self) -> float:
         return self.settlement.unsettled_total()
 
+    def settled_balance(self) -> float:
+        """Total cash minus unsettled proceeds, NOT clamped at zero.
+
+        settled_cash() clamps for sizing and display, which is right for "what
+        may be deployed" and wrong for "did a fill spend more than was settled":
+        clamped, a capped BUY that fills above its reference can overspend the
+        settled balance while total cash (padded by unsettled proceeds) stays
+        positive, and nothing sees it. Sonnet's ORCL fill on 2026-11-11 did
+        exactly that: total cash +$60.73, settled balance -$0.2855. Equal to
+        `cash` for any book with no unsettled tranches.
+        """
+        return float(self.cash) - self.settlement.unsettled_total()
+
     # ----- intraday session helpers -----
     def reset_intraday_if_new_session(self, session_date: str) -> bool:
         """Zero the intraday counters when a new ET trading day begins.
@@ -551,7 +564,10 @@ def load_portfolio(model_key: str) -> Portfolio:
 
 def save_portfolio(p: Portfolio) -> None:
     p.last_updated = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    if p.cash >= -1e-6:
+    # The overrun explanation is carried while the SETTLED balance is negative
+    # (FILL_OVERRUN measures settled cash); it clears once settlement or a sale
+    # brings that balance back to zero. Settled >= 0 implies total cash >= 0.
+    if p.settled_balance() >= -1e-6:
         p.fill_overrun_usd = 0.0
     out = {
         "model_key": p.model_key,
