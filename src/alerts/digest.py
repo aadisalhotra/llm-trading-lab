@@ -315,6 +315,28 @@ def _overflow_section(overflow: list[dict[str, Any]]) -> str:
     )
 
 
+def _continuing_section(continuing: list[dict[str, Any]]) -> str:
+    """Conditions already emailed once that persist unchanged (report_once)."""
+    if not continuing:
+        return ""
+    items = ""
+    for ev in continuing:
+        sev = ev.get("severity", "INFO")
+        color = RED if sev == "CRITICAL" else ("#d35400" if sev == "WARN" else MUTED)
+        items += (
+            f'<li style="margin:6px 0;font-size:13px;color:{INK};">'
+            f'<span style="color:{color};font-weight:700;">[{sev}]</span> '
+            f'{ev.get("title","")}<br>'
+            f'<span style="color:{MUTED};">{ev.get("body","")}</span></li>'
+        )
+    return (
+        f'<div style="margin-top:8px;">'
+        f'<div style="font-size:12px;color:{MUTED};text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">'
+        f"Continuing conditions (already reported, unchanged)</div>"
+        f'<ul style="margin:0;padding-left:18px;list-style:none;">{items}</ul></div>'
+    )
+
+
 def _section_header(title: str) -> str:
     return (
         f'<div style="font-size:13px;font-weight:700;color:{INK};text-transform:uppercase;'
@@ -345,6 +367,7 @@ def build_digest(summary: dict[str, Any], settings: dict[str, Any] | None = None
 
     daily_bucket = load_state().get("daily") or {}
     overflow = daily_bucket.get("overflow", []) if daily_bucket.get("date") == date_str else []
+    continuing = daily_bucket.get("continuing", []) if daily_bucket.get("date") == date_str else []
 
     subject = f"LLM Trading Lab — Daily Digest {date_str}"
 
@@ -378,6 +401,7 @@ def build_digest(summary: dict[str, Any], settings: dict[str, Any] | None = None
     {_section_header("System health")}
     {_health_section(issues)}
     {_overflow_section(overflow)}
+    {_continuing_section(continuing)}
   </td></tr>
 
   <tr><td style="padding:20px 24px;color:{MUTED};font-size:11px;border-top:1px solid {BORDER};margin-top:16px;">

@@ -8,6 +8,13 @@ it survives the ephemeral GitHub Actions runners. Two scopes:
     threshold per model, ever" rather than every day the model is above the
     line.
 
+  - `reported_once`: cross-day ledger of conditions that are emailed once
+    and then folded into the digest while they persist, as
+    {condition key: signature}. A new signature (the condition changed) is a
+    new event and emails again. Used for the explained negative-cash state
+    (a FILL_OVERRUN the system already accounts for), which otherwise
+    re-emailed every evening until the book's cash recovered.
+
   - `daily`: a single-day bucket (keyed by ET trading date) holding the
     de-dup keys already fired today, the count of event emails sent today
     (against the 10/day cap), the overflow queue (alerts past the cap, to be
@@ -34,6 +41,7 @@ STATE_FILE = ALERTS_DIR / "state.json"
 def _default_state() -> dict[str, Any]:
     return {
         "milestones_fired": {},   # model_key -> [thresholds]
+        "reported_once": {},      # condition key -> signature already emailed
         "daily": _default_daily(""),
     }
 
@@ -44,6 +52,7 @@ def _default_daily(date_str: str) -> dict[str, Any]:
         "sent_count": 0,        # event emails actually sent today (toward the cap)
         "dedup_keys": [],       # keys already fired today
         "overflow": [],         # events past the cap — bundled into the digest
+        "continuing": [],       # already-reported conditions, folded into the digest
         "digest_sent": False,   # digest dedupe (EOD can fire multiple times/day)
         "fired_log": [],        # compact record of every event handled today
     }
@@ -62,6 +71,8 @@ def load_state() -> dict[str, Any]:
     if not isinstance(data, dict):
         return _default_state()
     data.setdefault("milestones_fired", {})
+    if not isinstance(data.get("reported_once"), dict):
+        data["reported_once"] = {}
     daily = data.get("daily")
     if not isinstance(daily, dict):
         data["daily"] = _default_daily("")
@@ -85,8 +96,9 @@ def save_state(state: dict[str, Any]) -> None:
 def ensure_daily(state: dict[str, Any], date_str: str) -> dict[str, Any]:
     """Return today's daily bucket, resetting it if the ET date has rolled.
 
-    `milestones_fired` is intentionally preserved across the reset — it's the
-    permanent once-ever ledger. Everything else is per-day and starts clean.
+    `milestones_fired` and `reported_once` are intentionally preserved across
+    the reset — they are the cross-day ledgers. Everything else is per-day and
+    starts clean.
     """
     daily = state.get("daily") or {}
     if daily.get("date") != date_str:

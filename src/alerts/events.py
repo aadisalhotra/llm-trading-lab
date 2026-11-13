@@ -8,7 +8,9 @@ Two halves:
        * the per-day cap (default 10 event emails/day; anything past the cap
          is queued into the daily "overflow" bucket and bundled into the
          digest instead of emailed), and
-       * the once-ever milestone ledger.
+       * the once-ever milestone ledger, and
+       * report-once conditions (`report_once`): emailed the first time,
+         folded into the digest while they persist unchanged.
      It is the ONLY writer of /data/alerts/state.json, guarded by a process
      lock so the parallel per-model threads can't race it.
 
@@ -279,10 +281,12 @@ def dispatch_event(
     dedup_key: str | None = None,
     email: bool | None = None,
     mark_milestones: tuple[str, list[int]] | None = None,
+    report_once: tuple[str, str] | None = None,
     settings: dict[str, Any] | None = None,
 ) -> str:
     """Route one event. Returns disposition: queued | overflow | deduped |
-    logged | disabled, or (with ASYNC_SEND False) sent | send_failed.
+    continuing | logged | disabled, or (with ASYNC_SEND False) sent |
+    send_failed.
 
     `queued`: the cap slot and dedup key are reserved and the email is being
     sent on a background thread; `_deliver` settles it to sent or send_failed
@@ -293,6 +297,11 @@ def dispatch_event(
     `dedup_key`: defaults to "{kind}:{model}". A key fires at most once/day.
     `mark_milestones`: (model_key, thresholds) recorded into the once-ever
     ledger when the event is actually handled (sent or overflowed).
+    `report_once`: (condition key, signature). If the ledger already holds
+    that signature for the key, the event is NOT emailed: it is folded into
+    the digest's continuing-conditions list (`continuing`). Otherwise it
+    routes normally and the signature is recorded once handled (sent or
+    overflowed), so the next evening it folds. A changed signature emails.
     """
     context = context or {}
     if settings is None:
@@ -333,12 +342,23 @@ def dispatch_event(
         if dedup_key in daily["dedup_keys"]:
             return "deduped"
 
+        # Already reported and unchanged: one digest line, no email, no cap slot.
+        if report_once and state.setdefault("reported_once", {}).get(report_once[0]) == report_once[1]:
+            daily.setdefault("continuing", []).append(event_record)
+            daily["dedup_keys"].append(dedup_key)
+            daily["fired_log"].append({**_compact(event_record), "disposition": "continuing"})
+            save_state(state)
+            logger.info("Condition already reported — folded into digest: [%s] %s", kind, title)
+            return "continuing"
+
         def _mark_milestones() -> None:
             if mark_milestones:
                 mk, thresholds = mark_milestones
                 existing = set(state["milestones_fired"].get(mk, []))
                 existing.update(int(t) for t in thresholds)
                 state["milestones_fired"][mk] = sorted(existing)
+            if report_once:
+                state.setdefault("reported_once", {})[report_once[0]] = report_once[1]
 
         # Past the cap → queue into the digest overflow instead of emailing.
         if daily["sent_count"] >= cap:
@@ -367,7 +387,8 @@ def dispatch_event(
                  f"{', '.join(str(m) for m in (context.get('models') or ([context['model']] if context.get('model') else [])))}"
                  f"\nTime: {fired_at_et}")
     job = functools.partial(_deliver, subject, html, text_body, kind, settings,
-                            reserved_date, dispatch_id, dedup_key, mark_milestones)
+                            reserved_date, dispatch_id, dedup_key, mark_milestones,
+                            report_once)
     if not ASYNC_SEND:
         return job()
     t = threading.Thread(target=job, name=f"alert-send-{dispatch_id}", daemon=True)
@@ -435,7 +456,8 @@ atexit.register(_drain_at_exit)
 
 def _deliver(subject: str, html: str, text_body: str, kind: str,
              settings: dict[str, Any], reserved_date: str, dispatch_id: str,
-             dedup_key: str, mark_milestones: tuple[str, list[int]] | None) -> str:
+             dedup_key: str, mark_milestones: tuple[str, list[int]] | None,
+             report_once: tuple[str, str] | None = None) -> str:
     """Send one reserved event email and settle its state. Never raises."""
     try:
         ok = send_email(subject, html, text_body=text_body,
@@ -444,14 +466,16 @@ def _deliver(subject: str, html: str, text_body: str, kind: str,
         logger.exception("Event send raised unexpectedly: %s", subject)
         ok = False
     disposition = "sent" if ok else "send_failed"
-    _settle(reserved_date, dispatch_id, dedup_key, disposition, mark_milestones if ok else None)
+    _settle(reserved_date, dispatch_id, dedup_key, disposition, mark_milestones if ok else None,
+            report_once if ok else None)
     if not ok:
         logger.error("Event email NOT delivered after retries: %s", subject)
     return disposition
 
 
 def _settle(reserved_date: str, dispatch_id: str, dedup_key: str, disposition: str,
-            mark_milestones: tuple[str, list[int]] | None) -> None:
+            mark_milestones: tuple[str, list[int]] | None,
+            report_once: tuple[str, str] | None = None) -> None:
     """Record a reserved send's outcome. The reservation (cap slot + dedup key)
     is held exactly while the fired_log entry reads 'queued': a failed or
     abandoned send gives it back, and a send that completes after being
@@ -482,6 +506,8 @@ def _settle(reserved_date: str, dispatch_id: str, dedup_key: str, disposition: s
                 existing = set(state["milestones_fired"].get(mk, []))
                 existing.update(int(t) for t in thresholds)
                 state["milestones_fired"][mk] = sorted(existing)
+            if report_once:
+                state.setdefault("reported_once", {})[report_once[0]] = report_once[1]
             save_state(state)
     except Exception:  # noqa: BLE001
         logger.exception("Could not settle alert state for %s (%s)", dispatch_id, disposition)
@@ -1183,14 +1209,24 @@ def detect_state_anomalies(settings: dict[str, Any], date_str: str | None = None
             # must not read as a balance-integrity failure. Anything it does
             # not explain still does.
             explained = round(-p.cash, 2) <= round(p.fill_overrun_usd, 2)
-            specs.append(_state_spec(
+            spec = _state_spec(
                 "state_cash", "WARN" if explained else "CRITICAL", key, name,
                 (f"{name} has negative cash of {_fmt_money(p.cash)}, explained by "
                  f"recorded fill slippage of {_fmt_money(p.fill_overrun_usd)}."
                  if explained else
                  f"{name} has <b>negative cash</b> of {_fmt_money(p.cash)} — a balance-integrity failure."),
                 {"Cash": _fmt_money(p.cash)},
-            ))
+            )
+            if explained:
+                # The FILL_OVERRUN alert already reported this at the fill, and
+                # the balance persists until a sale or settlement clears it, so
+                # it re-emailed every evening (GPT -$0.0105: 11-12 02:04Z,
+                # 02:41Z, 22:07Z). Email it once; while the balance and its
+                # explanation are unchanged, fold it into the digest. An
+                # unexplained balance stays CRITICAL and emails every day.
+                spec["report_once"] = (f"state_cash:{key}",
+                                       f"{p.cash:.4f}|{p.fill_overrun_usd:.6f}")
+            specs.append(spec)
 
         # Duplicate-state signature (non-trivial: must hold something)
         if p.holdings:
@@ -1445,6 +1481,7 @@ def run_eod_alert_sweep(summary: dict[str, Any], settings: dict[str, Any] | None
                     dedup_key=spec.get("dedup_key"),
                     email=spec.get("email"),
                     mark_milestones=spec.get("mark_milestones"),
+                    report_once=spec.get("report_once"),
                     settings=settings,
                 )
             except Exception:
