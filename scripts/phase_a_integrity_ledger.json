@@ -3353,6 +3353,119 @@
         },
         "validation_count": "Unaffected (data-validity class).",
         "open_items": "The closed validator reason set is listed in prose at docs/prereg/tier2_novel_sections.md:344 (the Gate 4 cross-reference); PRICE_UNAVAILABLE is not yet in that list and is added there only on a hub ruling. The venue fallback of §2.2 is not automated here; it is used by a backfill when the vendor bar stays invalid."
+      },
+      {
+        "id": "grok_stop_unprotected_on_dust_2026_11_12",
+        "date": "2026-11-12",
+        "type": "gexec_event",
+        "scope": "Grok, cycle 20261112T143314Z (09:33 ET), decision grok-20261112T143314Z-stop-NVDA.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-12 'Thursday close: amend, ledger, review branch', delivered inline: no reclassification; the event stays fail:stop_unprotected as scored (Research's counterfactual-record rule: classification follows what happened); its resolution is the dust exemption landing with this entry. Research confirms."
+        },
+        "what_happened": "Grok held 0.0001 NVDA (average cost 187.93), pre-(c) dust. The 14:32:50Z fetch marked NVDA at 152.84, 18.67% below cost, past the 15% long stop (line 159.74). The stop sweep force-sold it; the $0.02 SELL was refused pre-submission as BELOW_VENUE_MINIMUM. force_liquidate returned stop_unprotected=true, which raised STOP UNPROTECTED: grok (CRITICAL, emailed 14:35:06Z) after the position-stop WARN (14:33:14Z). The book stayed correct: it still holds the 0.0001.",
+        "price_check": "Alpaca SIP 1-minute bars: 14:32 bar 152.75-154.66 (contains 152.84); SIP high 14:30-14:35 was 157.37, under the stop line, so the breach is real. Only this cycle breached (next mark 160.76 at 15:02:20Z).",
+        "scoring": "classify_execution tests stop_unprotected before the constraint tag, so the row scored fail:stop_unprotected despite carrying BELOW_VENUE_MINIMUM. Recorded as scored: Grok G-EXEC 12/13 for 2026-11-12 and 57/64 for 2026-11 to date (other 6 failures: day-one unclassified skips, 2026-11-06).",
+        "cause": "The position-stop domain included unactionable dust: a holding under the venue minimum can produce no order the venue accepts, so any stop on it ends unprotected.",
+        "resolution": "Commit 708553f5b (ghost-position ruling §⑧, entry ghost_position_ruling_section_8_2026_11_12): dust is excluded from stop evaluation, so no forced order, no alert and no STOP UNPROTECTED can arise from it.",
+        "s1_note": "An organic G-EXEC event during the corrected-executor window. Resolved by the §⑧ landing, not reclassified."
+      },
+      {
+        "id": "ghost_position_ruling_section_8_2026_11_12",
+        "date": "2026-11-12",
+        "type": "registration",
+        "scope": "Position stops (15% long, 10% short), all books. The drawdown halt is unchanged.",
+        "provenance": "§⑧ delivered inline by Research 2026-11-12, relayed by the PI. It joins ghost_position_ruling.md as §⑧ in Research’s next re-issue; the ledger records the inline text until then.",
+        "delivered": "Research, inline, 2026-11-12 22:40 ET; relayed by the PI in HUB -> OPERATIONS '§⑧ verbatim, and three implementation answers'.",
+        "text": "Position stops (the 15% per-position stop-loss and the 10% short stop) evaluate only holdings with notional ≥ BEHAVIOURAL_NOTIONAL_FLOOR ($1, the venue minimum) at the stop-evaluation mark. Holdings below it are dust: unactionable by any order, carrying less than the cash tolerance in risk, excluded from stop evaluation and logged as dust in the stop record. STOP UNPROTECTED fires only for an actionable position whose forced exit failed. This amends the registered stop rule’s domain, not its level, before the live phase; the portfolio drawdown halt is unchanged (dust remains in NAV truthfully). The threshold is the registered floor, derived, not a new constant.",
+        "research_notes": [
+          "The threshold is mark-based because the stop evaluates at the mark. That’s correct for risk control, and it deliberately differs from §⑤’s fill-price anchoring for metrics, where reproducibility from the fill record governs. They must not be “aligned” later.",
+          "The exemption handles residual and pre-(c) dust. Once full-quantity exits are live, new dust should be rare, and the exemption’s firing count is a descriptor to watch: if it stays nonzero after (c), something else is still making dust."
+        ],
+        "implementation_answers_hub": {
+          "stop_record": "A field on the cycle's decision-log record for that book, stop_dust_exempt: a list of {ticker, shares, mark, notional}, one per exempt holding. Not a row in the execution results, so the G-EXEC scorer never sees it as an order or a skip.",
+          "descriptor": "stop_dust_exemptions: the per-book, per-day count of stop_dust_exempt entries, derived by reporting. No stored counter.",
+          "floor_constant": "BEHAVIOURAL_NOTIONAL_FLOOR, defined once beside the venue's $1 minimum as an alias of that constant (derived, not new). The §5 metrics work reuses it."
+        },
+        "implementation": {
+          "commit": "708553f5b",
+          "floor": "src/execution/broker.py: BEHAVIOURAL_NOTIONAL_FLOOR = MIN_ORDER_NOTIONAL (1.00). broker.py is not imported by the install-nothing entry points (tests/test_stdlib_only_entry_points.py green).",
+          "mark": "portfolio.mark(ticker, prices): the cycle's valid price, or for an unpriced name its classified fallback mark (the price force_liquidate would size the exit at). Unpriced dust is therefore dust, not stop-unevaluable.",
+          "sites": "risk.is_stop_exempt_dust / risk.stop_dust_holdings; check_position_stops and position_stops_unevaluable skip dust; pipeline._position_stop_sweep logs one line per dust holding; decision_log writes stop_dust_exempt on every record ([] = no dust; an absent key = a pre-§⑧ record). Both decision-log call sites pass it.",
+          "tests": "tests/test_dust_stop_exemption.py, 13 tests. Grok's case (0.0001 NVDA at 152.84 against cost 187.93): no forced order, no alert, one dust log line. A $50 holding at the same loss: the stop fires. Also the $1 boundary at the mark, the short stop, unpriced dust, and the drawdown halt still counting dust in NAV."
+        },
+        "count_class": "Not executor-class (hub view, Research confirms, 2026-11-12): the venue order set is unchanged, because the excluded orders could never reach the venue. The corrected-executor session count is unaffected.",
+        "first_effective": "The first cycle after the landing on main. Every decision record from then on carries stop_dust_exempt; Grok's NVDA remainder should appear in each Grok record until it is re-bought above $1 or otherwise resolved."
+      },
+      {
+        "id": "settled_cash_overruns_undetected_2026_11",
+        "date": "2026-11-12",
+        "type": "disclosure",
+        "scope": "Three confirmed BUY fills that overspent the book's settled cash without a FILL_OVERRUN event.",
+        "cause": "The FILL_OVERRUN detector tested total cash (cash < 0). A BUY capped at the settled balance (UNSETTLED_FUNDS_CAPPED) that fills above its reference overspends settled funds while unsettled sale proceeds keep total cash positive, and Portfolio.settled_cash() clamps at zero, so the negative settled balance was never visible.",
+        "events": [
+          {
+            "book": "claude",
+            "cycle_id": "20261111T163255Z",
+            "decision_id": "claude-20261111T163255Z-d00",
+            "order_id": "claude-20261111T163255Z-00-a0",
+            "ticker": "ORCL",
+            "quantity": 0.8947,
+            "fill_price": 128.518,
+            "settled_cap_usd": 114.6995,
+            "settled_balance_after_usd": -0.2855,
+            "total_cash_after_usd": 60.7291
+          },
+          {
+            "book": "claude",
+            "cycle_id": "20261112T143314Z",
+            "decision_id": "claude-20261112T143314Z-d01",
+            "order_id": "claude-20261112T143314Z-01-a0",
+            "ticker": "QCOM",
+            "quantity": 0.3428,
+            "fill_price": 177.452,
+            "settled_cap_usd": 60.7291,
+            "settled_balance_after_usd": -0.1015,
+            "total_cash_after_usd": 145.25
+          },
+          {
+            "book": "gpt",
+            "cycle_id": "20261109T190244Z",
+            "decision_id": "gpt-20261109T190244Z-d01",
+            "order_id": "gpt-20261109T190244Z-01-a0",
+            "ticker": "AMD",
+            "quantity": 0.0863,
+            "fill_price": 507.324,
+            "settled_cap_usd": 43.7792,
+            "settled_balance_after_usd": -0.0029,
+            "total_cash_after_usd": 96.884
+          }
+        ],
+        "method": "Every UNSETTLED_FUNDS_CAPPED or FILL_OVERRUN row in data/trades/*_2026-11.jsonl, settled balance = portfolio_after.cash - portfolio_after.unsettled_cash. These three are the only negatives without an event. GPT AVGO 2026-11-11 (-$0.0105) and Grok ORCL 2026-11-12 (-$0.0335) went negative in TOTAL cash and fired FILL_OVERRUN as designed.",
+        "effect": "Book records are truthful: every fill is venue-confirmed, and reconciliation stayed clean throughout. No order was refused, and the books carried no wrong balance. The defect was in detection only. Each negative settled balance clears when the cycle's unsettled tranche settles (T+1).",
+        "resolution": "Commit 59fc24f83 (detector_fixes_2026_11_12)."
+      },
+      {
+        "id": "detector_fixes_2026_11_12",
+        "date": "2026-11-12",
+        "type": "detector_change",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-12 'Thursday close', items 3 and 4, delivered inline: both staged, and both accepted as built."
+        },
+        "fill_overrun_on_settled_cash": {
+          "commit": "59fc24f83",
+          "change": "Portfolio.settled_balance() = cash - unsettled, unclamped. The executor tests it before and after each confirmed BUY, and the event adds settled_balance_after beside book_cash_after. The explanation carry (fill_overrun_usd) persists while the settled balance is negative and clears once settlement or a sale restores it.",
+          "unchanged": "With no unsettled tranches, settled balance equals cash, so paper books and every pre-existing test behave as before. Sizing still uses the clamped settled_cash().",
+          "tests": "tests/test_fill_overrun_settled.py (4)."
+        },
+        "state_cash_report_once": {
+          "commit": "353a75260",
+          "change": "dispatch_event(report_once=(key, signature)). An explained negative-cash state anomaly emails once; while its signature (cash to 4 dp, carry to 6 dp) is unchanged, later evenings fold it into the digest's 'Continuing conditions' section (alert state reported_once ledger, daily 'continuing' list) with no email and no cap slot. A changed signature emails again; a failed send records nothing; an unexplained negative balance stays CRITICAL and emails every day.",
+          "case": "GPT's -$0.0105 (AVGO, 2026-11-11, explained) emailed at 2026-11-12 02:04Z, 02:41Z and 22:07Z.",
+          "transition": "The reported_once ledger starts empty at landing (data/alerts/state.json is rewritten by every cron tick and was not seeded), so GPT's condition emails once more at the first end-of-day run after landing, then folds.",
+          "tests": "tests/test_state_cash_report_once.py (7)."
+        },
+        "count_class": "Monitoring and alerting only: neither change alters a venue order or a decision.",
+        "suite": "974 passed at branch tip, Python 3.14 locally; the CI 3.11 run is the PI's Tests run on review/thursday-close-2026-11-12."
       }
     ]
   }
