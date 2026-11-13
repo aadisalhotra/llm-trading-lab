@@ -41,14 +41,17 @@
   },
   "daily": {
     "date": "2026-11-13",
-    "sent_count": 2,
+    "sent_count": 5,
     "dedup_keys": [
       "fill_overrun:grok:20261113T153247Z:grok-20261113T153247Z-01-a0",
-      "macro_event:Severe economic data"
+      "macro_event:Severe economic data",
+      "macro_event:Geopolitical shock",
+      "state_cash:gpt",
+      "news:LLY:7680e185d7"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "fill_overrun",
@@ -73,6 +76,38 @@
         },
         "disposition": "sent",
         "dispatch_id": "93620a81fbb3"
+      },
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-13T22:07:26.747371+00:00",
+        "trigger": {
+          "headline": "Yemen's Houthis say they fired missiles at Saudi forces in Jazan - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-13T20:54:19+00:00",
+          "category": "Geopolitical shock",
+          "matched_term": "missiles",
+          "score": -0.9413
+        },
+        "disposition": "sent",
+        "dispatch_id": "604d064345f1"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-13T22:07:47.280856+00:00",
+        "disposition": "queued",
+        "dispatch_id": "fa8fe111c44a"
+      },
+      {
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on LLY (held by 5)",
+        "timestamp": "2026-11-13T22:07:47.627793+00:00",
+        "disposition": "queued",
+        "dispatch_id": "002d57cf3d70"
       }
     ]
   },
