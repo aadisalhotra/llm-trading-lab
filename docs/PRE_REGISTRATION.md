@@ -169,9 +169,9 @@ Each RQ is stated with a null/alternative hypothesis, the operational definition
 |---|---|---|---|---|---|---|
 | Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
 | Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| GPT-5.4 | OpenAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| GPT-5.4 | OpenAI | `gpt-5.4-2026-03-05` (dated snapshot; `config/settings.json` `models.gpt.model`) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
 | Gemini 3.1 Pro | Google | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Grok 4.20 Reasoning | xAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Grok 4.20 Reasoning | xAI | `grok-4.20-0309-reasoning` (dated snapshot; `config/settings.json` `models.grok.model`) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
 | DeepSeek v4-pro | DeepSeek | `[PIN]` | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
 
 `[PIN]` = dated immutable snapshot ID resolved before the deposit (Claude rows use the dateless 4.6-generation canonical snapshot, no `[PIN]` needed). `[VERIFY]` = filled by the per-model API-configuration verification (a hard pre-deposit dependency of RQ6); DeepSeek's row is verified.
@@ -261,12 +261,12 @@ Discloses the Phase A (pilot) data-quality issues and the registered handling. P
 
 | Model | Provider | Lifecycle status | Retirement floor / change exposure | Inside confirmatory window? | Source |
 |---|---|---|---|---|---|
-| `claude-sonnet-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-17 | Yes | `<Anthropic deprecations page — fill URL>` |
-| `claude-opus-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-05 | Yes | `<Anthropic deprecations page — fill URL>` |
+| `claude-sonnet-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-17 | Yes | https://platform.claude.com/docs/en/about-claude/model-deprecations |
+| `claude-opus-4-6` | Anthropic | Active | Retirement floor: not sooner than 2027-02-05 | Yes | https://platform.claude.com/docs/en/about-claude/model-deprecations |
 | Gemini 3.1 Pro (`gemini-3.1-pro-preview`) | Google | Active — preview (pre-GA) build | Structural preview-supersession risk; no dated retirement floor published | Yes — undated, structural | https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview |
 | GPT-5.4 | OpenAI | `[VERIFY — deprecation audit pending]` | `[VERIFY]` | `[VERIFY]` | `<OpenAI deprecations page — fill URL>` |
 | Grok 4.20 Reasoning | xAI | `[VERIFY — deprecation audit pending]` | `[VERIFY]` | `[VERIFY]` | `<xAI model page — fill URL>` |
-| DeepSeek v4-pro | DeepSeek | Active | No retirement announced as of audit | No (none published) | `<DeepSeek docs — fill URL>` |
+| DeepSeek v4-pro | DeepSeek | Active | No retirement announced as of audit | No (none published) | https://api-docs.deepseek.com/updates/ |
 
 The GPT-5.4 and Grok 4.20 rows are pending the OpenAI and xAI deprecation audit, which must complete before the OSF deposit.
 
