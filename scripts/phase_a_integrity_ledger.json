@@ -3466,6 +3466,234 @@
         },
         "count_class": "Monitoring and alerting only: neither change alters a venue order or a decision.",
         "suite": "974 passed at branch tip, Python 3.14 locally; the CI 3.11 run is the PI's Tests run on review/thursday-close-2026-11-12."
+      },
+      {
+        "id": "cohort_as_run_2026_10_26_provider_tests",
+        "date": "2026-11-14",
+        "type": "cohort_as_run_addendum",
+        "amends": "operational_events.2026-11[cohort_as_run_2026_10_26].b_newer_ga_flagship_on_2026_10_26. That entry is not edited; this one adds four mechanical tests per slot to its availability reading, which it recorded as Operations' interpretation for every provider but Google ('ga_wording').",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-14 'Saturday: Friday's backlog', item 2, delivered inline: 'per-slot provider tests for cohort_as_run_2026_10_26 (page, date, billing status, no preview tag)'."
+        },
+        "tests": {
+          "page": "A primary provider page (release notes, changelog, model list or announcement) names the model's API id.",
+          "date": "A primary page dates the model's API availability on or before 2026-10-26.",
+          "billing_status": "A primary page states a paid per-token API price for the model, with no billing-deferred or free-only status. Dated on or before 2026-10-26 where a dated page states it; a price found only on an undated current page is recorded as such.",
+          "no_preview_tag": "The API id carries no -preview, -exp or -beta suffix, and no primary page labels the model itself preview, experimental or beta on the provider's own API. Labels on a feature of the model, or on a third-party cloud channel, are recorded but are not the model's tag."
+        },
+        "definitions_note": "The hub named the four tests without operational definitions; the wording above is Operations', recorded so the verdicts can be re-run. Research may restate it.",
+        "retrieved": "2026-11-14, by HTTP GET of each URL (curl; pages stripped to text). Quotes are verbatim from the fetched bytes; where a link or code tag splits a sentence, the pieces are joined with single spaces.",
+        "slots": {
+          "anthropic_opus": {
+            "deployed": "claude-opus-4-6",
+            "tested": "claude-opus-5-5",
+            "page": {
+              "result": "PASS",
+              "url": "https://platform.claude.com/docs/en/models/overview",
+              "quote": "claude-opus-5-5"
+            },
+            "date": {
+              "result": "PASS",
+              "value": "2026-09-22",
+              "url": "https://platform.claude.com/docs/en/release-notes/overview",
+              "page_date": "entry 'September 22, 2026'",
+              "quote": "We’ve launched Claude Opus 5.5 ( claude-opus-5-5 ), a model for long-running agentic coding and knowledge work."
+            },
+            "billing_status": {
+              "result": "PASS (dated)",
+              "url": "https://platform.claude.com/docs/en/release-notes/overview",
+              "page_date": "entry 'September 22, 2026'",
+              "quote": "at $4 / $20 USD per MTok (Claude Opus 5 is $5 / $25 USD). Claude Opus 5.5 is available on the Claude API,",
+              "current": "https://platform.claude.com/docs/en/about-claude/pricing lists Claude Opus 5.5 at $4 / MTok input, $20 / MTok output."
+            },
+            "no_preview_tag": {
+              "result": "PASS",
+              "detail": "Id claude-opus-5-5, listed with the current models on the models overview (separate from 'Legacy models'). The release notes' 'research preview' wording for Opus 5.5 concerns fast mode, a feature ('Fast mode is out of research preview for Claude Opus 5.5'), not the model."
+            }
+          },
+          "anthropic_sonnet": {
+            "deployed": "claude-sonnet-4-6",
+            "tested": "claude-sonnet-5-5",
+            "page": {
+              "result": "PASS",
+              "url": "https://platform.claude.com/docs/en/models/overview",
+              "quote": "claude-sonnet-5-5"
+            },
+            "date": {
+              "result": "PASS",
+              "value": "2026-09-28",
+              "url": "https://platform.claude.com/docs/en/release-notes/overview",
+              "page_date": "entry 'September 28, 2026'",
+              "quote": "We’ve launched Claude Sonnet 5.5 ( claude-sonnet-5-5 ). It’s available on the Claude API,"
+            },
+            "billing_status": {
+              "result": "PASS (dated)",
+              "url": "https://platform.claude.com/docs/en/release-notes/overview",
+              "page_date": "entry 'October 7, 2026'",
+              "quote": "We’ve lowered the price of prompt cache reads on Claude Sonnet 5.5 from $0.20 USD to $0.10 USD per million tokens",
+              "note": "The 2026-09-28 launch entry points to the model page for prices rather than stating them; the 2026-10-07 entry is the dated primary statement that the model was priced before the pin date.",
+              "current": "https://platform.claude.com/docs/en/about-claude/pricing lists Claude Sonnet 5.5 at $2 / MTok input, $10 / MTok output."
+            },
+            "no_preview_tag": {
+              "result": "PASS",
+              "detail": "Id claude-sonnet-5-5, listed with the current models on the models overview."
+            }
+          },
+          "openai": {
+            "deployed": "gpt-5.4-2026-03-05",
+            "tested": "gpt-6-astra (the cohort_as_run verdict's newest model by the provider's own positioning)",
+            "page": {
+              "result": "PASS",
+              "url": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+              "quote": "Snapshots gpt-6-astra"
+            },
+            "date": {
+              "result": "PASS",
+              "value": "2026-09-03",
+              "url": "https://developers.openai.com/api/docs/changelog",
+              "page_date": "entry 'Sep 3' under 'September, 2026'",
+              "quote": "Released GPT-6 Astra , our most capable model, built for the hardest end-to-end work."
+            },
+            "billing_status": {
+              "result": "PASS on the current page; the 2026-10-26 price is not established from a dated primary page.",
+              "dated": "The 2026-09-03 entry ends 'see pricing for available inference tiers.' and the 2026-09-29 entry ('Added Ultrafast mode for GPT-6 Astra in the Responses API. ... It is available to API customers') ends 'See Ultrafast pricing'. Both point to pricing; neither states a figure or a billing deferral.",
+              "current": "https://developers.openai.com/api/docs/pricing lists gpt-6-astra at $10.00 input / $50.00 output per 1M tokens (standard); the model page states 'Input $10.00 Cached input $1.00' per 1M text tokens.",
+              "contrast": "The same changelog states deferrals when they exist: the 2026-09-08 GPT-Rosalind entry reads 'Billing begins on October 5, 2026.' No such statement accompanies GPT-6 Astra."
+            },
+            "no_preview_tag": {
+              "result": "PASS",
+              "detail": "Id gpt-6-astra; the changelog says 'Released'. The model page's cloud-provider table reads 'Google Cloud Private preview' for gpt-6-astra: a third-party channel, not the OpenAI API."
+            }
+          },
+          "xai": {
+            "deployed": "grok-4.20-0309-reasoning",
+            "tested": "grok-4.7",
+            "page": {
+              "result": "PASS",
+              "url": "https://docs.x.ai/developers/models",
+              "page_date": "Last updated: September 21, 2026",
+              "quote": "grok-4.7 Our flagship model for code and everything else"
+            },
+            "date": {
+              "result": "PASS",
+              "value": "2026-09-21",
+              "url": "https://docs.x.ai/developers/release-notes",
+              "page_date": "entry 'September 21' (no year printed on the page; 2026 from https://x.ai/news/grok-4-7, 'Sep 21, 2026')",
+              "quote": "Grok 4.7, SpaceXSI's frontier model for coding, agentic tasks, and knowledge work, is now available on the xAI API as grok-4.7"
+            },
+            "billing_status": {
+              "result": "PASS (dated)",
+              "url": "https://docs.x.ai/developers/release-notes",
+              "page_date": "entry 'September 21'",
+              "quote": "Pricing is $2 / $0.50 / $6 per 1M tokens (input / cached input / output) below 200k prompt tokens, and $4 / $1 / $12 above.",
+              "current": "https://docs.x.ai/developers/models lists grok-4.7 at $2.00 / 1M input tokens, $6.00 / 1M output tokens."
+            },
+            "no_preview_tag": {
+              "result": "PASS",
+              "detail": "Id grok-4.7; the models page labels it 'New' and 'Latest', not preview or beta."
+            }
+          },
+          "google": {
+            "deployed": "gemini-3.1-pro-preview",
+            "tested": "gemini-4-argon",
+            "page": {
+              "result": "PASS",
+              "url": "https://aistudio.google.com/docs/models/gemini-4-argon (redirected from ai.google.dev)",
+              "quote": "Stable: `gemini-4-argon`"
+            },
+            "date": {
+              "result": "PASS",
+              "value": "2026-10-13",
+              "url": "https://aistudio.google.com/docs/changelog",
+              "page_date": "entry 'October 13, 2026'",
+              "quote": "Gemini 4 Argon (`gemini-4-argon`) generally available (GA)"
+            },
+            "billing_status": {
+              "result": "PASS (dated by the price window)",
+              "url": "https://aistudio.google.com/docs/whats-new-gemini-4-argon",
+              "quote": [
+                "Gemini 4 Argon is available at introductory pricing through November 30, 2026:",
+                "Gemini 4 Argon is not available on the Free tier."
+              ],
+              "dating": "The page is undated, but it states the introductory price as running through 2026-11-30 and the 2026-10-13 changelog entry links it ('For API changes, pricing, and migration guidance, see What's new in Gemini 4 Argon'), so the paid price covers 2026-10-26.",
+              "current": "https://aistudio.google.com/docs/pricing: input '$2.00 through November 30, 2026. $4.00 starting December 1, 2026.' (paid tier; free tier 'Not available')."
+            },
+            "no_preview_tag": {
+              "result": "PASS",
+              "detail": "Id gemini-4-argon, labelled 'Stable' on its model page and GA in the changelog."
+            },
+            "note": "Argon's per-token price doubles on 2026-12-01, the Phase B boundary. Relevant only if Research ever rules Argon a migration target; recorded, not assessed. The deployed gemini-3.1-pro-preview would fail the no-preview test on its own id, as cohort_as_run_2026_10_26 already records."
+          }
+        },
+        "result": "All five newer-model slots pass page, date and no-preview. Billing passes on a dated primary page for Anthropic (both), xAI and Google; for OpenAI it passes on the current pricing page only, and GPT-6 Astra's price on 2026-10-26 is not established from a dated primary page.",
+        "consequence": "None to the cohort: the 2026-11-08 pre-deposit amendment pins the deployed snapshots regardless. The tests replace 'Operations' interpretation' in cohort_as_run_2026_10_26.ga_wording with four checks per slot."
+      },
+      {
+        "id": "full_quantity_exits_hub_sign_off_2026_11_10",
+        "date": "2026-11-14",
+        "type": "sign_off_record",
+        "amends": "operational_events.2026-11[full_quantity_exits_executor_change_2026_11_10].s1_conditional_branch.hub_sign_off, which reads 'Pending' at entry. That entry is not edited.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-10 'sign-off for part 2 (main)', delivered inline: 'Record the hub's sign-off (hub_sign_off currently reads \"Pending\" at entry).' Repeated in HUB -> OPERATIONS 2026-11-14 'Saturday: Friday's backlog', item 2."
+        },
+        "records": [
+          {
+            "received": "2026-11-10T22:21:39Z (17:21 ET)",
+            "dispatch": "HUB -> OPERATIONS: push to a review branch for the diff review",
+            "quote": "Signed off: a push to a review branch only, not main. Push the part-2 commits (e66710302, 2cb205646, c0eaab584, 83c15e601) to a new remote branch",
+            "executed": "origin review/full-quantity-exits = 83c15e601 (ls-remote 17:25:09 ET); main untouched at a225f3b44."
+          },
+          {
+            "received": "2026-11-10T22:25:05Z (17:25 ET)",
+            "dispatch": "HUB -> OPERATIONS: sign-off for part 2 (main)",
+            "quote": "The hub has reviewed e66710302 and 2cb205646 line by line on origin. They are correct as built. Signed off, on condition that the PI’s manual Tests run on review/full-quantity-exits is green: fast-forward main to 83c15e601. That carries e66710302, 2cb205646, c0eaab584 and the merge 83c15e601.",
+            "condition_met": "Tests run 42914783466 (workflow_dispatch, review/full-quantity-exits @ 83c15e601c831ad7bc0722088c763bf030075ecc): completed success; jobs test and alerting-preflight success, notify-failure skipped.",
+            "executed": "ls-remote immediately before the push: main a225f3b44ff4c05e716236694187af6fca7cfe91. Fast-forward, no force: a225f3b44..83c15e601 at 17:34 ET. Review branch deleted on origin. The push-triggered Tests run on main, 42915816389 (push, 83c15e601), completed success."
+          }
+        ],
+        "effective": "First cycle under the change: Wednesday 2026-11-11, 09:35 ET slot. The push landed inside the hub's window (before 09:15 ET 11-11), so the original entry's effective date and the validation count 15 -> 13 stand without correction.",
+        "s1_scope": "This entry records the sign-off condition of the S1 conditional branch as met on 2026-11-10. It does not re-assess the branch's other condition ('zero unresolved organic G-BOOK/G-EXEC events') after that date; see grok_stop_unprotected_on_dust_2026_11_12, scored and not reclassified."
+      },
+      {
+        "id": "full_exit_corporate_action_residual",
+        "date": "2026-11-14",
+        "type": "known_residual",
+        "amends": "operational_events.2026-11[full_quantity_exits_executor_change_2026_11_10].known_residual, which names only the oversell-at-submission residual. That entry is not edited.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-10 sign-off for part 2: 'Add a residual: a corporate action leaving a holding with more than 9 decimal places would trip the oversell guard, refusing the full exit with a CRITICAL. That fails safe and loud.'"
+        },
+        "residual": "A corporate action that leaves a book holding with more than 9 decimal places.",
+        "mechanism": "A full exit sends broker.round_qty(held), the 9-dp ROUND_HALF_EVEN quantity (executor._exit_quantity). The guard raises when the rounded quantity exceeds the holding by more than FULL_EXIT_OVERSELL_GUARD = 1e-12, and the raise is classified as a sizing failure: nothing is sent, an unclassified-skip CRITICAL fires, and the cycle scores a G-EXEC failure.",
+        "two_branches": {
+          "rounds_up": "Roughly half of >9-dp holdings: the guard trips and the full exit is refused with a CRITICAL. Fails safe and loud, as the hub states. Demonstrated: 0.1234567896 -> 0.12345679 (+4.0e-10, refused); 1.8518518518518519 -> 1.851851852 (+1.5e-10, refused).",
+          "rounds_down": "The other half: the guard does not trip; the order sends the 9-dp quantity and leaves a book remainder below 5e-10 share, under Portfolio.no_position_shares() (venue precision, 1e-9), so the book reads no position. Demonstrated: 0.1234567891 -> 0.123456789 (remainder 1.0e-10). Whether that matches the venue depends on the venue's own post-action quantity, which level-2 reconciliation compares each cycle (position_tolerance_usd = 1.00)."
+        },
+        "precondition": "src applies no corporate-action adjustment to book holdings (no split or spin-off handling in src/; the only matches are news-sentiment keywords in src/dashboard/build_data.py). A split today would first appear as a level-2 position mismatch, before any >9-dp holding could exist. The residual becomes reachable only once an adjustment path is built, which should round to 9 dp at the adjustment, not at the exit.",
+        "restatement_check": "The hub's sentence describes the round-up branch. The round-down branch is added here so the record does not overstate the guard's coverage (rule 10)."
+      },
+      {
+        "id": "price_guard_follow_ups_2026_11_13",
+        "date": "2026-11-14",
+        "type": "follow_up",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-12 (Friday, non-blocking) and 2026-11-14 'Saturday: Friday's backlog', item 3: 'the test that a NaN ticker and an empty-frame ticker render byte-identical prompts, and a count of stop-unevaluable WARNs since Thursday.'"
+        },
+        "nan_empty_prompt_test": {
+          "commit": "03080c3dc",
+          "file": "tests/test_nan_empty_prompt_equivalence.py (8 tests)",
+          "path": "Production path end to end on the golden fixture's inputs: ingest_market_data -> holding_marks -> Portfolio.snapshot -> build_prompts / build_screening_prompt. Compares decision_system, decision_user, screening_system, screening_user and the chart image, byte for byte.",
+          "identical": "An unheld ticker with a NaN last close vs an empty frame; a held ticker with no valid bar vs an empty frame (both marked at avg_cost); a held ticker whose last-valid-bar mark equals avg_cost vs an empty frame.",
+          "differs_by_design": "A held ticker whose NaN frame keeps an earlier valid bar is valued at that bar (MARK_LAST_VALID_BAR); an empty frame leaves only avg_cost (MARK_AVG_COST). The valuation lines then differ. This is the ruling's classified-mark design, not a rendering difference: with the marks made equal the prompts are byte-identical, so the mark is the only channel.",
+          "controls": "The unequal-mark case must differ, and an unguarded NaN frame must not render like an empty one.",
+          "re_inserted_defect": "Pre-guard behaviour restored (the NaN frame passed through ingestion unreplaced): the 5 identity tests fail, the 3 controls pass. Restored: 8 pass.",
+          "not_a_case": "A symbol absent from the fetch dict: both fetchers (fetch_universe_data, fetch_intraday_data) write an empty frame for a no-data symbol, so that shape does not occur in production."
+        },
+        "stop_unevaluable_warn_count": {
+          "window": "2026-11-12 09:35 ET through 2026-11-13 end of day: the first two sessions with the full guard on main (f7d505c23, landed 2026-11-11 23:03 ET). 13 intraday cycles + 1 end-of-day run per session, 28 runs.",
+          "count": 0,
+          "sources": "logs/alerts.jsonl: no stop_unevaluable record. data/alerts/email_log.jsonl: no 'Position stop unevaluable' email. data/data_availability/2026-11.jsonl: n_missing = 0 (of 80 expected symbols) on all 28 runs, so the precondition (a held name with no valid price) never occurred.",
+          "reading": "The WARN dedups once per book per day, so the alert count bounds book-days, not cycles; the per-cycle observable is the data-availability descriptor, which is also zero. Grok's 0.0001 NVDA was priced every cycle and is dust under §⑧ (stop_dust_exempt on all 13 Grok records of 2026-11-13), so it could not raise this WARN either."
+        }
       }
     ]
   }
