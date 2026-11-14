@@ -3694,6 +3694,33 @@
           "sources": "logs/alerts.jsonl: no stop_unevaluable record. data/alerts/email_log.jsonl: no 'Position stop unevaluable' email. data/data_availability/2026-11.jsonl: n_missing = 0 (of 80 expected symbols) on all 28 runs, so the precondition (a held name with no valid price) never occurred.",
           "reading": "The WARN dedups once per book per day, so the alert count bounds book-days, not cycles; the per-cycle observable is the data-availability descriptor, which is also zero. Grok's 0.0001 NVDA was priced every cycle and is dust under §⑧ (stop_dust_exempt on all 13 Grok records of 2026-11-13), so it could not raise this WARN either."
         }
+      },
+      {
+        "id": "digest_state_race_2026_11",
+        "date": "2026-11-14",
+        "type": "detector_defect_and_correction",
+        "amends": "operational_events.2026-11[detector_fixes_2026_11_12].state_cash_report_once.transition, which reads: 'The reported_once ledger starts empty at landing (data/alerts/state.json is rewritten by every cron tick and was not seeded), so GPT's condition emails once more at the first end-of-day run after landing, then folds.' That entry is not edited. The 'then folds' half is false as landed: the fold could never persist.",
+        "authority": {
+          "hub": "HUB -> OPERATIONS 2026-11-14 'Saturday follow-up', item 4, delivered inline: 'stage a fix (re-read the state under the dispatch lock, or wait for pending sends before saving), plus a ledger correction for the \"emails once more, then folds\" statement. Alerting class, review branch, halt.'"
+        },
+        "defect": "src/alerts/digest.send_daily_digest read data/alerts/state.json, sent the digest over SMTP, then saved its own copy with digest_sent = True, outside events._DISPATCH_LOCK. Event emails dispatched just before the digest run on background threads (ASYNC_SEND, since fc7626e18, 2026-11-04) and settle while the digest's send is in flight: fired_log 'queued' -> 'sent', reported_once, milestones_fired. The digest's stale save overwrote every one of those writes.",
+        "evidence": {
+          "committed_state": "data/alerts/state.json at each end-of-day tick since async sends: every event dispatched in the end-of-day sweep reads disposition 'queued' (never settled), while intraday events read 'sent'. 98f36b8b9 (2026-11-06): 7 oversized_trade + 1 news_impact; 019dad3e9 (11-09): oversized_trade, news_impact; a225f3b44/83c15e601 (11-10): 2 news_impact; 50b551ea9 (11-11, the reverted NaN run): state_anomaly, 6 negative_return, ath; 32fe61bf0 (11-11 backup run): state_anomaly, 3 news_impact; 7cf86edb3 (11-12): state_anomaly, news_impact; 0bda1f934 (11-13): state_anomaly, news_impact.",
+          "reported_once": "At 0bda1f934 (2026-11-13 22:07Z, the first end-of-day run with 353a75260 on main) GPT's state_cash email was sent (data/alerts/email_log.jsonl, 22:07:47Z) but reported_once reads {}.",
+          "email_log": "data/alerts/email_log.jsonl recorded every one of these sends as 'sent'. The emails went out; only the alert state's record of them was lost."
+        },
+        "consequences": {
+          "fold": "GPT's explained -$0.0105 would have emailed every evening it persisted, instead of once.",
+          "dispositions": "End-of-day fired_log entries since 2026-11-06 misread 'queued'. Their dedup keys and cap slots were held, as for a send, so no duplicate email resulted within a day.",
+          "milestones": "None lost. Only 'milestone' events write milestones_fired (ATH alerts do not), and data/alerts/email_log.jsonl shows no 'milestone' email since 2026-11-04; the five ATH emails in that span (four on 11-04, one in the reverted NaN run) write nothing there.",
+          "class": "Alerting only. No venue order, decision, book record or reconciliation was affected."
+        },
+        "fix": {
+          "commit": "b338dfc2e",
+          "change": "digest._mark_digest_sent re-reads the state under _DISPATCH_LOCK and sets only digest_sent. With it, every writer of the alert state (dispatch_event x3, _settle, the digest) holds the lock for its whole read-modify-write.",
+          "tests": "tests/test_digest_state_race.py (4), running the production interleaving with real threads: the event's send is released only while the digest's send is in flight. Without the fix, 3 fail (disposition 'queued', milestone lost, the next evening emails instead of folding); with it, 4 pass. Full suite 986 passed locally."
+        },
+        "corrected_statement": "reported_once is still empty on main (the 2026-11-13 write was overwritten). After this fix lands, GPT's condition emails once more at the first end-of-day run where it persists unchanged, then folds into the digest's 'Continuing conditions'. If the fix lands before Monday 2026-11-16 end of day, that is one email on 11-16 and a fold from 11-17. A changed balance or carry emails again by design."
       }
     ]
   }
