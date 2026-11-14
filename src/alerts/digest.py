@@ -22,6 +22,7 @@ from typing import Any
 from ..config_loader import DATA_DIR, load_settings
 from .alert_state import ensure_daily, load_state, save_state
 from .email_alerts import send_email
+from .events import _DISPATCH_LOCK
 
 logger = logging.getLogger("llmlab.alerts.digest")
 
@@ -442,6 +443,22 @@ def send_daily_digest(summary: dict[str, Any], settings: dict[str, Any] | None =
     ok = send_email(subject, html, alert_type="daily_digest",
                     trigger="eod_digest", settings=settings)
     if ok:
-        daily["digest_sent"] = True
-        save_state(state)
+        _mark_digest_sent(date_str)
     return ok
+
+
+def _mark_digest_sent(date_str: str) -> None:
+    """Set digest_sent by re-reading the state under the dispatch lock.
+
+    The copy read above is stale by the time the SMTP send returns: event
+    emails dispatched just before the digest settle on their own threads
+    (fired_log 'sent', reported_once, milestones_fired) while it is in flight.
+    Saving that copy overwrote every one of those writes on every end-of-day
+    run from at least 2026-11-10 until this fix (ledger: digest_state_race_2026_11,
+    tests/test_digest_state_race.py). Every writer of
+    the alert state now holds _DISPATCH_LOCK for its whole read-modify-write.
+    """
+    with _DISPATCH_LOCK:
+        state = load_state()
+        ensure_daily(state, date_str)["digest_sent"] = True
+        save_state(state)
