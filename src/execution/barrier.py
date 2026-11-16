@@ -38,6 +38,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import threading
+import time
 from dataclasses import dataclass
 
 logger = logging.getLogger("llmlab.execution.barrier")
@@ -187,12 +188,28 @@ class CycleBarrier:
         """Whether (book, ticker, action) is a held order, and its release gate."""
         return self._gates.get((ticker, book, action))
 
-    def wait_to_submit(self, book: str, ticker: str, action: str) -> None:
-        """Blocks iff this order is the held side of a contended ticker."""
+    def wait_to_submit(self, book: str, ticker: str, action: str) -> dict | None:
+        """Blocks iff this order is the held side of a contended ticker.
+
+        Returns None for an order the barrier did not hold. For a held order,
+        returns the BARRIER_DELAYED detail the executor writes to the decision
+        record (logging package 2026-11-15): who it waited behind, whether the
+        contender's terminal state or the release timeout let it go, and how
+        long it waited. Observability only; the wait itself is unchanged.
+        """
         gate = self.gate_for(book, ticker, action)
         if gate is None:
-            return
+            return None
+        started = time.monotonic()
         released = gate.wait(timeout=self._release_timeout)
+        waited = time.monotonic() - started
+        winner_book, winner_action = self._winners.get(ticker, (None, None))
+        detail = {
+            "winner_book": winner_book,
+            "winner_action": winner_action,
+            "released_by": "CONTENDER_TERMINAL" if released else "RELEASE_TIMEOUT",
+            "wait_seconds": round(waited, 3),
+        }
         if released:
             # Observability seam for integration probes: proves, from the
             # log timeline alone, that the held order's submission followed
@@ -206,6 +223,7 @@ class CycleBarrier:
                 "resulting wash-trade rejection reports as "
                 "CONSTRAINT_WASH_TRADE_BLOCK, not a hang",
                 book, action, ticker, self._release_timeout)
+        return detail
 
     def notify_terminal(self, book: str, ticker: str, action: str) -> None:
         """Call once an order reaches terminal state. Releases held orders

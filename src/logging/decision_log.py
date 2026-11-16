@@ -110,6 +110,11 @@ def log_decision_run(
         "data_inputs_hash": data_inputs_hash,
         "api_success": decision_result.success,
         "api_error": decision_result.error,
+        # Failure class (logging package 2026-11-15): TIMEOUT / API_ERROR /
+        # PARSE_FAILURE, null on success. A client-side timeout used to be
+        # visible only in api_error text (api_call_timeout.md section 3). Absent
+        # key = a record from before this package, not "no error".
+        "api_error_class": getattr(decision_result, "error_class", None),
         "api_latency_seconds": decision_result.latency_seconds,
         # Which call attempt produced the parsed decision. Every adapter
         # inherits the BaseAdapter retry loop: 1 on first-try success,
@@ -135,6 +140,17 @@ def log_decision_run(
         # build fingerprint can: it is set by the provider, not by us, and
         # unlike cost-per-call it does not depend on our own rate table.
         "api_system_fingerprint": md.get("system_fingerprint"),
+        # Gemini only (logging package 2026-11-15): the response's raw
+        # model_version, null when absent. model_id_returned falls back to the
+        # configured id, so on its own it cannot tell "absent" from "echoed the
+        # alias". Null on every other provider; `provider` disambiguates.
+        "model_version_raw": md.get("model_version_raw"),
+        # xAI only (logging package 2026-11-15): live-search provenance as xAI
+        # reports it. The adapter sends no search tools, so the expected values
+        # are 0 and null; anything else means Grok saw sources we did not ask
+        # for. Null on every other provider.
+        "num_sources_used": md.get("num_sources_used"),
+        "citations": md.get("citations"),
         # Prompt-cache split. cost_rates.py prices every call at the cache-MISS
         # rate; these make that conservatism measurable rather than assumed.
         # Note the two accounting conventions: OpenAI/xAI/Gemini report an
@@ -230,6 +246,17 @@ def log_decision_run(
                 "intended_notional": getattr(e, "intended_notional", None),
                 # settled_usd / unsettled_usd / cap_usd on the settled-funds tags.
                 "constraint_detail": getattr(e, "constraint_detail", None),
+                # "BARRIER_DELAYED" when the P1 cycle barrier held this order
+                # behind a contending book (spike_rulings_parity_wash_barrier.md,
+                # Visibility: barrier-held orders are tagged in the decision
+                # log). "" otherwise, and on every simulator record. Separate
+                # from `constraint` on purpose: a hold is not a venue
+                # constraint, Gate 4 must not count it as one, and a held order
+                # can still carry a real constraint of its own.
+                "barrier_tag": getattr(e, "barrier_tag", ""),
+                # On BARRIER_DELAYED: winner_book, winner_action, released_by
+                # (CONTENDER_TERMINAL | RELEASE_TIMEOUT), wait_seconds.
+                "barrier_detail": getattr(e, "barrier_detail", None),
                 # The classified FILL_OVERRUN event, when this fill made one.
                 "fill_overrun": getattr(e, "fill_overrun", None),
                 "timestamp": e.timestamp,

@@ -95,7 +95,14 @@ class GeminiAdapter(BaseAdapter):
         # model_id_returned, falling back to the configured id only when the
         # response doesn't expose it. If model_version is absent, Gemini drift
         # is NOT observable via the echo and must be tracked another way.
-        returned_id = getattr(response, "model_version", None) or self.model
+        #
+        # Logging package 2026-11-15: the fallback above makes "absent" and
+        # "echoed the alias" look identical in model_id_returned (the
+        # migration probe showed the field present and verbatim
+        # "gemini-3.1-pro-preview"). model_version_raw below keeps the raw
+        # field, None when absent, so the two cases separate in the record.
+        model_version_raw = getattr(response, "model_version", None)
+        returned_id = model_version_raw or self.model
 
         # Gemini exposes usage_metadata on responses with prompt_token_count
         # and candidates_token_count (visible output only — thoughts are
@@ -112,6 +119,7 @@ class GeminiAdapter(BaseAdapter):
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "cost_usd": cost,
+            "model_version_raw": model_version_raw,
         }
 
         # Failure forensics (Operations 2026-07-27): finish_reason separates a

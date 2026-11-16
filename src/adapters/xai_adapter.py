@@ -96,4 +96,14 @@ class XAIAdapter(BaseAdapter):
         metadata["cache_miss_tokens"] = (
             max(0, in_tok - int(cached)) if cached is not None else None
         )
+
+        # --- search provenance (logging package 2026-11-15) -----------------
+        # The adapter sends no search tools, so Grok as deployed has no live
+        # X/web access (xAI: "no access to realtime events without search tools
+        # enabled"; a live call returned num_sources_used 0 and no citations).
+        # Nothing recorded that, so the claim could not be checked from the
+        # log. These make it checkable per call. Raw values, None when absent:
+        # 0 means xAI reported zero sources, None means it reported nothing.
+        metadata["num_sources_used"] = usage.get("num_sources_used")
+        metadata["citations"] = data.get("citations")
         return text, returned_id, metadata

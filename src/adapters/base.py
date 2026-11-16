@@ -48,6 +48,37 @@ _MAX_ATTEMPTS = 2
 # is a single 300s stall, not 300s x _MAX_ATTEMPTS.
 API_CALL_TIMEOUT_SECONDS = 300
 
+# Failure classes for the decision record's `api_error_class` (logging
+# package 2026-11-15; docs/registrations/api_call_timeout.md section 3: "a
+# timeout is a TIMEOUT event, not a generic error"). Before this, a client-side
+# timeout was distinguishable only by grepping `api_error` text, which is how
+# the four xAI 120s clippings went unseen as a class. None on success.
+ERROR_CLASS_TIMEOUT = "TIMEOUT"              # client-side deadline hit in _call_api
+ERROR_CLASS_API_ERROR = "API_ERROR"          # any other exception from _call_api
+ERROR_CLASS_PARSE_FAILURE = "PARSE_FAILURE"  # response unparseable after the retry
+
+
+def is_client_timeout(exc: BaseException) -> bool:
+    """True iff `exc`, or anything in its cause/context chain, is a client-side
+    timeout from any transport the five adapters use.
+
+    Matched on the class hierarchy by name rather than by importing each SDK,
+    so base.py keeps importing no provider package. The covered classes:
+    requests Timeout/ReadTimeout/ConnectTimeout (xAI, DeepSeek), httpx
+    TimeoutException (google-genai), anthropic/openai APITimeoutError, and the
+    builtin TimeoutError (socket.timeout is an alias of it). A provider-side
+    deadline (an HTTP 504, google's DeadlineExceeded) is NOT a client timeout
+    and stays API_ERROR: the registration concerns our own ceiling.
+    """
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if any("Timeout" in k.__name__ for k in type(cur).__mro__):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
 
 def repair_json(text: str) -> str:
     """Best-effort fix for common JSON defects in LLM output.
@@ -160,6 +191,9 @@ class DecisionResult:
     latency_seconds: float
     success: bool
     error: str | None = None
+    # ERROR_CLASS_* when success is False, None otherwise. Logged as
+    # `api_error_class`; never read by control flow.
+    error_class: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     # v2 period-level reasoning fields (additive; None/[] under v1).
     cash_rationale: str | None = None
@@ -269,6 +303,8 @@ class BaseAdapter(ABC):
                     latency_seconds=latency,
                     success=False,
                     error=str(e),
+                    error_class=(ERROR_CLASS_TIMEOUT if is_client_timeout(e)
+                                 else ERROR_CLASS_API_ERROR),
                     metadata={"attempt": attempt},
                 )
 
@@ -302,6 +338,7 @@ class BaseAdapter(ABC):
                     latency_seconds=latency,
                     success=False,
                     error=last_error,
+                    error_class=ERROR_CLASS_PARSE_FAILURE,
                     metadata={**last_metadata, "attempt": attempt},
                 )
 
@@ -340,6 +377,7 @@ class BaseAdapter(ABC):
             latency_seconds=latency,
             success=False,
             error=last_error or "retries exhausted",
+            error_class=ERROR_CLASS_PARSE_FAILURE,
             metadata={**last_metadata, "attempt": _MAX_ATTEMPTS},
         )
 

@@ -105,6 +105,12 @@ REGISTERED_SKIP_CLASSES = frozenset({
 # failure, and it raises the alarm below (ruling section 5.3).
 CONSTRAINT_UNCLASSIFIED_SKIP = "UNCLASSIFIED_SKIP"
 
+# NOT a constraint and NOT a skip class: the decision-log tag on an order the P1
+# cycle barrier held behind a contending book (spike_rulings_parity_wash_barrier.md,
+# Visibility). It rides on ExecutionResult.barrier_tag, never on `constraint`,
+# so Gate 4 and the skip alarm see exactly what they saw before it existed.
+BARRIER_DELAYED_TAG = "BARRIER_DELAYED"
+
 # A classified event, not a skip class: a venue-confirmed BUY took the book's cash
 # below zero. An order capped at exact cash is sized at the reference price and
 # sent as a share quantity, so a fill above reference can overrun by cents. The
@@ -155,6 +161,11 @@ class ExecutionResult:
     constraint_detail: dict[str, Any] | None = None
     # The FILL_OVERRUN event, when this fill took the book's cash below zero.
     fill_overrun: dict[str, Any] | None = None
+    # BARRIER_DELAYED_TAG when the P1 cycle barrier held this order behind a
+    # contending book; "" otherwise. Logging only: set after the order has
+    # resolved, read by nothing in the execution path.
+    barrier_tag: str = ""
+    barrier_detail: dict[str, Any] | None = None
 
 
 def requires_skip_alarm(result: ExecutionResult) -> bool:
@@ -779,9 +790,15 @@ class Executor:
         for i in id_order:
             client_order_ids[i] = self._next_order_id(book)
 
-        def _run(s: _SizedOrder, client_order_id: str) -> _Placement:
+        # Index -> BARRIER_DELAYED detail for held orders. Each worker writes
+        # only its own index; read after the pool has joined.
+        barrier_holds: dict[int, dict[str, Any]] = {}
+
+        def _run(i: int, s: _SizedOrder, client_order_id: str) -> _Placement:
             if barrier is not None:
-                barrier.wait_to_submit(book, s.ticker, s.action)
+                hold = barrier.wait_to_submit(book, s.ticker, s.action)
+                if hold is not None:
+                    barrier_holds[i] = hold
             try:
                 placement = self._submit_one(book, s, client_order_id, barrier)
             finally:
@@ -796,7 +813,7 @@ class Executor:
         placements: dict[int, _Placement] = {}
         with ThreadPoolExecutor(max_workers=max(1, n),
                                 thread_name_prefix=f"order-{book}") as pool:
-            futures = {pool.submit(_run, sized[i][1], client_order_ids[i]): i
+            futures = {pool.submit(_run, i, sized[i][1], client_order_ids[i]): i
                       for i in range(n)}
             for fut in as_completed(futures):
                 placements[futures[fut]] = fut.result()
@@ -810,6 +827,9 @@ class Executor:
                                            batch_slippage)
             if result.executed and result.side == "BUY":
                 batch_slippage += (result.fill_price - sized[i][1].price) * result.shares
+            if i in barrier_holds:
+                result.barrier_tag = BARRIER_DELAYED_TAG
+                result.barrier_detail = barrier_holds[i]
             applied.append((sized[i][0], result))
         return applied
 
