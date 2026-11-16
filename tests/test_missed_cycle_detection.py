@@ -278,7 +278,6 @@ def _write_day(trades: Path, skip: dict[str, set[str]] | None = None):
 @pytest.fixture
 def eod(tmp_path, monkeypatch):
     monkeypatch.setattr(events, "TRADES_DIR", tmp_path / "trades")
-    monkeypatch.setattr(events, "CYCLE_COMPLETENESS_DIR", tmp_path / "cc")
     monkeypatch.setattr(events, "_session_close_et", lambda d: time(16, 0))
     settings = {"models": {b: {"enabled": True} for b in BOOKS}}
     return tmp_path, settings
@@ -288,7 +287,7 @@ def test_eod_clean_day_raises_nothing_and_records_nothing(eod):
     tmp, settings = eod
     _write_day(tmp / "trades")
     assert events.detect_missed_cycles(settings, "2026-11-16") == []
-    assert not (tmp / "cc").exists()
+    assert not (tmp / "cycle_completeness").exists()
 
 
 def test_eod_missed_slot_is_one_critical_and_one_durable_event(eod):
@@ -299,18 +298,18 @@ def test_eod_missed_slot_is_one_critical_and_one_durable_event(eod):
     s = specs[0]
     assert (s["kind"], s["severity"], s["title"]) == ("missed_cycle", "CRITICAL", "Slot 15:30 produced no cycle")
     assert s["dedup_key"] == "missed_cycle:2026-11-16"
-    rows = [json.loads(l) for l in (tmp / "cc" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()]
+    rows = [json.loads(l) for l in (tmp / "cycle_completeness" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [(r["kind"], r["slot_et"], r["detected_by"]) for r in rows] == [("MISSED_CYCLE", "15:30", "eod_sweep")]
     # an EOD rerun (the late 22:00Z backup) writes nothing twice
     events.detect_missed_cycles(settings, "2026-11-16")
-    assert len((tmp / "cc" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+    assert len((tmp / "cycle_completeness" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()) == 1
 
 
 def test_eod_partial_slot_is_recorded_but_does_not_page_alone(eod):
     tmp, settings = eod
     _write_day(tmp / "trades", {"gemini": {"11:00"}})
     assert events.detect_missed_cycles(settings, "2026-11-16") == []
-    rows = (tmp / "cc" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()
+    rows = (tmp / "cycle_completeness" / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()
     assert json.loads(rows[0])["kind"] == "PARTIAL_CYCLE"
 
 
@@ -326,6 +325,12 @@ def test_eod_non_session_day_is_silent(eod, monkeypatch):
     tmp, settings = eod
     monkeypatch.setattr(events, "_session_close_et", lambda d: None)
     assert events.detect_missed_cycles(settings, "2026-11-26") == []
+
+
+def test_production_record_lives_beside_the_trade_logs():
+    from src.config_loader import DATA_DIR, TRADES_DIR
+    assert events.CYCLE_COMPLETENESS_DIR is None
+    assert TRADES_DIR.parent / "cycle_completeness" == DATA_DIR / "cycle_completeness"
 
 
 def test_eod_sweep_runs_the_detector():

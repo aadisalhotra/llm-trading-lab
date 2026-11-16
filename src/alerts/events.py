@@ -1417,7 +1417,10 @@ def detect_missed_runs(settings: dict[str, Any], date_str: str) -> list[dict[str
     }]
 
 
-CYCLE_COMPLETENESS_DIR = DATA_DIR / "cycle_completeness"
+# None = data/cycle_completeness beside TRADES_DIR, resolved at call time, so a
+# test that redirects TRADES_DIR to a tmp dir also redirects this record and can
+# never write into the real data/ tree (it did, once, on the review branch).
+CYCLE_COMPLETENESS_DIR = None
 
 
 def _session_close_et(date_str: str):
@@ -1462,7 +1465,8 @@ def detect_missed_cycles(settings: dict[str, Any], date_str: str) -> list[dict[s
     books = _enabled_model_keys(settings)
     events = day_events(TRADES_DIR, books, _date.fromisoformat(date_str), close,
                         detected_by="eod_sweep")
-    written = record_events(events, CYCLE_COMPLETENESS_DIR)
+    out_dir = CYCLE_COMPLETENESS_DIR or (TRADES_DIR.parent / "cycle_completeness")
+    written = record_events(events, out_dir)
     if written:
         logger.warning("Recorded %d cycle-completeness event(s) for %s", written, date_str)
 
