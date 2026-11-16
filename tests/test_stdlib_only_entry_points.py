@@ -108,6 +108,16 @@ def test_staleness_monitor_runs_stdlib_only(sandbox):
     assert "ALL PASS" in proc.stdout
 
 
+def test_slot_watcher_runs_stdlib_only(sandbox):
+    # slot_watch.yml installs nothing. A rejected --slot exits 2 after every
+    # module-level import (email, events renderer, cycle_watch) has loaded, and
+    # before any git or network call.
+    proc = _run(sandbox, "scripts/check_slot_cycle.py", "--slot", "not-a-slot")
+    _assert_no_import_failure(proc)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "--slot must be" in proc.stdout + proc.stderr
+
+
 def test_the_hook_actually_blocks_a_third_party_import(sandbox, tmp_path):
     # Control: without this the three passes could mean the hook never armed.
     probe = sandbox / "scripts" / "_probe_pandas.py"

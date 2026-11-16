@@ -125,17 +125,34 @@ def probe_dispatch(now_utc: datetime) -> tuple[str, int]:
     return "probe", max(int((floor - now_et).total_seconds()), 0)
 
 
+def current_slot(now_utc: datetime) -> str:
+    """The slot `now` falls in, as 'YYYY-MM-DDTHH:MM:00Z' (UTC).
+
+    Asked by the chain right after it dispatches a slot, to tell the missed-cycle
+    watcher (slot_watch.yml) which slot to verify. The dispatch lands 30 s into
+    the slot (DISPATCH_BUFFER) and its run-created verify takes at most ~36 s
+    more, so "the slot now is in" is the slot just dispatched. ET and UTC differ
+    by whole hours, so the half-hour floor is the same instant in both."""
+    n = now_utc.astimezone(timezone.utc)
+    slot = n.replace(minute=(n.minute // 30) * 30, second=0, microsecond=0)
+    return slot.strftime("%Y-%m-%dT%H:%M:00Z")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--close-et", default="", help="the day's NYSE close, ET 'HH:MM' (default 16:00)")
     ap.add_argument("--still-open", action="store_true", help="post-sleep re-check")
     ap.add_argument("--probe-slot", action="store_true",
                     help="is the current slot a barrier-probe slot? 'probe <wait_s>' | 'none 0'")
+    ap.add_argument("--current-slot", action="store_true",
+                    help="the slot now falls in, UTC ISO (for the missed-cycle watcher)")
     ap.add_argument("--now", help="ISO timestamp override (tests only)")
     args = ap.parse_args(argv)
     now = datetime.fromisoformat(args.now) if args.now else datetime.now(timezone.utc)
     close = parse_close(args.close_et)
-    if args.probe_slot:
+    if args.current_slot:
+        print(current_slot(now))
+    elif args.probe_slot:
         action, wait = probe_dispatch(now)
         print(f"{action} {wait}")
     elif args.still_open:

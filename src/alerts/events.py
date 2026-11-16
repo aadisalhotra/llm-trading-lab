@@ -98,6 +98,7 @@ KIND_LABELS: dict[str, str] = {
     "budget": "API budget threshold",
     "model_transition": "Model version transition",
     "completeness": "Daily decision completeness",
+    "missed_cycle": "Missed intraday cycle",
 }
 
 
@@ -1416,6 +1417,78 @@ def detect_missed_runs(settings: dict[str, Any], date_str: str) -> list[dict[str
     }]
 
 
+CYCLE_COMPLETENESS_DIR = DATA_DIR / "cycle_completeness"
+
+
+def _session_close_et(date_str: str):
+    """The NYSE close (ET wall clock) for `date_str`, or None on a non-session day.
+
+    Read from pandas_market_calendars with a LAZY import, the same pattern as
+    _trading_days_between: nothing under src/alerts may import src.data, so
+    src.data.market_data.session_bounds is off limits here. Unlike that helper
+    this one has NO weekday fallback. A guessed 16:00 on a 13:00 early close
+    would report the 13:00..15:30 slots as missed, so a missing calendar raises
+    and the sweep logs the detector as failed."""
+    import pandas_market_calendars as mcal  # lazy: the EOD run job has it installed
+    sched = mcal.get_calendar("NYSE").schedule(start_date=date_str, end_date=date_str)
+    if sched.empty:
+        return None
+    return sched.iloc[0]["market_close"].tz_convert(EASTERN).time()
+
+
+def detect_missed_cycles(settings: dict[str, Any], date_str: str) -> list[dict[str, Any]]:
+    """Intraday slots of `date_str` that produced no cycle, or a partial one.
+
+    The day-level backstop to the real-time watcher (scripts/check_slot_cycle.py,
+    .github/workflows/slot_watch.yml). It covers what that watcher cannot: the
+    09:30 slot (started by the external kick, not the chain), a slot whose
+    watcher dispatch failed, and a day where Actions itself was down.
+
+    Side effect, by design: it records each miss as a completeness event in
+    data/cycle_completeness/{YYYY-MM}.jsonl (idempotent on kind + slot, so an
+    EOD rerun writes nothing twice). The EOD run commits data/, which makes this
+    the durable record. The watcher commits nothing.
+
+    One CRITICAL per day, listing every missed slot. Partial slots (some books
+    have a record, some not) are recorded and named in the body. They do not
+    raise the CRITICAL alone: a missing book in a slot that otherwise ran is a
+    per-model fault, and the per-model completeness alert already covers it."""
+    from datetime import date as _date
+    from ..cycle_watch import MISSED_CYCLE, day_events, record_events
+
+    close = _session_close_et(date_str)
+    if close is None:
+        return []
+    books = _enabled_model_keys(settings)
+    events = day_events(TRADES_DIR, books, _date.fromisoformat(date_str), close,
+                        detected_by="eod_sweep")
+    written = record_events(events, CYCLE_COMPLETENESS_DIR)
+    if written:
+        logger.warning("Recorded %d cycle-completeness event(s) for %s", written, date_str)
+
+    missed = [e["slot_et"] for e in events if e["kind"] == MISSED_CYCLE]
+    partial = [e for e in events if e["kind"] != MISSED_CYCLE]
+    if not missed:
+        return []
+    partial_txt = ""
+    if partial:
+        partial_txt = " Partial slots: " + "; ".join(
+            f"{e['slot_et']} ({len(e['books_with_record'])}/{len(e['books_expected'])} books)"
+            for e in partial) + "."
+    return [{
+        "kind": "missed_cycle",
+        "severity": "CRITICAL",
+        "title": (f"Slot {missed[0]} produced no cycle" if len(missed) == 1
+                  else f"{len(missed)} slots produced no cycle: {', '.join(missed)}"),
+        "body": (f"{date_str}: no book wrote a decision record for the "
+                 f"<b>{', '.join(missed)} ET</b> slot(s). Recorded in "
+                 f"data/cycle_completeness/{date_str[:7]}.jsonl.{partial_txt}"),
+        "context": {"numbers": {"Missed slots": ", ".join(missed),
+                                "Session close": close.strftime("%H:%M ET")}},
+        "dedup_key": f"missed_cycle:{date_str}",
+    }]
+
+
 def _trading_days_between(start_exclusive: str, end_exclusive: str) -> list[str]:
     """NYSE trading days strictly between two YYYY-MM-DD dates."""
     try:
@@ -1455,6 +1528,7 @@ def run_eod_alert_sweep(summary: dict[str, Any], settings: dict[str, Any] | None
         ("macro_market_events", lambda: detect_macro_market_events(settings)),
         ("state_anomalies", lambda: detect_state_anomalies(settings, date_str)),
         ("missed_runs", lambda: detect_missed_runs(settings, date_str)),
+        ("missed_cycles", lambda: detect_missed_cycles(settings, date_str)),
         ("completeness", lambda: detect_completeness_degradation(settings, date_str)),
         ("oversized_trades", lambda: detect_oversized_trades(settings, date_str)),
         ("negative_crossings", lambda: detect_negative_crossings(settings)),

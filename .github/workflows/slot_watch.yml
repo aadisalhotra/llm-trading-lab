@@ -1,0 +1,64 @@
+name: Slot Watch
+
+# Real-time missed-cycle detection (scripts/check_slot_cycle.py).
+#
+# intraday.yml's chain job dispatches this right after it dispatches an intraday
+# slot, with that slot's start. The watcher polls origin/main and raises a
+# CRITICAL "Slot HH:MM produced no cycle" if no decision record for the slot has
+# landed by slot + 15 min. If a record then appears before the slot ends, it
+# sends a WARN follow-up saying the cycle landed late.
+#
+# Why (2026-11-16): the chain's own check proves only that a run was CREATED. On
+# 2026-11-16 the 15:30 ET run was created on time, then held by GitHub with no
+# jobs for 30 minutes, past the close. It finished green and nothing alerted.
+#
+# DETECTION ONLY. It never dispatches, re-runs or trades, and it commits nothing
+# (read-only token). The durable completeness event is written by the EOD sweep,
+# which already commits (src/alerts/events.py detect_missed_cycles). The 09:30
+# slot, which the external kick starts rather than the chain, is covered only by
+# that EOD sweep.
+#
+# No concurrency group. This workflow deliberately stays OUT of the
+# intraday-pipeline group: a pending watcher there could displace a pending
+# production tick, the same reason the barrier probe stays out. It needs no
+# group of its own: each run is read-only and watches one slot, and a shared
+# group would let a pending watcher be replaced by the next slot's watcher.
+on:
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Slot start, UTC: YYYY-MM-DDTHH:(00|30):00Z"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    # Deadline 15 min + polling to the slot's end at 30 min, plus setup.
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Stdlib only, no pip install (tests/test_stdlib_only_entry_points.py).
+      - name: Verify the slot produced a cycle
+        env:
+          # A free-text dispatch input: bound to env and never interpolated
+          # into the script. The script also validates it against a strict
+          # pattern before using it.
+          SLOT: ${{ github.event.inputs.slot }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+        run: python scripts/check_slot_cycle.py --slot "$SLOT"
