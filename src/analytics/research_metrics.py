@@ -79,9 +79,32 @@ RQ5_PEAK_WINDOW = 60
 # state-file commingling corruption-end (~2026-04-23). All RQ5 Phase A pilot
 # analyses begin here, excluding the shakedown/commingling window for all models.
 RQ5_PHASE_A_PILOT_START = "2026-04-23"
-# Full-exit epsilon — a position is "closed" only when residual shares fall
-# below this (mirrors Portfolio.GHOST_SHARES_EPSILON).
-SHARES_EPSILON = 0.01
+# Behavioural-position floor (ghost-position ruling section 5, ruled 2026-11-09):
+# a reconstructed holding is a behavioural position iff its notional is at
+# least BEHAVIOURAL_NOTIONAL_FLOOR ($1, the venue minimum) AT THE FILL PRICE OF
+# THE FILL BEING PROCESSED. Deterministic from the fill record, no mark.
+#   closure: the closing fill takes residual notional below $1
+#   entry:   a fill opens a position when the prior residual notional is below $1
+# It replaces SHARES_EPSILON = 0.01, a share constant that "mirrored"
+# Portfolio.GHOST_SHARES_EPSILON (removed by fix A): at $2,000 books a $9.60
+# holding of 0.007 LLY read as no position. Weight-based metrics take no floor.
+# Output-version event: Phase A recomputes, dual publication if a figure moves.
+
+
+def dust_threshold_shares(fill_price: float) -> float:
+    """BEHAVIOURAL_NOTIONAL_FLOOR / fill_price: the residual share count below
+    which a position is dust at this fill's price.
+
+    The floor is read from src.execution.broker, where it is DERIVED from the
+    venue minimum; it is not a second constant. Imported lazily: the execution
+    package pulls in pandas and the data layer, which a metrics import must not.
+    A fill with no positive finite price has no notional, so nothing is dust at
+    it: the threshold is 0 and only an exact zero closes. (Every executed fill
+    in the record, 11,486 at 2026-11-17, has a positive price.)"""
+    from ..execution.broker import BEHAVIOURAL_NOTIONAL_FLOOR
+    if not (isinstance(fill_price, (int, float)) and math.isfinite(fill_price) and fill_price > 0):
+        return 0.0
+    return BEHAVIOURAL_NOTIONAL_FLOOR / fill_price
 
 _ACTION_CODE = {"BUY": 0, "SELL": 1, "HOLD": 2}
 
@@ -505,7 +528,7 @@ def _replay_avg_cost(records: list[dict[str, Any]], segment: str = "long"):
                     closes_info.append((t, is_gain, is_loss))
                     closed_tickers.add(t)
                 shares[t] = max(0.0, shares[t] - qty)
-                if shares[t] < SHARES_EPSILON:
+                if shares[t] < dust_threshold_shares(price):
                     shares[t] = 0.0
         if closes_info:
             # Paper gains/losses from same-segment positions still held
@@ -711,7 +734,8 @@ def _closed_trades(records: list[dict[str, Any]], segment: str = "long") -> list
     """Replay to extract fully-closed positions with entry confidence + outcome.
 
     A position counts as closed ONLY when the segment's closing side takes
-    residual magnitude below SHARES_EPSILON. Partial trims never close a
+    residual notional below the $1 behavioural floor at the closing fill's
+    price (dust_threshold_shares; ghost-position ruling section 5). Partial trims never close a
     position (pre-registered). Entry confidence is magnitude-weighted across the
     opens composing the position. Outcome = realized P&L > 0 over the full life.
 
@@ -732,6 +756,7 @@ def _closed_trades(records: list[dict[str, Any]], segment: str = "long") -> list
         raise ValueError(f"_closed_trades: segment must be one of {SEGMENTS}, got {segment!r}")
     open_side = _OPEN_SIDE[segment]
     shares: dict[str, float] = defaultdict(float)            # magnitude, >= 0
+    opened_qty: dict[str, float] = defaultdict(float)        # Σ qty over opens
     open_notional: dict[str, float] = defaultdict(float)     # Σ qty*price over opens
     close_notional: dict[str, float] = defaultdict(float)    # Σ qty*price over closes
     entry_date: dict[str, str] = {}
@@ -744,24 +769,32 @@ def _closed_trades(records: list[dict[str, Any]], segment: str = "long") -> list
             price = float(ex.get("fill_price") or 0.0)
             qty = float(ex.get("shares") or 0.0)
             if ex["side"] == open_side:
-                if shares[t] < SHARES_EPSILON:
+                if shares[t] < dust_threshold_shares(price):
                     entry_date[t] = rec.get("date", "")
                 shares[t] += qty
+                opened_qty[t] += qty
                 open_notional[t] += qty * price
             else:  # the segment's closing side
                 if _is_administrative(ex):
                     censored[t] = True
                 close_notional[t] += qty * price
                 shares[t] -= qty
-                if shares[t] < SHARES_EPSILON:
+                if shares[t] < dust_threshold_shares(price):
                     # Full exit -> close the position. Realized P&L over the
-                    # whole life. Long: proceeds - cost. Short: the short sale
-                    # is the open and the cover is the close, so the same
-                    # (close - open) expression flips sign correctly.
+                    # CLOSED PORTION (ghost-position ruling section 5): the
+                    # sub-$1 residual still held is dust, disclosed, not
+                    # realized, so its cost is not charged to this position.
+                    # The open cost is taken pro rata on opened quantity.
+                    # Long: proceeds - cost. Short: the short sale is the open
+                    # and the cover is the close, so (open - close) flips sign.
+                    residual = max(shares[t], 0.0)
+                    closed_frac = ((opened_qty[t] - residual) / opened_qty[t]
+                                   if opened_qty[t] > 0 else 1.0)
+                    closed_cost = open_notional[t] * closed_frac
                     if segment == "long":
-                        realized = close_notional[t] - open_notional[t]
+                        realized = close_notional[t] - closed_cost
                     else:
-                        realized = open_notional[t] - close_notional[t]
+                        realized = closed_cost - close_notional[t]
                     if not censored[t]:
                         closed.append({
                             "ticker": t,
@@ -772,6 +805,7 @@ def _closed_trades(records: list[dict[str, Any]], segment: str = "long") -> list
                             "profitable": 1 if realized > 0 else 0,
                         })
                     shares[t] = 0.0
+                    opened_qty[t] = 0.0
                     open_notional[t] = 0.0
                     close_notional[t] = 0.0
                     censored[t] = False
@@ -813,7 +847,7 @@ def _attach_entry_confidence(records: list[dict[str, Any]],
                 if _is_administrative(ex):
                     censored[t] = True
                 shares[t] -= qty
-                if shares[t] < SHARES_EPSILON:
+                if shares[t] < dust_threshold_shares(float(ex.get("fill_price") or 0.0)):
                     ec = (conf_w[t] / opened[t]) if opened[t] > 0 else None
                     queue[t].append(ec if ec is not None else float("nan"))
                     censored_q[t].append(censored[t])

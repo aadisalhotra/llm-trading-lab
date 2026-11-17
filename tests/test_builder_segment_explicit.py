@@ -154,7 +154,8 @@ def test_pre_july_long_segment_equals_the_unsegmented_paper_leg(bmdl, records):
     keys, full = records
     seg = bmdl._rq2_month(full, keys, "2026-04-09", "2026-06-30", B, "long")["pooled"]
     from src.analytics.research_metrics import _pgr_plr, _executed_trades, _is_administrative
-    from src.analytics.research_metrics import SHARES_EPSILON
+    # ghost ruling section 5: the $1 floor at the fill price (was SHARES_EPSILON = 0.01)
+    from src.analytics.research_metrics import dust_threshold_shares
     from collections import defaultdict
 
     def replay_unsegmented(recs):
@@ -176,7 +177,7 @@ def test_pre_july_long_segment_equals_the_unsegmented_paper_leg(bmdl, records):
                         closes.append((price > ac, price < ac))
                         closed_tickers.add(t)
                     shares[t] = max(0.0, shares[t] - qty)
-                    if shares[t] < SHARES_EPSILON:
+                    if shares[t] < dust_threshold_shares(price):
                         shares[t] = 0.0
             if closes:
                 pg = pl = 0

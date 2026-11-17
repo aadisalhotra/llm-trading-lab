@@ -29,6 +29,7 @@ Outputs reports/monthly/2026-05/defab_clean_window.json. Mutates nothing.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sys
@@ -36,6 +37,8 @@ from collections import defaultdict
 from typing import Any
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 MODELS = ["claude", "claude_opus", "deepseek", "gemini", "gpt", "grok"]
 DISPLAY = {
@@ -58,15 +61,42 @@ MONTHS = ["2026-04", "2026-05"]
 
 CASH_EPS = 1e-6
 SHARE_EPS = 1e-6
-GHOST_SHARES = 0.01  # mirror Portfolio.GHOST_SHARES_EPSILON
+# NO FIXED SHARE THRESHOLDS (ghost-position ruling section 5(b), ruled
+# 2026-11-10). Two former constants are now derived at the fill price:
+#   * the dust drop (was GHOST_SHARES = 0.01, "mirror
+#     Portfolio.GHOST_SHARES_EPSILON", a constant fix A removed) uses the
+#     section 5 behavioural floor: BEHAVIOURAL_NOTIONAL_FLOOR / fill_price.
+#   * an oversell or over-cover is COUNTED (was OVERSELL_SHARES_MIN = 0.05
+#     share) when its notional at the fill price exceeds the section 2
+#     per-name tolerance, reconciliation.position_tolerance_usd ($1).
+# At $100k books 0.05 share was ~$70 per name; at $2,000 books it was 3.5% of
+# NAV on LLY. Output-version event: the April-May clean-window audit re-runs,
+# and its published counts are compared before and after.
+
+
+def _dust_shares(fill_price: float) -> float:
+    from src.analytics.research_metrics import dust_threshold_shares
+    return dust_threshold_shares(fill_price)
+
+
+@functools.lru_cache(maxsize=1)
+def _per_name_tolerance_usd() -> float:
+    """reconciliation.position_tolerance_usd, read directly: the same key
+    reconciliation_params() serves, without its venue-cash-baseline requirement,
+    which an offline Phase A audit has no reason to depend on. A missing key
+    raises (fail loud), exactly as reconciliation_params() would."""
+    from src.config_loader import load_settings
+    rec = load_settings().get("reconciliation", {}) or {}
+    if "position_tolerance_usd" not in rec:
+        raise KeyError("reconciliation.position_tolerance_usd is not set in config/settings.json")
+    return float(rec["position_tolerance_usd"])
+
 
 # Meaningful thresholds for COUNTING a replay inconsistency. Models run
 # ~fully invested, so de-fab cash hovers near $0 and float rounding trips a
 # raw "cost > cash" test constantly with negligible magnitude — that is noise,
-# not a shortfall. The audit's own conservation test uses a $1 cash / 0.05
-# share tolerance; we match it.
+# not a shortfall.
 CASH_SHORT_USD_MIN = 1.0
-OVERSELL_SHARES_MIN = 0.05
 
 
 def load_runs(model_key: str, months: list[str] = MONTHS) -> list[dict[str, Any]]:
@@ -233,7 +263,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
                     held_s = shorts.get(tkr, {}).get("shares", 0.0)
                     held_s_after = held_s - shares
                     incr_over = max(0.0, -held_s_after) - max(0.0, -held_s)
-                    if incr_over > OVERSELL_SHARES_MIN:
+                    if incr_over * fp > _per_name_tolerance_usd():
                         incons[window]["oversell_count"] += 1
                         incons[window]["oversell_gross_usd"] += incr_over * fp
                         incon_events.append({"date": date, "window": window,
@@ -243,7 +273,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
                     cash -= shares * fp
                     if tkr in shorts:
                         shorts[tkr]["shares"] -= shares
-                        if abs(shorts[tkr]["shares"]) < GHOST_SHARES:
+                        if abs(shorts[tkr]["shares"]) < _dust_shares(fp):
                             del shorts[tkr]
                     else:
                         shorts[tkr] = {"shares": -shares, "avg_entry": fp}
@@ -282,7 +312,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
                     # below zero (phantom shares the de-fab book does not hold).
                     held_after = held - shares
                     incr_neg = max(0.0, -held_after) - max(0.0, -held)
-                    if incr_neg > OVERSELL_SHARES_MIN:
+                    if incr_neg * fp > _per_name_tolerance_usd():
                         phantom = incr_neg * fp
                         incons[window]["oversell_count"] += 1
                         incons[window]["oversell_gross_usd"] += phantom
@@ -297,7 +327,7 @@ def defab_one_model(model_key, runs, per_model, pooled, all_dates,
                         holdings[tkr] = {"shares": -shares, "avg_cost": fp}
                     # drop only true positive dust; keep negatives (they are the signal)
                     h = holdings[tkr]
-                    if 0.0 <= h["shares"] < GHOST_SHARES:
+                    if 0.0 <= h["shares"] < _dust_shares(fp):
                         del holdings[tkr]
 
         # EOD snapshot for `date` (mark every nonzero position, negatives included)
