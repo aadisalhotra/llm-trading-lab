@@ -41,13 +41,33 @@
   },
   "daily": {
     "date": "2026-11-17",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "state_cash:gpt",
+      "negative:grok"
     ],
     "overflow": [],
-    "continuing": [],
-    "digest_sent": false,
+    "continuing": [
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "body": "GPT-5.4 has negative cash of $-0.01, explained by recorded fill slippage of $0.03.",
+        "context": {
+          "model": "gpt",
+          "models": [
+            "GPT-5.4"
+          ],
+          "numbers": {
+            "Cash": "$-0.01"
+          }
+        },
+        "fired_at_et": "2026-11-17 17:07 ET",
+        "timestamp": "2026-11-17T22:07:32.589721+00:00"
+      }
+    ],
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -64,6 +84,21 @@
         },
         "disposition": "sent",
         "dispatch_id": "9a4288d898a1"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-17T22:07:32.589721+00:00",
+        "disposition": "continuing"
+      },
+      {
+        "kind": "negative_return",
+        "severity": "WARN",
+        "title": "Grok 4.20 (Reasoning) went negative",
+        "timestamp": "2026-11-17T22:07:34.173967+00:00",
+        "disposition": "sent",
+        "dispatch_id": "5b8b34e186e0"
       }
     ]
   },
