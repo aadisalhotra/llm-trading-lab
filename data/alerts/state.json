@@ -40,49 +40,65 @@
     ]
   },
   "daily": {
-    "date": "2026-11-16",
-    "sent_count": 4,
+    "date": "2026-11-17",
+    "sent_count": 2,
     "dedup_keys": [
+      "macro_event:Geopolitical shock",
       "state_cash:gpt",
-      "negative:claude",
-      "negative:claude_opus",
-      "news:PG:933d948453"
+      "negative:grok"
     ],
     "overflow": [],
-    "continuing": [],
-    "digest_sent": true,
-    "fired_log": [
+    "continuing": [
       {
         "kind": "state_anomaly",
         "severity": "WARN",
         "title": "State anomaly (cash): GPT-5.4",
-        "timestamp": "2026-11-16T22:07:59.710391+00:00",
+        "body": "GPT-5.4 has negative cash of $-0.01, explained by recorded fill slippage of $0.03.",
+        "context": {
+          "model": "gpt",
+          "models": [
+            "GPT-5.4"
+          ],
+          "numbers": {
+            "Cash": "$-0.01"
+          }
+        },
+        "fired_at_et": "2026-11-17 17:07 ET",
+        "timestamp": "2026-11-17T22:07:32.589721+00:00"
+      }
+    ],
+    "digest_sent": true,
+    "fired_log": [
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-17T18:03:44.940991+00:00",
+        "trigger": {
+          "headline": "Trump and Tehran gamble on time as Iran war stalemate deepens - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-17T16:23:42+00:00",
+          "category": "Geopolitical shock",
+          "matched_term": "war",
+          "score": -0.8402
+        },
         "disposition": "sent",
-        "dispatch_id": "ecfd1bf75de4"
+        "dispatch_id": "9a4288d898a1"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-17T22:07:32.589721+00:00",
+        "disposition": "continuing"
       },
       {
         "kind": "negative_return",
         "severity": "WARN",
-        "title": "Claude Sonnet 4.6 went negative",
-        "timestamp": "2026-11-16T22:08:00.085075+00:00",
+        "title": "Grok 4.20 (Reasoning) went negative",
+        "timestamp": "2026-11-17T22:07:34.173967+00:00",
         "disposition": "sent",
-        "dispatch_id": "8678077c40a6"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Claude Opus 4.6 went negative",
-        "timestamp": "2026-11-16T22:08:00.086965+00:00",
-        "disposition": "sent",
-        "dispatch_id": "4e4f423086b1"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on PG (held by 4)",
-        "timestamp": "2026-11-16T22:08:00.143744+00:00",
-        "disposition": "sent",
-        "dispatch_id": "81a8e33bd24d"
+        "dispatch_id": "5b8b34e186e0"
       }
     ]
   },
