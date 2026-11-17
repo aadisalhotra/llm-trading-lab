@@ -74,14 +74,22 @@ def boundary_parts(run_date: datetime) -> tuple[str, str]:
 def load_ledger(path: Path | None = None) -> tuple[dict[str, list[str]], Exception | None]:
     """Load the ledger. Returns (ledger, read_error).
 
-    Distinguishes "absent/empty" (normal — first tick of the day, no file yet)
-    from "present-but-unreadable" (corrupt JSON / OS error), because only the
-    latter warrants an alert:
-        absent file        -> ({}, None)        normal; proceed silently
+    Distinguishes "absent" (normal — no file yet) from "present-but-unreadable"
+    (corrupt JSON, bad UTF-8, wrong shape, OS error), because only the latter
+    is a guard that cannot guard:
+        absent file        -> ({}, None)        normal; proceed
         present + parses   -> (ledger, None)
-        present + corrupt  -> ({}, exception)   caller FAILS OPEN and alerts loudly
+        present + corrupt  -> ({}, exception)   caller WITHHOLDS the tick (Gate A)
 
-    Never raises — a corrupt ledger must never block a trading tick.
+    FAILS CLOSED at the caller (tick_admission_guards_ruling.md section 3,
+    registered blocking condition: "the ledger blocks when the file is present
+    and cannot be parsed"). The pipeline prompts no model, pages CRITICAL and
+    writes a TICK_WITHHELD_GUARD_UNREADABLE event. This function itself never
+    raises; the error is returned so the caller can name it.
+
+    "Parsed" means parsed AS A LEDGER: an object mapping each day to a list of
+    slot strings. A day mapped to a string would otherwise answer
+    `slot in "09:30"` by substring, which is not a ledger lookup.
     """
     p = _ledger_path(path)
     if not p.exists():
@@ -91,8 +99,11 @@ def load_ledger(path: Path | None = None) -> tuple[dict[str, list[str]], Excepti
             data = json.load(f)
         if not isinstance(data, dict):
             raise ValueError(f"ledger root is {type(data).__name__}, expected an object")
+        for day, slots in data.items():
+            if not isinstance(slots, list) or not all(isinstance(s, str) for s in slots):
+                raise ValueError(f"ledger day {day!r} is not a list of slot strings")
         return data, None
-    except Exception as e:  # noqa: BLE001 — a corrupt ledger is reported, never fatal
+    except Exception as e:  # noqa: BLE001 — returned to the caller, which withholds
         return {}, e
 
 

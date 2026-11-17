@@ -157,24 +157,28 @@ def test_last_row_wins_not_the_first(tmp_path):
     assert check_spacing(_settings(), NOW, tmp_path).skip is True
 
 
-# ------------------------------------------------------------------ fail-open paths
+# ------------------------------------------- unreadable paths (Gate A: fail closed)
 
 def test_torn_final_row_does_not_halt_and_other_models_still_count(tmp_path):
+    """Registered: one torn final row with other books readable remains an answer."""
     for m in COHORT[:-1]:
         _write_log(tmp_path, m, NOW - timedelta(minutes=2))
     bad = tmp_path / f"{COHORT[-1]}_2026-08.jsonl"
     bad.write_text('{"model_key": "grok", "timesta\n', encoding="utf-8")
     v = check_spacing(_settings(), NOW, tmp_path)
     assert v.skip is True          # the five readable models still answer
+    assert v.withhold is False
     assert v.gap_minutes == pytest.approx(2.0)
 
 
-def test_all_logs_unparseable_proceeds_rather_than_halting(tmp_path):
+def test_all_logs_unparseable_withholds(tmp_path):
+    """Gate A: logs are present and none yields a usable final row -> withhold.
+    (Before Gate A this proceeded as `no_prior_tick` with no protection.)"""
     for m in COHORT:
         (tmp_path / f"{m}_2026-08.jsonl").write_text("not json at all\n", encoding="utf-8")
     v = check_spacing(_settings(), NOW, tmp_path)
-    assert v.skip is False
-    assert v.reason == "no_prior_tick"
+    assert (v.withhold, v.skip, v.reason) == (True, False, "no_usable_row")
+    assert len(v.unreadable) == len(COHORT)
 
 
 def test_future_timestamp_proceeds(tmp_path):
@@ -186,10 +190,23 @@ def test_future_timestamp_proceeds(tmp_path):
     assert v.reason == "future_timestamp"
 
 
-def test_empty_file_is_not_a_prior_tick(tmp_path):
+def test_all_present_logs_empty_withholds(tmp_path):
+    """Registered: "no present log yields a parseable final row" -> withhold.
+    An empty file is present and yields no row. No code path creates an empty
+    decision log (rows are appended), so this is damage, not a month start —
+    the month start is the ABSENT case, which still proceeds."""
     for m in COHORT:
         (tmp_path / f"{m}_2026-08.jsonl").write_text("", encoding="utf-8")
-    assert check_spacing(_settings(), NOW, tmp_path).reason == "no_prior_tick"
+    v = check_spacing(_settings(), NOW, tmp_path)
+    assert (v.withhold, v.reason, v.unreadable) == (True, "no_usable_row", ())
+
+
+def test_one_empty_log_beside_readable_logs_still_answers(tmp_path):
+    for m in COHORT[:-1]:
+        _write_log(tmp_path, m, NOW - timedelta(minutes=40))
+    (tmp_path / f"{COHORT[-1]}_2026-08.jsonl").write_text("", encoding="utf-8")
+    v = check_spacing(_settings(), NOW, tmp_path)
+    assert (v.withhold, v.skip, v.reason) == (False, False, "spaced")
 
 
 # --------------------------------------------------------------- timestamp handling

@@ -86,6 +86,13 @@ from .logging import (
     is_boundary_handled,
     mark_boundary_handled,
 )
+from .logging.tick_admission import (
+    GUARD_BOUNDARY_LEDGER,
+    GUARD_SPACING,
+    TICK_WITHHELD_GUARD_UNREADABLE,
+    build_withhold_event,
+    record_withhold,
+)
 from .reports import generate_daily_report
 from .model_versions import detect_version_transition, record_observation
 from .data.price_validity import (
@@ -625,6 +632,32 @@ def _eod_skip_reason(settings: dict[str, Any], run_date: datetime) -> str | None
     return None
 
 
+def _withhold_tick(settings: dict[str, Any], run_date: datetime, *, guard: str,
+                   files: list[str], reason: str, detail: str = "",
+                   boundary: tuple[str, str] | None = None) -> None:
+    """Gate A withhold: write the TICK_WITHHELD_GUARD_UNREADABLE event and ping
+    the watchdog /fail. Called BEFORE the data fetch and the model loop, so the
+    caller's `return 0` exits with no model prompted and no order possible —
+    the pre-prompt stop sweep included (ruling section 2: the admission point is
+    the book's first possible order, and that sweep runs inside run_one_model).
+
+    Exit 0 is deliberate: the workflow commits data/ only after a successful
+    pipeline step, and the event must reach origin to be durable. The CRITICAL
+    and the /fail ping are the page. Never raises.
+    """
+    try:
+        books = [mk for mk, cfg in settings["models"].items() if (cfg or {}).get("enabled", True)]
+        row = build_withhold_event(
+            TICK_WITHHELD_GUARD_UNREADABLE, guard=guard,
+            now_utc=run_date.astimezone(timezone.utc), books=books, files=files,
+            reason=reason, detail=detail, boundary=boundary)
+        record_withhold(row)
+    except Exception as e:  # noqa: BLE001 — the tick is withheld regardless
+        logging.getLogger("llmlab").error(
+            "Withhold event could not be built or written (tick still withheld): %s", e)
+    send_heartbeat(success=False, settings=settings)
+
+
 def run_pipeline(mode: str = "intraday", force: bool = False,
                  force_trade: bool = False) -> int:
     """Run one pipeline tick.
@@ -708,24 +741,28 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         b_day, b_slot = boundary_parts(run_date)
         _ledger, _ledger_err = load_ledger()
         if _ledger_err is not None:
-            # FAIL OPEN: a silently-halted pipeline is the exact failure class
-            # this workstream exists to kill, so a corrupt ledger must never
-            # block trading. But make it LOUD on real channels, not just a log
-            # line — CRITICAL email (deduped once/day) plus an external-watchdog
-            # /fail ping for an SMS/push.
-            logger.error("Idempotency ledger unreadable (%s) — proceeding WITHOUT "
-                         "duplicate protection for %s %s", _ledger_err, b_day, b_slot)
-            # Title: the hub's duplicate-guard-unreadable wording (2026-11-16),
-            # shared with the spacing guard below. Behaviour is unchanged here:
-            # the tick still proceeds (Gate A, tick_admission_guards_ruling.md
-            # section 3, is the change that blocks).
+            # FAIL CLOSED (Gate A, tick_admission_guards_ruling.md section 3).
+            # A guard that trades when it cannot guard is not a guard. The old
+            # fail-open rationale was to avoid a SILENT halt; this withhold is
+            # not silent — CRITICAL email (deduped once/day), an external-
+            # watchdog /fail ping on every withheld tick, and a tagged
+            # TICK_WITHHELD_GUARD_UNREADABLE event. Present-and-unreadable only:
+            # an ABSENT ledger loads as {} with no error and proceeds.
+            logger.error("Idempotency ledger unreadable (%s) — WITHHOLDING tick "
+                         "%s %s (no models prompted, no orders)", _ledger_err, b_day, b_slot)
             send_alert("CRITICAL", "Duplicate guard unreadable: data/state/handled_boundaries.json",
                        f"data/state/handled_boundaries.json could not be read "
-                       f"({_ledger_err}). Proceeding WITHOUT duplicate protection for "
-                       f"boundary {b_day} {b_slot}; a duplicate or concurrent run could "
-                       f"double-trade until this is fixed.",
+                       f"({_ledger_err}). Tick {b_day} {b_slot} is WITHHELD: no model was "
+                       f"prompted and no order was submitted. Every tick withholds until "
+                       f"the file is repaired.",
+                       {"file": "data/state/handled_boundaries.json",
+                        "event": TICK_WITHHELD_GUARD_UNREADABLE},
                        kind="idempotency_ledger", dedup_key="idempotency_ledger_unreadable")
-            send_heartbeat(success=False, settings=settings)
+            _withhold_tick(settings, run_date, guard=GUARD_BOUNDARY_LEDGER,
+                           files=["data/state/handled_boundaries.json"],
+                           reason="ledger_unreadable", detail=str(_ledger_err),
+                           boundary=(b_day, b_slot))
+            return 0
         elif is_boundary_handled(_ledger, b_day, b_slot):
             logger.info("Boundary %s %s already handled — skipping duplicate tick "
                         "(no models prompted, no trades)", b_day, b_slot)
@@ -747,22 +784,46 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # the case it exists for. The reference is therefore the last COMPLETED
     # decision in the committed logs, not the schedule.
     #
-    # Fails open, like the ledger above: check_spacing() swallows read errors
-    # and returns skip=False, so an unreadable log trades rather than halting.
+    # FAILS CLOSED (Gate A), on the registered blocking conditions only: any
+    # enabled book's present log raises on read, or logs are present and none
+    # yields a usable final row. One torn row while other books answer is still
+    # an answer (the run proceeds, and the torn file is still paged). An absent
+    # log — the first tick of a month — is normal and proceeds.
     if not is_eod and not force_trade:
         verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
         if verdict.unreadable:
-            # Alert only: `skip` above is computed exactly as before, so an
-            # unreadable log still proceeds. One CRITICAL per file per day (the
-            # ledger's cadence); every tick still logs at ERROR.
+            # One CRITICAL per file per day (the ledger's cadence); every tick
+            # still logs at ERROR.
+            consequence = (
+                "This tick is WITHHELD: no model was prompted and no order was submitted."
+                if verdict.withhold else
+                "The other books' logs still answer, so this tick proceeds; this "
+                "file gives no spacing protection until it is repaired.")
             for bad in verdict.unreadable:
                 send_alert("CRITICAL", f"Duplicate guard unreadable: {bad}",
-                           f"The 20-minute spacing guard could not read {bad} "
-                           f"(verdict {verdict.reason}). This tick proceeds WITHOUT "
-                           f"that log's spacing protection.",
-                           {"file": bad, "reason": verdict.reason},
+                           f"The 20-minute spacing guard could not use {bad} "
+                           f"(verdict {verdict.reason}). {consequence}",
+                           {"file": bad, "reason": verdict.reason,
+                            "withhold": verdict.withhold},
                            kind="guard_unreadable",
                            dedup_key=f"guard_unreadable:{bad}:{run_date.strftime('%Y-%m-%d')}")
+        if verdict.withhold:
+            logger.error("Spacing guard cannot answer (%s) — WITHHOLDING the tick "
+                         "(no models prompted, no orders)", verdict.reason)
+            if not verdict.unreadable:
+                # Every present log is empty: nothing to name per file, but the
+                # withhold must still page.
+                send_alert("CRITICAL", "Duplicate guard unreadable: decision logs",
+                           f"No present decision log yields a final row (verdict "
+                           f"{verdict.reason}). This tick is WITHHELD: no model was "
+                           f"prompted and no order was submitted.",
+                           {"reason": verdict.reason, "withhold": True},
+                           kind="guard_unreadable",
+                           dedup_key=f"guard_unreadable:no_rows:{run_date.strftime('%Y-%m-%d')}")
+            _withhold_tick(settings, run_date, guard=GUARD_SPACING,
+                           files=list(verdict.unreadable), reason=verdict.reason,
+                           boundary=boundary_parts(run_date))
+            return 0
         if verdict.skip:
             logger.info(
                 "Spacing guard: last cohort decision %s was %.1f min ago "
