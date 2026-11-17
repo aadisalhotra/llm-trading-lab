@@ -227,16 +227,47 @@ that redundancy.
 > the push is rejected non-fast-forward). Without serialization, two concurrent
 > runs could both pass the check before either writes — and both would trade.
 
-**Known limitation (v1, accepted for Phase A paper only):** the boundary is
-marked at *completion*. A hard kill mid-model-loop (runner eviction / OOM) after
-some models have filled but before the commit leaves the boundary unmarked, so a
-retry re-trades the models that already filled. This is a real-money double-trade
-risk in **Phase B** and is tracked as **"per-model idempotency"** on the
-pre-Phase-B list. Do not go live with real money without it.
+**Known limitation — marking at completion** (`tick_admission_guards_ruling.md`
+§§1–3). The boundary is marked when the run completes and reaches origin only in
+the end-of-run commit. In Phase B the venue is durable state outside that
+commit, so the hazard is any venue order the committed record does not account
+for. Four routes reach it: a kill mid-loop; a raise after the first order; a
+completed run whose push fails five times; one book raising inside a run that
+then commits. In the first three, the **next** slot also trades on stale books,
+which no slot-keyed marker can see. Per-model marking in the working tree does
+not fix this and is not a conforming construction (P2).
 
-If the ledger is ever unreadable (corrupt JSON), the guard **fails open**
-(proceeds, so it can never silently halt trading) and fires a CRITICAL email
-*plus* a watchdog `/fail` ping — a loud SMS/push page, not a silent log line.
+What has landed against it is the **workflow fail-stop** (job `fail-stop` in
+`intraday.yml`, `scripts/fail_stop.py`). On failure **or cancellation** of a run
+in a broker mode, it asks the venue for orders whose ids carry a venue book and a
+`cycle_id` inside the run's window. If there are any, or if that cannot be
+determined, it disables the intraday workflow and cancels queued runs. The
+workflow stays disabled until a person has reconciled the books to the venue
+and ledgered the re-enable. Limits: it keys on run failure, so it does not see
+the fourth route (the run succeeds). There, post-cycle reconciliation covers only
+the pre-save half, by halting every venue book; the post-save half is visible
+only to the pre-trade venue check (V), which has not landed. Gate B is met by (V)
+enforcing. On the fail-stop alone, go-live also requires the nightly offline
+order-id set difference.
+
+**Re-enabling after a fail-stop:** reconcile every venue book to the venue by
+order id, ledger the repair and the re-enable, then
+`gh workflow enable intraday.yml` (or the Actions tab → *Enable workflow*).
+Positions in every venue book are unprotected by the tick-driven stop while the
+workflow is disabled, so time-to-repair is a risk parameter (ruling §2).
+
+**Unreadable guard files fail closed (Gate A).** If the ledger is present and
+cannot be parsed as a ledger, or the spacing guard's registered blocking
+conditions hold (any enabled book's present decision log raises on read,
+including a final row that is not valid UTF-8; or logs are present and none
+yields a usable final row), the tick is **withheld**: no model is prompted, no
+order is possible, a CRITICAL email and a watchdog `/fail` ping go out, and a
+`TICK_WITHHELD_GUARD_UNREADABLE` event is appended to
+`data/admission/{YYYY-MM}.jsonl`. The run exits 0 so that event is committed.
+Every tick withholds until the file is repaired. An **absent** file is normal
+(the first tick of a day or month) and proceeds. One torn final row while other
+books' logs answer is still an answer: the tick proceeds, and the torn file is
+still paged.
 
 ---
 

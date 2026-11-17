@@ -1056,14 +1056,25 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # state files, so the marker exists iff the decisions were durably committed.
     # (EOD is not guarded — see the guard block above.)
     #
-    # KNOWN LIMITATION (v1 — accepted for Phase A paper, NOT for Phase B):
-    # marks at COMPLETION. A hard kill mid-loop (runner eviction / OOM) after
-    # some models have filled but before the commit leaves the boundary UNMARKED,
-    # so a retry re-prompts and RE-TRADES the models that already filled. That is
-    # a real-money double-trade risk in Phase B and is tracked as "per-model
-    # idempotency" on the pre-Phase-B list — DO NOT go live with real money
-    # without it. The fix is per-model marking (record each model right after it
-    # trades, so a retry skips the ones already done).
+    # KNOWN LIMITATION — marks at COMPLETION (tick_admission_guards_ruling.md
+    # sections 1-3). In Phase B the venue is durable state outside the commit,
+    # so the hazard is any venue order the committed record does not account
+    # for. Four routes reach it: a kill mid-loop; a raise after the first order;
+    # a completed run whose push fails five times; one book raising inside a run
+    # that then commits. In the first three the NEXT slot also trades on stale
+    # books, which no slot-keyed marker can see. Per-model marking written here
+    # does not fix this: it lives in the same working tree and is lost in the
+    # same cases (ruling section 2, P2).
+    #
+    # What has landed against it: the workflow fail-stop (.github/workflows/
+    # intraday.yml job `fail-stop`, scripts/fail_stop.py) disables the intraday
+    # workflow when a failed or cancelled broker-mode run submitted any order,
+    # or when that cannot be determined. It keys on run failure, so it does not
+    # see the fourth route (the run succeeds); there, post-cycle reconciliation
+    # covers only the pre-save half, by halting every venue book. The post-save
+    # half is visible only to the pre-trade venue check (V), not yet landed.
+    # Gate B is met by (V) enforcing; on the fail-stop alone, go-live also
+    # requires the nightly offline order-id set difference (ruling section 3).
     if not is_eod:
         mark_boundary_handled(*boundary_parts(run_date))
 
