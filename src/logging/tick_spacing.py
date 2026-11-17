@@ -67,6 +67,11 @@ class SpacingVerdict(NamedTuple):
     last_decision: datetime | None
     gap_minutes: float | None
     min_minutes: int
+    # Files the guard could not read: an OSError on read, or a final row that
+    # does not parse. Observability only (the duplicate-guard-unreadable
+    # CRITICAL): `skip` is unchanged by it. Defaulted so every existing
+    # construction and reader keeps working.
+    unreadable: tuple[str, ...] = ()
 
 
 def _settings_block(settings: dict[str, Any] | None) -> dict[str, Any]:
@@ -147,8 +152,13 @@ def last_cohort_decision_utc(
     settings: dict[str, Any] | None,
     now_utc: datetime,
     trades_dir: Path | None = None,
+    unreadable: list[str] | None = None,
 ) -> datetime | None:
     """Most recent decision-log timestamp across all enabled models, or None.
+
+    `unreadable`, when given, collects the name of each present log whose final
+    row does not parse. It does not change the return value. (An OSError still
+    propagates from the first file that raises, as before.)
 
     Only the current month's files are consulted. A month whose file is absent
     means no tick has run this month, and the previous month's last tick is at
@@ -179,6 +189,8 @@ def last_cohort_decision_utc(
             # A torn final line is not a reason to halt trading; the other five
             # models still answer the question.
             logger.error("Unparseable final row in %s — ignoring for spacing", path.name)
+            if unreadable is not None:
+                unreadable.append(str(path))
             continue
         stamp = _parse_utc(row.get("timestamp"))
         if stamp is None:
@@ -199,14 +211,16 @@ def check_spacing(
         return SpacingVerdict(False, "disabled", None, None, minimum)
     if minimum <= 0:
         return SpacingVerdict(False, "disabled", None, None, minimum)
+    torn: list[str] = []
     try:
-        last = last_cohort_decision_utc(settings, now_utc, trades_dir)
+        last = last_cohort_decision_utc(settings, now_utc, trades_dir, unreadable=torn)
     except OSError as e:
         logger.error("Spacing guard could not read the decision logs (%s) — "
                      "proceeding WITHOUT spacing protection", e)
-        return SpacingVerdict(False, "read_error", None, None, minimum)
+        return SpacingVerdict(False, "read_error", None, None, minimum,
+                              tuple(torn) + (str(e.filename or e),))
     if last is None:
-        return SpacingVerdict(False, "no_prior_tick", None, None, minimum)
+        return SpacingVerdict(False, "no_prior_tick", None, None, minimum, tuple(torn))
 
     gap = (now_utc - last).total_seconds() / 60.0
     if gap < 0:
@@ -214,10 +228,10 @@ def check_spacing(
         # is not the thing to halt over it; say so and proceed.
         logger.error("Last decision (%s) is ahead of now (%s) — ignoring for spacing",
                      last.isoformat(), now_utc.isoformat())
-        return SpacingVerdict(False, "future_timestamp", last, gap, minimum)
+        return SpacingVerdict(False, "future_timestamp", last, gap, minimum, tuple(torn))
     if gap < minimum:
-        return SpacingVerdict(True, "too_soon", last, gap, minimum)
-    return SpacingVerdict(False, "spaced", last, gap, minimum)
+        return SpacingVerdict(True, "too_soon", last, gap, minimum, tuple(torn))
+    return SpacingVerdict(False, "spaced", last, gap, minimum, tuple(torn))
 
 
 def record_skip(

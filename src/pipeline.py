@@ -715,7 +715,11 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             # /fail ping for an SMS/push.
             logger.error("Idempotency ledger unreadable (%s) — proceeding WITHOUT "
                          "duplicate protection for %s %s", _ledger_err, b_day, b_slot)
-            send_alert("CRITICAL", "Idempotency ledger unreadable",
+            # Title: the hub's duplicate-guard-unreadable wording (2026-11-16),
+            # shared with the spacing guard below. Behaviour is unchanged here:
+            # the tick still proceeds (Gate A, tick_admission_guards_ruling.md
+            # section 3, is the change that blocks).
+            send_alert("CRITICAL", "Duplicate guard unreadable: data/state/handled_boundaries.json",
                        f"data/state/handled_boundaries.json could not be read "
                        f"({_ledger_err}). Proceeding WITHOUT duplicate protection for "
                        f"boundary {b_day} {b_slot}; a duplicate or concurrent run could "
@@ -747,6 +751,18 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # and returns skip=False, so an unreadable log trades rather than halting.
     if not is_eod and not force_trade:
         verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
+        if verdict.unreadable:
+            # Alert only: `skip` above is computed exactly as before, so an
+            # unreadable log still proceeds. One CRITICAL per file per day (the
+            # ledger's cadence); every tick still logs at ERROR.
+            for bad in verdict.unreadable:
+                send_alert("CRITICAL", f"Duplicate guard unreadable: {bad}",
+                           f"The 20-minute spacing guard could not read {bad} "
+                           f"(verdict {verdict.reason}). This tick proceeds WITHOUT "
+                           f"that log's spacing protection.",
+                           {"file": bad, "reason": verdict.reason},
+                           kind="guard_unreadable",
+                           dedup_key=f"guard_unreadable:{bad}:{run_date.strftime('%Y-%m-%d')}")
         if verdict.skip:
             logger.info(
                 "Spacing guard: last cohort decision %s was %.1f min ago "
