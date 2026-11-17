@@ -56,6 +56,42 @@ API_CALL_TIMEOUT_SECONDS = 300
 ERROR_CLASS_TIMEOUT = "TIMEOUT"              # client-side deadline hit in _call_api
 ERROR_CLASS_API_ERROR = "API_ERROR"          # any other exception from _call_api
 ERROR_CLASS_PARSE_FAILURE = "PARSE_FAILURE"  # response unparseable after the retry
+# The lab's own account standing at the provider (exhausted balance or credits,
+# team access): docs/registrations/rossi_review_rulings.md section 2.4. Keyed on
+# the error TEXT, never the status code: xAI's 429 "at capacity" is provider
+# availability (API_ERROR); Google's 429 "prepayment credits depleted" is ours.
+ERROR_CLASS_ACCOUNT_STATE = "ACCOUNT_STATE"
+
+# CLOSED SET, extended only by registration (section 2.4: "provider-specific
+# strings, a closed set extended only by registration"). One pattern per
+# observed form, each anchored on the provider's own wording as stored in
+# `api_error` (verbatim forms from 2026-08-10 / 08-28 / 08-31):
+#   deepseek  'DeepSeek API 402: {"error":{"message":"Insufficient Balance",...' (Aug)
+#             'DeepSeek API 402: {"error":{"message":"Insufficient Balance (request_id: ...)",...' (Nov)
+#   xai       'xAI API 403: {"code":"permission-denied","error":"Your team ... has
+#              either used all available credits or reached its monthly spending limit...'
+#   google    "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your
+#              prepayment credits are depleted. ..."
+# Matching is case-sensitive on purpose: these are machine strings, and a looser
+# match is how a different class gets absorbed (api_call_timeout.md section 3).
+ACCOUNT_STATE_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
+    # Prefix on the message: since 2026-11-03 DeepSeek appends a request id
+    # inside it ("Insufficient Balance (request_id: ...)"). Same registered form.
+    "deepseek": (re.compile(r"^DeepSeek API 402: .*\"message\":\"Insufficient Balance\b"),),
+    "xai": (re.compile(r"^xAI API 403: .*\"code\":\"permission-denied\""),),
+    "google": (re.compile(r"^429 RESOURCE_EXHAUSTED\..*prepayment credits are depleted"),),
+}
+
+
+def is_account_state(provider: str, error_text: str | None) -> bool:
+    """True iff `error_text` matches a registered account-state form for `provider`.
+
+    Pure text match, usable on live exceptions (str(exc)) and, identically, on
+    stored `api_error` strings for retro-classification. A provider with no
+    registered form never matches."""
+    if not error_text:
+        return False
+    return any(p.search(error_text) for p in ACCOUNT_STATE_PATTERNS.get(provider, ()))
 
 
 def is_client_timeout(exc: BaseException) -> bool:
@@ -303,7 +339,11 @@ class BaseAdapter(ABC):
                     latency_seconds=latency,
                     success=False,
                     error=str(e),
+                    # Logging only: the fail-fast return above is identical
+                    # for every class; the class changes attribution, never flow.
                     error_class=(ERROR_CLASS_TIMEOUT if is_client_timeout(e)
+                                 else ERROR_CLASS_ACCOUNT_STATE
+                                 if is_account_state(self.provider_name, str(e))
                                  else ERROR_CLASS_API_ERROR),
                     metadata={"attempt": attempt},
                 )

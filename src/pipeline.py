@@ -46,6 +46,7 @@ from .adapters import get_adapter
 from .alerts import scan_macro_events, send_alert, send_daily_summary, send_heartbeat
 from .alerts import preflight
 from .alerts.preflight import assert_configured as alert_preflight
+from .alerts.account_state import alert_if_account_state
 from .analytics import build_leaderboard, compute_budget_status
 from .analytics.intended_vs_expressed import write_session_descriptor
 from .config_loader import (
@@ -418,6 +419,10 @@ def run_one_model(
         send_alert("WARN", f"Model {model_key} failed", decision_result.error or "unknown",
                    {"model": model_key},
                    kind="api_failure", dedup_key=f"api_failure:{model_key}")
+        # ACCOUNT_STATE alarm (rossi_review_rulings.md section 2.4 rule 4). Called
+        # unconditionally; it decides from the failure class itself and only
+        # alerts. Nothing here branches on the class.
+        alert_if_account_state(model_key, decision_result, executor.cycle_id)
         # Still log the failure + intraday snapshot
         log_decision_run(
             model_key=model_key, run_date=run_date,
