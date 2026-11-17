@@ -233,18 +233,43 @@ def test_grep_proof_only_three_sites_touch_the_class():
 
 
 # --------------------------------------------------------- retro annotation
-def test_retro_annotation_is_exactly_the_20_aug_sep_records_verbatim():
+def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
+    """Complete, not scoped to one window (hub 2026-11-17): every decision
+    record from 2026-04 onward whose stored api_error matches the closed set."""
     rows = [json.loads(l) for l in ANNOTATION.read_text(encoding="utf-8").splitlines() if l.strip()]
-    assert len(rows) == 20
     from collections import Counter
-    assert Counter(r["model_key"] for r in rows) == {"grok": 13, "deepseek": 6, "gemini": 1}
+    assert Counter((r["date"][:7], r["model_key"]) for r in rows) == {
+        ("2026-08", "grok"): 13, ("2026-08", "deepseek"): 6, ("2026-08", "gemini"): 1,
+        ("2026-11", "deepseek"): 19}
     for r in rows:
         assert r["api_error_class"] == ERROR_CLASS_ACCOUNT_STATE
         assert r["classification_basis"] == "classified retroactively from stored error text"
         assert r["completeness_denominator_change"] == 0
-        assert r["date"][:7] in ("2026-08", "2026-09")
         raw = subprocess.run(["git", "-C", str(ROOT), "show", f"HEAD:{r['source_file']}"],
                              capture_output=True, check=True).stdout.split(b"\n")[r["source_line"] - 1]
         assert hashlib.sha256(raw).hexdigest() == r["source_line_sha256"]
         assert json.loads(raw)["api_error"] == r["api_error_verbatim"]
         assert is_account_state(r["provider"], r["api_error_verbatim"])
+        # the 2026-11-03 wording change is noted on exactly the rows that carry it
+        assert ("wording_note" in r) == ("(request_id:" in r["api_error_verbatim"])
+
+
+def test_annotation_is_complete_against_a_fresh_scan():
+    """No closed-set match from April onward is missing from the annotation."""
+    import glob
+    annotated = {(r["source_file"], r["source_line"]) for r in
+                 (json.loads(l) for l in ANNOTATION.read_text(encoding="utf-8").splitlines() if l.strip())}
+    found = set()
+    for path in sorted(glob.glob(str(ROOT / "data" / "trades" / "*_2026-*.jsonl"))):
+        rel = "data/trades/" + Path(path).name
+        if rel[len("data/trades/"):].split("_")[-1][:7] < "2026-04":
+            continue
+        raw = subprocess.run(["git", "-C", str(ROOT), "show", f"HEAD:{rel}"],
+                             capture_output=True, check=True).stdout.split(b"\n")
+        for i, line in enumerate(raw, 1):
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if not rec.get("api_success") and is_account_state(rec.get("provider", ""), rec.get("api_error")):
+                found.add((rel, i))
+    assert found == annotated
