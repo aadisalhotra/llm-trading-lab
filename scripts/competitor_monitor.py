@@ -207,10 +207,34 @@ _SIG_MULTI = _rx(r"cross-?model", r"multi-?model", r"multi-?llm", r"several (?:l
                  r"prompt-?identical", r"model comparison", r"comparing (?:llms|models)")
 _SIG_AGREE = _rx(r"herd\w*", r"convergen\w*", r"agreement", r"concordance", r"consensus",
                  r"correlat\w* decisions?")
-_SIG_BEHAV = _rx(r"disposition effect", r"calibrat\w*", r"drawdown", r"overconfiden\w*",
+# Criterion (b), AMENDED 2026-11-17 per reports/competitor_assessments/
+# finpanel_arxiv_2611.18150.md section 4 (Research). Two homonyms removed, and
+# nothing else (rider 2: "do not tighten further"):
+#   * "drawdown" as a reported performance metric (maximum drawdown, MDD, "a
+#     shallower drawdown than buy-and-hold") is not a behaviour signal. Drawdown
+#     counts only with RESPONSE language: the agent's behaviour during, after, or
+#     as a function of drawdown (_SIG_DRAWDOWN_RESPONSE).
+#   * bare "panel" was meant as panel data; FinPanel's "panel" is a panel of
+#     personas. The series signal now needs "panel data" / "panel regression".
+# A paper the amendment demotes lands in the DIGEST with a note (rider 1: fail
+# soft, never silent), so the weekly read can catch a wrong demotion.
+_SIG_BEHAV = _rx(r"disposition effect", r"calibrat\w*", r"overconfiden\w*",
                  r"loss aversion", r"risk-?taking")
+_SIG_DRAWDOWN_RESPONSE = _rx(
+    r"drawdown[- ]response", r"drawdown[- ](?:dependent|conditioned|contingent)",
+    r"(?:during|after|following|in response to|in the wake of|through|amid) (?:(?:deep|large|severe|sharp|prolonged|sustained|recent|the|a|their|its) )*drawdowns?",
+    r"as a function of (?:the )?drawdowns?(?: depth| path| size)?",
+    r"(?:de-?risk\w*|risk-?taking|position siz\w*|exposure|path[- ]dependen\w*|"
+    r"(?:reduce|increase|cut|raise|adjust)\w* (?:risk|exposure|positions?))[^.;]{0,80}\bdrawdowns?",
+    r"drawdowns?\b[^.;]{0,80}(?:de-?risk\w*|risk-?taking|position siz\w*|exposure|path[- ]dependen\w*)",
+)
+_SIG_DRAWDOWN_ANY = _rx(r"drawdowns?", r"mdd")
 _SIG_SERIES = _rx(r"time series", r"sequential", r"over time", r"longitudinal",
-                  r"daily", r"panel", r"episodes?")
+                  r"daily", r"panel data", r"panel regressions?", r"episodes?")
+# The pre-amendment series vocabulary, kept ONLY to detect a demotion: a paper
+# that would have met (b) under the old patterns but not the new ones.
+_SIG_SERIES_PRE_AMENDMENT = _rx(r"time series", r"sequential", r"over time", r"longitudinal",
+                                r"daily", r"panel", r"episodes?")
 _SIG_PREREG = _rx(r"pre-?registered", r"pre-?registration", r"preregistr\w*")
 _SIG_FIRST = _rx(r"first (?:study|work|paper|to|systematic|large-?scale)",
                  r"we are the first", r"novel(?:ty)? claim")
@@ -259,13 +283,25 @@ def triage(title: str, abstract: str) -> dict:
     if llm and trade and _SIG_MULTI.search(hay) and _SIG_AGREE.search(hay):
         crit.append("(a) >=2 LLMs on identical inputs, cross-model agreement/convergence/herding")
         rqs.append(_RQ_OF["herding"])
-    if llm and trade and _SIG_BEHAV.search(hay) and _SIG_SERIES.search(hay):
+    behav = bool(_SIG_BEHAV.search(hay))
+    dd_response = bool(_SIG_DRAWDOWN_RESPONSE.search(hay))
+    b_met = llm and trade and (behav or dd_response) and bool(_SIG_SERIES.search(hay))
+    if b_met:
         crit.append("(b) disposition / calibration / drawdown response in LLM trading agents over a series")
         for key, pat in (("disposition", r"disposition effect"),
-                         ("calibration", r"calibrat"),
-                         ("drawdown", r"drawdown")):
+                         ("calibration", r"calibrat")):
             if re.search(pat, hay, re.I):
                 rqs.append(_RQ_OF[key])
+        if dd_response:
+            rqs.append(_RQ_OF["drawdown"])
+    # What the pre-amendment (b) would have said, for the fail-soft rider.
+    b_pre = llm and trade and (behav or bool(_SIG_DRAWDOWN_ANY.search(hay)))         and bool(_SIG_SERIES_PRE_AMENDMENT.search(hay))
+    demotion_notes: list[str] = []
+    if b_pre and not b_met:
+        if not behav and not dd_response:
+            demotion_notes.append("drawdown reported as a metric")
+        if not _SIG_SERIES.search(hay):
+            demotion_notes.append('"panel" is not panel data')
     if llm and trade and _SIG_PREREG.search(hay):
         crit.append("(c) pre-registered LLM trading-behavior study")
     if llm and trade and _SIG_FIRST.search(hay):
@@ -275,6 +311,14 @@ def triage(title: str, abstract: str) -> dict:
         return {"tier": ESCALATE, "criteria": crit,
                 "threatened_rqs": sorted(set(rqs)),
                 "assessment": _overlap_assessment(title, crit, sorted(set(rqs)))}
+
+    if demotion_notes:
+        # Rider 1: fail soft, never silent. Placed ahead of the silent bucket
+        # on purpose.
+        return {"tier": DIGEST,
+                "criteria": ["(b) not met after the 2026-11-17 amendment: " + "; ".join(demotion_notes)],
+                "threatened_rqs": [], "assessment": "",
+                "note": "; ".join(demotion_notes)}
 
     if _SIG_SILENT.search(hay) and not (llm and trade):
         return {"tier": SILENT, "criteria": ["RL-only / crypto / human-subject"],
@@ -694,8 +738,12 @@ def build_digest(week_tag: str, arxiv_papers: list[dict],
     else:
         for p in dig:
             url = p["id"].replace("http://", "https://")
+            # A paper demoted by the 2026-11-17 (b) amendment carries its reason,
+            # so the weekly read can catch a wrong demotion (fail-soft rider).
+            demoted = [c for c in (p.get("triage_criteria") or []) if "not met after" in c]
+            note = f" — _{demoted[0].split(': ', 1)[1]}_" if demoted else ""
             lines.append(f"- **{p['title']}** — {p.get('venue') or 'arXiv'}, "
-                         f"{p['published']} — {url}")
+                         f"{p['published']} — {url}{note}")
     lines.append("")
 
     # ---- SILENT LOG ---------------------------------------------------
