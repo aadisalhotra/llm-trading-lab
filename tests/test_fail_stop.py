@@ -1,0 +1,264 @@
+"""Workflow fail-stop — demonstration (ix), tick_admission_guards_ruling.md §3.
+
+    (ix) a failed run and a cancelled run, each having submitted an order ->
+         the workflow is disabled; a failed run that submitted none -> it is
+         not; a run whose orders cannot be determined -> it is.
+
+Two layers are demonstrated, because the fail-closed property lives in both:
+
+  * scripts/fail_stop.py decides (`decide`), against a fake jobs API payload
+    and a fake venue order listing in the real id format;
+  * the workflow's disable step — the actual bash extracted from
+    .github/workflows/intraday.yml — acts, with a stub `curl` on PATH that
+    records calls instead of reaching GitHub. That step must disable on every
+    verdict except exactly "clear", including no verdict at all (the
+    determine step crashed or never ran).
+
+No venue, no GitHub API, no validation book is touched (condition 4). The
+live-workflow form of (ix) — an induced failure on GitHub — needs a separate
+paper account and is not run here.
+"""
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import fail_stop as fs  # noqa: E402
+
+from src.execution.administrative import PROBE_BOOK_PREFIX  # noqa: E402
+from src.execution.broker import BROKER_MODES, build_order_id  # noqa: E402
+
+JOB_START = datetime(2026, 11, 18, 15, 0, 5, tzinfo=timezone.utc)
+BOOKS = ["claude", "claude_opus", "gpt", "gemini", "grok", "deepseek"]
+THIS_CYCLE = (JOB_START + timedelta(seconds=70)).strftime("%Y%m%dT%H%M%SZ")
+PREV_CYCLE = (JOB_START - timedelta(minutes=30)).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _jobs(step_conclusion="failure", step_started=True, job_name="run"):
+    step = {"name": "Run pipeline", "status": "completed", "conclusion": step_conclusion,
+            "started_at": (JOB_START + timedelta(seconds=60)).isoformat().replace("+00:00", "Z")
+            if step_started else None}
+    return {"jobs": [{"name": job_name, "started_at": JOB_START.isoformat().replace("+00:00", "Z"),
+                      "steps": [{"name": "Checkout", "conclusion": "success",
+                                 "started_at": JOB_START.isoformat()}, step]}]}
+
+
+def _order(coid):
+    return {"id": "x", "client_order_id": coid, "submitted_at": JOB_START.isoformat()}
+
+
+def _decide(jobs, orders, mode="broker_paper"):
+    seen = {}
+
+    def orders_fn(after):
+        seen["after"] = after
+        if isinstance(orders, Exception):
+            raise orders
+        return orders
+
+    def jobs_fn():
+        if isinstance(jobs, Exception):
+            raise jobs
+        return jobs
+    out = fs.decide(mode=mode, broker_modes=BROKER_MODES, jobs_payload_fn=jobs_fn,
+                    orders_fn=orders_fn, book_keys=BOOKS, probe_prefix=PROBE_BOOK_PREFIX)
+    return out, seen
+
+
+ORDER = build_order_id("gpt", THIS_CYCLE, 1)
+
+
+# ------------------------------------------------------- the four (ix) cases
+
+def test_ix_failed_run_with_an_order_disables():
+    out, _ = _decide(_jobs("failure"), [_order(ORDER)])
+    assert out["verdict"] == "disable" and out["this_run_orders"] == [ORDER]
+
+
+def test_ix_cancelled_run_with_an_order_disables():
+    out, _ = _decide(_jobs("cancelled"), [_order(ORDER)])
+    assert out["verdict"] == "disable" and out["this_run_orders"] == [ORDER]
+
+
+def test_ix_failed_run_with_no_order_does_not_disable():
+    out, seen = _decide(_jobs("failure"), [])
+    assert out["verdict"] == "clear"
+    assert seen["after"] == JOB_START - fs.SKEW_MARGIN      # the venue WAS asked
+
+
+@pytest.mark.parametrize("label,jobs,orders", [
+    ("venue unreachable", _jobs(), ConnectionError("venue down")),
+    ("jobs API unreachable", ConnectionError("api down"), []),
+    ("no run job in payload", _jobs(job_name="something-else"), []),
+    ("malformed jobs payload", {"nope": 1}, []),
+    ("venue listing not a list", _jobs(), {"message": "forbidden"}),
+])
+def test_ix_undeterminable_disables(label, jobs, orders):
+    if isinstance(orders, dict):
+        out = fs.decide(mode="broker_paper", broker_modes=BROKER_MODES,
+                        jobs_payload_fn=lambda: jobs,
+                        orders_fn=lambda after: fs.fetch_orders(_FakeClient(orders), after),
+                        book_keys=BOOKS, probe_prefix=PROBE_BOOK_PREFIX)
+    else:
+        out, _ = _decide(jobs, orders)
+    assert out["verdict"] == "disable", label
+    assert out["reason"].startswith("undetermined")
+
+
+# ------------------------------------------------------------ attribution
+
+def test_pipeline_step_never_started_is_clear_without_asking_the_venue():
+    """A cancelled pending run: no pipeline process ever existed."""
+    out, seen = _decide(_jobs("skipped", step_started=False), ConnectionError("not asked"))
+    assert out["verdict"] == "clear" and "after" not in seen
+
+
+def test_probe_orders_are_not_this_runs():
+    probe = build_order_id(PROBE_BOOK_PREFIX + "SELL", THIS_CYCLE, 0)
+    out, _ = _decide(_jobs(), [_order(probe)])
+    assert out["verdict"] == "clear"
+
+
+@pytest.mark.parametrize("coid", ["manual-order-1", "", "gpt-notacycle-01-a0",
+                                  build_order_id("gpt", PREV_CYCLE, 3)])
+def test_unattributable_order_in_the_window_disables(coid):
+    """Unknown segment, no id, unparseable cycle, or a book order from an older
+    cycle submitted inside the window: nothing rules it out."""
+    out, _ = _decide(_jobs(), [_order(coid)])
+    assert out["verdict"] == "disable" and out["unattributable_orders"]
+
+
+def test_order_inside_the_skew_margin_counts_as_this_run():
+    early = (JOB_START - timedelta(seconds=30)).strftime("%Y%m%dT%H%M%SZ")
+    out, _ = _decide(_jobs(), [_order(build_order_id("claude", early, 0))])
+    assert out["verdict"] == "disable" and out["this_run_orders"]
+
+
+def test_simulator_mode_reaches_no_venue():
+    out, seen = _decide(_jobs(), ConnectionError("not asked"), mode="paper")
+    assert out["verdict"] == "clear" and "after" not in seen
+
+
+class _FakeClient:
+    def __init__(self, pages):
+        self.pages = pages if isinstance(pages, list) else [pages]
+        self.calls = []
+
+    def _request(self, method, path, params=None):
+        self.calls.append(params)
+        return self.pages.pop(0) if self.pages else []
+
+
+def test_fetch_orders_paginates_by_submitted_at():
+    first = [{"client_order_id": f"o{i}", "submitted_at": (JOB_START + timedelta(seconds=i)).isoformat()}
+             for i in range(fs.ORDER_PAGE_LIMIT)]
+    client = _FakeClient([first, [{"client_order_id": "last",
+                                   "submitted_at": (JOB_START + timedelta(hours=1)).isoformat()}]])
+    got = fs.fetch_orders(client, JOB_START)
+    assert len(got) == fs.ORDER_PAGE_LIMIT + 1
+    assert client.calls[0]["status"] == "all"
+    assert client.calls[1]["after"] == first[-1]["submitted_at"]
+
+
+# --------------------------------------------- the workflow wiring and the act
+
+# Parsed as text: the CI test environment installs only the production lock
+# plus pytest, and PyYAML is in neither. The workflow is the file GitHub reads,
+# so its exact text is what these assertions pin.
+WF_TEXT = (ROOT / ".github/workflows/intraday.yml").read_text(encoding="utf-8").replace("\r\n", "\n")
+JOB_TEXT = WF_TEXT[WF_TEXT.index("\n  fail-stop:\n"):]
+
+
+def _step(job_text: str, marker: str) -> str:
+    """The text of the step containing `marker`, up to the next step."""
+    i = job_text.index(marker)
+    start = job_text.rindex("\n      - ", 0, i)
+    nxt = job_text.find("\n      - ", i)
+    return job_text[start:nxt if nxt != -1 else len(job_text)]
+
+
+def _env(step_text: str) -> dict[str, str]:
+    out = {}
+    for line in step_text.splitlines():
+        m = re.match(r"^          ([A-Z_]+): (.+)$", line)
+        if m:
+            out[m.group(1)] = m.group(2).strip()
+    return out
+
+
+def test_job_runs_on_failure_and_on_cancellation():
+    head = JOB_TEXT[:JOB_TEXT.index("    steps:")]
+    assert "    needs: [run]\n" in head
+    cond = re.search(r"^    if: (.+)$", head, re.M).group(1)
+    assert "always()" in cond
+    assert "needs.run.result == 'failure'" in cond and "needs.run.result == 'cancelled'" in cond
+
+
+def test_determine_step_cannot_stop_the_disable_step():
+    det = _step(JOB_TEXT, "name: Determine whether the run submitted orders")
+    assert "        continue-on-error: true\n" in det
+    dis = _step(JOB_TEXT, "name: Disable the workflow unless the run provably submitted nothing")
+    assert "        if: always()\n" in dis
+    assert "VERDICT: ${{ steps.determine.outputs.verdict }}" in dis
+
+
+def test_run_job_alpaca_env_is_mirrored():
+    run_job = WF_TEXT[WF_TEXT.index("\n  run:\n"):WF_TEXT.index("\n  alerting-preflight:\n")]
+    run_env = _env(_step(run_job, "name: Run pipeline"))
+    det_env = _env(_step(JOB_TEXT, "id: determine"))
+    alpaca = {k: v for k, v in run_env.items() if k.startswith("ALPACA_")}
+    assert alpaca and all(det_env.get(k) == v for k, v in alpaca.items())
+
+
+def _disable_script() -> str:
+    step = _step(JOB_TEXT, "id: disable")
+    body = step[step.index("        run: |\n") + len("        run: |\n"):]
+    return "\n".join(line[10:] for line in body.splitlines()) + "\n"
+
+
+BASH = shutil.which("bash")
+
+
+@pytest.mark.skipif(BASH is None, reason="needs bash")
+@pytest.mark.parametrize("verdict,disables", [
+    ("clear", False),
+    ("disable", True),
+    ("", True),            # the determine step crashed or never wrote a verdict
+    ("CLEAR", True),       # anything but exactly "clear"
+    ("clear ", True),
+])
+def test_disable_step_acts_on_everything_but_exactly_clear(tmp_path, verdict, disables):
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    log = tmp_path / "curl.log"
+    (stub / "curl").write_text(f'#!/usr/bin/env bash\necho "$@" >> "{log.as_posix()}"\n'
+                               'case "$*" in *"/runs?status="*) echo \'{"workflow_runs":[]}\';; esac\n',
+                               encoding="utf-8", newline="\n")
+    (stub / "curl").chmod(0o755)
+    (stub / "sleep").write_text("#!/usr/bin/env bash\n:\n", encoding="utf-8", newline="\n")
+    (stub / "sleep").chmod(0o755)
+    out = tmp_path / "gh_output"
+    script = tmp_path / "step.sh"
+    script.write_text(_disable_script(), encoding="utf-8", newline="\n")
+    env = dict(os.environ, VERDICT=verdict, GH_TOKEN="t", REPO="o/r", SELF_RUN="1",
+               GITHUB_OUTPUT=out.as_posix(),
+               PATH=f"{stub.as_posix()}{os.pathsep}{os.environ.get('PATH', '')}")
+    r = subprocess.run([BASH, "--noprofile", "--norc", "-eo", "pipefail", script.as_posix()], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    calls = log.read_text(encoding="utf-8") if log.exists() else ""
+    outputs = out.read_text(encoding="utf-8")
+    if disables:
+        assert "-X PUT" in calls and "/workflows/intraday.yml/disable" in calls
+        assert "acted=true" in outputs and "disabled=true" in outputs
+    else:
+        assert calls == "" and "acted=false" in outputs
