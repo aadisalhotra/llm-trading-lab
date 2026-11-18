@@ -11,6 +11,7 @@
 3. **The ledgered repair record is the only thing that readmits the book.** It is what accounts for the `cycle_id` under P1's id test.
 4. **No manual trades of any kind while withheld.** That includes closing or hedging an open position whose stop is suspended. A discretionary trade breaks zero intervention and cannot be attributed to one book.
 5. **If the target is missed, the book stays withheld.** Unprotected time is recorded, not acted on.
+6. **Cancel, never place** (hub ruling 2026-11-18). A person may cancel an open order that the committed record does not account for. A cancel places nothing, so it is not a trade under rule 4. The cancel is ledgered by order id. If the order filled before the cancel, the fill is adopted by order id under rule 1.
 
 ## 1. Identify, by order id
 
@@ -22,7 +23,7 @@
 
 - For each **filled** order, apply exactly its fill to that book's state file (`data/state/{book}.json`): shares and average cost as the executor would have applied them, cash by the fill notional, proceeds booked as unsettled where settlement is enforced.
 - An order that never filled (cancelled, rejected, expired) moves nothing. It is still listed in the repair record.
-- An order still **open** at the venue: **proposed, not yet ruled.** Operations' proposal is to cancel it under its own ledger entry, then handle it as above. A cancel submits no order, but it is a venue action, and the registered constraints do not name it. Until the hub rules, page the hub and do nothing at the venue.
+- An order still **open** at the venue that the committed record does not account for: **a person may cancel it, never place one** (hub ruling 2026-11-18). The cancel is ledgered by order id. If the order filled before the cancel took effect, the fill is adopted by order id like any other (the first bullet).
 - Never touch another book's file, even when the symbol is shared.
 
 ## 3. Ledger the repair (what accounts for the `cycle_id`)
