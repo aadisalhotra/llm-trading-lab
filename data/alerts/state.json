@@ -40,65 +40,31 @@
     ]
   },
   "daily": {
-    "date": "2026-11-17",
+    "date": "2026-11-18",
     "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "state_cash:gpt",
-      "negative:grok"
+      "news:TJX:681eeee31e",
+      "news:WMT:681eeee31e"
     ],
     "overflow": [],
-    "continuing": [
-      {
-        "kind": "state_anomaly",
-        "severity": "WARN",
-        "title": "State anomaly (cash): GPT-5.4",
-        "body": "GPT-5.4 has negative cash of $-0.01, explained by recorded fill slippage of $0.03.",
-        "context": {
-          "model": "gpt",
-          "models": [
-            "GPT-5.4"
-          ],
-          "numbers": {
-            "Cash": "$-0.01"
-          }
-        },
-        "fired_at_et": "2026-11-17 17:07 ET",
-        "timestamp": "2026-11-17T22:07:32.589721+00:00"
-      }
-    ],
+    "continuing": [],
     "digest_sent": true,
     "fired_log": [
       {
-        "kind": "macro_event",
-        "severity": "CRITICAL",
-        "title": "Major Market Event Detected",
-        "timestamp": "2026-11-17T18:03:44.940991+00:00",
-        "trigger": {
-          "headline": "Trump and Tehran gamble on time as Iran war stalemate deepens - Reuters",
-          "source": "Reuters",
-          "headline_time": "2026-11-17T16:23:42+00:00",
-          "category": "Geopolitical shock",
-          "matched_term": "war",
-          "score": -0.8402
-        },
+        "kind": "news_impact",
+        "severity": "WARN",
+        "title": "Very Positive news on TJX (held by 4)",
+        "timestamp": "2026-11-18T22:07:51.558541+00:00",
         "disposition": "sent",
-        "dispatch_id": "9a4288d898a1"
+        "dispatch_id": "66c4607ba21f"
       },
       {
-        "kind": "state_anomaly",
+        "kind": "news_impact",
         "severity": "WARN",
-        "title": "State anomaly (cash): GPT-5.4",
-        "timestamp": "2026-11-17T22:07:32.589721+00:00",
-        "disposition": "continuing"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Grok 4.20 (Reasoning) went negative",
-        "timestamp": "2026-11-17T22:07:34.173967+00:00",
+        "title": "Very Positive news on WMT (held by 5)",
+        "timestamp": "2026-11-18T22:07:51.560552+00:00",
         "disposition": "sent",
-        "dispatch_id": "5b8b34e186e0"
+        "dispatch_id": "e8786e8baeaa"
       }
     ]
   },
