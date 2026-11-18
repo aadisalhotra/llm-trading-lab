@@ -17,7 +17,9 @@ on:
     # 17:00 EST, at least an hour after a full-session close in either regime.
     # (It was 21:00 UTC, which in EST is 16:00 ET, the closing bell itself.)
     # The chain's own EOD dispatch, at close + 65 min, is the primary.
-    # This run does NOT execute trades.
+    # This run places no MODEL trades, but it CAN submit per-position stop
+    # orders (the stop sweep runs before run_one_model's EOD early-return).
+    # EOD admission coverage is pending (hub ruling 2026-11-17, Thursday).
     - cron: "0 22 * * 1-5"
   workflow_dispatch:
     inputs:
@@ -689,3 +691,124 @@ jobs:
           RUN_MODE: ${{ needs.run.result == 'failure' && 'pipeline run' || 'workflow' }}
           FAILED_CONTEXT: "run=${{ needs.run.result }} chain=${{ needs.chain.result }} pages=${{ needs.pages.result }}"
         run: python scripts/notify_failure.py
+
+  # Workflow fail-stop (tick_admission_guards_ruling.md section 3, hub
+  # amendment 2). On FAILURE OR CANCELLATION of the `run` job, ask the venue
+  # whether this run submitted any order. If it did, or if that cannot be
+  # determined, DISABLE this workflow and cancel queued runs: the next slot
+  # would otherwise check out stale books and trade on them. It stays disabled
+  # until a person has reconciled the books to the venue and ledgered the
+  # re-enable (docs/MONITORING.md, "Re-enabling after a fail-stop").
+  #
+  # Fail-closed by construction: the determine step may crash, time out or be
+  # skipped, and the disable step still runs (`always()`) and acts unless the
+  # verdict is EXACTLY "clear". `always()` at job level is what makes this run
+  # after a cancelled `run` job; notify-failure's `!cancelled()` excludes that
+  # case, which is why this is a separate job.
+  #
+  # Outside the order path: it reads the venue and the Actions API, and its
+  # only write is to the workflow's enabled state. It does not see a run that
+  # SUCCEEDS (the ruling's fourth route) — that is (V)'s job.
+  #
+  # Credentials MUST mirror the `run` job's Alpaca env: the venue is asked with
+  # the same mode binding the pipeline traded under.
+  fail-stop:
+    needs: [run]
+    if: ${{ always() && (needs.run.result == 'failure' || needs.run.result == 'cancelled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: main
+      - name: Set up Python
+        continue-on-error: true
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        continue-on-error: true
+        run: |
+          python -m pip install "pip==26.2.2"
+          pip install --no-deps -r requirements.txt
+      - name: Determine whether the run submitted orders
+        id: determine
+        continue-on-error: true
+        timeout-minutes: 4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_RESULT: ${{ needs.run.result }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
+        run: python scripts/fail_stop.py --run-id "${{ github.run_id }}" --out fail_stop_verdict.json
+      - name: Disable the workflow unless the run provably submitted nothing
+        id: disable
+        if: always()
+        env:
+          VERDICT: ${{ steps.determine.outputs.verdict }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SELF_RUN: ${{ github.run_id }}
+        run: |
+          if [ "$VERDICT" = "clear" ]; then
+            echo "Fail-stop: verdict clear — the run submitted no order. Workflow stays enabled."
+            echo "acted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::Fail-stop: verdict '${VERDICT:-<none>}' — disabling intraday.yml"
+          API="https://api.github.com/repos/${REPO}/actions"
+          AUTH=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          DISABLED=false
+          for attempt in 1 2 3; do
+            if curl -fsS -X PUT "${AUTH[@]}" "${API}/workflows/intraday.yml/disable"; then
+              DISABLED=true; break
+            fi
+            sleep $(( attempt * 5 ))
+          done
+          echo "acted=true" >> "$GITHUB_OUTPUT"
+          echo "disabled=${DISABLED}" >> "$GITHUB_OUTPUT"
+          # A disabled workflow schedules nothing new, but a run already queued
+          # in the concurrency group would still start when this run ends.
+          for status in queued pending waiting requested; do
+            ids=$(curl -fsS "${AUTH[@]}" "${API}/workflows/intraday.yml/runs?status=${status}&per_page=100" \
+                  | jq -r '.workflow_runs[].id' 2>/dev/null || true)
+            for id in $ids; do
+              [ "$id" = "$SELF_RUN" ] && continue
+              curl -fsS -X POST "${AUTH[@]}" "${API}/runs/${id}/cancel" >/dev/null \
+                && echo "Cancelled queued run ${id}" \
+                || echo "::warning::Could not cancel queued run ${id}"
+            done
+          done
+          if [ "$DISABLED" != "true" ]; then
+            echo "::error::Fail-stop could NOT disable the workflow — a person must disable it now."
+          fi
+      - name: Page
+        if: always() && steps.disable.outputs.acted == 'true'
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
+          RUN_MODE: fail-stop
+          FAILED_CONTEXT: "run=${{ needs.run.result }} verdict=${{ steps.determine.outputs.verdict || 'none' }} disabled=${{ steps.disable.outputs.disabled }}"
+          FAILURE_SUMMARY: >-
+            FAIL-STOP: this run failed or was cancelled and either submitted
+            orders or could not be shown not to have. The intraday workflow has
+            been DISABLED (see disabled= below; if false, disable it by hand now).
+            Reconcile every venue book to the venue by order id, ledger the
+            repair and the re-enable, then re-enable the workflow. The verdict
+            file is in this run's fail-stop-verdict artifact.
+        run: python3 scripts/notify_failure.py
+      - name: Keep the verdict
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fail-stop-verdict
+          path: fail_stop_verdict.json
+          if-no-files-found: warn
+      - name: Red the job if the disable did not happen
+        if: always() && steps.disable.outputs.acted == 'true' && steps.disable.outputs.disabled != 'true'
+        run: exit 1

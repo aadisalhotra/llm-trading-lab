@@ -54,7 +54,8 @@ from src.alerts.email_alerts import send_email  # noqa: E402
 from src.alerts.events import render_event_html  # noqa: E402
 from src.config_loader import force_utf8_console, load_env, load_settings  # noqa: E402
 from src.cycle_watch import (  # noqa: E402
-    SLOT, books_in_slot, classify_slot, month_log_name, parse_utc, slot_label,
+    SLOT, admission_log_name, books_in_slot, classify_slot, month_log_name, parse_utc,
+    slot_label, withhold_in_slot,
 )
 
 logger = logging.getLogger("check_slot_cycle")
@@ -65,6 +66,8 @@ POLL_SECONDS = 60
 SLOT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:(00|30):00Z$")
 
 Reader = Callable[[list[str], datetime], "dict[str, list[str]] | None"]
+# The slot's admission file lines, read from the same fetch; None = unreadable.
+AdmissionReader = Callable[[datetime], "list[str] | None"]
 Sender = Callable[[str, str, str], bool]
 
 
@@ -94,6 +97,24 @@ def git_reader(repo: Path) -> Reader:
     return read
 
 
+def git_admission_reader(repo: Path) -> AdmissionReader:
+    """Read the slot's admission file from FETCH_HEAD, which `git_reader` has
+    just fetched in the same poll. A path absent from main reads as no lines
+    (no withhold this month); any other failure is None."""
+    def read(slot: datetime) -> list[str] | None:
+        path = f"data/admission/{admission_log_name(slot)}"
+        show = subprocess.run(["git", "-C", str(repo), "show", f"FETCH_HEAD:{path}"],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=60)
+        if show.returncode == 0:
+            return show.stdout.splitlines()
+        if "does not exist" in show.stderr or "exists on disk, but not in" in show.stderr:
+            return []
+        logger.warning("could not read %s from origin: %s", path, show.stderr.strip()[:300])
+        return None
+    return read
+
+
 def email_sender(settings: dict) -> Sender:
     def send(severity: str, title: str, body: str) -> bool:
         now_et = datetime.now(timezone.utc).astimezone(ZoneInfo("America/New_York")).strftime(
@@ -118,7 +139,7 @@ def summary(line: str) -> None:
 
 def watch(slot: datetime, books: list[str], reader: Reader, send: Sender,
           now: Callable[[], datetime], sleep: Callable[[float], None],
-          deadline: timedelta = DEADLINE) -> int:
+          deadline: timedelta = DEADLINE, admission: AdmissionReader | None = None) -> int:
     label = slot_label(slot)
     due = slot + deadline
     slot_end = slot + SLOT
@@ -152,14 +173,26 @@ def watch(slot: datetime, books: list[str], reader: Reader, send: Sender,
                 summary(f"UNVERIFIED slot {label} ET: origin/main unreadable through {t:%H:%M:%S}Z")
                 return 1
             title = f"Slot {label} produced no cycle"
-            body = (f"No book wrote a decision record for the <b>{label} ET</b> slot "
-                    f"({slot:%Y-%m-%d %H:%M}Z) by {due:%H:%M}Z, the watch deadline. "
-                    f"The chain dispatched this slot; a dispatched run that never starts, or "
-                    f"starts too late, looks exactly like this. Nothing was re-dispatched. "
-                    f"Check the Actions run for the slot and the broker for orders.")
+            # If the slot's admission record is visible, say so: the miss has a
+            # registered cause (hub ruling 2026-11-17). The page itself stays.
+            withheld = withhold_in_slot((admission(slot) or []) if admission else [], slot)
+            if withheld is not None:
+                body = (f"No book wrote a decision record for the <b>{label} ET</b> slot "
+                        f"({slot:%Y-%m-%d %H:%M}Z): it was <b>withheld by the admission "
+                        f"guard</b> ({withheld.get('event')}, guard {withheld.get('guard')}, "
+                        f"reason {withheld.get('reason')}, at {withheld.get('timestamp')}). "
+                        f"No model was prompted and no order was submitted. The EOD sweep "
+                        f"records this slot under that cause, not as a missed cycle. Repair "
+                        f"the file the admission record names; every tick withholds until then.")
+            else:
+                body = (f"No book wrote a decision record for the <b>{label} ET</b> slot "
+                        f"({slot:%Y-%m-%d %H:%M}Z) by {due:%H:%M}Z, the watch deadline. "
+                        f"The chain dispatched this slot; a dispatched run that never starts, or "
+                        f"starts too late, looks exactly like this. Nothing was re-dispatched. "
+                        f"Check the Actions run for the slot and the broker for orders.")
             ok = send("CRITICAL", title, body)
-            summary(f"MISSED slot {label} ET: no record by {due:%H:%M}Z; CRITICAL "
-                    f"{'sent' if ok else 'NOT sent'}")
+            summary(f"{'WITHHELD' if withheld is not None else 'MISSED'} slot {label} ET: no "
+                    f"record by {due:%H:%M}Z; CRITICAL {'sent' if ok else 'NOT sent'}")
             if not ok:
                 return 1
             critical_sent = True
@@ -187,7 +220,8 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("no enabled books in settings; nothing to watch")
         return 2
     return watch(parse_utc(args.slot), books, git_reader(ROOT), email_sender(settings),
-                 now=lambda: datetime.now(timezone.utc), sleep=_time.sleep)
+                 now=lambda: datetime.now(timezone.utc), sleep=_time.sleep,
+                 admission=git_admission_reader(ROOT))
 
 
 if __name__ == "__main__":

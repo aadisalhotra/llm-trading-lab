@@ -6,12 +6,17 @@ decisions are made, and checks the ledger BEFORE prompting any model, so a
 duplicate run for the same boundary cleanly no-ops instead of re-prompting the
 models and double-trading.
 
-The EOD wrap-up is deliberately NOT guarded: it executes no trades (run_one_model
-has an is_eod early-return — snapshot/report only), so it carries no double-trade
-risk, and it keeps its own per-day idempotency (log_daily_snapshot date-dedup,
-once-per-day digest) plus its intentional two-trigger redundancy (chain post-close
-handoff + the 21:00 UTC cron). Guarding it here would needlessly neuter that
-redundancy.
+The EOD wrap-up is NOT guarded here. It places no MODEL trades, but it CAN submit
+per-position stop orders: run_one_model runs the stop sweep before its is_eod
+early-return (which writes no decision row), and in broker modes a triggered stop
+goes to the venue. So EOD does carry double-trade risk: a second EOD run (the
+22:00 UTC backup beside the chain post-close handoff) can re-run the stop sweep
+on a book the first run failed to commit. Its per-day idempotency today is
+log_daily_snapshot date-dedup, the once-per-day digest and the pipeline's
+_eod_skip_reason. EOD admission coverage — this ledger, the spacing guard and the
+pre-trade venue check, run before the stop sweep under an EOD-specific boundary
+key (one EOD per session) — is PENDING (hub ruling 2026-11-17, Thursday's
+package).
 
 What this protects against: a Fix A dispatch retry, a manual force-run, a
 backup-cron double-fire, and multi-trigger redundancy (Path 1/2) — any of which
@@ -74,14 +79,22 @@ def boundary_parts(run_date: datetime) -> tuple[str, str]:
 def load_ledger(path: Path | None = None) -> tuple[dict[str, list[str]], Exception | None]:
     """Load the ledger. Returns (ledger, read_error).
 
-    Distinguishes "absent/empty" (normal — first tick of the day, no file yet)
-    from "present-but-unreadable" (corrupt JSON / OS error), because only the
-    latter warrants an alert:
-        absent file        -> ({}, None)        normal; proceed silently
+    Distinguishes "absent" (normal — no file yet) from "present-but-unreadable"
+    (corrupt JSON, bad UTF-8, wrong shape, OS error), because only the latter
+    is a guard that cannot guard:
+        absent file        -> ({}, None)        normal; proceed
         present + parses   -> (ledger, None)
-        present + corrupt  -> ({}, exception)   caller FAILS OPEN and alerts loudly
+        present + corrupt  -> ({}, exception)   caller WITHHOLDS the tick (Gate A)
 
-    Never raises — a corrupt ledger must never block a trading tick.
+    FAILS CLOSED at the caller (tick_admission_guards_ruling.md section 3,
+    registered blocking condition: "the ledger blocks when the file is present
+    and cannot be parsed"). The pipeline prompts no model, pages CRITICAL and
+    writes a TICK_WITHHELD_GUARD_UNREADABLE event. This function itself never
+    raises; the error is returned so the caller can name it.
+
+    "Parsed" means parsed AS A LEDGER: an object mapping each day to a list of
+    slot strings. A day mapped to a string would otherwise answer
+    `slot in "09:30"` by substring, which is not a ledger lookup.
     """
     p = _ledger_path(path)
     if not p.exists():
@@ -91,8 +104,11 @@ def load_ledger(path: Path | None = None) -> tuple[dict[str, list[str]], Excepti
             data = json.load(f)
         if not isinstance(data, dict):
             raise ValueError(f"ledger root is {type(data).__name__}, expected an object")
+        for day, slots in data.items():
+            if not isinstance(slots, list) or not all(isinstance(s, str) for s in slots):
+                raise ValueError(f"ledger day {day!r} is not a list of slot strings")
         return data, None
-    except Exception as e:  # noqa: BLE001 — a corrupt ledger is reported, never fatal
+    except Exception as e:  # noqa: BLE001 — returned to the caller, which withholds
         return {}, e
 
 

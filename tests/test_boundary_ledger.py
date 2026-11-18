@@ -2,8 +2,10 @@
 
 These encode the dry-run the design specifies: a boundary handled once is not
 re-handled (duplicate run no-ops), a fresh boundary proceeds, and a corrupt
-ledger fails OPEN (read error surfaced, ledger treated as empty). The guard is
-intraday-only; EOD is not keyed here (it executes no trades).
+ledger surfaces its read error, on which the pipeline WITHHOLDS the tick (Gate A,
+tick_admission_guards_ruling.md section 3). The guard is
+intraday-only; EOD is not keyed here yet (EOD places no model trades but can
+submit per-position stop orders; EOD admission coverage is pending, Thursday).
 Run with: python -m pytest tests/test_boundary_ledger.py
 """
 from __future__ import annotations
@@ -11,6 +13,8 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -59,15 +63,35 @@ def test_handled_boundary_no_ops(tmp_path):
     assert not is_boundary_handled(ledger, "2026-05-26", "15:30")  # a new boundary still proceeds
 
 
-def test_corrupt_ledger_fails_open(tmp_path):
-    """A present-but-unreadable ledger surfaces an error and reads as empty,
-    so the caller proceeds (fail open) rather than silently halting."""
+def test_corrupt_ledger_returns_its_error(tmp_path):
+    """A present-but-unreadable ledger surfaces an error (never raises). The
+    caller WITHHOLDS the tick on it (Gate A) — see test_gate_a_admission.py."""
     led = tmp_path / "ledger.json"
     led.write_text("{not valid json", encoding="utf-8")
     ledger, err = load_ledger(led)
-    assert err is not None                         # caller fires the loud alert
-    assert ledger == {}                            # ...and proceeds (does not block trading)
-    assert not is_boundary_handled(ledger, "2026-05-26", "15:00")
+    assert err is not None                         # caller withholds and pages
+    assert ledger == {}
+
+
+def test_non_utf8_ledger_is_corrupt_not_a_crash(tmp_path):
+    led = tmp_path / "ledger.json"
+    led.write_bytes(b'{"2026-11-17": ["09:30\xff"]}')
+    _, err = load_ledger(led)
+    assert isinstance(err, UnicodeDecodeError)
+
+
+@pytest.mark.parametrize("body", ['{"2026-11-17": "09:30"}', '{"2026-11-17": [930]}',
+                                  '{"2026-11-17": null}'])
+def test_wrong_shape_day_is_corrupt(tmp_path, body):
+    """A day mapped to a string would answer `slot in "09:30"` by substring."""
+    led = tmp_path / "ledger.json"
+    led.write_text(body, encoding="utf-8")
+    _, err = load_ledger(led)
+    assert err is not None
+
+
+def test_absent_ledger_is_normal(tmp_path):
+    assert load_ledger(tmp_path / "missing.json") == ({}, None)
 
 
 def test_non_dict_ledger_is_corrupt(tmp_path):

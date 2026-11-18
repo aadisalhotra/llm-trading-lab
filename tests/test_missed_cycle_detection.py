@@ -353,3 +353,117 @@ def test_real_decision_logs_show_exactly_the_known_misses(day, missed):
     ev = cw.day_events(TRADES_DIR, BOOKS, date.fromisoformat(day), time(16, 0), "test")
     assert [e["slot_et"] for e in ev if e["kind"] == cw.MISSED_CYCLE] == missed
     assert [e for e in ev if e["kind"] != cw.MISSED_CYCLE] == []
+
+
+# ------------------------- single classification of a withheld tick (2026-11-17)
+# A Gate A withhold writes a TICK_WITHHELD_* admission record and no decision
+# record, so the slot looks missed. The EOD sweep records it ONCE, under its
+# cause, never as MISSED_CYCLE; the watcher keeps its page but says why.
+from src.logging import tick_admission  # noqa: E402
+
+SLOT_1100 = datetime(2026, 11, 16, 16, 0, tzinfo=UTC)    # 11:00 EST
+
+
+def _withhold(admission_dir: Path, at: datetime, event=tick_admission.TICK_WITHHELD_GUARD_UNREADABLE):
+    """An admission row written by the REAL writer, so the reader is tested
+    against the format the pipeline actually produces."""
+    row = tick_admission.build_withhold_event(
+        event, guard="tick_spacing", now_utc=at, books=BOOKS,
+        files=["data/trades/grok_2026-11.jsonl"], reason="read_error")
+    assert tick_admission.record_withhold(row, path=admission_dir / f"{at:%Y-%m}.jsonl")
+    return row
+
+
+def test_eod_withheld_slot_is_recorded_once_under_its_cause_and_never_as_a_miss(eod):
+    tmp, settings = eod
+    _write_day(tmp / "trades", {"*": {"11:00"}})
+    _withhold(tmp / "admission", SLOT_1100 + timedelta(seconds=40))
+    assert events.detect_missed_cycles(settings, "2026-11-16") == []     # no generic page
+    path = tmp / "cycle_completeness" / "2026-11.jsonl"
+    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines()]
+    assert [(r["kind"], r["slot_et"]) for r in rows] == [("TICK_WITHHELD_GUARD_UNREADABLE", "11:00")]
+    assert rows[0]["admission_record"]["guard"] == "tick_spacing"
+    assert not any(r["kind"] == cw.MISSED_CYCLE for r in rows)
+    events.detect_missed_cycles(settings, "2026-11-16")                 # EOD rerun
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_eod_withheld_and_genuine_miss_page_only_the_miss_and_name_the_withhold(eod):
+    tmp, settings = eod
+    _write_day(tmp / "trades", {"*": {"11:00", "15:30"}})
+    _withhold(tmp / "admission", SLOT_1100 + timedelta(seconds=40))
+    spec = events.detect_missed_cycles(settings, "2026-11-16")
+    assert len(spec) == 1 and spec[0]["title"] == "Slot 15:30 produced no cycle"
+    assert "Withheld by the admission guard" in spec[0]["body"]
+    assert "11:00 (TICK_WITHHELD_GUARD_UNREADABLE)" in spec[0]["body"]
+    rows = [json.loads(l) for l in (tmp / "cycle_completeness" / "2026-11.jsonl")
+            .read_text(encoding="utf-8").splitlines()]
+    assert sorted((r["kind"], r["slot_et"]) for r in rows) == [
+        ("MISSED_CYCLE", "15:30"), ("TICK_WITHHELD_GUARD_UNREADABLE", "11:00")]
+
+
+def test_eod_withhold_in_another_slot_does_not_excuse_a_miss(eod):
+    tmp, settings = eod
+    _write_day(tmp / "trades", {"*": {"11:00"}})
+    _withhold(tmp / "admission", SLOT_1100 - timedelta(seconds=1))      # 10:30 slot
+    spec = events.detect_missed_cycles(settings, "2026-11-16")
+    assert spec and spec[0]["title"] == "Slot 11:00 produced no cycle"
+
+
+def test_a_withhold_in_a_slot_that_then_ran_records_nothing(eod):
+    tmp, settings = eod
+    _write_day(tmp / "trades")                                           # every slot ran
+    _withhold(tmp / "admission", SLOT_1100 + timedelta(seconds=40))
+    assert events.detect_missed_cycles(settings, "2026-11-16") == []
+    assert not (tmp / "cycle_completeness").exists()
+
+
+def test_withhold_reader_skips_corrupt_and_foreign_rows():
+    lines = ["{not json", json.dumps({"event": "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+                                      "timestamp": "2026-11-16T16:00:40+00:00"}),
+             json.dumps({"event": "TICK_WITHHELD_GUARD_UNREADABLE", "timestamp": "garbage"}), ""]
+    assert cw.withhold_in_slot(lines, SLOT_1100) is None
+
+
+def test_the_admission_file_name_matches_the_writer():
+    at = SLOT_1100 + timedelta(seconds=40)
+    assert cw.admission_log_name(SLOT_1100) == tick_admission.admission_log_path(at, Path("x")).name
+
+
+def test_production_admission_path_lives_beside_the_trade_logs():
+    from src.config_loader import DATA_DIR, TRADES_DIR
+    assert events.ADMISSION_DIR is None
+    assert TRADES_DIR.parent / "admission" == DATA_DIR / tick_admission.ADMISSION_DIRNAME
+
+
+def _watch_1530(admission_lines):
+    clock = Clock(SLOT_1530 + timedelta(seconds=40))
+    mail = Mail()
+    mail.clock = clock
+    code = watcher.watch(SLOT_1530, BOOKS, lambda books, slot: {b: [] for b in books}, mail,
+                         now=clock.now, sleep=clock.sleep,
+                         admission=(lambda slot: admission_lines))
+    return code, mail
+
+
+def test_watcher_says_withheld_when_it_can_see_the_admission_record(tmp_path):
+    row = _withhold(tmp_path, SLOT_1530 + timedelta(seconds=35))
+    lines = (tmp_path / "2026-11.jsonl").read_text(encoding="utf-8").splitlines()
+    code, mail = _watch_1530(lines)
+    assert code == 0 and len(mail.sent) == 1
+    severity, title, body, _ = mail.sent[0]
+    assert (severity, title) == ("CRITICAL", "Slot 15:30 produced no cycle")   # the page stays
+    assert "withheld by the admission guard" in body
+    assert row["event"] in body and "Nothing was re-dispatched" not in body
+
+
+@pytest.mark.parametrize("lines", [[], None])
+def test_watcher_body_is_generic_without_an_admission_record(lines):
+    code, mail = _watch_1530(lines)
+    body = mail.sent[0][2]
+    assert "withheld by the admission guard" not in body and "Nothing was re-dispatched" in body
+
+
+def test_watcher_reads_admission_from_the_same_fetch_and_never_writes():
+    src = (ROOT / "scripts" / "check_slot_cycle.py").read_text(encoding="utf-8")
+    assert 'f"FETCH_HEAD:{path}"' in src and "admission=git_admission_reader(ROOT)" in src

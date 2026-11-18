@@ -28,9 +28,20 @@ most recent decision-log row across all enabled models. Per-model spacing would
 let the cohort drift apart tick by tick, which is an effective-parity problem,
 not just an untidy one.
 
-FAILS OPEN. An unreadable or unparseable log proceeds to trade and logs at
-ERROR — a silently halted pipeline is the worse failure, and the boundary
-ledger still holds the primary duplicate protection underneath.
+FAILS CLOSED (Gate A, tick_admission_guards_ruling.md section 3, registered
+blocking conditions). The verdict WITHHOLDS the tick when:
+
+  * any enabled book's PRESENT log raises on read — an OSError, or a final row
+    that is not valid UTF-8 (UnicodeDecodeError used to escape this module and
+    crash the run); or
+  * at least one log is present and NO present log yields a usable final row
+    (a JSON object with a parseable timestamp).
+
+One torn final row with other books readable remains an answer, as before:
+the readable books still say when the cohort last decided. An ABSENT log is
+normal — the first tick of a month — and never withholds (demonstration (v)).
+A withhold is not a silent halt: the pipeline pages CRITICAL and writes a
+TICK_WITHHELD_GUARD_UNREADABLE event (src/logging/tick_admission.py).
 """
 from __future__ import annotations
 
@@ -59,7 +70,9 @@ _TAIL_BLOCK = 65536
 class SpacingVerdict(NamedTuple):
     """Outcome of the spacing check.
 
-    `skip` is the only field the pipeline acts on; the rest exist so the skip
+    The pipeline acts on two fields. `withhold` (Gate A) means the guard could
+    not answer and the tick must not run; it is checked first. `skip` means the
+    guard answered "too soon". They are never both True. The rest exist so the
     event records why, which is what makes the guard's firing rate auditable.
     """
     skip: bool
@@ -67,11 +80,13 @@ class SpacingVerdict(NamedTuple):
     last_decision: datetime | None
     gap_minutes: float | None
     min_minutes: int
-    # Files the guard could not read: an OSError on read, or a final row that
-    # does not parse. Observability only (the duplicate-guard-unreadable
-    # CRITICAL): `skip` is unchanged by it. Defaulted so every existing
-    # construction and reader keeps working.
+    # Files the guard could not use: a read that raised, or a final row that
+    # is not usable. Each is named in a CRITICAL. A torn row alone does not
+    # withhold while another book answers; see `withhold`.
     unreadable: tuple[str, ...] = ()
+    # Gate A: True when a registered blocking condition holds. Defaulted so
+    # every existing construction keeps working.
+    withhold: bool = False
 
 
 def _settings_block(settings: dict[str, Any] | None) -> dict[str, Any]:
@@ -99,8 +114,9 @@ def is_enabled(settings: dict[str, Any] | None = None) -> bool:
 def _last_line(path: Path) -> str | None:
     """Last non-empty line of a file, read by seeking from the end.
 
-    Returns None for a missing or empty file. Never raises for content reasons;
-    OS errors propagate to the caller, which fails open.
+    Returns None for a missing or empty file. OS errors propagate, and so does
+    UnicodeDecodeError for a final row that is not valid UTF-8; the caller
+    treats both as "raised on read" and withholds (Gate A).
     """
     with open(path, "rb") as f:
         f.seek(0, os.SEEK_END)
@@ -139,13 +155,78 @@ def _parse_utc(raw: str) -> datetime | None:
     value is stamped UTC rather than local — reading it as local time would
     shift the gap by the machine's offset and silently break the guard.
     """
+    if not isinstance(raw, str):
+        # A missing or non-string timestamp is "no usable row", never a crash
+        # (an int here used to raise AttributeError out of the guard).
+        return None
     try:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except (TypeError, ValueError):
+    except ValueError:
         return None
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+class _LogScan(NamedTuple):
+    """What reading the current month's logs found. Internal to the guard."""
+    latest: datetime | None
+    present: int                 # enabled books whose log path exists
+    usable: int                  # present logs that yielded a usable final row
+    raised: tuple[str, ...]      # present logs whose read raised (OSError / bad UTF-8)
+    torn: tuple[str, ...]        # present logs whose final row is not usable
+
+
+def _scan_logs(
+    settings: dict[str, Any] | None,
+    now_utc: datetime,
+    trades_dir: Path | None = None,
+) -> _LogScan:
+    """Read every enabled book's current-month log once. Never raises.
+
+    Every present file is attempted even after one fails, so the CRITICAL can
+    name each file that needs repair rather than only the first.
+    """
+    directory = trades_dir or TRADES_DIR
+    month = now_utc.strftime("%Y-%m")
+    models = (settings or {}).get("models") or {}
+    latest: datetime | None = None
+    present = usable = 0
+    raised: list[str] = []
+    torn: list[str] = []
+    for model_key, cfg in models.items():
+        if not (cfg or {}).get("enabled"):
+            continue
+        path = directory / f"{model_key}_{month}.jsonl"
+        if not path.exists():
+            # Absent is normal: no tick has run for this book this month.
+            continue
+        present += 1
+        try:
+            line = _last_line(path)
+        except (OSError, UnicodeDecodeError) as e:
+            logger.error("Decision log %s raised on read (%s: %s)",
+                         path.name, type(e).__name__, e)
+            raised.append(str(path))
+            continue
+        if not line:
+            # Present but empty: it yields no row. Nothing to name as damaged,
+            # but it is not an answer either.
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            row = None
+        stamp = _parse_utc(row.get("timestamp")) if isinstance(row, dict) else None
+        if stamp is None:
+            logger.error("Unusable final row in %s (not a JSON object with a "
+                         "parseable timestamp)", path.name)
+            torn.append(str(path))
+            continue
+        usable += 1
+        if latest is None or stamp > latest:
+            latest = stamp
+    return _LogScan(latest, present, usable, tuple(raised), tuple(torn))
 
 
 def last_cohort_decision_utc(
@@ -154,11 +235,11 @@ def last_cohort_decision_utc(
     trades_dir: Path | None = None,
     unreadable: list[str] | None = None,
 ) -> datetime | None:
-    """Most recent decision-log timestamp across all enabled models, or None.
+    """Most recent usable decision-log timestamp across all enabled models, or None.
 
-    `unreadable`, when given, collects the name of each present log whose final
-    row does not parse. It does not change the return value. (An OSError still
-    propagates from the first file that raises, as before.)
+    `unreadable`, when given, collects every present log that raised on read or
+    whose final row is not usable. It does not change the return value. Never
+    raises (Gate A: the verdict, not an exception, carries a read failure).
 
     Only the current month's files are consulted. A month whose file is absent
     means no tick has run this month, and the previous month's last tick is at
@@ -170,34 +251,10 @@ def last_cohort_decision_utc(
     choice, because over-detecting recency costs a skipped tick while
     under-detecting costs a double-trade.
     """
-    directory = trades_dir or TRADES_DIR
-    month = now_utc.strftime("%Y-%m")
-    models = (settings or {}).get("models") or {}
-    latest: datetime | None = None
-    for model_key, cfg in models.items():
-        if not (cfg or {}).get("enabled"):
-            continue
-        path = directory / f"{model_key}_{month}.jsonl"
-        if not path.is_file():
-            continue
-        line = _last_line(path)
-        if not line:
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            # A torn final line is not a reason to halt trading; the other five
-            # models still answer the question.
-            logger.error("Unparseable final row in %s — ignoring for spacing", path.name)
-            if unreadable is not None:
-                unreadable.append(str(path))
-            continue
-        stamp = _parse_utc(row.get("timestamp"))
-        if stamp is None:
-            continue
-        if latest is None or stamp > latest:
-            latest = stamp
-    return latest
+    scan = _scan_logs(settings, now_utc, trades_dir)
+    if unreadable is not None:
+        unreadable.extend(scan.raised + scan.torn)
+    return scan.latest
 
 
 def check_spacing(
@@ -205,33 +262,42 @@ def check_spacing(
     now_utc: datetime,
     trades_dir: Path | None = None,
 ) -> SpacingVerdict:
-    """Decide whether this tick is too close to the cohort's last decision."""
+    """Decide whether this tick may run, is too close to the last decision, or
+    must be withheld because the guard cannot answer (Gate A)."""
     minimum = min_spacing_minutes(settings)
     if not is_enabled(settings):
         return SpacingVerdict(False, "disabled", None, None, minimum)
     if minimum <= 0:
         return SpacingVerdict(False, "disabled", None, None, minimum)
-    torn: list[str] = []
-    try:
-        last = last_cohort_decision_utc(settings, now_utc, trades_dir, unreadable=torn)
-    except OSError as e:
-        logger.error("Spacing guard could not read the decision logs (%s) — "
-                     "proceeding WITHOUT spacing protection", e)
-        return SpacingVerdict(False, "read_error", None, None, minimum,
-                              tuple(torn) + (str(e.filename or e),))
-    if last is None:
-        return SpacingVerdict(False, "no_prior_tick", None, None, minimum, tuple(torn))
+    scan = _scan_logs(settings, now_utc, trades_dir)
+    named = scan.raised + scan.torn
 
+    # Registered blocking condition 1: any enabled book's present log raised.
+    if scan.raised:
+        logger.error("Spacing guard could not read %d decision log(s) — "
+                     "WITHHOLDING the tick", len(scan.raised))
+        return SpacingVerdict(False, "read_error", None, None, minimum, named, True)
+    # Registered blocking condition 2: logs are present and none of them answers.
+    if scan.present and not scan.usable:
+        logger.error("No present decision log yields a usable final row "
+                     "(%d present) — WITHHOLDING the tick", scan.present)
+        return SpacingVerdict(False, "no_usable_row", None, None, minimum, named, True)
+    if scan.latest is None:
+        # Nothing present at all: the first tick of a month. Normal; proceed.
+        return SpacingVerdict(False, "no_prior_tick", None, None, minimum, named)
+
+    last = scan.latest
     gap = (now_utc - last).total_seconds() / 60.0
     if gap < 0:
-        # A future-dated last tick means clock skew or a hand-edited log. Trading
-        # is not the thing to halt over it; say so and proceed.
+        # A future-dated last tick means clock skew or a hand-edited log. The
+        # guard did read its files, so this is an answer, not an unreadable
+        # guard: say so and proceed.
         logger.error("Last decision (%s) is ahead of now (%s) — ignoring for spacing",
                      last.isoformat(), now_utc.isoformat())
-        return SpacingVerdict(False, "future_timestamp", last, gap, minimum, tuple(torn))
+        return SpacingVerdict(False, "future_timestamp", last, gap, minimum, named)
     if gap < minimum:
-        return SpacingVerdict(True, "too_soon", last, gap, minimum, tuple(torn))
-    return SpacingVerdict(False, "spaced", last, gap, minimum, tuple(torn))
+        return SpacingVerdict(True, "too_soon", last, gap, minimum, named)
+    return SpacingVerdict(False, "spaced", last, gap, minimum, named)
 
 
 def record_skip(

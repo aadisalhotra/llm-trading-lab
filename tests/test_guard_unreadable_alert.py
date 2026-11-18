@@ -1,12 +1,10 @@
-"""Duplicate-guard-unreadable CRITICAL (hub 2026-11-16): logging only.
+"""Duplicate-guard-unreadable CRITICAL (hub 2026-11-16), now under Gate A.
 
-Both guards keep their behaviour: they proceed when they cannot read. The only
-addition is the CRITICAL. Gate A (tick_admission_guards_ruling.md section 3)
-is the later change that makes them block.
-
-Proof that behaviour is unchanged: the pre-change tick_spacing.py, loaded from
-the commit this branch is based on, and the new one return the same decision
-fields on every scenario, including the unreadable ones.
+The CRITICAL landed logging-only on 2026-11-17. Gate A
+(tick_admission_guards_ruling.md section 3) then made both guards WITHHOLD on
+the registered blocking conditions. This file pins both facts against the
+pre-CRITICAL guard (BASE): every scenario Gate A does not touch returns the
+same decision fields as BASE; the ones it does touch are named and asserted.
 """
 from __future__ import annotations
 
@@ -67,7 +65,12 @@ SCENARIOS = {
 }
 
 
-@pytest.mark.parametrize("name", sorted(SCENARIOS))
+# Scenarios where a registered Gate A blocking condition holds. Every other
+# scenario must be decided exactly as before.
+GATE_A_CHANGED = {"all_torn"}
+
+
+@pytest.mark.parametrize("name", sorted(set(SCENARIOS) - GATE_A_CHANGED))
 def test_decision_fields_identical_to_the_base_commit(tmp_path, name):
     _write(tmp_path, SCENARIOS[name])
     o = OLD.check_spacing(SETTINGS, NOW, tmp_path)
@@ -82,10 +85,12 @@ def test_torn_rows_are_named_and_still_proceed(tmp_path):
     assert [Path(p).name for p in v.unreadable] == ["claude_2026-11.jsonl"]
 
 
-def test_all_torn_names_every_file_and_proceeds(tmp_path):
+def test_all_torn_names_every_file_and_withholds(tmp_path):
     _write(tmp_path, SCENARIOS["all_torn"])
+    o = OLD.check_spacing(SETTINGS, NOW, tmp_path)
+    assert (o.skip, o.reason) == (False, "no_prior_tick")      # BASE: fail open
     v = new.check_spacing(SETTINGS, NOW, tmp_path)
-    assert (v.skip, v.reason) == (False, "no_prior_tick")
+    assert (v.withhold, v.skip, v.reason) == (True, False, "no_usable_row")
     assert sorted(Path(p).name for p in v.unreadable) == [
         "claude_2026-11.jsonl", "gpt_2026-11.jsonl", "grok_2026-11.jsonl"]
 
@@ -96,7 +101,7 @@ def test_absent_is_not_unreadable(tmp_path):
     assert (v.skip, v.reason, v.unreadable) == (False, "no_prior_tick", ())
 
 
-def test_os_error_names_the_file_and_proceeds(tmp_path, monkeypatch):
+def test_os_error_names_the_file_and_withholds(tmp_path, monkeypatch):
     _write(tmp_path, SCENARIOS["all_readable_spaced"])
     real_open = open
 
@@ -106,8 +111,8 @@ def test_os_error_names_the_file_and_proceeds(tmp_path, monkeypatch):
         return real_open(path, *a, **kw)
     monkeypatch.setattr("builtins.open", guarded)
     v = new.check_spacing(SETTINGS, NOW, tmp_path)
-    assert (v.skip, v.reason) == (False, "read_error")
-    assert any(p.endswith("gpt_2026-11.jsonl") for p in v.unreadable)
+    assert (v.withhold, v.skip, v.reason) == (True, False, "read_error")
+    assert [Path(p).name for p in v.unreadable] == ["gpt_2026-11.jsonl"]
 
 
 def test_existing_verdict_constructions_still_work():
@@ -119,28 +124,31 @@ def test_existing_verdict_constructions_still_work():
 PIPE = (ROOT / "src" / "pipeline.py").read_text(encoding="utf-8")
 
 
-def test_ledger_alert_uses_the_duplicate_guard_wording_and_still_proceeds():
+def test_ledger_alert_uses_the_duplicate_guard_wording_and_withholds():
     block = PIPE[PIPE.index("_ledger, _ledger_err = load_ledger()"):PIPE.index("elif is_boundary_handled(")]
     assert '"Duplicate guard unreadable: data/state/handled_boundaries.json"' in block
-    assert "return" not in block      # the unreadable-ledger branch never exits the run
+    assert "_withhold_tick(" in block and block.rstrip().endswith("return 0")
 
 
-def test_spacing_alert_fires_per_unreadable_file_and_skip_logic_is_unchanged():
+def test_spacing_alert_fires_per_unreadable_file_and_withhold_precedes_skip():
     block = PIPE[PIPE.index("verdict = check_spacing("):PIPE.index("record_skip(verdict")]
     assert 'f"Duplicate guard unreadable: {bad}"' in block
     assert "for bad in verdict.unreadable:" in block
-    alert = block[block.index("if verdict.unreadable:"):block.index("if verdict.skip:")]
-    assert "return" not in alert and "skip" not in alert.replace("`skip`", "")
+    alert = block[block.index("if verdict.unreadable:"):block.index("if verdict.withhold:")]
+    assert "return" not in alert                 # the per-file alert never exits by itself
+    withhold = block[block.index("if verdict.withhold:"):block.index("if verdict.skip:")]
+    assert "_withhold_tick(" in withhold and "return 0" in withhold
 
 
-def test_known_defect_for_gate_a_corrupt_bytes_raise_instead_of_failing_open(tmp_path):
-    """FOUND 2026-11-17, NOT FIXED HERE (behaviour must not change in this
-    package). The docstring says the guard FAILS OPEN, but a log whose final
-    row is not valid UTF-8 raises UnicodeDecodeError (a ValueError), which
-    check_spacing does not catch: the run crashes rather than proceeding or
-    withholding. Identical before and after this package. Gate A owns the fix."""
+def test_gate_a_fixes_the_non_utf8_crash_by_withholding(tmp_path):
+    """FOUND 2026-11-17, FIXED BY GATE A. A log whose final row is not valid
+    UTF-8 raised UnicodeDecodeError out of check_spacing and crashed the run.
+    Under Gate A that is "a present log raises on read": the verdict withholds
+    cleanly, names the file, and nothing escapes."""
     _write(tmp_path, {"claude": b'{"timestamp": "\xff\xfe"}\n', "gpt": _row("2026-11-17T14:34:00"),
                       "grok": _row("2026-11-17T14:33:00")})
-    for mod in (OLD, new):
-        with pytest.raises(UnicodeDecodeError):
-            mod.check_spacing(SETTINGS, NOW, tmp_path)
+    with pytest.raises(UnicodeDecodeError):
+        OLD.check_spacing(SETTINGS, NOW, tmp_path)               # BASE: crash
+    v = new.check_spacing(SETTINGS, NOW, tmp_path)
+    assert (v.withhold, v.skip, v.reason) == (True, False, "read_error")
+    assert [Path(p).name for p in v.unreadable] == ["claude_2026-11.jsonl"]

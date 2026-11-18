@@ -21,7 +21,9 @@ re-derives level 1's per-trade check -- it only compares aggregates.
 HALT-never-repair, reused from level 1's own discipline (the monthly
 builder's conservation audit HALTS the build on a violation rather than
 adjusting a figure to make it pass): a divergence here is reported and
-halts the affected books' trading (see `handle_reconciliation_result`);
+halts EVERY venue book's trading, not only the book the divergence looks
+attributable to (see `handle_reconciliation_result`; corrected 2026-11-17 per
+tick_admission_guards_ruling.md section 5 — the handler is the behaviour);
 nothing in this module ever adjusts a book's cash or holdings to match the
 broker. Repairing by overwriting the ledger from broker state would hide
 the exact bug class this exists to catch.
