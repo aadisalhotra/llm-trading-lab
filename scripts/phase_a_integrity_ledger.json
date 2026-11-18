@@ -3757,7 +3757,8 @@
         "known_limits": {
           "force_trade": "--force-trade bypasses the spacing guard entirely (existing behaviour, ruled unchanged). The ledger guard still applies under it.",
           "stops_suspended": "A withheld tick evaluates no per-position stops (ruling §2). Every tick withholds until the named file is repaired, so time-to-repair is a risk parameter.",
-          "github_behaviour_unproven_live": "Three GitHub behaviours the fail-stop relies on are not yet observed live: an always() job running after a cancellation, GITHUB_TOKEN with actions: write disabling a workflow, and queued runs of a disabled workflow. The Thursday probe answers them."
+          "github_behaviour_unproven_live": "Three GitHub behaviours the fail-stop relies on are not yet observed live: an always() job running after a cancellation, GITHUB_TOKEN with actions: write disabling a workflow, and queued runs of a disabled workflow. The Thursday probe answers them.",
+          "eod_stop_orders": "EOD places no model trades but can submit per-position stop orders: run_one_model runs the stop sweep (executor.force_liquidate, the venue in broker modes) before its is_eod early-return, which writes no decision row. Neither duplicate guard applies in EOD mode, so EOD admission coverage is pending (hub ruling 2026-11-17, Thursday's package: both guards and (V) before the stop sweep under an EOD-specific boundary key, and an administrative decision-log record for any EOD stop order). Base rate: the read-only order-id set difference over every venue order since the 2026-11-06 cutover through the 2026-11-17 EOD (origin/main 75d643ae5) is empty: 184 book orders across 121 book-cycles, all accounted, none submitted at or after 21:00Z."
         }
       }
     ]

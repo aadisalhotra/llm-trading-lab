@@ -17,7 +17,9 @@ on:
     # 17:00 EST, at least an hour after a full-session close in either regime.
     # (It was 21:00 UTC, which in EST is 16:00 ET, the closing bell itself.)
     # The chain's own EOD dispatch, at close + 65 min, is the primary.
-    # This run does NOT execute trades.
+    # This run places no MODEL trades, but it CAN submit per-position stop
+    # orders (the stop sweep runs before run_one_model's EOD early-return).
+    # EOD admission coverage is pending (hub ruling 2026-11-17, Thursday).
     - cron: "0 22 * * 1-5"
   workflow_dispatch:
     inputs:

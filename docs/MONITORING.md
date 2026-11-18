@@ -209,12 +209,17 @@ multi-trigger redundancy) cleanly no-ops instead of double-trading. The ledger i
 committed in the same commit as the decision logs, so a boundary's marker exists
 iff its decisions were durably committed.
 
-The **EOD wrap-up is deliberately not guarded**: it executes no trades (the
-`is_eod` early-return in `run_one_model` does snapshot/report only), so it carries
-no double-trade risk and keeps its own per-day idempotency (`log_daily_snapshot`,
-the once-per-day digest) plus its intentional two-trigger redundancy (chain
-post-close handoff + the 21:00 UTC cron). Guarding it would needlessly neuter
-that redundancy.
+The **EOD wrap-up is not guarded yet.** It places no *model* trades, but it
+**can submit per-position stop orders**. `run_one_model` runs the stop sweep
+before its `is_eod` early-return, and in broker modes a triggered stop goes to
+the venue. That early-return writes no decision row. So EOD does carry
+double-trade risk. A second EOD run (the 22:00 UTC backup beside the chain
+post-close handoff) can re-run the stop sweep on a book the first run failed to
+commit. Its per-day idempotency today is `log_daily_snapshot` date-dedup, the
+once-per-day digest and `_eod_skip_reason`. **EOD admission coverage is
+pending** (hub ruling 2026-11-17, Thursday's package). That covers both guards
+and the pre-trade venue check, run before the stop sweep under an EOD-specific
+boundary key (one EOD per session).
 
 > ⚠️ **TRIPWIRE — do not remove the intraday concurrency group.** The guard is a
 > read-check-then-write and is race-free *only* because

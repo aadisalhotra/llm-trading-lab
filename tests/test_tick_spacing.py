@@ -88,7 +88,8 @@ def test_backup_run_filling_a_genuine_gap_is_not_suppressed(tmp_path):
 
 
 def test_eod_and_force_trade_bypass_the_guard_at_the_call_site():
-    """EOD executes no trades and must never be spacing-skipped; --force-trade
+    """EOD is not spacing-checked today (it places no model trades but can submit
+    per-position stop orders; EOD admission coverage is pending); --force-trade
     is the deliberate operator override. Both are call-site conditions, pinned
     here because neither is expressible in `check_spacing` itself."""
     src = (ROOT / "src" / "pipeline.py").read_text(encoding="utf-8")

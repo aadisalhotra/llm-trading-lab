@@ -4,7 +4,8 @@ These encode the dry-run the design specifies: a boundary handled once is not
 re-handled (duplicate run no-ops), a fresh boundary proceeds, and a corrupt
 ledger surfaces its read error, on which the pipeline WITHHOLDS the tick (Gate A,
 tick_admission_guards_ruling.md section 3). The guard is
-intraday-only; EOD is not keyed here (it executes no trades).
+intraday-only; EOD is not keyed here yet (EOD places no model trades but can
+submit per-position stop orders; EOD admission coverage is pending, Thursday).
 Run with: python -m pytest tests/test_boundary_ledger.py
 """
 from __future__ import annotations

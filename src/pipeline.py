@@ -727,10 +727,17 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # the same boundary. Checked BEFORE the data fetch and the model loop, so a
     # duplicate exits having done nothing.
     #
-    # EOD is not guarded HERE: it places no model trades (run_one_model's is_eod
-    # early-return is snapshot/report only), and its per-day idempotency is
-    # _eod_skip_reason above, which runs ahead of the first book load, plus its
-    # deliberate two-trigger redundancy (chain handoff + 22:00 UTC cron).
+    # EOD is not guarded HERE. It places no MODEL trades, but it CAN submit
+    # per-position stop orders: run_one_model runs the stop sweep
+    # (_position_stop_sweep -> executor.force_liquidate -> the venue in broker
+    # modes) BEFORE its is_eod early-return, and that return writes no decision
+    # row. Its per-day idempotency today is _eod_skip_reason above, which runs
+    # ahead of the first book load, plus its deliberate two-trigger redundancy
+    # (chain handoff + 22:00 UTC cron) — neither of which stops a second EOD run
+    # from re-running the stop sweep on a book the first run failed to commit.
+    # EOD admission coverage (both guards and (V) before the stop sweep, an
+    # EOD-specific boundary key) is PENDING: hub ruling 2026-11-17, Thursday's
+    # package.
     #
     # RACE-FREEDOM DEPENDS ON THE intraday-pipeline CONCURRENCY GROUP in
     # .github/workflows/intraday.yml (cancel-in-progress: false): it serializes
