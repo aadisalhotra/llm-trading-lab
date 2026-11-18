@@ -57,6 +57,9 @@ def _order(coid):
     return {"id": "x", "client_order_id": coid, "submitted_at": JOB_START.isoformat()}
 
 
+NOW = JOB_START + timedelta(minutes=20)
+
+
 def _decide(jobs, orders, mode="broker_paper"):
     seen = {}
 
@@ -71,7 +74,8 @@ def _decide(jobs, orders, mode="broker_paper"):
             raise jobs
         return jobs
     out = fs.decide(mode=mode, broker_modes=BROKER_MODES, jobs_payload_fn=jobs_fn,
-                    orders_fn=orders_fn, book_keys=BOOKS, probe_prefix=PROBE_BOOK_PREFIX)
+                    orders_fn=orders_fn, book_keys=BOOKS, probe_prefix=PROBE_BOOK_PREFIX,
+                    now_fn=lambda: NOW)
     return out, seen
 
 
@@ -98,9 +102,7 @@ def test_ix_failed_run_with_no_order_does_not_disable():
 
 @pytest.mark.parametrize("label,jobs,orders", [
     ("venue unreachable", _jobs(), ConnectionError("venue down")),
-    ("jobs API unreachable", ConnectionError("api down"), []),
-    ("no run job in payload", _jobs(job_name="something-else"), []),
-    ("malformed jobs payload", {"nope": 1}, []),
+    ("jobs API AND venue unreachable", ConnectionError("api down"), ConnectionError("venue down")),
     ("venue listing not a list", _jobs(), {"message": "forbidden"}),
 ])
 def test_ix_undeterminable_disables(label, jobs, orders):
@@ -115,12 +117,77 @@ def test_ix_undeterminable_disables(label, jobs, orders):
     assert out["reason"].startswith("undetermined")
 
 
-# ------------------------------------------------------------ attribution
+# ------------------------- the GitHub check before the venue (ruling 2026-11-17)
+# "clear" without the venue ONLY when the jobs and steps positively show that
+# "Run pipeline" never started; every other shape falls through to the venue.
 
-def test_pipeline_step_never_started_is_clear_without_asking_the_venue():
-    """A cancelled pending run: no pipeline process ever existed."""
-    out, seen = _decide(_jobs("skipped", step_started=False), ConnectionError("not asked"))
-    assert out["verdict"] == "clear" and "after" not in seen
+def _payload(step_fields=None, *, job_count=1, step_count=1, drop_steps=False,
+             job_started=None):
+    step = {"name": "Run pipeline", **(step_fields or {})}
+    job = {"name": "run", "started_at": job_started,
+           "steps": [{"name": "Checkout", "status": "completed", "conclusion": "success",
+                      "started_at": JOB_START.isoformat()}] + [dict(step) for _ in range(step_count)]}
+    if drop_steps:
+        del job["steps"]
+    return {"jobs": [dict(job) for _ in range(job_count)]}
+
+
+@pytest.mark.parametrize("label,fields", [
+    ("skipped", {"status": "completed", "conclusion": "skipped", "started_at": None}),
+    ("pending", {"status": "pending", "conclusion": None, "started_at": None}),
+    ("queued", {"status": "queued", "conclusion": None, "started_at": None}),
+    ("cancelled before start", {"status": "completed", "conclusion": "cancelled", "started_at": None}),
+])
+def test_positive_never_started_is_clear_without_asking_the_venue(label, fields):
+    out, seen = _decide(_payload(fields), ConnectionError("must not be asked"))
+    assert out["verdict"] == "clear", label
+    assert "after" not in seen
+
+
+FALL_THROUGH = [
+    ("jobs API error", ConnectionError("api down")),
+    ("payload without a job list", {"nope": 1}),
+    ("payload not an object", ["jobs"]),
+    ("no run job", _payload({"status": "pending", "started_at": None}, job_count=0)),
+    ("two run jobs", _payload({"status": "pending", "started_at": None}, job_count=2)),
+    ("run job without steps", _payload(drop_steps=True)),
+    ("no Run pipeline step", _payload({"status": "pending", "started_at": None}, step_count=0)),
+    ("two Run pipeline steps", _payload({"status": "pending", "started_at": None}, step_count=2)),
+    ("started_at field missing", _payload({"status": "completed", "conclusion": "skipped"})),
+    ("null start but failed", _payload({"status": "completed", "conclusion": "failure", "started_at": None})),
+    ("null start but succeeded", _payload({"status": "completed", "conclusion": "success", "started_at": None})),
+    ("null start but in progress", _payload({"status": "in_progress", "conclusion": None, "started_at": None})),
+    ("null start, no status", _payload({"started_at": None})),
+    ("step started", _jobs("cancelled")),
+]
+
+
+@pytest.mark.parametrize("label,jobs", FALL_THROUGH)
+def test_any_doubt_falls_through_to_the_venue_and_an_order_disables(label, jobs):
+    out, seen = _decide(jobs, [_order(ORDER)])
+    assert "after" in seen, label                         # the venue WAS asked
+    assert out["verdict"] == "disable" and out["this_run_orders"] == [ORDER]
+
+
+@pytest.mark.parametrize("label,jobs", FALL_THROUGH)
+def test_any_doubt_falls_through_to_the_venue_and_no_order_is_clear(label, jobs):
+    out, seen = _decide(jobs, [])
+    assert "after" in seen, label
+    assert out["verdict"] == "clear"
+
+
+def test_without_a_start_time_the_venue_window_is_the_lookback():
+    out, seen = _decide(ConnectionError("api down"), [])
+    assert seen["after"] == NOW - fs.LOOKBACK - fs.SKEW_MARGIN
+    assert out["window_basis"].startswith("lookback")
+
+
+def test_with_a_start_time_the_venue_window_opens_at_the_run_job():
+    out, seen = _decide(_jobs("failure"), [])
+    assert seen["after"] == JOB_START - fs.SKEW_MARGIN and out["window_basis"] == "run job start"
+
+
+# ------------------------------------------------------------ attribution
 
 
 def test_probe_orders_are_not_this_runs():

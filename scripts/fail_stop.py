@@ -16,12 +16,21 @@ after it disables unless the verdict is exactly `clear` — so a crash here, a
 missing dependency, a timeout or a typo all disable. Fail-closed by
 construction, not by this file's error handling alone.
 
-How the run's window is found. The GitHub Actions jobs API reports when this
-run's `run` job started and whether its "Run pipeline" step ever started. If
-that step never started, no pipeline process existed and no order was
-possible: `clear`. (That is an independent witness, not the dead runner.)
-Otherwise the window opens at the `run` job's start, less a skew margin, and
-the venue is asked for every order submitted after it.
+The GitHub check before the venue (hub ruling 2026-11-17). The Actions jobs
+API may answer "clear" WITHOUT the venue only when the run's jobs and steps
+POSITIVELY show that the "Run pipeline" step never started: exactly one `run`
+job, exactly one such step, its `started_at` present and null, and its state
+one of pending / queued / waiting / requested, or completed as skipped or
+cancelled. Anything else — an API error, a missing field, more than one
+match, a null start beside a state that implies it ran — is not an answer,
+and the venue is asked.
+
+The venue window opens at the `run` job's start (or the pipeline step's) less
+a skew margin. When the jobs API cannot give either, it opens LOOKBACK before
+now — longer than GitHub's maximum job time — so every order the run could
+have placed is inside it. That wide window also holds earlier ticks' orders,
+which then count against this run: under ambiguity the outcome on a trading
+day is a disable, which is the safe side.
 
 How an order is attributed. Every pipeline order id is
 `{book}-{cycle_id}-{seq:02d}-a{attempt}` with `cycle_id` the run's UTC start
@@ -62,6 +71,12 @@ PIPELINE_STEP_NAME = "Run pipeline"
 # never fewer. The previous run in the group finished its pipeline step long
 # before this job started (its commit, push and chain jobs run in between).
 SKEW_MARGIN = timedelta(minutes=2)
+# Venue window when the jobs API cannot date the run: past GitHub's maximum
+# job execution time (6 h), plus an hour of queueing.
+LOOKBACK = timedelta(hours=7)
+# The only step states that positively mean "never started".
+NEVER_STARTED_STATUSES = frozenset({"pending", "queued", "waiting", "requested"})
+NEVER_STARTED_CONCLUSIONS = frozenset({"skipped", "cancelled"})
 ORDER_PAGE_LIMIT = 500
 MAX_ORDER_PAGES = 20
 CYCLE_ID_FORMAT = "%Y%m%dT%H%M%SZ"
@@ -83,30 +98,50 @@ def _parse_iso(raw: Any) -> datetime | None:
 
 # ------------------------------------------------------------------ pure logic
 
-def pipeline_window(jobs_payload: dict[str, Any]) -> tuple[bool, datetime | None, str]:
-    """From the jobs API payload: (pipeline_started, window_start, detail).
-
-    Raises Undetermined when the payload cannot answer the question.
-    """
+def _run_job_and_step(jobs_payload: Any) -> tuple[dict | None, dict | None, str]:
+    """The single `run` job and its single "Run pipeline" step, or why not."""
     jobs = jobs_payload.get("jobs") if isinstance(jobs_payload, dict) else None
     if not isinstance(jobs, list):
-        raise Undetermined("jobs API payload has no job list")
+        return None, None, "jobs API payload has no job list"
     runs = [j for j in jobs if isinstance(j, dict) and j.get("name") == RUN_JOB_NAME]
-    if not runs:
-        # If this job exists, the run's jobs were instantiated; a missing `run`
-        # job is not an answer.
-        raise Undetermined(f"no job named {RUN_JOB_NAME!r} in this run")
-    job = runs[-1]
+    if len(runs) != 1:
+        return None, None, f"{len(runs)} jobs named {RUN_JOB_NAME!r}"
+    job = runs[0]
     steps = job.get("steps")
     if not isinstance(steps, list):
-        raise Undetermined("run job has no step list")
-    step = next((s for s in steps if isinstance(s, dict) and s.get("name") == PIPELINE_STEP_NAME), None)
-    if step is None or step.get("conclusion") == "skipped" or not step.get("started_at"):
-        return False, None, f"step {PIPELINE_STEP_NAME!r} never started"
-    start = _parse_iso(job.get("started_at")) or _parse_iso(step.get("started_at"))
-    if start is None:
-        raise Undetermined("pipeline step started but no parseable start time")
-    return True, start, f"pipeline step started; run job started {start.isoformat()}"
+        return job, None, "run job has no step list"
+    matches = [s for s in steps if isinstance(s, dict) and s.get("name") == PIPELINE_STEP_NAME]
+    if len(matches) != 1:
+        return job, None, f"{len(matches)} steps named {PIPELINE_STEP_NAME!r}"
+    return job, matches[0], "found"
+
+
+def pipeline_never_started(jobs_payload: Any) -> tuple[bool, str]:
+    """True ONLY when the payload positively shows the pipeline step never
+    started. Never raises; every doubt returns False (ask the venue)."""
+    _job, step, why = _run_job_and_step(jobs_payload)
+    if step is None:
+        return False, why
+    if "started_at" not in step:
+        return False, "pipeline step has no started_at field"
+    if step["started_at"] is not None:
+        return False, "pipeline step has a start time"
+    status, conclusion = step.get("status"), step.get("conclusion")
+    if status in NEVER_STARTED_STATUSES:
+        return True, f"pipeline step {status}, never started"
+    if status == "completed" and conclusion in NEVER_STARTED_CONCLUSIONS:
+        return True, f"pipeline step {conclusion} before it started"
+    return False, f"ambiguous: no start time but status={status!r} conclusion={conclusion!r}"
+
+
+def window_start_from(jobs_payload: Any) -> datetime | None:
+    """The run job's start (or the pipeline step's), if the payload has one."""
+    job, step, _ = _run_job_and_step(jobs_payload)
+    for source in (job, step):
+        start = _parse_iso((source or {}).get("started_at"))
+        if start is not None:
+            return start
+    return None
 
 
 def _cycle_of(client_order_id: str) -> datetime | None:
@@ -160,6 +195,7 @@ def decide(
     orders_fn: Callable[[datetime], list[dict[str, Any]]],
     book_keys: Iterable[str],
     probe_prefix: str,
+    now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> dict[str, Any]:
     """The verdict. Never raises: anything undetermined is `disable`."""
     out: dict[str, Any] = {"mode": mode, "this_run_orders": [], "unattributable_orders": []}
@@ -167,13 +203,23 @@ def decide(
         if mode not in set(broker_modes):
             out.update(verdict=VERDICT_CLEAR, reason=f"mode {mode!r} reaches no venue")
             return out
-        started, window_start, detail = pipeline_window(jobs_payload_fn())
-        out["window_detail"] = detail
-        if not started:
+        # The GitHub check. Its failure is not an answer: fall through.
+        try:
+            payload: Any = jobs_payload_fn()
+        except Exception as e:  # noqa: BLE001 — an API error falls through to the venue
+            payload = None
+            out["jobs_api_error"] = f"{type(e).__name__}: {e}"
+        never, detail = pipeline_never_started(payload)
+        out["github_check"] = detail
+        if never:
             out.update(verdict=VERDICT_CLEAR, reason="the pipeline never started: no order possible")
             return out
+        window_start = window_start_from(payload)
         if window_start is None:
-            raise Undetermined("pipeline started but no window start")
+            window_start = now_fn() - LOOKBACK
+            out["window_basis"] = "lookback (jobs API gave no start time)"
+        else:
+            out["window_basis"] = "run job start"
         out["window_start"] = window_start.isoformat()
         orders = orders_fn(window_start - SKEW_MARGIN)
         out["orders_in_window"] = len(orders)
