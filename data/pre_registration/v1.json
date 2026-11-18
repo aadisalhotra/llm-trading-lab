@@ -24,7 +24,7 @@
       {"key": "gpt", "display_name": "GPT-5.4", "provider": "openai", "cohort": "core"},
       {"key": "gemini", "display_name": "Gemini 3.1 Pro", "provider": "google", "cohort": "core"},
       {"key": "grok", "display_name": "Grok 4.20 (Reasoning)", "provider": "xai", "cohort": "core"},
-      {"key": "deepseek", "display_name": "DeepSeek Reasoner", "provider": "deepseek", "cohort": "core"},
+      {"key": "deepseek", "display_name": "DeepSeek v4-pro", "provider": "deepseek", "cohort": "core"},
       {"key": "claude_opus", "display_name": "Claude Opus 4.6", "provider": "anthropic", "cohort": "expansion"}
     ],
     "benchmark": "SPY buy-and-hold",
@@ -91,7 +91,7 @@
         "null": "P(profitable | confidence=k) is flat in k; ECE no better than a non-informative baseline.",
         "alternative": "P(profitable | confidence=k) increases in k (confidence is informative)."
       },
-      "operationalization": "Closed trades only. A position is closed ONLY on full exit (residual shares < 0.01); partial trims never close it; re-entry after exit is an independent trade. Outcome = realized P&L > 0 over the full life. Entry confidence = share-weighted average of buy-leg confidences, rounded to nearest integer 1-10.",
+      "operationalization": "Closed trades only. A position is closed ONLY on full exit (residual notional < $1.00 at that fill's price; the behavioural-position floor, docs/registrations/ghost_position_ruling.md section 5; Phase A pilot figures published before that ruling's output-version recomputation used a 0.01-share constant); partial trims never close it; re-entry after exit is an independent trade. Outcome = realized P&L > 0 over the full life. Entry confidence = share-weighted average of buy-leg confidences, rounded to nearest integer 1-10.",
       "metric_definition": "Calibration curve P(profitable | confidence=k) for k=1..10. Brier = mean((p_hat - outcome)^2), p_hat = confidence/10. ECE = sum_k (n_k/N)*|acc_k - k/10|, bins = integer confidence. Headline statistic = point-biserial correlation between entry confidence and profitable outcome.",
       "prediction": "Directionally informative but overconfident: confidence/outcome correlation in ~[+0.05, +0.20], ECE materially above 0.",
       "decision_rule": "Per model with >=20 closed trades (locked minimum): Resolved-calibrated if BCa 90% CI for confidence/outcome correlation excludes 0 and is positive (live data). <20 closed trades stays Open. Pooled correlation enters the FDR family.",
@@ -170,18 +170,18 @@
       "inference": "Per-model Delta_m with BCa bootstrap CI, resampling contexts, B = 10000. No hypothesis is tested.",
       "decision_rule": "Report Delta_m and CI per model with deployed configuration; interpret as a comparison of deployed agents, not intrinsic model stochasticity; use Delta_m to qualify RQ1-RQ5 reproducibility. No NHST.",
       "in_fdr_family": false,
-      "parameters": { "K": null, "M": null, "B": 10000 },
+      "parameters": { "K": 10, "M": 30, "B": 10000 },
       "notes": "K, M pinned before OSF deposit; recommended K >= 10, M >= 30.",
       "per_model_api_configuration": {
-        "note": "Canonical deployed-configuration record, reproduced inline so RQ6 is self-contained. [VERIFY] = filled by the per-model API-config verification (a hard pre-deposit dependency of RQ6); [PIN] = dated immutable snapshot ID resolved before the deposit (Claude rows use the dateless 4.6-generation canonical snapshot, no [PIN] needed).",
-        "columns": ["model", "provider", "pinned_snapshot_id", "thinking_reasoning_mode", "reasoning_effort_provider_standard", "temperature_behavior", "temperature_value_used"],
+        "note": "Regenerated from the canonical Per-Model API Configuration table in the RQ6 entry of docs/PRE_REGISTRATION.md. Pin class: D = dated immutable snapshot id; C = the provider's canonical undated id, the most specific callable identifier, with no dated snapshot id confirmed beneath it; P = preview alias. All six identifiers are the ids sent and echoed on every November record (ledger cohort_as_run_2026_10_26). Cells in the four configuration columns are filled by the per-model API-configuration verification (a hard pre-deposit dependency of RQ6); DeepSeek's row is verified.",
+        "columns": ["model", "provider", "pinned_identifier_class", "thinking_reasoning_mode", "reasoning_effort_provider_standard", "temperature_behavior", "temperature_value_used"],
         "rows": [
-          ["Claude Sonnet 4.6", "Anthropic", "claude-sonnet-4-6 (dateless canonical snapshot)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
-          ["Claude Opus 4.6", "Anthropic", "claude-opus-4-6 (dateless canonical snapshot)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
-          ["GPT-5.4", "OpenAI", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
-          ["Gemini 3.1 Pro", "Google", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
-          ["Grok 4.20 Reasoning", "xAI", "[PIN]", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
-          ["DeepSeek v4-pro", "DeepSeek", "[PIN]", "Enabled", "high", "Silently ignored (inoperative in thinking mode)", "n/a (inoperative)"]
+          ["Claude Sonnet 4.6", "Anthropic", "claude-sonnet-4-6 (C)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Claude Opus 4.6", "Anthropic", "claude-opus-4-6 (C)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["GPT-5.4", "OpenAI", "gpt-5.4-2026-03-05 (D; config/settings.json models.gpt.model)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Gemini 3.1 Pro", "Google", "gemini-3.1-pro-preview (P)", "[VERIFY]", "[VERIFY]", "[VERIFY]", "[VERIFY]"],
+          ["Grok 4.20 Reasoning", "xAI", "grok-4.20-0309-reasoning (D; config/settings.json models.grok.model)", "[VERIFY]", "Not established from primary sources: xAI documents reasoning_effort for Grok 4.5-4.7 only, and the default for grok-4.20-0309-reasoning is undocumented. The pipeline sends none; reasoning tokens are present on every successful November record (151 of 151 through 2026-11-17), so reasoning is on at an undocumented provider-default level.", "[VERIFY]", "[VERIFY]"],
+          ["DeepSeek v4-pro", "DeepSeek", "deepseek-v4-pro (C)", "Enabled", "high", "Silently ignored (inoperative in thinking mode)", "n/a (inoperative)"]
         ]
       }
     }
@@ -228,7 +228,7 @@
       "interpretation": "RQ1 convergence is read relative to (1 - within-model run-to-run divergence), never against a naive 100%."
     },
     "locked_definitions": {
-      "closed_trade": "Closed only on full exit (residual shares < 0.01). Partial trims never close a position; re-entry after exit is an independent trade.",
+      "closed_trade": "Closed only on full exit (residual notional < $1.00 at the closing fill's price; docs/registrations/ghost_position_ruling.md section 5). Partial trims never close a position; re-entry after exit is an independent trade.",
       "portfolio_drawdown": "EOD portfolio value >= 10% below trailing 60-day peak. Distinct from the SPY drawdown regime (5% off a 60-day peak).",
       "confidence_to_probability": "Predicted win probability p_hat = stated confidence / 10.",
       "decision_unit": "A model's raw_decisions entry per (tick, ticker): {action in BUY/SELL/HOLD, target_weight in [0,1], confidence in 1-10}.",
