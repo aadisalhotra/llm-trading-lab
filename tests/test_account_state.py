@@ -1,13 +1,16 @@
 """ACCOUNT_STATE failure class (rossi_review_rulings.md section 2.4, rev. 2).
 
   * the classifier keys on the error TEXT, per provider, from a closed set;
-  * the verbatim stored forms classify, and the near misses do not (xAI's 429
-    at capacity, Google's 429 quota-exceeded, other providers);
+  * the verbatim stored forms classify with their registered reason (billing
+    or quota), and the near misses do not (xAI's 429 at capacity, xAI's
+    permission-denied code without the credits body, a Google per-minute limit,
+    the Google 403 HTML page);
   * the class changes attribution only: the adapter's return is the same shape
     for ACCOUNT_STATE as for API_ERROR;
   * any occurrence raises an immediate CRITICAL naming the book and provider;
   * nothing in control flow reads the class (grep-proved below);
-  * the retro annotation holds exactly the 20 Aug-Sep records, verbatim.
+  * the retro annotation holds every closed-set match from April on, verbatim
+    (84 rows since the 2026-11-19 sync: +1 Anthropic credit, +44 Google quota).
 
 No network: every transport is a fake.
 """
@@ -29,7 +32,10 @@ from src.adapters.base import (
     ACCOUNT_STATE_PATTERNS,
     ERROR_CLASS_ACCOUNT_STATE,
     ERROR_CLASS_API_ERROR,
+    REASON_BILLING,
+    REASON_QUOTA,
     BaseAdapter,
+    account_state_reason,
     is_account_state,
 )
 from src.adapters.deepseek_adapter import DeepSeekAdapter
@@ -61,31 +67,50 @@ GOOGLE_429_PREPAY = ("data/trades/gemini_2026-08.jsonl", 66)
 XAI_429_CAPACITY = ("data/trades/grok_2026-09.jsonl", 264)
 GOOGLE_429_QUOTA = ("data/trades/gemini_2026-04.jsonl", 77)
 ANTHROPIC_CREDIT = ("data/trades/claude_opus_2026-04.jsonl", 1)
+GOOGLE_403_HTML = ("data/trades/gemini_2026-10.jsonl", 102)
 
 
 # ------------------------------------------------------------------ the set
-def test_closed_set_is_exactly_the_three_registered_forms():
-    assert set(ACCOUNT_STATE_PATTERNS) == {"deepseek", "xai", "google"}
-    assert all(len(v) == 1 for v in ACCOUNT_STATE_PATTERNS.values())
+def test_closed_set_is_exactly_the_five_registered_forms():
+    """rossi_review_rulings.md section 2.4 "Registered forms (closed set)"."""
+    assert {k: len(v) for k, v in ACCOUNT_STATE_PATTERNS.items()} == {
+        "deepseek": 1, "xai": 1, "google": 2, "anthropic": 1}
 
 
-@pytest.mark.parametrize("provider,src", [
-    ("deepseek", DEEPSEEK_AUG),
-    ("deepseek", DEEPSEEK_NOV),
-    ("xai", XAI_403),
-    ("google", GOOGLE_429_PREPAY),
+@pytest.mark.parametrize("provider,src,reason", [
+    ("deepseek", DEEPSEEK_AUG, REASON_BILLING),
+    ("deepseek", DEEPSEEK_NOV, REASON_BILLING),
+    ("xai", XAI_403, REASON_BILLING),
+    ("google", GOOGLE_429_PREPAY, REASON_BILLING),
+    ("anthropic", ANTHROPIC_CREDIT, REASON_BILLING),
+    ("google", GOOGLE_429_QUOTA, REASON_QUOTA),
 ])
-def test_verbatim_stored_forms_classify(provider, src):
+def test_verbatim_stored_forms_classify(provider, src, reason):
     assert is_account_state(provider, _stored(*src))
+    assert account_state_reason(provider, _stored(*src)) == reason
 
 
 @pytest.mark.parametrize("provider,src,why", [
     ("xai", XAI_429_CAPACITY, "429 at capacity is provider availability"),
-    ("google", GOOGLE_429_QUOTA, "quota-exceeded is not a registered form"),
-    ("anthropic", ANTHROPIC_CREDIT, "Anthropic has no registered form"),
+    ("google", GOOGLE_403_HTML, "a generic HTML 403 identifies nothing about the account"),
 ])
 def test_near_misses_do_not_classify(provider, src, why):
     assert not is_account_state(provider, _stored(*src)), why
+
+
+def test_google_per_minute_quota_is_not_account_state():
+    """The line is the quota PERIOD: a per-minute limit is provider-side
+    pacing and stays API_ERROR; only a per-day allowance is account state."""
+    per_day = _stored(*GOOGLE_429_QUOTA)
+    assert "_per_day" in per_day
+    assert not is_account_state("google", per_day.replace("per_model_per_day", "per_model_per_minute"))
+
+
+def test_xai_matches_the_credits_body_not_the_permission_code():
+    """Section 2.4 correction: the 403 is billing because of its body; a
+    permission-denied code on any other body is not this class."""
+    assert not is_account_state("xai", 'xAI API 403: {"code":"permission-denied","error":"region"}')
+    assert is_account_state("xai", _stored(*XAI_403))
 
 
 def test_a_form_only_matches_its_own_provider():
@@ -152,11 +177,13 @@ class _Google(BaseAdapter):
         raise self._exc
 
 
-def test_google_prepay_429_is_account_state_and_quota_429_is_not():
-    assert _Google(RuntimeError(_stored(*GOOGLE_429_PREPAY))).generate_decision("s", "u").error_class \
-        == ERROR_CLASS_ACCOUNT_STATE
-    assert _Google(RuntimeError(_stored(*GOOGLE_429_QUOTA))).generate_decision("s", "u").error_class \
-        == ERROR_CLASS_API_ERROR
+def test_google_prepay_and_per_day_quota_are_account_state_with_their_reasons():
+    a = _Google(RuntimeError(_stored(*GOOGLE_429_PREPAY))).generate_decision("s", "u")
+    b = _Google(RuntimeError(_stored(*GOOGLE_429_QUOTA))).generate_decision("s", "u")
+    assert (a.error_class, a.error_reason) == (ERROR_CLASS_ACCOUNT_STATE, REASON_BILLING)
+    assert (b.error_class, b.error_reason) == (ERROR_CLASS_ACCOUNT_STATE, REASON_QUOTA)
+    c = _Google(RuntimeError("500 INTERNAL")).generate_decision("s", "u")
+    assert (c.error_class, c.error_reason) == (ERROR_CLASS_API_ERROR, None)
 
 
 def test_class_changes_attribution_never_the_result_shape():
@@ -173,8 +200,9 @@ class _Sent(list):
         self.append((a, kw))
 
 
-def _result(cls, provider="deepseek", error="DeepSeek API 402: ..."):
-    return SimpleNamespace(error_class=cls, provider=provider, error=error, success=False)
+def _result(cls, provider="deepseek", error="DeepSeek API 402: ...", reason="billing"):
+    return SimpleNamespace(error_class=cls, provider=provider, error=error, success=False,
+                           error_reason=reason)
 
 
 def test_account_state_raises_a_critical_naming_book_and_provider():
@@ -187,7 +215,18 @@ def test_account_state_raises_a_critical_naming_book_and_provider():
     assert kw["dedup_key"] == "account_state:deepseek:20261103T173900Z"
 
 
-@pytest.mark.parametrize("provider,name", [("xai", "xAI"), ("google", "Google (Gemini)")])
+@pytest.mark.parametrize("reason", [REASON_BILLING, REASON_QUOTA])
+def test_the_critical_names_the_reason(reason):
+    sent = _Sent()
+    alert_if_account_state("gemini", _result(ERROR_CLASS_ACCOUNT_STATE, "google", reason=reason),
+                           "c", sent)
+    (args, kw), = sent
+    assert f"({reason})" in args[1] and f"Reason: {reason}" in args[2]
+    assert args[3]["reason"] == reason
+
+
+@pytest.mark.parametrize("provider,name", [("xai", "xAI"), ("google", "Google (Gemini)"),
+                                           ("anthropic", "Anthropic")])
 def test_alert_names_each_provider(provider, name):
     sent = _Sent()
     alert_if_account_state("grok", _result(ERROR_CLASS_ACCOUNT_STATE, provider), "c", sent)
@@ -232,6 +271,19 @@ def test_grep_proof_only_three_sites_touch_the_class():
                for h in record), record
 
 
+def test_grep_proof_only_three_sites_touch_the_reason():
+    """The reason field (2026-11-19) has the class's readers and no others:
+    base.py sets it, decision_log.py records it, account_state.py names it."""
+    hits = subprocess.run(
+        ["git", "-C", str(ROOT), "grep", "--untracked", "-n", "-E", r"error_reason", "--", "src/"],
+        capture_output=True, text=True).stdout.splitlines()
+    assert {h.split(":", 1)[0] for h in hits} == {
+        "src/adapters/base.py", "src/logging/decision_log.py", "src/alerts/account_state.py"}
+    record = [h for h in hits if h.startswith("src/logging/decision_log.py")]
+    assert all("getattr(decision_result, \"error_reason\", None)" in h
+               or h.split(":", 2)[2].lstrip().startswith("#") for h in record), record
+
+
 # --------------------------------------------------------- retro annotation
 def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
     """Complete, not scoped to one window (hub 2026-11-17): every decision
@@ -240,7 +292,12 @@ def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
     from collections import Counter
     assert Counter((r["date"][:7], r["model_key"]) for r in rows) == {
         ("2026-08", "grok"): 13, ("2026-08", "deepseek"): 6, ("2026-08", "gemini"): 1,
-        ("2026-11", "deepseek"): 19}
+        ("2026-11", "deepseek"): 19,
+        # 2026-11-19 sync: section 2.4's Google per-day quota (44) and the
+        # Anthropic credit record (1; model_key "claude", the pre-split key).
+        ("2026-04", "gemini"): 14, ("2026-05", "gemini"): 30, ("2026-04", "claude"): 1}
+    assert Counter(r.get("api_error_reason") for r in rows) == {
+        None: 39, REASON_QUOTA: 44, REASON_BILLING: 1}
     for r in rows:
         assert r["api_error_class"] == ERROR_CLASS_ACCOUNT_STATE
         assert r["classification_basis"] == "classified retroactively from stored error text"
@@ -250,6 +307,8 @@ def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
         assert hashlib.sha256(raw).hexdigest() == r["source_line_sha256"]
         assert json.loads(raw)["api_error"] == r["api_error_verbatim"]
         assert is_account_state(r["provider"], r["api_error_verbatim"])
+        if "api_error_reason" in r:
+            assert r["api_error_reason"] == account_state_reason(r["provider"], r["api_error_verbatim"])
         # the 2026-11-03 wording change is noted on exactly the rows that carry it
         assert ("wording_note" in r) == ("(request_id:" in r["api_error_verbatim"])
 

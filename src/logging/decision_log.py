@@ -115,6 +115,10 @@ def log_decision_run(
         # visible only in api_error text (api_call_timeout.md section 3). Absent
         # key = a record from before this package, not "no error".
         "api_error_class": getattr(decision_result, "error_class", None),
+        # billing / quota beside an ACCOUNT_STATE class (rossi_review_rulings.md
+        # section 2.4, reason field); null otherwise. Absent key = a record from
+        # before 2026-11-19, not "no reason".
+        "api_error_reason": getattr(decision_result, "error_reason", None),
         "api_latency_seconds": decision_result.latency_seconds,
         # Which call attempt produced the parsed decision. Every adapter
         # inherits the BaseAdapter retry loop: 1 on first-try success,

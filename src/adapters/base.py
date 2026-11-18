@@ -56,42 +56,75 @@ API_CALL_TIMEOUT_SECONDS = 300
 ERROR_CLASS_TIMEOUT = "TIMEOUT"              # client-side deadline hit in _call_api
 ERROR_CLASS_API_ERROR = "API_ERROR"          # any other exception from _call_api
 ERROR_CLASS_PARSE_FAILURE = "PARSE_FAILURE"  # response unparseable after the retry
-# The lab's own account standing at the provider (exhausted balance or credits,
-# team access): docs/registrations/rossi_review_rulings.md section 2.4. Keyed on
-# the error TEXT, never the status code: xAI's 429 "at capacity" is provider
-# availability (API_ERROR); Google's 429 "prepayment credits depleted" is ours.
+# The lab's own account standing at the provider (an exhausted balance, credit
+# or spending limit, or an exhausted per-day quota):
+# docs/registrations/rossi_review_rulings.md section 2.4. Keyed on the error
+# TEXT, never the status code: xAI's 429 "at capacity" is provider availability
+# (API_ERROR); Google's 429 "prepayment credits depleted" is ours.
 ERROR_CLASS_ACCOUNT_STATE = "ACCOUNT_STATE"
 
-# CLOSED SET, extended only by registration (section 2.4: "provider-specific
-# strings, a closed set extended only by registration"). One pattern per
-# observed form, each anchored on the provider's own wording as stored in
-# `api_error` (verbatim forms from 2026-08-10 / 08-28 / 08-31):
-#   deepseek  'DeepSeek API 402: {"error":{"message":"Insufficient Balance",...' (Aug)
-#             'DeepSeek API 402: {"error":{"message":"Insufficient Balance (request_id: ...)",...' (Nov)
-#   xai       'xAI API 403: {"code":"permission-denied","error":"Your team ... has
-#              either used all available credits or reached its monthly spending limit...'
-#   google    "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your
-#              prepayment credits are depleted. ..."
-# Matching is case-sensitive on purpose: these are machine strings, and a looser
-# match is how a different class gets absorbed (api_call_timeout.md section 3).
+# The reason, registered with the class (section 2.4): the class says whose
+# side the failure is on, the reason says what to fix.
+REASON_BILLING = "billing"
+REASON_QUOTA = "quota"
+
+# CLOSED SET, extended only by registration (section 2.4 "Registered forms").
+# Each form is a STABLE SUBSTRING of the stored error, not the whole message,
+# because providers reword around it, plus the status that carries it:
+#   deepseek  402  'Insufficient Balance'                                   billing
+#             (since 2026-11-03 with "(request_id: ...)" inside the message)
+#   xai       403  'used all available credits or reached its monthly
+#                   spending limit' -- matched on the body, NOT the
+#                   'permission-denied' code (section 2.4 correction)      billing
+#   google    429  'prepayment credits are depleted'                        billing
+#   anthropic 400  'credit balance is too low'                              billing
+#   google    429  'Quota exceeded for metric' naming a PER-DAY metric
+#                  (generate_requests_per_model_per_day)                    quota
+# Not registered, and so never matched: xAI 429 "at capacity" (provider
+# availability), Google 429 per-minute limits (the line is the quota period),
+# Google 403 with an HTML body (stays API_ERROR). Case-sensitive on purpose:
+# these are machine strings, and a looser match is how a different class gets
+# absorbed (api_call_timeout.md section 3). DOTALL where the stored text spans
+# lines (the Google quota body does).
+ACCOUNT_STATE_FORMS: dict[str, tuple[tuple[re.Pattern[str], str], ...]] = {
+    "deepseek": (
+        (re.compile(r"^DeepSeek API 402: .*\"message\":\"Insufficient Balance\b"), REASON_BILLING),
+    ),
+    "xai": (
+        (re.compile(r"^xAI API 403: .*used all available credits or reached its monthly "
+                    r"spending limit"), REASON_BILLING),
+    ),
+    "google": (
+        (re.compile(r"^429 RESOURCE_EXHAUSTED\..*prepayment credits are depleted"), REASON_BILLING),
+        (re.compile(r"^429 .*Quota exceeded for metric: \S*_per_day\b", re.DOTALL), REASON_QUOTA),
+    ),
+    "anthropic": (
+        (re.compile(r"^Error code: 400 - .*credit balance is too low"), REASON_BILLING),
+    ),
+}
 ACCOUNT_STATE_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
-    # Prefix on the message: since 2026-11-03 DeepSeek appends a request id
-    # inside it ("Insufficient Balance (request_id: ...)"). Same registered form.
-    "deepseek": (re.compile(r"^DeepSeek API 402: .*\"message\":\"Insufficient Balance\b"),),
-    "xai": (re.compile(r"^xAI API 403: .*\"code\":\"permission-denied\""),),
-    "google": (re.compile(r"^429 RESOURCE_EXHAUSTED\..*prepayment credits are depleted"),),
+    provider: tuple(p for p, _ in forms) for provider, forms in ACCOUNT_STATE_FORMS.items()
 }
 
 
-def is_account_state(provider: str, error_text: str | None) -> bool:
-    """True iff `error_text` matches a registered account-state form for `provider`.
+def account_state_reason(provider: str, error_text: str | None) -> str | None:
+    """The registered reason ("billing" / "quota") if `error_text` matches a
+    registered account-state form for `provider`, else None.
 
     Pure text match, usable on live exceptions (str(exc)) and, identically, on
     stored `api_error` strings for retro-classification. A provider with no
     registered form never matches."""
     if not error_text:
-        return False
-    return any(p.search(error_text) for p in ACCOUNT_STATE_PATTERNS.get(provider, ()))
+        return None
+    for pattern, reason in ACCOUNT_STATE_FORMS.get(provider, ()):
+        if pattern.search(error_text):
+            return reason
+    return None
+
+
+def is_account_state(provider: str, error_text: str | None) -> bool:
+    """True iff `error_text` matches a registered account-state form for `provider`."""
+    return account_state_reason(provider, error_text) is not None
 
 
 def is_client_timeout(exc: BaseException) -> bool:
@@ -230,6 +263,9 @@ class DecisionResult:
     # ERROR_CLASS_* when success is False, None otherwise. Logged as
     # `api_error_class`; never read by control flow.
     error_class: str | None = None
+    # billing / quota on an ACCOUNT_STATE failure, else None. Recorded as
+    # `api_error_reason`; read only by the ACCOUNT_STATE alarm's text.
+    error_reason: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     # v2 period-level reasoning fields (additive; None/[] under v1).
     cash_rationale: str | None = None
@@ -345,6 +381,8 @@ class BaseAdapter(ABC):
                                  else ERROR_CLASS_ACCOUNT_STATE
                                  if is_account_state(self.provider_name, str(e))
                                  else ERROR_CLASS_API_ERROR),
+                    error_reason=(None if is_client_timeout(e)
+                                  else account_state_reason(self.provider_name, str(e))),
                     metadata={"attempt": attempt},
                 )
 
