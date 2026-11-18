@@ -3760,6 +3760,26 @@
           "github_behaviour_unproven_live": "Three GitHub behaviours the fail-stop relies on are not yet observed live: an always() job running after a cancellation, GITHUB_TOKEN with actions: write disabling a workflow, and queued runs of a disabled workflow. The Thursday probe answers them.",
           "eod_stop_orders": "EOD places no model trades but can submit per-position stop orders: run_one_model runs the stop sweep (executor.force_liquidate, the venue in broker modes) before its is_eod early-return, which writes no decision row. Neither duplicate guard applies in EOD mode, so EOD admission coverage is pending (hub ruling 2026-11-17, Thursday's package: both guards and (V) before the stop sweep under an EOD-specific boundary key, and an administrative decision-log record for any EOD stop order). Base rate: the read-only order-id set difference over every venue order since the 2026-11-06 cutover through the 2026-11-17 EOD (origin/main 75d643ae5) is empty: 184 book orders across 121 book-cycles, all accounted, none submitted at or after 21:00Z."
         }
+      },
+      {
+        "id": "barrier_probe_record_lost_2026_11_18",
+        "date": "2026-11-18",
+        "type": "record_lost",
+        "class": "Administrative (barrier probe), paper account, outside every validation book. Not a book order: no book's record is affected.",
+        "what_happened": {
+          "run": "GitHub Actions run 44337543855 (Barrier Probe, workflow_dispatch by github-actions[bot] from intraday run 44336426216's probe-dispatch job, the 10:30 ET slot). Conclusion: failure. 'Run barrier probe' step: success (continue-on-error). 'Commit probe record' step: failure, 15:38:14Z to 15:39:30Z.",
+          "probe_cycle": "20261118T153801Z, symbol F",
+          "orders": "Four, all filled, net flat: FORCED_PROBE_SEED buy 10 @ 11.31 (15:38:04.94Z); FORCED_PROBE_SELL sell 10 @ 11.30 (15:38:06.68Z); FORCED_PROBE_BUY buy 8.8417 @ 11.31 (15:38:09.39Z); FORCED_PROBE_CLEANUP sell 8.8417 @ 11.30 (15:38:12.13Z). Each id is FORCED_PROBE_<book>-20261118T153801Z-00-a0. Read from the venue 2026-11-18 after the close.",
+          "alert": "CRITICAL email 15:38:13Z, 'Barrier probe: F not flat in the paper account', body: cleanup flatten filled 8.8417 of 8.8417, deadline_hit False, errors [], open_orders_in_symbol 1, position_in_symbol 0, clean False. The account was flat; the open order listed was most likely the CLEANUP sell, read about one second after it filled.",
+          "why_lost": "Sending the CRITICAL wrote three tracked files (logs/alerts.jsonl, data/alerts/state.json, data/alerts/email_log.jsonl). The commit step stages only data/barrier_probe/, so the checkout stayed dirty, and `git pull --rebase` refused five times (the step's 76 s is the five attempts plus 75 s of backoff). No commit reached origin/main between 15:35 and 16:05Z, so it was not a push race. Determined from step timings and code inspection: the run log is not readable from this machine (HTTP 403).",
+          "surviving_copy": "The CRITICAL email is the only surviving copy of any part of the record. The probe record itself was not reconstructed and will not be."
+        },
+        "consequences": {
+          "second_run": "The 12:00 ET slot's probe (run 44354755873, cycle 20261118T170736Z) found no COMPLETED record for the day on origin and ran in full. It is the day's only committed probe record, clean.",
+          "accounting": "The nightly set difference lists 20261118T153801Z as the only probe cycle at the venue with no committed probe record, and names this entry. Its four orders are the probe's segment: no book order is unaccounted (2026-11-18: 215 book orders, 0 unaccounted, 0 after the close).",
+          "account": "0 open orders and no F position, read 2026-11-18 17:20 ET. Nothing was cancelled."
+        },
+        "fixed_by": "Thursday 2026-11-19 package, commit 0c20e5ad9 on review/thursday-package-2026-11-19: the probe sends its CRITICAL without writing tracked files; the commit step names and sets aside any stray tracked change before the rebase; cleanup re-polls open orders until none or 30 s before declaring its state; alert titles state the true condition."
       }
     ]
   }
