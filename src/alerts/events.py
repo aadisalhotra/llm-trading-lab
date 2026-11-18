@@ -1421,6 +1421,10 @@ def detect_missed_runs(settings: dict[str, Any], date_str: str) -> list[dict[str
 # test that redirects TRADES_DIR to a tmp dir also redirects this record and can
 # never write into the real data/ tree (it did, once, on the review branch).
 CYCLE_COMPLETENESS_DIR = None
+# Same pattern for the admission record (src/logging/tick_admission.py writes
+# data/admission/{YYYY-MM}.jsonl). Path only: src/alerts never imports the
+# writer, so the stdlib-only entry points stay stdlib-only.
+ADMISSION_DIR = None
 
 
 def _session_close_et(date_str: str):
@@ -1455,23 +1459,32 @@ def detect_missed_cycles(settings: dict[str, Any], date_str: str) -> list[dict[s
     One CRITICAL per day, listing every missed slot. Partial slots (some books
     have a record, some not) are recorded and named in the body. They do not
     raise the CRITICAL alone: a missing book in a slot that otherwise ran is a
-    per-model fault, and the per-model completeness alert already covers it."""
+    per-model fault, and the per-model completeness alert already covers it.
+
+    A slot an admission guard WITHHELD (a TICK_WITHHELD_* row in
+    data/admission/{YYYY-MM}.jsonl inside the slot) is recorded ONCE, under that
+    class, and never as MISSED_CYCLE (hub ruling 2026-11-17). It does not raise
+    this CRITICAL: the withhold paged its own CRITICAL when it happened. When
+    the day also has a genuine miss, the body names the withheld slots so the
+    two are not confused."""
     from datetime import date as _date
-    from ..cycle_watch import MISSED_CYCLE, day_events, record_events
+    from ..cycle_watch import MISSED_CYCLE, PARTIAL_CYCLE, WITHHELD_PREFIX, day_events, record_events
 
     close = _session_close_et(date_str)
     if close is None:
         return []
     books = _enabled_model_keys(settings)
+    admission_dir = ADMISSION_DIR or (TRADES_DIR.parent / "admission")
     events = day_events(TRADES_DIR, books, _date.fromisoformat(date_str), close,
-                        detected_by="eod_sweep")
+                        detected_by="eod_sweep", admission_dir=admission_dir)
     out_dir = CYCLE_COMPLETENESS_DIR or (TRADES_DIR.parent / "cycle_completeness")
     written = record_events(events, out_dir)
     if written:
         logger.warning("Recorded %d cycle-completeness event(s) for %s", written, date_str)
 
     missed = [e["slot_et"] for e in events if e["kind"] == MISSED_CYCLE]
-    partial = [e for e in events if e["kind"] != MISSED_CYCLE]
+    partial = [e for e in events if e["kind"] == PARTIAL_CYCLE]
+    withheld = [e for e in events if e["kind"].startswith(WITHHELD_PREFIX)]
     if not missed:
         return []
     partial_txt = ""
@@ -1479,6 +1492,10 @@ def detect_missed_cycles(settings: dict[str, Any], date_str: str) -> list[dict[s
         partial_txt = " Partial slots: " + "; ".join(
             f"{e['slot_et']} ({len(e['books_with_record'])}/{len(e['books_expected'])} books)"
             for e in partial) + "."
+    if withheld:
+        partial_txt += (" Withheld by the admission guard (recorded under their cause, "
+                        "not counted as missed): " + "; ".join(
+                            f"{e['slot_et']} ({e['kind']})" for e in withheld) + ".")
     return [{
         "kind": "missed_cycle",
         "severity": "CRITICAL",

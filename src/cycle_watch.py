@@ -43,6 +43,51 @@ SESSION_OPEN = time(9, 30)
 # Event kinds written to data/cycle_completeness/{YYYY-MM}.jsonl.
 MISSED_CYCLE = "MISSED_CYCLE"      # no book wrote a record for the slot
 PARTIAL_CYCLE = "PARTIAL_CYCLE"    # some books did, some did not
+# A slot with no record that an admission guard WITHHELD is not a generic miss.
+# It is recorded once, under the admission record's own class (e.g.
+# TICK_WITHHELD_GUARD_UNREADABLE), never as MISSED_CYCLE
+# (hub ruling 2026-11-17, single classification of a withheld tick). Only the
+# cohort-wide TICK_WITHHELD_* classes qualify: a per-book withhold leaves the
+# other books' records, so its slot is never a MISSED_CYCLE.
+WITHHELD_PREFIX = "TICK_WITHHELD_"
+
+
+def admission_log_name(slot_utc: datetime) -> str:
+    """The admission file a slot's withhold lands in. src/logging/tick_admission
+    keys it on the UTC month of the withheld tick; a session never crosses a
+    UTC month boundary (the latest close is 21:00 UTC)."""
+    return f"{slot_utc.astimezone(timezone.utc).strftime('%Y-%m')}.jsonl"
+
+
+def read_admission_log(admission_dir: Path, slot_utc: datetime) -> list[str]:
+    """Raw lines of the slot's admission file. A missing file reads as no lines."""
+    p = admission_dir / admission_log_name(slot_utc)
+    return p.read_text(encoding="utf-8").splitlines() if p.exists() else []
+
+
+def withhold_in_slot(admission_lines: Iterable[str], slot_utc: datetime) -> dict | None:
+    """The first TICK_WITHHELD_* admission record whose timestamp (the withheld
+    run's start) falls inside the slot, or None. A malformed line is skipped,
+    never fatal, as in books_in_slot."""
+    lo, hi = slot_utc, slot_utc + SLOT
+    for i, line in enumerate(admission_lines):
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            logger.warning("cycle_watch: admission line %d is not JSON; skipped", i + 1)
+            continue
+        if not isinstance(rec, dict) or not str(rec.get("event", "")).startswith(WITHHELD_PREFIX):
+            continue
+        try:
+            t = parse_utc(str(rec.get("timestamp", "")))
+        except ValueError:
+            logger.warning("cycle_watch: admission line %d has an unparseable timestamp", i + 1)
+            continue
+        if lo <= t < hi:
+            return rec
+    return None
 
 
 def parse_utc(value: str) -> datetime:
@@ -140,9 +185,14 @@ def classify_slot(counts: Mapping[str, int]) -> str | None:
 
 
 def day_events(trades_dir: Path, books: list[str], session_date: date, close_et: time,
-               detected_by: str, detected_at: datetime | None = None) -> list[dict]:
-    """Completeness events for every expected slot of the day that is missed or
-    partial. Empty list = every slot ran for every book."""
+               detected_by: str, detected_at: datetime | None = None,
+               admission_dir: Path | None = None) -> list[dict]:
+    """Completeness events for every expected slot of the day that is missed,
+    withheld or partial. Empty list = every slot ran for every book.
+
+    With `admission_dir`, a slot with no record that an admission guard withheld
+    is classified under the withhold's class instead of MISSED_CYCLE, and the
+    event carries the admission record's facts."""
     detected_at = detected_at or datetime.now(timezone.utc)
     events: list[dict] = []
     for slot in expected_slots(session_date, close_et):
@@ -150,7 +200,12 @@ def day_events(trades_dir: Path, books: list[str], session_date: date, close_et:
         kind = classify_slot(counts)
         if kind is None:
             continue
-        events.append({
+        cause = None
+        if kind == MISSED_CYCLE and admission_dir is not None:
+            cause = withhold_in_slot(read_admission_log(admission_dir, slot), slot)
+            if cause is not None:
+                kind = str(cause["event"])
+        event = {
             "kind": kind,
             "date": session_date.isoformat(),
             "slot_et": slot_label(slot),
@@ -159,7 +214,11 @@ def day_events(trades_dir: Path, books: list[str], session_date: date, close_et:
             "books_with_record": sorted(b for b, n in counts.items() if n > 0),
             "detected_by": detected_by,
             "detected_at": detected_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        }
+        if cause is not None:
+            event["admission_record"] = {k: cause.get(k) for k in
+                                         ("timestamp", "guard", "reason", "files")}
+        events.append(event)
     return events
 
 
