@@ -296,8 +296,9 @@ def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
         # 2026-11-19 sync: section 2.4's Google per-day quota (44) and the
         # Anthropic credit record (1; model_key "claude", the pre-split key).
         ("2026-04", "gemini"): 14, ("2026-05", "gemini"): 30, ("2026-04", "claude"): 1}
+    # The original 39 carry "billing" since the 2026-11-19 backfill (hub ruling).
     assert Counter(r.get("api_error_reason") for r in rows) == {
-        None: 39, REASON_QUOTA: 44, REASON_BILLING: 1}
+        REASON_QUOTA: 44, REASON_BILLING: 40}
     for r in rows:
         assert r["api_error_class"] == ERROR_CLASS_ACCOUNT_STATE
         assert r["classification_basis"] == "classified retroactively from stored error text"
@@ -307,8 +308,7 @@ def test_retro_annotation_is_every_closed_set_match_from_april_verbatim():
         assert hashlib.sha256(raw).hexdigest() == r["source_line_sha256"]
         assert json.loads(raw)["api_error"] == r["api_error_verbatim"]
         assert is_account_state(r["provider"], r["api_error_verbatim"])
-        if "api_error_reason" in r:
-            assert r["api_error_reason"] == account_state_reason(r["provider"], r["api_error_verbatim"])
+        assert r["api_error_reason"] == account_state_reason(r["provider"], r["api_error_verbatim"])
         # the 2026-11-03 wording change is noted on exactly the rows that carry it
         assert ("wording_note" in r) == ("(request_id:" in r["api_error_verbatim"])
 
