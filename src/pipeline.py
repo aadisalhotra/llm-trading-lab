@@ -278,9 +278,13 @@ def run_one_model(
     data_hash = hash_inputs(market_data)
     from .config_loader import universe_symbols as _universe_symbols
 
-    # EOD pass: no trading — only snapshot, log, and report. The EOD cron
+    # EOD pass: no MODEL trading — only snapshot, log, and report. The EOD cron
     # fires after market close to capture closing prices and generate the
-    # daily report. It must NOT execute any trades.
+    # daily report. It places no model trades, but it CAN submit per-position
+    # stop orders: the stop sweep above runs before this branch, and in broker
+    # modes a triggered stop goes to the venue. This branch writes no decision
+    # row for them. EOD admission coverage and the EOD administrative stop row
+    # land Thursday (hub ruling 2026-11-17; eod_stop_record_and_evaluation_ruling.md).
     if is_eod:
         snapshot_after = snapshot_before
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
