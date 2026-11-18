@@ -161,3 +161,24 @@ def test_row_is_written_before_the_book_is_saved():
     src = (Path(pipeline.__file__)).read_text(encoding="utf-8")
     branch = src[src.index("    if is_eod:\n        snapshot_after = snapshot_before"):]
     assert branch.index("_write_eod_admin_row(") < branch.index("save_portfolio(portfolio)")
+
+
+def test_case_a_rejection_scores_as_a_legitimate_rejection_from_the_one_set(tmp_trades):
+    """Hub ruling 2026-11-18: a venue refusal of an after-close stop is a
+    legitimate market rejection, never fail:submission_failed, and Gate 4 and
+    the skip alarm read it from the one shared set."""
+    from src.analytics import execution_metrics as em
+    from src.execution.executor import REGISTERED_SKIP_CLASSES, requires_skip_alarm
+    tmp, _ = tmp_trades
+    row = _write([_result(False, None)], _executor(broken=True), tmp)
+    assert EOD_STOP_NOT_EXECUTABLE in REGISTERED_SKIP_CLASSES
+    assert em._LEGIT_CONSTRAINTS is REGISTERED_SKIP_CLASSES
+    (e,) = row["executions"]
+    assert em.classify_execution(e) == f"ok:constraint_{EOD_STOP_NOT_EXECUTABLE}"
+    scored = em.score_cycles([row], {CYC: True})
+    assert scored["cycles"] == 1 and scored["successes"] == 1
+    assert scored["failure_cycles_by_reason"] == {}
+    assert scored["constraint_events"] == {EOD_STOP_NOT_EXECUTABLE: 1}
+    r = _result(False, None, constraint=EOD_STOP_NOT_EXECUTABLE, unprotected=False)
+    r.broker_order = None
+    assert not requires_skip_alarm(r)
