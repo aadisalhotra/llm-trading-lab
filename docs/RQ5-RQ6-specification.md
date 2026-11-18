@@ -27,18 +27,18 @@ Operationalization.
 - Held-out context set. A pre-registered, regime-stratified sample of M frozen decision-period input bundles. A "decision context" is the complete frozen input for one decision period: prompt (versioned), market-state snapshot, portfolio state, recent-decision memory, macro headline, pre-market context. The sampling rule and the resulting M contexts are pinned in v1.json before the RQ6 measurement is run. Stratify across market regimes and drawdown states. The frozen-context sample is tick-position-stratified with identical tick-position composition across all six models, and the measurement batch is run off-peak (not at the 09:31 ET open) so the K repeated calls do not reproduce live open-bell congestion.
 - Deployed configuration. Each model is called at the exact configuration used in live trading — pinned snapshot ID, thinking/reasoning mode and reasoning_effort per METHODOLOGY section "Reasoning Configuration and Cross-Model Equivalence", and the deployed temperature value (for most models the native/ignored value), recorded per the Per-Model API Configuration table reproduced below. Configuration is reported as a per-model variable.
 - Repeated calls. For each context, issue K independent API calls in a single time-clustered batch. Time-clustering isolates run-to-run divergence from longitudinal infrastructure drift. If calls fail even off-peak, Delta_m for that context is computed on the K' <= K successful calls and K' is reported.
-- Parameters. K and M are pinned in v1.json before the OSF deposit. Recommended minima: K >= 10 (>= 45 call-pairs per context), M >= 30 regime-stratified contexts. These are sample-size choices, set independently of pilot results.
+- Parameters. K = 10 repeated calls per context (45 call-pairs) and M = 30 regime-stratified contexts per model per configuration, as registered in the RQ6 entry of PRE_REGISTRATION.md, which governs; v1.json carries the same values. These are sample-size choices, set independently of pilot results.
 
 Per-Model API Configuration table (reproduced inline so RQ6 is self-contained):
 
-| Model | Provider | Pinned snapshot ID | Thinking/reasoning mode | reasoning_effort (provider-standard) | Temperature behavior | Temperature value used |
+| Model | Provider | Pinned identifier (class) | Thinking/reasoning mode | reasoning_effort (provider-standard) | Temperature behavior | Temperature value used |
 |---|---|---|---|---|---|---|
-| Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| GPT-5.4 | OpenAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Gemini 3.1 Pro | Google | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Grok 4.20 Reasoning | xAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| DeepSeek v4-pro | DeepSeek | `[PIN]` | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
+| Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (C) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (C) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| GPT-5.4 | OpenAI | `gpt-5.4-2026-03-05` (D; `config/settings.json` `models.gpt.model`) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Gemini 3.1 Pro | Google | `gemini-3.1-pro-preview` (P) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Grok 4.20 Reasoning | xAI | `grok-4.20-0309-reasoning` (D; `config/settings.json` `models.grok.model`) | `[VERIFY]` | Not established from primary sources: xAI documents `reasoning_effort` for Grok 4.5–4.7 only, and the default for `grok-4.20-0309-reasoning` is undocumented. The pipeline sends none; reasoning tokens are present on every successful November record (151 of 151 through 2026-11-17), so reasoning is on at an undocumented provider-default level. | `[VERIFY]` | `[VERIFY]` |
+| DeepSeek v4-pro | DeepSeek | `deepseek-v4-pro` (C) | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
 
 Metrics.
 
@@ -106,7 +106,7 @@ alpha_m are model fixed effects, so the test is within-model — how a model's t
 
 Estimand / null. beta. H0: beta = 0 (trade-driven concentration change does not respond to drawdown depth, pooled across the cohort). Two-sided. beta > 0: models actively concentrate more when deeper in drawdown; beta < 0: models actively diversify under drawdown.
 
-Inference. Moving-block bootstrap over decision periods within model, preserving the panel and serial-correlation structure. Block length L is pinned in v1.json before the deposit by a pre-specified rule (e.g. L = round(n^(1/3)) per model, or L from the estimated decorrelation time of dHHI_trade — not chosen to optimize the pilot p-value). B = 10000 replicates. The headline RQ5 p-value is the two-sided percentile-bootstrap p-value for beta: p = 2 * min(share of beta_star <= 0, share of beta_star >= 0). A BCa CI for beta is reported alongside for effect size.
+Inference. Moving-block bootstrap over decision periods within model, preserving the panel and serial-correlation structure. Block length follows a pre-specified rule, L = round(n^(1/3)), with n the number of decision periods in the analysis window; the resolved integer is logged in v1.json once n is fixed, and is never chosen to optimize the pilot p-value. B = 10000 replicates. The headline RQ5 p-value is the two-sided percentile-bootstrap p-value for beta: p = 2 * min(share of beta_star <= 0, share of beta_star >= 0). A BCa CI for beta is reported alongside for effect size.
 
 FDR. This single p-value is RQ5's entry in the Benjamini-Hochberg family. The family is genuinely {RQ1, RQ2, RQ3, RQ4, RQ5} — five p-values, one per RQ. RQ6 is excluded (characterization, no p-value). BH correction is applied across the five headline p-values at the pre-registered q-level set in v1.json; RQ5's null is rejected if its BH-adjusted p-value is below q.
 

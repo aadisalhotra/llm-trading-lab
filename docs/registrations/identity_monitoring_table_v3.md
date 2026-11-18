@@ -1,7 +1,7 @@
 # Identity-Monitoring Capability — Per-Provider Table (v3, Final Corrected State)
 
 - **Artifact:** `docs/registrations/identity_monitoring_table_v3.md` — governing text. Committed per the standing convention; relay citations retire upon landing.
-- **Ruled:** 2026-09-11 (per-provider rewrite), amended 2026-09-11 (OpenAI/Anthropic de-collapse; decision-leg scope) and 2026-09-13 (the no-substitution reclassification — see provenance). This artifact is the **final corrected state**; superseded intermediate states are recorded in §5, not restated as current.
+- **Ruled:** 2026-09-11 (per-provider rewrite), amended 2026-09-11 (OpenAI/Anthropic de-collapse; decision-leg scope) and 2026-09-13 (the no-substitution reclassification — see provenance). This artifact is the **final corrected state**; superseded intermediate states are recorded in §5, not restated as current. **Google row corrected 2026-11-17 against logged data** (§5, item 5).
 
 ## 1. Scope statement (cohort-wide, conditions every row)
 
@@ -21,7 +21,7 @@ Identity telemetry is captured on the **decision leg only**; no screening-call f
 |---|---|---|---|
 | xAI | `system_fingerprint` populated (`fp_d44b4eeb21`); four-field surface confirmed | Observed; untested against any substitution | Candidate — undemonstrated |
 | DeepSeek | `system_fingerprint` populated | Constant across all observations; **never tested against a substitution** (none has occurred on this string in the capture era) | Candidate — undemonstrated; logged descriptor |
-| Google | Build-level `model_version` (e.g., `gemini-3.1-pro-002`); no fingerprint | Provider-documented as build-scoped; untested | Strongest *documented* signal; undemonstrated |
+| Google | `model_version` is captured and **echoes the alias**: `gemini-3.1-pro-preview` in `model_id_returned` on every November decision record (152 of 152 through 2026-11-17) and in `model_version_raw` on every record that carries the raw field (25 of 25, logged since `57c8fd8`); no fingerprint | **Alias only** — the field the provider documents as build-scoped returns no build identifier for this preview model; not closable by logging | None while it echoes the alias; converts to candidate if a build-level value ever appears |
 | OpenAI | `system_fingerprint` key present, **empty provider-side** — dated, narrow claim: on 2026-09-10, `gpt-5.4-2026-03-05` returned no fingerprint on 13/13 production decision calls while `service_tier` and `finish_reason` populated from the same response objects; no pre-2026-09-10 observations exist (field uncaptured before then) | **Behavioral absence** — field exists in schema, adapter verified correct, re-checkable daily at no cost; possibly model- or tier-specific (re-check, **firms the row**: `data/trades/gpt_2026-09.jsonl` records dated 2026-09-11, `"api_system_fingerprint": null` on 13/13 production decision calls; 2026-09-12 was a Saturday, no session) | None while empty; converts to candidate if it populates |
 | Anthropic (×2: Sonnet, Opus) | Model string only | **Structural absence** — no fingerprint, no reasoning counter; the fields do not exist in the Messages schema; not closable by logging or re-checking | None, permanently |
 
@@ -37,6 +37,7 @@ Residual, all six cells: an unannounced substitution with an unremarkable behavi
 2. **Fingerprint-primary (2026-09-10, withdrawn):** the fingerprint promoted to primary control. Withdrawn when measurement showed one populated-and-tested-looking cell was actually never-moving (one value across a probe point and 13 calls — "didn't move across the substitution" and "never moves" are not separable), one null provider-side, two structurally absent.
 3. **Fingerprint-demoted / profile-primary (2026-09-11):** behavioral-profile + announcement promoted as the stack that fired; fingerprints demoted to corroborants.
 4. **No-substitution reclassification (2026-09-13):** provider attestation + own telemetry established the 2026-09-10 routing covered `deepseek-v4-flash`, not `deepseek-v4-pro`; the event reclassified to an announced retirement, reversed within days, with no serving change on our string; the "demonstrated non-responsive" DeepSeek row corrected to "never tested"; the tok/s corroboration withdrawn (control-arm failure, rule 1 above). The ledger's original entries stand append-only with `corrects_prior_finding` fragments.
+5. **Google build-level field falsified (2026-11-17):** the row registered a build-level `model_version` ("e.g., `gemini-3.1-pro-002`") as the strongest documented signal. That was a documentation-based claim never checked against the record. The adapter captures the field, and it returns the alias on every record; the config note that expected a dated id to surface was rewritten on 2026-11-15 ("the dated id did NOT surface"). Gemini's pin class is P (preview alias), and its identity assurance is provider-conduct-based plus profile monitoring, with no corroborant.
 - 2026-10-04: produced as a committed artifact in the relay-only batch (citation-resolution gate).
 
 ## 6. Landing instructions
@@ -44,4 +45,4 @@ Residual, all six cells: an unannounced substitution with an unremarkable behavi
 1. Commit at `docs/registrations/identity_monitoring_table_v3.md`.
 2. The Forced-Change/Deprecation Exposure table's rows gain one cross-reference line each to their detection cells here (exposure = conduct × observability; the two tables must read consistently).
 3. The DeepSeek cohort determination (pre-read 3 / the internal ruling) cites this artifact for its apparatus claims.
-4. Clear the two `[CITE-FILL]`s by quotation before deposit assembly.
+4. Both citation markers were cleared by quotation at landing; zero markers remain in this artifact.

@@ -16,7 +16,7 @@ Given identical information, identical constraints, and identical execution infr
 ## Acknowledged Variables (intentional, not bugs)
 
 1. **Provider velocity.** If Anthropic ships an upgrade in August but OpenAI doesn't update until December, that asymmetry is a measured variable, not noise to control.
-2. **Native data access.** Grok has live X/Twitter access baked into the model. This is logged and analyzed, not stripped out.
+2. **Information set.** All six models receive identical information: the same market data, news payload (hash-logged per decision), and portfolio state. Grok 4.20's X Search is a separate, separately billed xAI tool that this pipeline does not enable; the adapter sends no search tools or parameters, and no X data has been ingested or analysed at any point. An earlier version of this document stated that Grok had live X/Twitter access baked into the model; that statement was a launch-era design assumption, never verified against the adapter or the API, and is corrected here.
 3. **Reasoning style differences.** Each model's reasoning chain is captured in full and analyzed qualitatively in monthly reports.
 
 ## Phases
@@ -34,7 +34,7 @@ Given identical information, identical constraints, and identical execution infr
 ## Model Evolution Policy
 
 - **Core 5 are permanent.** Anthropic, OpenAI, Google, xAI, DeepSeek slots never close.
-- **Models auto-upgrade monthly.** First trading day of each month, the pipeline checks each provider's flagship and transitions if a newer version exists. Logged with 30-day before/after comparison.
+- **Model versions are pinned.** No automatic upgrade exists; the pipeline never changes a model identifier on its own. Any version change is a documented regime event with pre/post boundary capture and a ledger entry (the May 2026 DeepSeek repoint is the worked example); the Phase B cohort is pinned to the deployed identifiers per T2.6 and the identity-monitoring registration.
 - **Expansion cohort, never replacement.** New providers can join with their own portfolio but never displace a core 5 model. This preserves head-to-head continuity.
 
 ## Reasoning Configuration and Cross-Model Equivalence
@@ -51,20 +51,20 @@ The pin does **not** guarantee that the surrounding serving infrastructure is fi
 
 ## Per-Model API Configuration
 
-The deployed configuration of each model is recorded in the table below. It is the canonical record referenced by RQ6's operationalization and is reproduced in the RQ6 entries of `PRE_REGISTRATION.md` and `v1.json` (pre-registration sections are self-contained).
+The deployed configuration of each model is recorded in `PRE_REGISTRATION.md` (RQ6 API-configuration table), the canonical copy; this table reproduces it and is regenerated from it.
 
-| Model | Provider | Pinned snapshot ID | Thinking/reasoning mode | reasoning_effort (provider-standard) | Temperature behavior | Temperature value used |
+| Model | Provider | Pinned identifier (class) | Thinking/reasoning mode | reasoning_effort (provider-standard) | Temperature behavior | Temperature value used |
 |---|---|---|---|---|---|---|
-| Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (dateless canonical snapshot) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| GPT-5.4 | OpenAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Gemini 3.1 Pro | Google | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| Grok 4.20 Reasoning | xAI | `[PIN]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
-| DeepSeek v4-pro | DeepSeek | `[PIN]` | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
+| Claude Sonnet 4.6 | Anthropic | `claude-sonnet-4-6` (C) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Claude Opus 4.6 | Anthropic | `claude-opus-4-6` (C) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| GPT-5.4 | OpenAI | `gpt-5.4-2026-03-05` (D; `config/settings.json` `models.gpt.model`) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Gemini 3.1 Pro | Google | `gemini-3.1-pro-preview` (P) | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` | `[VERIFY]` |
+| Grok 4.20 Reasoning | xAI | `grok-4.20-0309-reasoning` (D; `config/settings.json` `models.grok.model`) | `[VERIFY]` | Not established from primary sources: xAI documents `reasoning_effort` for Grok 4.5–4.7 only, and the default for `grok-4.20-0309-reasoning` is undocumented. The pipeline sends none; reasoning tokens are present on every successful November record (151 of 151 through 2026-11-17), so reasoning is on at an undocumented provider-default level. | `[VERIFY]` | `[VERIFY]` |
+| DeepSeek v4-pro | DeepSeek | `deepseek-v4-pro` (C) | Enabled | `high` | Silently ignored (inoperative in thinking mode) | n/a (inoperative) |
 
 Placeholder key:
 
-- `[PIN]` — the dated immutable snapshot ID; a pinning task, completed before the OSF deposit. (Claude rows need no `[PIN]`: the dateless 4.6-generation ID is the canonical fixed snapshot.)
+- Pin class — D = dated immutable snapshot id; C = the provider's canonical undated id, the most specific callable identifier, with no dated snapshot id confirmed beneath it; P = preview alias. All six identifiers are the ids sent and echoed on every November record (ledger `cohort_as_run_2026_10_26`).
 - `[VERIFY]` — established by the per-model API-configuration verification. **This verification is a hard pre-deposit dependency of RQ6, not a separable later task.** DeepSeek's row is verified; the five other models' configuration cells must be verified before the OSF deposit. The `reasoning_effort` cell is set to the provider-standard value per the equivalence principle; the specific value and parameter name are filled by verification. Temperature behavior is one of: honored / silently ignored / constrained to a range / not exposed.
 
 ## API Non-Determinism (RQ6) — Deployed-Configuration Basis

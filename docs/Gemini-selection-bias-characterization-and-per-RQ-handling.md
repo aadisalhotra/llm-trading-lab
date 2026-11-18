@@ -24,19 +24,32 @@ series is episodic and the current rate is low.
 - **Current state:** trailing five sessions ~4.6%. Gemini is currently healthy;
   there is no active Phase B threat as of this writing. The current rate is to be
   re-confirmed before the OSF deposit.
-- **Failure mode:** ~73% server-side deadline/timeout, ~22% rate-limiting. The
-  driver is open-bell congestion — all six models firing at 09:31 ET.
-- **Tick-position gradient:** a clean monotonic gradient by within-session tick
-  position — ~76% failure on the first tick of the session, declining to near-zero
-  by the close.
+- **Failure mode** (203 failed decision records through 2026-05-22; corrected
+  2026-11-17): ~73% server-side deadline/timeout (148); ~22% exhaustion of the lab
+  project's per-day request quota (44) — an `ACCOUNT_STATE` failure, reason `quota`:
+  lab-side, not rate limiting by the provider
+  (`docs/registrations/rossi_review_rulings.md` §2.4); ~5% parse (11). The earlier
+  attribution of both modes to open-bell congestion (all six models firing at 09:31
+  ET) is withdrawn: a per-day allowance is indifferent to the bell, and the most
+  plausible cause of the deadline/timeout failures is provider-side serving capacity
+  (same registration, §2.2).
+- **Tick-position gradient:** carried by the deadline/timeout failures — 67% of
+  first-tick records (13:00–13:59 UTC, n = 30), declining to 12% in the session's
+  last hour (19:00–19:59 UTC, n = 60). The quota failures carry none: they fall by
+  day (2026-04-16, 04-23, 04-28, 05-05, 05-06, 05-07), never on a first tick. The
+  earlier figures (~76% declining to near-zero) do not reproduce under this
+  estimator; all failures together run 70% to 23%.
 - **Weekday skew:** a mild Monday–Wednesday-heavy skew.
 - **Market-state independence:** failure is uncorrelated with market volatility
   (r = −0.12).
 
 **Analytic characterization.** The missingness is **predominantly missing at random
-conditional on within-session tick-position** (MAR | tick-position): it is driven by
-open-bell server congestion, has a fully observed structure (the tick-position
-gradient), and is uncorrelated with market state. It is **not** missing-not-at-random
+conditional on within-session tick-position** (MAR | tick-position): the deadline/timeout failures have a fully observed structure
+(the tick-position gradient), and the pooled failure series is uncorrelated with
+market state. The quota failures are conditional on the day instead — observed,
+dated, and following that day's earlier deadline/timeout failures. The earlier
+clause that the missingness "is driven by open-bell server congestion" is withdrawn
+(2026-11-17): the cause of the gradient is not established. It is **not** missing-not-at-random
 with respect to market conditions. Because the selection structure is observed and
 conditionable, conditioning on tick-position removes the dominant bias; this licenses
 the per-RQ handling in Part 2.
