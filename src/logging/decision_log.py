@@ -205,66 +205,7 @@ def log_decision_run(
             for v in violations
         ],
         "executions": [
-            {
-                "ticker": e.ticker,
-                "side": e.side,
-                # Direction of the executed trade, encoded from go-live so the
-                # short side is segmentable without reprocessing: SHORT/COVER ->
-                # short, BUY/SELL -> long, HOLD/SKIP -> flat.
-                "direction": (
-                    "short" if e.side in ("SHORT", "COVER")
-                    else "long" if e.side in ("BUY", "SELL")
-                    else "flat"
-                ),
-                "executed": e.executed,
-                "shares": e.shares,
-                "fill_price": e.fill_price,
-                "notional": e.notional,
-                "order_id": e.order_id,
-                "error": e.error,
-                # Venue-imposed execution constraint, when one shaped this
-                # result (e.g. UNSETTLED_FUNDS under the cash branch's T+1
-                # rule). Empty for ordinary fills, holds and skips. Blocked
-                # purchases carry executed=false, so they are already invisible
-                # to every behavioral reader; this field makes them countable
-                # as execution-constraint events for Gate 4.
-                "constraint": getattr(e, "constraint", ""),
-                # Broker-authoritative order record; null in the simulator.
-                # This is the tagged-order set G-EXEC computes over and the
-                # per-book side of the two-level reconciliation, so it is
-                # persisted from the first broker order rather than
-                # retrofitted later.
-                "broker_order": getattr(e, "broker_order", None),
-                # A risk stop that did not close at the venue. Recorded on the
-                # execution itself so the condition is visible in the committed
-                # record and not only in an alert that may not have been read.
-                "stop_unprotected": bool(getattr(e, "stop_unprotected", False)),
-                # Which decision this was, and what it asked for before any cap
-                # (executor_sizing_floor_ruling.md sections 5.1 and 5.4). A
-                # pre-submission skip has no order id, so this is its identity.
-                "decision_id": getattr(e, "decision_id", ""),
-                "intended_notional": getattr(e, "intended_notional", None),
-                # settled_usd / unsettled_usd / cap_usd on the settled-funds tags.
-                "constraint_detail": getattr(e, "constraint_detail", None),
-                # "BARRIER_DELAYED" when the P1 cycle barrier held this order
-                # behind a contending book (spike_rulings_parity_wash_barrier.md,
-                # Visibility: barrier-held orders are tagged in the decision
-                # log). "" otherwise, and on every simulator record. Separate
-                # from `constraint` on purpose: a hold is not a venue
-                # constraint, Gate 4 must not count it as one, and a held order
-                # can still carry a real constraint of its own.
-                "barrier_tag": getattr(e, "barrier_tag", ""),
-                # On BARRIER_DELAYED: winner_book, winner_action, released_by
-                # (CONTENDER_TERMINAL | RELEASE_TIMEOUT), wait_seconds.
-                "barrier_detail": getattr(e, "barrier_detail", None),
-                # The classified FILL_OVERRUN event, when this fill made one.
-                "fill_overrun": getattr(e, "fill_overrun", None),
-                "timestamp": e.timestamp,
-                "decision": e.decision,
-                # How many models (including this one) hold this ticker at
-                # execution time. Drives the consensus/agreement analysis.
-                "agreement_count": (agreement_counts or {}).get(e.ticker),
-            }
+            serialize_execution(e, agreement_counts)
             for e in execution_results
         ],
         "portfolio_after": portfolio_snapshot_after,
@@ -466,3 +407,145 @@ def log_intraday_snapshot(
         record["unpriced_holdings"] = snapshot["unpriced_holdings"]
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
+
+
+def serialize_execution(e: Any, agreement_counts: dict[str, int] | None = None) -> dict[str, Any]:
+    """One execution result as the decision log records it. Shared by the
+    model-call writer and the administrative writer, so an EOD stop's
+    execution has exactly the schema of an intraday one."""
+    return {
+        "ticker": e.ticker,
+        "side": e.side,
+        # Direction of the executed trade, encoded from go-live so the
+        # short side is segmentable without reprocessing: SHORT/COVER ->
+        # short, BUY/SELL -> long, HOLD/SKIP -> flat.
+        "direction": (
+            "short" if e.side in ("SHORT", "COVER")
+            else "long" if e.side in ("BUY", "SELL")
+            else "flat"
+        ),
+        "executed": e.executed,
+        "shares": e.shares,
+        "fill_price": e.fill_price,
+        "notional": e.notional,
+        "order_id": e.order_id,
+        "error": e.error,
+        # Venue-imposed execution constraint, when one shaped this
+        # result (e.g. UNSETTLED_FUNDS under the cash branch's T+1
+        # rule). Empty for ordinary fills, holds and skips. Blocked
+        # purchases carry executed=false, so they are already invisible
+        # to every behavioral reader; this field makes them countable
+        # as execution-constraint events for Gate 4.
+        "constraint": getattr(e, "constraint", ""),
+        # Broker-authoritative order record; null in the simulator.
+        # This is the tagged-order set G-EXEC computes over and the
+        # per-book side of the two-level reconciliation, so it is
+        # persisted from the first broker order rather than
+        # retrofitted later.
+        "broker_order": getattr(e, "broker_order", None),
+        # A risk stop that did not close at the venue. Recorded on the
+        # execution itself so the condition is visible in the committed
+        # record and not only in an alert that may not have been read.
+        "stop_unprotected": bool(getattr(e, "stop_unprotected", False)),
+        # Which decision this was, and what it asked for before any cap
+        # (executor_sizing_floor_ruling.md sections 5.1 and 5.4). A
+        # pre-submission skip has no order id, so this is its identity.
+        "decision_id": getattr(e, "decision_id", ""),
+        "intended_notional": getattr(e, "intended_notional", None),
+        # settled_usd / unsettled_usd / cap_usd on the settled-funds tags.
+        "constraint_detail": getattr(e, "constraint_detail", None),
+        # "BARRIER_DELAYED" when the P1 cycle barrier held this order
+        # behind a contending book (spike_rulings_parity_wash_barrier.md,
+        # Visibility: barrier-held orders are tagged in the decision
+        # log). "" otherwise, and on every simulator record. Separate
+        # from `constraint` on purpose: a hold is not a venue
+        # constraint, Gate 4 must not count it as one, and a held order
+        # can still carry a real constraint of its own.
+        "barrier_tag": getattr(e, "barrier_tag", ""),
+        # On BARRIER_DELAYED: winner_book, winner_action, released_by
+        # (CONTENDER_TERMINAL | RELEASE_TIMEOUT), wait_seconds.
+        "barrier_detail": getattr(e, "barrier_detail", None),
+        # The classified FILL_OVERRUN event, when this fill made one.
+        "fill_overrun": getattr(e, "fill_overrun", None),
+        "timestamp": e.timestamp,
+        "decision": e.decision,
+        # How many models (including this one) hold this ticker at
+        # execution time. Drives the consensus/agreement analysis.
+        "agreement_count": (agreement_counts or {}).get(e.ticker),
+    }
+
+
+ADMIN_EOD_SENTENCE = (
+    "Administrative row (EOD_POSITION_STOP): the end-of-day pass's position-stop sweep "
+    "produced the forced results below. No model was called.")
+
+
+def log_administrative_row(
+    model_key: str,
+    run_date: datetime,
+    *,
+    admin_class: str,
+    cycle_id: str,
+    executions: list[dict[str, Any]],
+    portfolio_snapshot_after: dict[str, Any],
+    prompt_version: str,
+    execution_mode: str,
+    inception_date: str,
+    stop_evaluation: list[dict[str, Any]],
+    stop_dust_exempt: list[dict[str, Any]] | None = None,
+    overall_reasoning: str = ADMIN_EOD_SENTENCE,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Append one ADMINISTRATIVE row (eod_stop_record_and_evaluation_ruling.md
+    section 1) to the book's decision log and return it.
+
+    Every model-call field is null: no model was called, so no reader may take
+    it for a call (src/record_class.py). `fetch_started_at` is "" because no
+    fetch belongs to it and the slot readers must never see a tick here.
+    `executions` are already serialized (serialize_execution) so the caller can
+    record the EOD tag on them first.
+    """
+    TRADES_DIR.mkdir(parents=True, exist_ok=True)
+    path = TRADES_DIR / f"{model_key}_{run_date.strftime('%Y-%m')}.jsonl"
+    record: dict[str, Any] = {
+        "record_class": "ADMINISTRATIVE",
+        "admin_class": admin_class,
+        "date": run_date.strftime("%Y-%m-%d"),
+        "timestamp": datetime.utcnow().isoformat(),
+        "cycle_id": cycle_id,
+        "fetch_started_at": "",
+        "screening_latency_seconds": None,
+        "model_key": model_key,
+        "model_id_configured": "n/a",
+        "model_id_returned": "n/a",
+        "provider": "administrative",
+        "execution_mode": execution_mode,
+        "month_tag": _month_tag(run_date, inception_date),
+        "prompt_version": prompt_version,
+        "data_inputs_hash": None,
+        # Model-call fields: null, never zero (ruling section 1; section 3 is
+        # what a 0.0 latency and a true api_success did to the 10-23 rows).
+        "api_success": None,
+        "api_error": None,
+        "api_latency_seconds": None,
+        "api_attempt": None,
+        "input_tokens": None,
+        "output_tokens": None,
+        "cost_usd": None,
+        "api_finish_reason": None,
+        "thoughts_tokens": None,
+        "overall_reasoning": overall_reasoning,
+        "raw_decisions": [],
+        "accepted_decisions": [],
+        "violations": [],
+        "executions": executions,
+        "stop_evaluation": stop_evaluation,
+        "portfolio_after": portfolio_snapshot_after,
+        "memory_hit": False,
+        "stop_dust_exempt": list(stop_dust_exempt or []),
+    }
+    if extra:
+        record.update(extra)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record

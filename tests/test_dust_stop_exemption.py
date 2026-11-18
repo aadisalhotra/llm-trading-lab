@@ -188,4 +188,8 @@ def test_no_dust_is_an_empty_list_not_an_absent_key(tmp_path, monkeypatch):
 def test_both_decision_log_calls_in_the_pipeline_pass_it():
     src = Path(pipeline.__file__).read_text(encoding="utf-8")
     assert src.count("log_decision_run(") == 2
-    assert src.count("stop_dust_exempt=stop_dust_exempt,") == 2
+    # Both model-call writes, plus the EOD administrative row (Thursday
+    # 2026-11-19), which carries stop_dust_exempt "as on intraday rows"
+    # (eod_stop_record_and_evaluation_ruling.md section 1).
+    assert src.count("stop_dust_exempt=stop_dust_exempt,") == 3
+    assert src.count("stop_dust_exempt=stop_dust_exempt, extra=extra)") == 1

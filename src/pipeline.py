@@ -96,6 +96,8 @@ from .logging.tick_admission import (
     record_withhold,
 )
 from .logging.venue_check import run_shadow_check
+from .logging.decision_log import log_administrative_row, serialize_execution
+from .record_class import ADMIN_CLASS_EOD_POSITION_STOP, EOD_STOP_NOT_EXECUTABLE
 
 # The EOD boundary key (tick_admission_guards_ruling.md rev. 5 section 2): one
 # EOD per session, in the same ledger as the intraday :00/:30 slots.
@@ -233,6 +235,123 @@ def _position_stop_sweep(
     return forced_results, stop_dust_exempt
 
 
+def _confirm_terminal(executor: Executor, model_key: str,
+                      results: list[Any]) -> dict[str, dict[str, Any]]:
+    """Re-read every venue order the EOD sweep placed (read-only GETs). Returns
+    client_order_id -> {status, terminal, broker_order or error}. An order
+    still open is §4 case C: it would fill at the open against a book that has
+    not moved, so "no order outlives the run that placed it" is checked here,
+    before the commit. An order that cannot be re-read counts as open."""
+    out: dict[str, dict[str, Any]] = {}
+    if not executor.on_venue(model_key) or executor.broker is None:
+        return out
+    for r in results:
+        oid = str(getattr(r, "order_id", "") or "")
+        if not oid or oid.startswith("FORCED_"):
+            continue
+        try:
+            o = executor.broker.get_order_by_client_id(oid)
+            out[oid] = {"status": o.status, "terminal": bool(o.is_terminal),
+                        "broker_order": o.to_dict()}
+        except Exception as e:  # noqa: BLE001 — unconfirmable counts as open
+            prior = getattr(r, "broker_order", None) or {}
+            if not prior:
+                # Never reached the venue (rejected at submission): nothing to
+                # confirm, and nothing can be open.
+                continue
+            out[oid] = {"status": prior.get("status"), "terminal": False,
+                        "error": f"{type(e).__name__}: {e}"}
+    return out
+
+
+def _stop_evaluation(pre_sweep: dict[str, tuple[float, float]], prices: dict[str, float],
+                     results: list[Any]) -> list[dict[str, Any]]:
+    """Per triggered holding: shares, average cost, the closing mark, the loss."""
+    rows = []
+    for t in sorted({getattr(r, "ticker", "") for r in results}):
+        if t not in pre_sweep:
+            continue
+        shares, avg = pre_sweep[t]
+        mark = prices.get(t)
+        loss_pct = loss_usd = None
+        if mark and avg:
+            # Loss against entry, positive = losing: a long below cost, a short above.
+            loss_pct = (mark / avg - 1.0) if shares < 0 else (1.0 - mark / avg)
+            loss_usd = abs(shares) * avg * loss_pct
+        rows.append({"ticker": t, "shares": shares, "avg_cost": avg, "closing_mark": mark,
+                     "loss_pct": loss_pct, "loss_usd": loss_usd})
+    return rows
+
+
+def _write_eod_admin_row(model_key: str, portfolio: Any, results: list[Any],
+                         pre_sweep: dict[str, tuple[float, float]], prices: dict[str, float],
+                         executor: Executor, settings: dict[str, Any], run_date: datetime,
+                         snapshot_after: dict[str, Any], stop_dust_exempt: list[dict[str, Any]],
+                         logger: logging.Logger) -> dict[str, Any] | None:
+    """Write the EOD_POSITION_STOP administrative row (ruling §1, §4).
+
+    Record class only: the orders already happened; this reads them back and
+    writes the row. Never raises -- a failure is CRITICAL (any venue fill is
+    then an order without a record) but must not stop the book being saved.
+    """
+    try:
+        confirmed = _confirm_terminal(executor, model_key, results)
+        executions, open_orders = [], []
+        for r in results:
+            e = serialize_execution(r)
+            c = confirmed.get(str(e.get("order_id") or ""))
+            if c and c.get("broker_order"):
+                e["broker_order"] = c["broker_order"]
+            if c and not c["terminal"]:
+                # §4 case C: open past the run. Recorded on the row and paged;
+                # it stays stop_unprotected (the position is open and the
+                # order can fill at the open).
+                e["eod_open_order"] = True
+                open_orders.append({"client_order_id": e.get("order_id"),
+                                    "status": c.get("status"), "error": c.get("error")})
+            elif not e.get("executed") and executor.on_venue(model_key):
+                # §4 cases A/B: the venue rejected it, or accepted it for the
+                # next open and our deadline cancelled it. A detection by
+                # design, never stop_unprotected (consequence 1).
+                e["venue_constraint"] = e.get("constraint") or ""
+                e["constraint"] = EOD_STOP_NOT_EXECUTABLE
+                e["stop_unprotected"] = False
+            executions.append(e)
+        extra: dict[str, Any] = {}
+        if open_orders:
+            extra["eod_open_orders"] = open_orders
+        row = log_administrative_row(
+            model_key, run_date, admin_class=ADMIN_CLASS_EOD_POSITION_STOP,
+            cycle_id=executor.cycle_id, executions=executions,
+            portfolio_snapshot_after=snapshot_after,
+            prompt_version=settings.get("prompt_version", ""),
+            execution_mode=effective_mode(model_key, settings),
+            inception_date=settings["experiment_start_date"],
+            stop_evaluation=_stop_evaluation(pre_sweep, prices, results),
+            stop_dust_exempt=stop_dust_exempt, extra=extra)
+        logger.info("[%s] EOD administrative row: %d forced result(s), %d not executable, "
+                    "%d open", model_key, len(executions),
+                    sum(1 for e in executions if e.get("constraint") == EOD_STOP_NOT_EXECUTABLE),
+                    len(open_orders))
+        if open_orders:
+            send_alert("CRITICAL", f"EOD stop order left open at the venue: {model_key}",
+                       f"The end-of-day stop sweep placed order(s) that are not terminal "
+                       f"after the run: {open_orders}. An open order fills at the next open "
+                       f"against a book that has not moved. Recorded on the administrative row.",
+                       {"model": model_key, "cycle_id": executor.cycle_id},
+                       kind="eod_open_order",
+                       dedup_key=f"eod_open_order:{model_key}:{executor.cycle_id}")
+        return row
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] EOD administrative row NOT written: %s", model_key, e)
+        send_alert("CRITICAL", f"EOD administrative row not written: {model_key}",
+                   f"The end-of-day stop sweep produced forced results but their row could "
+                   f"not be written ({e}). Any venue fill is now an order without a record.",
+                   {"model": model_key}, kind="eod_admin_row_error",
+                   dedup_key=f"eod_admin_row_error:{model_key}:{run_date.strftime('%Y-%m-%d')}")
+        return None
+
+
 def run_one_model(
     model_key: str,
     cfg: dict[str, Any],
@@ -284,6 +403,10 @@ def run_one_model(
     # an EOD pass already handled this session, suspends the stop sweep only.
     # `eod_stops_suspended` names why; the snapshot below still runs.
     sweep_suspended = is_eod and bool(eod_stops_suspended)
+    # The EOD administrative row records each triggered holding as it stood
+    # before the sweep moved it (eod_stop_record_and_evaluation_ruling.md §1).
+    pre_sweep = ({t: (h.shares, h.avg_cost) for t, h in portfolio.holdings.items()}
+                 if is_eod else {})
     if sweep_suspended:
         logger.info("[%s] EOD stop sweep suspended (%s): no stop evaluated, no order",
                     model_key, eod_stops_suspended)
@@ -299,12 +422,18 @@ def run_one_model(
     # EOD pass: no MODEL trading — only snapshot, log, and report. The EOD cron
     # fires after market close to capture closing prices and generate the
     # daily report. It places no model trades, but it CAN submit per-position
-    # stop orders: the stop sweep above runs before this branch, and in broker
-    # modes a triggered stop goes to the venue. This branch writes no decision
-    # row for them. EOD admission coverage and the EOD administrative stop row
-    # land Thursday (hub ruling 2026-11-17; eod_stop_record_and_evaluation_ruling.md).
+    # stop orders: the stop sweep above runs before this branch (unless EOD
+    # admission suspended it), and in broker modes a triggered stop goes to the
+    # venue. Any forced result -- executed, rejected or left unexecuted --
+    # gets one ADMINISTRATIVE row in this book's decision log, written before
+    # the book is saved so both land in the same commit, after every order is
+    # confirmed terminal (eod_stop_record_and_evaluation_ruling.md §1, §4).
     if is_eod:
         snapshot_after = snapshot_before
+        if forced_results:
+            _write_eod_admin_row(model_key, portfolio, forced_results, pre_sweep, prices,
+                                 executor, settings, run_date, snapshot_after,
+                                 stop_dust_exempt, logger)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
         save_portfolio(portfolio)
         if not eod_valuation_ok:
