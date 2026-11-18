@@ -99,6 +99,18 @@ jobs:
             exit 0
           fi
           git commit -m "barrier probe $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # The probe must leave no tracked change but its record. On
+          # 2026-11-18 (run 44337543855) the CRITICAL alert's writes to
+          # data/alerts/ and logs/alerts.jsonl left the tree dirty, `git pull
+          # --rebase` refused five times and the record was lost. The probe
+          # now sends its alert without touching tracked files
+          # (scripts/barrier_probe._untracked_alert_files). If anything else
+          # ever leaves a tracked change, name it loudly and set it aside so
+          # the record still lands; it is never committed from here.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::warning::Probe left changes outside data/barrier_probe/ (not committed): $(git status --porcelain | tr '\n' ' ')"
+            git stash push --include-untracked -m "probe run ${GITHUB_RUN_ID}: stray changes"
+          fi
           # Same rebase-and-retry as intraday.yml. The probe touches only
           # data/barrier_probe/, so a cron tick landing first rebases cleanly.
           for attempt in 1 2 3 4 5; do

@@ -81,6 +81,7 @@ measured nothing; that is the rule-9 failure this exit code exists to prevent.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import json
 import logging
@@ -142,6 +143,14 @@ PRODUCTION_JOB = "run"
 BUSY_JOB_STATES = {"queued", "in_progress", "waiting", "pending", "requested"}
 
 EXIT_OK, EXIT_FAIL = 0, 1
+
+# Cleanup verification re-polls the venue's open orders in SYMBOL until none is
+# left or this deadline passes, and only then declares the cleanup's state. One
+# read is not enough: on 2026-11-18 (cycle 20261118T153801Z) the venue listed
+# the cleanup SELL as open about a second after it had filled, and that single
+# stale read raised a CRITICAL on a flat account.
+OPEN_ORDER_REPOLL_SECONDS = 30.0
+OPEN_ORDER_REPOLL_INTERVAL = 2.0
 
 
 class ProbeAbort(RuntimeError):
@@ -356,14 +365,52 @@ def position_explained(broker_qty: float, attributed_qty: float) -> bool:
     return abs(broker_qty - attributed_qty) < 1e-6
 
 
+@contextlib.contextmanager
+def _untracked_alert_files():
+    """Point the alert stack's three tracked files at a temporary directory.
+
+    The alert stack writes logs/alerts.jsonl, data/alerts/state.json and
+    data/alerts/email_log.jsonl, all tracked, and every intraday tick commits
+    them too. On 2026-11-18 (cycle 20261118T153801Z, run 44337543855) those
+    writes left the probe's checkout dirty, `git pull --rebase` refused five
+    times, and the probe record never reached origin. The probe must leave no
+    tracked change but its own record. Staging the alert files instead would
+    put the probe's commit on paths every tick rewrites (state.json is a full
+    rewrite, not an append), so a tick landing first would conflict the rebase:
+    the same lost record by another route.
+
+    What is lost: the probe's alert does not appear in the committed alert log
+    or the per-day cap. The probe's own record carries `critical_alert` and the
+    alert's title, and its dedup key carries the cycle id, so neither is needed.
+    The email is sent and awaited before the paths are restored.
+    """
+    import tempfile
+    from src.alerts import alert_state, alerter, email_alerts
+    saved = (alerter.ALERT_LOG, alert_state.STATE_FILE, email_alerts.EMAIL_LOG)
+    with tempfile.TemporaryDirectory(prefix="probe_alerts_") as tmp:
+        t = Path(tmp)
+        alerter.ALERT_LOG = t / "alerts.jsonl"
+        alert_state.STATE_FILE = t / "state.json"
+        email_alerts.EMAIL_LOG = t / "email_log.jsonl"
+        try:
+            yield
+        finally:
+            alerter.ALERT_LOG, alert_state.STATE_FILE, email_alerts.EMAIL_LOG = saved
+
+
 def raise_critical(title: str, body: str, context: dict) -> bool:
-    """CRITICAL alert for a probe integrity failure (a stuck or unexplained
-    position, or an unverified cleanup). Returns whether the dispatch was
-    attempted without raising."""
+    """CRITICAL alert for a probe integrity failure (a held or unexplained
+    position, an order left open, or a cleanup error). Returns whether the
+    dispatch was attempted without raising. Writes no tracked file."""
     try:
         from src.alerts.alerter import send_alert
-        send_alert("CRITICAL", title, body, context, kind="barrier_probe",
-                   dedup_key=f"barrier_probe:{context.get('cycle_id')}:{title}")
+        from src.alerts.events import wait_for_pending_sends
+        with _untracked_alert_files():
+            send_alert("CRITICAL", title, body, context, kind="barrier_probe",
+                       dedup_key=f"barrier_probe:{context.get('cycle_id')}:{title}")
+            # The send is asynchronous and settles into the state and email
+            # log; it must finish while those still point at the temp dir.
+            wait_for_pending_sends(timeout=60)
         return True
     except Exception:                       # noqa: BLE001 -- logged, never masks the run
         logger.exception("CRITICAL alert dispatch failed: %s", title)
@@ -587,14 +634,50 @@ def cleanup(client: BrokerClient, cycle_id: str, started: datetime,
     except Exception as e:                      # noqa: BLE001
         out["errors"].append(f"flatten: {type(e).__name__}: {e}")
     try:
-        opens, qty = _symbol_state(client)
+        opens, qty, polls, first_seen = _settled_symbol_state(client)
         out["open_orders_in_symbol"] = len(opens)
         out["position_in_symbol"] = qty
+        out["open_order_polls"] = polls
+        if first_seen:
+            # Every order seen open on any poll, with its state on the LAST
+            # poll that listed it. A stale listing that cleared shows here and
+            # nowhere else.
+            out["open_orders_seen"] = first_seen
+        if opens:
+            out["open_orders_at_deadline"] = [
+                {"client_order_id": o.get("client_order_id"), "side": o.get("side"),
+                 "status": o.get("status"), "qty": o.get("qty")} for o in opens]
         out["clean"] = (not opens and abs(qty) < 1e-9 and not out["errors"])
     except Exception as e:                      # noqa: BLE001
         out["errors"].append(f"verify: {type(e).__name__}: {e}")
         out["clean"] = False
     return out
+
+
+def _settled_symbol_state(client: BrokerClient, *,
+                          deadline_seconds: float | None = None,
+                          interval: float | None = None,
+                          sleep: Callable[[float], None] = time.sleep,
+                          clock: Callable[[], float] = time.monotonic,
+                          ) -> tuple[list[dict], float, int, list[dict]]:
+    """Read SYMBOL's open orders and position, re-polling while any order is
+    open, until none is or the deadline passes. Returns (opens on the last
+    poll, position on the last poll, polls made, every order seen open)."""
+    limit = OPEN_ORDER_REPOLL_SECONDS if deadline_seconds is None else deadline_seconds
+    step = OPEN_ORDER_REPOLL_INTERVAL if interval is None else interval
+    started = clock()
+    polls = 0
+    seen: dict[str, dict] = {}
+    while True:
+        opens, qty = _symbol_state(client)
+        polls += 1
+        for o in opens:
+            seen[str(o.get("client_order_id"))] = {
+                "client_order_id": o.get("client_order_id"), "side": o.get("side"),
+                "status": o.get("status"), "poll": polls}
+        if not opens or clock() - started >= limit:
+            return opens, qty, polls, list(seen.values())
+        sleep(step)
 
 
 def settle_record(client: Any, record: dict, cycle_id: str, started: datetime,
@@ -641,25 +724,59 @@ def settle_record(client: Any, record: dict, cycle_id: str, started: datetime,
         code = EXIT_FAIL
 
     delta = record.get("position_delta")
-    unclean = (not recovery) and not (record.get("cleanup") or {}).get("clean")
-    if delta is None:
-        held_msg = (f"The probe could not account for its {SYMBOL} position "
-                    f"({record.get('position_error')}). It is unaccounted, so level-2 "
-                    "reconciliation will halt every book on it.")
-        stuck = True
-    else:
-        held = attributed + sum(delta.values())
-        stuck = abs(held) > 1e-9
-        held_msg = (f"The probe holds {held:g} {SYMBOL} after its run. It is recorded, so "
-                    "level 2 reconciles it without halting; the next scheduled run "
-                    "closes it first.")
+    cleanup = record.get("cleanup") or {}
+    unclean = (not recovery) and not cleanup.get("clean")
+    held = None if delta is None else attributed + sum(delta.values())
+    stuck = delta is None or abs(held) > 1e-9
     if stuck or unclean:
         code = EXIT_FAIL
+        title, body = alert_text(delta, held, record.get("position_error"), cleanup)
+        record["critical_alert_title"] = title
         record["critical_alert"] = raise_critical(
-            f"Barrier probe: {SYMBOL} not flat in the paper account",
-            f"{held_msg} Cleanup: {record.get('cleanup')}",
+            title, f"{body} Cleanup: {cleanup}",
             {"cycle_id": cycle_id, "position_delta": delta, "attributed_before": attributed})
     return code
+
+
+def alert_text(delta: dict | None, held: float | None, position_error: str | None,
+               cleanup: dict) -> tuple[str, str]:
+    """Title and first sentences of the probe's CRITICAL, stating what is true.
+
+    The title names the worst condition present, in this order: a position the
+    records cannot explain, a position held, an order still open, a cleanup
+    error. "Not flat" is said only when the probe holds a position: on
+    2026-11-18 the old single title said "F not flat" of a flat account whose
+    only fault was a stale open-order read.
+    """
+    opens = int(cleanup.get("open_orders_in_symbol") or 0)
+    errors = list(cleanup.get("errors") or [])
+    parts: list[str] = []
+    if delta is None:
+        title = f"Barrier probe: {SYMBOL} position unaccounted in the paper account"
+        parts.append(f"The probe could not account for its {SYMBOL} position "
+                     f"({position_error}). It is unaccounted, so level-2 reconciliation "
+                     "will halt every book on it.")
+    elif held is not None and abs(held) > 1e-9:
+        title = f"Barrier probe: {SYMBOL} position held after the run ({held:g} sh)"
+        parts.append(f"The probe holds {held:g} {SYMBOL} after its run. It is recorded, so "
+                     "level 2 reconciles it without halting; the next scheduled run "
+                     "closes it first.")
+    elif opens:
+        title = f"Barrier probe: open order in {SYMBOL} after cleanup (position flat)"
+    elif errors:
+        title = f"Barrier probe: cleanup errors (position flat, no open order in {SYMBOL})"
+    else:
+        title = "Barrier probe: cleanup not verified"
+    if delta is not None and (held is None or abs(held) <= 1e-9):
+        parts.append(f"The probe's {SYMBOL} position is flat.")
+    if opens:
+        parts.append(f"{opens} order(s) in {SYMBOL} were still listed open at the venue "
+                     f"after {cleanup.get('open_order_polls', 1)} poll(s) over the re-poll "
+                     "deadline; an open order can fill at the next open against books "
+                     "that have not moved.")
+    if errors:
+        parts.append(f"Cleanup errors: {errors}.")
+    return title, " ".join(parts)
 
 
 def main(argv: list[str] | None = None) -> int:
