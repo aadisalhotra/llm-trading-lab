@@ -171,7 +171,7 @@
       "decision_rule": "Report Delta_m and CI per model with deployed configuration; interpret as a comparison of deployed agents, not intrinsic model stochasticity; use Delta_m to qualify RQ1-RQ5 reproducibility. No NHST.",
       "in_fdr_family": false,
       "parameters": { "K": 10, "M": 30, "B": 10000 },
-      "notes": "K, M pinned before OSF deposit; recommended K >= 10, M >= 30.",
+      "notes": "K = 10 and M = 30, registered in the RQ6 entry of docs/PRE_REGISTRATION.md, which governs; this file carries the same values.",
       "per_model_api_configuration": {
         "note": "Regenerated from the canonical Per-Model API Configuration table in the RQ6 entry of docs/PRE_REGISTRATION.md. Pin class: D = dated immutable snapshot id; C = the provider's canonical undated id, the most specific callable identifier, with no dated snapshot id confirmed beneath it; P = preview alias. All six identifiers are the ids sent and echoed on every November record (ledger cohort_as_run_2026_10_26). Cells in the four configuration columns are filled by the per-model API-configuration verification (a hard pre-deposit dependency of RQ6); DeepSeek's row is verified.",
         "columns": ["model", "provider", "pinned_identifier_class", "thinking_reasoning_mode", "reasoning_effort_provider_standard", "temperature_behavior", "temperature_value_used"],
