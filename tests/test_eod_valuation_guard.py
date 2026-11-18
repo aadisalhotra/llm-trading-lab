@@ -53,11 +53,12 @@ def _book(key):
 @pytest.fixture
 def eod(monkeypatch):
     """Run the EOD pass with the given closes; return what it did."""
-    def run(closes):
+    def run(closes, ledger=({}, None), spacing_withhold=False):
         calls = {k: [] for k in ("alerts", "daily_rows", "intraday_rows", "saved",
                                  "recon", "descriptor", "dashboard", "report",
                                  "leaderboard", "summary", "budget", "index",
-                                 "availability")}
+                                 "availability", "eod_mark", "vcheck", "stop_checks",
+                                 "withholds")}
         books = {k: _book(k) for k in HOLDINGS}
 
         class Frozen(datetime):
@@ -91,7 +92,7 @@ def eod(monkeypatch):
         sp(pipeline, "load_portfolio", lambda k: books[k])
         sp(pipeline, "save_portfolio", lambda p: calls["saved"].append(
             (p.model_key, p.intraday.runs_today)))
-        sp(pipeline, "check_position_stops", lambda *_: [])
+        sp(pipeline, "check_position_stops", lambda *_: calls["stop_checks"].append(1) or [])
         sp(pipeline, "get_adapter", lambda *a: SimpleNamespace())
         sp(pipeline, "hash_inputs", lambda *_: "h")
         sp(pipeline, "log_intraday_snapshot", lambda **k: calls["intraday_rows"].append(k["model_key"]))
@@ -114,6 +115,16 @@ def eod(monkeypatch):
         sp(pipeline, "send_heartbeat", lambda **k: None)
         sp(pipeline, "send_alert", lambda sev, title, *a, **k: calls["alerts"].append(
             (sev, title, k.get("kind"))))
+        # EOD admission (Thursday 2026-11-19 package): stub its I/O too, so
+        # these tests never touch data/state or data/admission.
+        sp(pipeline, "load_ledger", lambda *a, **k: ledger)
+        sp(pipeline, "check_spacing", lambda *a, **k: SimpleNamespace(
+            withhold=spacing_withhold, unreadable=["data/trades/book_a_2026-11.jsonl"]
+            if spacing_withhold else [], reason="read_error" if spacing_withhold else "ok",
+            skip=False))
+        sp(pipeline, "record_withhold", lambda row, **k: calls["withholds"].append(row) or True)
+        sp(pipeline, "mark_boundary_handled", lambda *a, **k: calls["eod_mark"].append(a))
+        sp(pipeline, "run_shadow_check", lambda *a, **k: calls["vcheck"].append(k["scope"]) or [])
         rc = pipeline.run_pipeline(mode="end-of-day")
         return rc, calls
     return run
@@ -182,3 +193,37 @@ def test_clean_valuation_runs_the_full_eod_unchanged(eod, closes):
     assert sorted(calls["saved"]) == [("book_a", 13), ("book_b", 13)]
     assert calls["recon"] == ["cyc"] and calls["descriptor"] == ["2026-11-12"]
     assert calls["budget"] == [1]
+
+
+# ------------------------------------------- EOD admission (rev. 5 section 2)
+def test_clean_eod_runs_the_sweep_marks_the_eod_key_and_runs_v_shadow(eod):
+    rc, calls = eod(CLEAN)
+    assert rc == 0 and len(calls["stop_checks"]) == 2          # one sweep per book
+    assert calls["eod_mark"] == [("2026-11-12", "EOD")]
+    assert calls["vcheck"] == ["EOD"] and calls["withholds"] == []
+
+
+def test_unreadable_ledger_suspends_only_the_eod_stop_sweep(eod):
+    rc, calls = eod(CLEAN, ledger=({}, ValueError("torn")))
+    assert rc == 0 and calls["stop_checks"] == []              # no stop evaluated
+    assert calls["daily_rows"] and calls["report"] and calls["summary"]   # rest ran
+    (w,) = calls["withholds"]
+    assert w["event"] == "TICK_WITHHELD_GUARD_UNREADABLE" and w["scope"] == "EOD"
+    assert w["suspended"] == "eod_stop_sweep" and w["boundary_slot"] == "EOD"
+    assert any(sev == "CRITICAL" and "EOD" in t for sev, t, _ in calls["alerts"])
+    # Never marked over an unreadable ledger (the mark would self-heal it).
+    assert calls["eod_mark"] == []
+
+
+def test_duplicate_eod_after_a_handled_one_submits_nothing(eod):
+    rc, calls = eod(CLEAN, ledger=({"2026-11-12": ["15:30", "EOD"]}, None))
+    assert rc == 0 and calls["stop_checks"] == [] and calls["withholds"] == []
+    assert calls["daily_rows"]                                  # housekeeping still ran
+
+
+def test_unreadable_decision_logs_suspend_the_eod_sweep(eod):
+    rc, calls = eod(CLEAN, spacing_withhold=True)
+    assert rc == 0 and calls["stop_checks"] == []
+    (w,) = calls["withholds"]
+    assert w["guard"] == "tick_spacing" and w["scope"] == "EOD"
+    assert calls["eod_mark"] == [("2026-11-12", "EOD")]         # ledger itself was readable

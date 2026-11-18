@@ -209,17 +209,19 @@ multi-trigger redundancy) cleanly no-ops instead of double-trading. The ledger i
 committed in the same commit as the decision logs, so a boundary's marker exists
 iff its decisions were durably committed.
 
-The **EOD wrap-up is not guarded yet.** It places no *model* trades, but it
-**can submit per-position stop orders**. `run_one_model` runs the stop sweep
-before its `is_eod` early-return, and in broker modes a triggered stop goes to
-the venue. That early-return writes no decision row. So EOD does carry
-double-trade risk. A second EOD run (the 22:00 UTC backup beside the chain
-post-close handoff) can re-run the stop sweep on a book the first run failed to
-commit. Its per-day idempotency today is `log_daily_snapshot` date-dedup, the
-once-per-day digest and `_eod_skip_reason`. **EOD admission coverage is
-pending** (hub ruling 2026-11-17, Thursday's package). That covers both guards
-and the pre-trade venue check, run before the stop sweep under an EOD-specific
-boundary key (one EOD per session).
+The **EOD wrap-up is guarded under its own key** (`"EOD"`, one per session;
+`tick_admission_guards_ruling.md` rev. 5 §2). It places no *model* trades, but
+it **can submit per-position stop orders**: `run_one_model` runs the stop sweep
+before its `is_eod` branch, and in broker modes a triggered stop goes to the
+venue. Before that sweep the pipeline checks this ledger under the EOD key, the
+spacing guard's fail-closed blocking conditions, and the pre-trade venue check
+(V, in shadow). An unreadable guard file withholds, and an EOD key already
+handled this session suspends: either way **only the stop sweep** is suspended,
+and the closing snapshot and report still run. An EOD withhold is recorded in
+`data/admission/{YYYY-MM}.jsonl` with `scope: "EOD"`; it is not a G-COMPLETE
+miss and counts toward unprotected time. The EOD key is marked at the end of the
+pass, and never over an unreadable ledger (the mark would self-heal the file and
+silently re-arm the intraday guard).
 
 > ⚠️ **TRIPWIRE — do not remove the intraday concurrency group.** The guard is a
 > read-check-then-write and is race-free *only* because

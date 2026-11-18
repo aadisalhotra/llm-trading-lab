@@ -80,6 +80,10 @@ def withhold_in_slot(admission_lines: Iterable[str], slot_utc: datetime) -> dict
             continue
         if not isinstance(rec, dict) or not str(rec.get("event", "")).startswith(WITHHELD_PREFIX):
             continue
+        # An EOD-scope withhold suspended the after-close stop sweep, not a
+        # decision tick: it never explains a missed intraday slot.
+        if rec.get("scope") == "EOD":
+            continue
         try:
             t = parse_utc(str(rec.get("timestamp", "")))
         except ValueError:

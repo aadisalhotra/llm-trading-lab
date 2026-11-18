@@ -89,10 +89,19 @@ from .logging import (
 from .logging.tick_admission import (
     GUARD_BOUNDARY_LEDGER,
     GUARD_SPACING,
+    SCOPE_EOD,
+    SCOPE_INTRADAY,
     TICK_WITHHELD_GUARD_UNREADABLE,
     build_withhold_event,
     record_withhold,
 )
+from .logging.venue_check import run_shadow_check
+
+# The EOD boundary key (tick_admission_guards_ruling.md rev. 5 section 2): one
+# EOD per session, in the same ledger as the intraday :00/:30 slots.
+EOD_SLOT = "EOD"
+# settings["mode"] values that reach a venue (src/execution/broker.BROKER_MODES).
+_VENUE_MODES = ("broker_paper", "live")
 from .reports import generate_daily_report
 from .model_versions import detect_version_transition, record_observation
 from .data.price_validity import (
@@ -243,6 +252,7 @@ def run_one_model(
     eod_valuation_ok: bool = True,
     ingestion: PriceIngestion | None = None,
     marks_by_book: dict[str, dict[str, tuple[float, str]]] | None = None,
+    eod_stops_suspended: str | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
 
@@ -270,8 +280,16 @@ def run_one_model(
     # pass whose valuation aborted: its one CRITICAL already names every
     # missing close, and nothing is sized or valued.
     valuation_aborted = is_eod and not eod_valuation_ok
-    forced_results, stop_dust_exempt = ([], []) if valuation_aborted else _position_stop_sweep(
-        model_key, portfolio, prices, executor, session_date_str, logger)
+    # EOD admission (rev. 5 section 2): a withheld EOD pass, or a duplicate of
+    # an EOD pass already handled this session, suspends the stop sweep only.
+    # `eod_stops_suspended` names why; the snapshot below still runs.
+    sweep_suspended = is_eod and bool(eod_stops_suspended)
+    if sweep_suspended:
+        logger.info("[%s] EOD stop sweep suspended (%s): no stop evaluated, no order",
+                    model_key, eod_stops_suspended)
+    forced_results, stop_dust_exempt = (
+        ([], []) if (valuation_aborted or sweep_suspended) else _position_stop_sweep(
+            model_key, portfolio, prices, executor, session_date_str, logger))
 
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
@@ -731,17 +749,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # the same boundary. Checked BEFORE the data fetch and the model loop, so a
     # duplicate exits having done nothing.
     #
-    # EOD is not guarded HERE. It places no MODEL trades, but it CAN submit
-    # per-position stop orders: run_one_model runs the stop sweep
-    # (_position_stop_sweep -> executor.force_liquidate -> the venue in broker
-    # modes) BEFORE its is_eod early-return, and that return writes no decision
-    # row. Its per-day idempotency today is _eod_skip_reason above, which runs
-    # ahead of the first book load, plus its deliberate two-trigger redundancy
-    # (chain handoff + 22:00 UTC cron) — neither of which stops a second EOD run
-    # from re-running the stop sweep on a book the first run failed to commit.
-    # EOD admission coverage (both guards and (V) before the stop sweep, an
-    # EOD-specific boundary key) is PENDING: hub ruling 2026-11-17, Thursday's
-    # package.
+    # EOD is not guarded HERE but in the EOD admission block below. It places
+    # no MODEL trades, but it CAN submit per-position stop orders: run_one_model
+    # runs the stop sweep (_position_stop_sweep -> executor.force_liquidate ->
+    # the venue in broker modes) BEFORE its is_eod branch. EOD admission (rev. 5
+    # section 2): this ledger under the EOD key (day, "EOD"), the spacing
+    # guard's fail-closed blocking conditions, and (V) in shadow all run before
+    # that sweep; a withhold, or an EOD key already handled this session,
+    # suspends the stop sweep only. _eod_skip_reason above still skips a whole
+    # pass whose day's rows already exist.
     #
     # RACE-FREEDOM DEPENDS ON THE intraday-pipeline CONCURRENCY GROUP in
     # .github/workflows/intraday.yml (cancel-in-progress: false): it serializes
@@ -844,6 +860,92 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             )
             record_skip(verdict, run_date.astimezone(timezone.utc))
             return 0
+
+    # --- EOD admission (tick_admission_guards_ruling.md rev. 5 section 2) ----
+    # The EOD pass can submit orders (the stop sweep in run_one_model), so the
+    # admission point exists here too. Both guards run before that sweep under
+    # an EOD boundary key, one EOD per session. At EOD a withhold suspends the
+    # stop sweep ONLY: the closing snapshot, the report and the digest submit
+    # nothing and still run. An EOD withhold is recorded under the same class
+    # with scope EOD; it is not a G-COMPLETE miss and it counts toward
+    # unprotected time.
+    #
+    # The spacing guard contributes its fail-closed blocking conditions only.
+    # Its 20-minute skip rule answers "did the cohort just decide?", which the
+    # EOD pass never does; one EOD per session is the EOD boundary key's job.
+    eod_stops_suspended: str | None = None
+    eod_ledger_readable = True
+    if is_eod:
+        e_day = run_date.strftime("%Y-%m-%d")
+        _eledger, _eledger_err = load_ledger()
+        if _eledger_err is not None:
+            eod_ledger_readable = False
+            eod_stops_suspended = "guard_unreadable:boundary_ledger"
+            logger.error("Idempotency ledger unreadable (%s) — WITHHOLDING the EOD stop "
+                         "sweep for %s (snapshot and report still run)", _eledger_err, e_day)
+            send_alert("CRITICAL", "Duplicate guard unreadable at EOD: data/state/handled_boundaries.json",
+                       f"data/state/handled_boundaries.json could not be read ({_eledger_err}). "
+                       f"The {e_day} end-of-day stop sweep is WITHHELD: no stop was evaluated "
+                       f"and no order was submitted. The closing snapshot and report ran.",
+                       {"file": "data/state/handled_boundaries.json",
+                        "event": TICK_WITHHELD_GUARD_UNREADABLE, "scope": SCOPE_EOD},
+                       kind="idempotency_ledger", dedup_key=f"idempotency_ledger_unreadable_eod:{e_day}")
+            try:
+                record_withhold(build_withhold_event(
+                    TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_BOUNDARY_LEDGER,
+                    now_utc=run_date.astimezone(timezone.utc),
+                    books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                    files=["data/state/handled_boundaries.json"], reason="ledger_unreadable",
+                    detail=str(_eledger_err), boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
+            except Exception as e:  # noqa: BLE001 — the sweep is suspended regardless
+                logger.error("EOD withhold event could not be written: %s", e)
+        elif is_boundary_handled(_eledger, e_day, EOD_SLOT):
+            # A duplicate EOD pass after a committed one submits nothing
+            # (demonstration (x), case 3). The rest of the pass is housekeeping
+            # with its own date de-duplication.
+            eod_stops_suspended = "eod_boundary_already_handled"
+            logger.info("EOD boundary %s already handled — stop sweep suspended "
+                        "(duplicate EOD pass submits nothing)", e_day)
+        if not force_trade and eod_stops_suspended is None:
+            e_verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
+            if e_verdict.withhold:
+                eod_stops_suspended = f"guard_unreadable:tick_spacing:{e_verdict.reason}"
+                logger.error("Spacing guard cannot answer at EOD (%s) — WITHHOLDING the EOD "
+                             "stop sweep", e_verdict.reason)
+                send_alert("CRITICAL", "Duplicate guard unreadable at EOD: decision logs",
+                           f"The spacing guard could not read the decision logs (verdict "
+                           f"{e_verdict.reason}; files {list(e_verdict.unreadable)}). The {e_day} "
+                           f"end-of-day stop sweep is WITHHELD: no stop was evaluated and no "
+                           f"order was submitted. The closing snapshot and report ran.",
+                           {"reason": e_verdict.reason, "scope": SCOPE_EOD},
+                           kind="guard_unreadable", dedup_key=f"guard_unreadable_eod:{e_day}")
+                try:
+                    record_withhold(build_withhold_event(
+                        TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_SPACING,
+                        now_utc=run_date.astimezone(timezone.utc),
+                        books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                        files=list(e_verdict.unreadable), reason=e_verdict.reason,
+                        boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
+                except Exception as e:  # noqa: BLE001
+                    logger.error("EOD withhold event could not be written: %s", e)
+
+    # --- (V) pre-trade venue check, SHADOW (rev. 5 section 2; condition 3) --
+    # Broker modes only, ahead of the stop sweep and of the fetch-start stamp,
+    # so the registered latency stages are unaffected. Logging-only: it records
+    # one verdict per venue book and pages, and changes nothing about this tick.
+    # It builds its own read-only venue client; the Executor and the order
+    # path are untouched.
+    if settings.get("mode") in _VENUE_MODES:
+        try:
+            _vbooks = venue_book_keys(
+                [mk for mk, c in settings["models"].items() if c.get("enabled", True)], settings)
+            run_shadow_check(
+                settings, _vbooks, datetime.now(timezone.utc),
+                scope=SCOPE_EOD if is_eod else SCOPE_INTRADAY,
+                boundary=((run_date.strftime("%Y-%m-%d"), EOD_SLOT) if is_eod
+                          else boundary_parts(run_date)))
+        except Exception as e:  # noqa: BLE001 — the shadow must never cost a tick
+            logger.exception("(V) shadow check could not start: %s", e)
 
     # Pull market data — intraday 30m bars by default, daily fallback at EOD
     # so the closing prices match what the daily analytics expect.
@@ -990,6 +1092,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 eod_valuation_ok=not eod_bad_closes,
                 ingestion=ingestion,
                 marks_by_book=marks_by_book,
+                eod_stops_suspended=eod_stops_suspended,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)
@@ -1083,11 +1186,19 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # or when that cannot be determined. It keys on run failure, so it does not
     # see the fourth route (the run succeeds); there, post-cycle reconciliation
     # covers only the pre-save half, by halting every venue book. The post-save
-    # half is visible only to the pre-trade venue check (V), not yet landed.
+    # half is visible only to the pre-trade venue check (V), which runs in
+    # SHADOW (src/logging/venue_check.py: verdicts recorded, nothing withheld).
     # Gate B is met by (V) enforcing; on the fail-stop alone, go-live also
     # requires the nightly offline order-id set difference (ruling section 3).
     if not is_eod:
         mark_boundary_handled(*boundary_parts(run_date))
+    elif eod_ledger_readable:
+        # One EOD per session: a later EOD pass (backup cron, late firing)
+        # finds this key and suspends its stop sweep. Not marked over an
+        # unreadable ledger: mark_boundary_handled self-heals a corrupt file by
+        # overwriting it, which would silently re-arm the intraday guard that
+        # Gate A keeps withholding until a person repairs the file.
+        mark_boundary_handled(run_date.strftime("%Y-%m-%d"), EOD_SLOT)
 
     # Rendered-prompt hash check (hub ruling 2026-10-30; infrastructure class,
     # no change slot, no version boundary). Runs only now, after every model
