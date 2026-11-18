@@ -44,6 +44,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.data.market_data import session_bounds  # noqa: E402
+from src.record_class import is_administrative_row  # noqa: E402
 
 ET = ZoneInfo("America/New_York")
 TRADES_DIR = ROOT / "data" / "trades"
@@ -96,6 +97,11 @@ def read_ticks(day: date, trades_dir: Path) -> tuple[dict, dict]:
                 except json.JSONDecodeError as exc:
                     raise RuntimeError(f"{path.name}:{lineno} is not valid JSON: {exc}") from exc
                 if rec.get("date") != day_str:
+                    continue
+                if is_administrative_row(rec):
+                    # No model call, so never a tick (an EOD stop row is after
+                    # the close and would otherwise read as AT/AFTER CLOSE).
+                    non_ticks[book].append(rec.get("timestamp", "?"))
                     continue
                 fetched = rec.get("fetch_started_at")
                 if fetched:

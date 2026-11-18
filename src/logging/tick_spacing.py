@@ -53,6 +53,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from ..config_loader import STATE_DIR, TRADES_DIR
+from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.tick_spacing")
 
@@ -224,9 +225,35 @@ def _scan_logs(
             torn.append(str(path))
             continue
         usable += 1
+        if is_administrative_row(row):
+            # The final row answers the read (Gate A's blocking conditions are
+            # about readability, and it is readable), but it records no model
+            # call, so it is not "last decided" (eod_stop ruling §1). Rare --
+            # an EOD stop row, a boundary force-cover -- so a full read is fine.
+            stamp = _last_model_call_stamp(path)
+            if stamp is None:
+                continue
         if latest is None or stamp > latest:
             latest = stamp
     return _LogScan(latest, present, usable, tuple(raised), tuple(torn))
+
+
+def _last_model_call_stamp(path: Path) -> datetime | None:
+    """Timestamp of the last parseable model-call row in `path`, or None."""
+    best: datetime | None = None
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and not is_administrative_row(row):
+                stamp = _parse_utc(row.get("timestamp"))
+                if stamp is not None:
+                    best = stamp
+    return best
 
 
 def last_cohort_decision_utc(

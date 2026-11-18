@@ -50,6 +50,7 @@ from typing import Any, Iterable
 from ..config_loader import RECONCILIATION_DIR, TRADES_DIR
 from ..execution.broker import TERMINAL_STATES
 from ..execution.executor import CONSTRAINT_WASH_TRADE_BLOCK, REGISTERED_SKIP_CLASSES
+from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.analytics.execution_metrics")
 
@@ -145,7 +146,10 @@ def score_cycles(records: Iterable[dict[str, Any]],
     for rec in records:
         if rec.get("execution_mode") not in BROKER_MODES:
             continue
-        if not rec.get("api_success", True):
+        # An administrative row (an EOD stop) has no model call, so its null
+        # api_success is not "no decision": its forced executions are scored
+        # exactly as an intraday forced result is (ruling §1, §6 item 3).
+        if not rec.get("api_success", True) and not is_administrative_row(rec):
             excluded += 1
             continue
         cycles += 1
