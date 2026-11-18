@@ -3721,6 +3721,44 @@
           "tests": "tests/test_digest_state_race.py (4), running the production interleaving with real threads: the event's send is released only while the digest's send is in flight. Without the fix, 3 fail (disposition 'queued', milestone lost, the next evening emails instead of folding); with it, 4 pass. Full suite 986 passed locally."
         },
         "corrected_statement": "reported_once is still empty on main (the 2026-11-13 write was overwritten). After this fix lands, GPT's condition emails once more at the first end-of-day run where it persists unchanged, then folds into the digest's 'Continuing conditions'. If the fix lands before Monday 2026-11-16 end of day, that is one email on 11-16 and a fold from 11-17. A changed balance or carry emails again by design."
+      },
+      {
+        "id": "gate_a_and_fail_stop_2026_11_18",
+        "date": "2026-11-18",
+        "type": "admission_control_change",
+        "class": "Admission class (tick_admission_guards_ruling.md §2), not executor-class: code that decides whether a tick occurs, evaluated before a book's first possible order. The corrected-executor count is unaffected, subject to the ruling's four §3 conditions.",
+        "scope": "Every intraday tick, all books. End-of-day runs are not guarded by either duplicate guard. The fail-stop acts on the intraday workflow as a whole.",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/tick_admission_guards_ruling.md",
+            "revision": "rev. 4",
+            "sha256_prefix": "75ab843b2188c8a2",
+            "bytes": 33215,
+            "commit": "04131d7a7 (sha256 and bytes are of the committed blob, LF form)"
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-17, delivered inline: Gate A plus the fail-stop per rev. 4, staged on a review branch, landing after the 2026-11-18 close on sign-off. Rulings on the staging report: non-UTF-8 blocks (decision logs are ASCII-only, so a non-UTF-8 byte means corruption, never a torn write); all-empty blocks; usable row = valid JSON with a readable timestamp; the GitHub check before the venue answers clear only on a positive never-started; --force-trade unchanged. Additions: this entry, and single classification of a withheld tick."
+        },
+        "commits": "ada15643a (Gate A), 0ed0ea861 (fail-stop), fd3005ea2 (restatements), 65fdb541b (replay instrument), dbfe6c049 (GitHub check: clear only on a positive never-started), 26520e25c (single classification of a withheld tick).",
+        "effective_from": "The first intraday cycle after the push: the 2026-11-19 09:35 ET cycle if pushed after the 2026-11-18 close. If the push slips, this entry is corrected before it lands.",
+        "change": {
+          "guards_block": "Both duplicate-trade guards now WITHHOLD the tick on the registered blocking conditions (ruling §3) instead of trading without protection. Boundary ledger: present and not parseable as a ledger (an object of day -> list of slot strings). Spacing guard: any enabled book's present decision log raises on read (an OSError, or a final row that is not valid UTF-8), or logs are present and none yields a usable final row (valid JSON with a readable timestamp). An absent file is normal and proceeds. One torn final row with other books readable remains an answer.",
+          "withhold": "No model prompted and no order possible: both guards sit before the data fetch, and the pre-prompt stop sweep runs inside the model loop after it. A CRITICAL ('Duplicate guard unreadable: <file>') and a watchdog /fail ping on every withheld tick. The run exits 0 so the record commits.",
+          "record_class": "TICK_WITHHELD_GUARD_UNREADABLE (ruling §4): one event per withheld tick, all books, correlated across the cohort by construction; scored by G-COMPLETE as a missing tick, never a G-EXEC event. Written to data/admission/{YYYY-MM}.jsonl by src/logging/tick_admission.py, append-only. It is the only §4 class in code; the other four land with (V) and the offline replay.",
+          "single_classification": "A withheld slot is recorded once in data/cycle_completeness/{YYYY-MM}.jsonl under its TICK_WITHHELD_* cause, never as MISSED_CYCLE, and raises no 'produced no cycle' CRITICAL from the end-of-day sweep. The real-time watcher keeps its page; when it can see the admission record, its body says 'withheld by the admission guard'.",
+          "crash_fixed": "The non-UTF-8 final row found 2026-11-17 raised UnicodeDecodeError out of the spacing guard and crashed the run. It now withholds cleanly.",
+          "fail_stop": "New intraday.yml job `fail-stop`, on failure or cancellation of the run job. scripts/fail_stop.py determines whether the run submitted any order, from the venue by order id in the run's window. The Actions jobs API may answer clear without the venue only when it positively shows 'Run pipeline' never started; any doubt asks the venue. The disable step disables intraday.yml and cancels queued runs unless the verdict is exactly 'clear', so a crash, timeout or missing verdict disables. The workflow stays disabled until a person reconciles the books to the venue and ledgers the re-enable (docs/MONITORING.md). Limit, per the ruling: it keys on run failure, so it does not see the fourth route; the post-save half of that route is visible only to (V)."
+        },
+        "conditions": {
+          "1_diff_scope": "No line on the path from a parsed decision to a submitted order. Files: src/logging/{tick_spacing,boundary_ledger,tick_admission}.py; src/pipeline.py (guard block, its helper, the marking note); src/execution/reconciliation.py (docstring only); src/cycle_watch.py; src/alerts/events.py (detect_missed_cycles); scripts/{fail_stop,replay_gate_a_verdicts,check_slot_cycle}.py; .github/workflows/intraday.yml (new job only); docs/MONITORING.md; tests. executor.py and broker.py are untouched.",
+          "2_verdict_replay": "scripts/replay_gate_a_verdicts.py, both guards at 71d025fb4 and as landed, against every intraday tick's committed pre-state (the tick commit's parent) at the tick's own cycle_id. Since 2026-11-11: 63 ticks, 0 differences, every tick proceeds. Since 2026-10-29: 178 ticks, 0 differences, including the real first tick of November (2026-11-02 09:30, no_prior_tick, proceeds).",
+          "3_shadow": "Not applicable to Gate A or the fail-stop; it governs (V), which has not landed.",
+          "4_demonstrations": "(i), (ii), (v): tests/test_gate_a_admission.py drives the real run_pipeline through the real guards against tmp_path files only. (ix): tests/test_fail_stop.py, the decision logic plus the disable step's actual bash against a stub curl. None touches data/, the venue or a validation book. The live form of (ix) is a throwaway probe workflow against a dummy target workflow, queued for after landing."
+        },
+        "known_limits": {
+          "force_trade": "--force-trade bypasses the spacing guard entirely (existing behaviour, ruled unchanged). The ledger guard still applies under it.",
+          "stops_suspended": "A withheld tick evaluates no per-position stops (ruling §2). Every tick withholds until the named file is repaired, so time-to-repair is a risk parameter.",
+          "github_behaviour_unproven_live": "Three GitHub behaviours the fail-stop relies on are not yet observed live: an always() job running after a cancellation, GITHUB_TOKEN with actions: write disabling a workflow, and queued runs of a disabled workflow. The Thursday probe answers them."
+        }
       }
     ]
   }
