@@ -53,12 +53,21 @@ class _Order:
         return {"status": self.status, "client_order_id": f"gpt-{CYC}-00-a0"}
 
 
-def _executor(final_status="filled", venue=True, broken=False):
+def _executor(final_status="filled", venue=True, broken=False, clock_open=False):
+    """`broken` breaks the order re-read; `clock_open` is what the venue clock
+    says (None = the clock read fails)."""
     class B:
         def get_order_by_client_id(self, oid):
             if broken:
                 raise ConnectionError("venue down")
             return _Order(final_status)
+
+        def _request(self, method, path, params=None, body=None):
+            assert (method, path) == ("GET", "/v2/clock")
+            if clock_open is None:
+                raise ConnectionError("clock down")
+            return {"is_open": clock_open, "timestamp": "2026-11-19T16:05:12-05:00",
+                    "next_open": "2026-11-20T09:30:00-05:00"}
     return SimpleNamespace(cycle_id=CYC, broker=B() if venue else None,
                            on_venue=lambda k: venue)
 
@@ -108,7 +117,9 @@ def test_cancelled_at_deadline_is_not_executable_not_unprotected(tmp_trades):
                  _executor("canceled"), tmp)
     (e,) = row["executions"]
     assert e["constraint"] == EOD_STOP_NOT_EXECUTABLE and e["stop_unprotected"] is False
-    assert e["venue_constraint"] == "UNFILLED_AT_DEADLINE" and sent == []
+    assert e["venue_constraint"] == "UNFILLED_AT_DEADLINE"
+    assert row["venue_clock"]["is_open"] is False
+    assert sent == [("WARN", "EOD stop not executable (market closed): gpt")]
 
 
 def test_rejected_at_submission_is_not_executable(tmp_trades):
@@ -117,7 +128,8 @@ def test_rejected_at_submission_is_not_executable(tmp_trades):
     row = _write([_result(False, None)], _executor(broken=True), tmp)
     (e,) = row["executions"]
     assert e["constraint"] == EOD_STOP_NOT_EXECUTABLE and e["stop_unprotected"] is False
-    assert "eod_open_orders" not in row and sent == []
+    assert "eod_open_orders" not in row
+    assert sent == [("WARN", "EOD stop not executable (market closed): gpt")]
 
 
 def test_order_open_past_the_run_is_critical_on_the_row(tmp_trades):
@@ -143,6 +155,7 @@ def test_paper_book_records_the_book_entry(tmp_trades):
                  _executor(venue=False), tmp)
     (e,) = row["executions"]
     assert e["executed"] and e["order_id"] == "FORCED_POSITION_STOP" and sent == []
+    assert row["venue_clock"] is None                    # paper: no venue, no clock
 
 
 def test_writer_failure_is_critical_and_never_raises(tmp_trades, monkeypatch):
@@ -174,7 +187,7 @@ def test_case_a_rejection_scores_as_a_legitimate_rejection_from_the_one_set(tmp_
     assert EOD_STOP_NOT_EXECUTABLE in REGISTERED_SKIP_CLASSES
     assert em._LEGIT_CONSTRAINTS is REGISTERED_SKIP_CLASSES
     (e,) = row["executions"]
-    assert em.classify_execution(e) == f"ok:constraint_{EOD_STOP_NOT_EXECUTABLE}"
+    assert em.classify_admin_execution(e, row) == f"ok:constraint_{EOD_STOP_NOT_EXECUTABLE}"
     scored = em.score_cycles([row], {CYC: True})
     assert scored["cycles"] == 1 and scored["successes"] == 1
     assert scored["failure_cycles_by_reason"] == {}
@@ -182,3 +195,91 @@ def test_case_a_rejection_scores_as_a_legitimate_rejection_from_the_one_set(tmp_
     r = _result(False, None, constraint=EOD_STOP_NOT_EXECUTABLE, unprotected=False)
     r.broker_order = None
     assert not requires_skip_alarm(r)
+
+
+# ------------------------------------- r4_notes rev. 2 section 4 (Gate 4)
+def _admin(results, ex, tmp):
+    return _write(results, ex, tmp)
+
+
+def test_no_market_closed_evidence_means_no_tag_and_a_critical(tmp_trades):
+    """§4.3: the tag needs the venue's evidence. Clock unreadable and no
+    rejection reason: the executor's stamp stands, and it is paged."""
+    tmp, sent = tmp_trades
+    row = _write([_result(False, "canceled", constraint="UNFILLED_AT_DEADLINE")],
+                 _executor("canceled", clock_open=None), tmp)
+    (e,) = row["executions"]
+    assert e["constraint"] == "UNFILLED_AT_DEADLINE" and e["stop_unprotected"] is True
+    assert sent == [("CRITICAL", "EOD stop not executed, market state unconfirmed: gpt")]
+
+
+def test_rejection_reason_alone_is_evidence(tmp_trades):
+    tmp, sent = tmp_trades
+    r = _result(False, None)
+    r.error = "Alpaca 403: market is closed"
+    row = _write([r], _executor(broken=True, clock_open=None), tmp)
+    assert row["executions"][0]["constraint"] == EOD_STOP_NOT_EXECUTABLE
+
+
+def test_score_by_case(tmp_trades):
+    """§4.5: A success (market rejection), B success (resolved), C failure
+    (unresolved_status, whatever the tag), D an ordinary fill."""
+    from src.analytics import execution_metrics as em
+    tmp, _ = tmp_trades
+    a = _write([_result(False, None)], _executor(broken=True), tmp)
+    (tmp / "gpt_2026-11.jsonl").unlink()
+    b = _write([_result(False, "canceled", constraint="UNFILLED_AT_DEADLINE")],
+               _executor("canceled"), tmp)
+    (tmp / "gpt_2026-11.jsonl").unlink()
+    c = _write([_result(False, "accepted")], _executor("accepted"), tmp)
+    (tmp / "gpt_2026-11.jsonl").unlink()
+    d = _write([_result(True, "filled")], _executor("filled"), tmp)
+    out = {k: em.classify_admin_execution(r["executions"][0], r)
+           for k, r in zip("ABCD", (a, b, c, d))}
+    assert out == {"A": f"ok:constraint_{EOD_STOP_NOT_EXECUTABLE}", "B": "ok:terminal_canceled",
+                   "C": "fail:unresolved_status", "D": "ok:terminal_filled"}
+
+
+def test_terminal_state_comes_before_the_tag():
+    from src.analytics import execution_metrics as em
+    row = {"record_class": "ADMINISTRATIVE", "admin_class": "EOD_POSITION_STOP",
+           "venue_clock": {"is_open": False}}
+    e = {"constraint": EOD_STOP_NOT_EXECUTABLE, "stop_unprotected": False,
+         "broker_order": {"status": "accepted"}}
+    assert em.classify_admin_execution(e, row) == "fail:unresolved_status"
+
+
+def test_tag_without_evidence_or_off_an_eod_row_fails():
+    from src.analytics import execution_metrics as em
+    e = {"constraint": EOD_STOP_NOT_EXECUTABLE, "side": "SKIP", "order_id": "x"}
+    no_evidence = {"record_class": "ADMINISTRATIVE", "admin_class": "EOD_POSITION_STOP",
+                   "venue_clock": {"is_open": True}}
+    other_admin = {"record_class": "ADMINISTRATIVE", "admin_class": "BOUNDARY_ADMIN",
+                   "venue_clock": {"is_open": False}}
+    assert em.classify_admin_execution(e, no_evidence) == "fail:unclassified_skip"
+    assert em.classify_admin_execution(e, other_admin) == "fail:unclassified_skip"
+    assert em.classify_execution(e) == "fail:unclassified_skip"     # an intraday row
+
+
+def test_admin_rows_admitted_by_record_class_and_counted_separately(tmp_trades):
+    from src.analytics import execution_metrics as em
+    tmp, _ = tmp_trades
+    a = _write([_result(False, None)], _executor(broken=True), tmp)
+    model = {"execution_mode": "broker_paper", "api_success": True, "cycle_id": "m1",
+             "executions": [{"side": "HOLD"}]}
+    c = dict(a, cycle_id="c1", executions=[dict(a["executions"][0], eod_open_order=True)])
+    out = em.score_cycles([model, a, c], {"m1": True, CYC: True, "c1": True})
+    assert out["cycles"] == 3 and out["successes"] == 2
+    assert out["rate_excluding_administrative"] == 1.0
+    assert out["administrative_cycles"] == {
+        "cycles": 2, "successes": 1,
+        "by_outcome": {"fail:unresolved_status": 1, "success": 1}}
+    assert out["excluded_no_decision"] == 0              # null api_success is not "no decision"
+
+
+def test_eod_reconciliation_must_be_clean(tmp_trades):
+    from src.analytics import execution_metrics as em
+    tmp, _ = tmp_trades
+    d = _write([_result(True, "filled")], _executor("filled"), tmp)
+    out = em.score_cycles([d], {CYC: False})
+    assert out["administrative_cycles"]["by_outcome"] == {"fail:reconciliation_diverged": 1}

@@ -296,7 +296,17 @@ def _write_eod_admin_row(model_key: str, portfolio: Any, results: list[Any],
     """
     try:
         confirmed = _confirm_terminal(executor, model_key, results)
-        executions, open_orders = [], []
+        # The venue's own evidence that the market was closed (r4_notes rev. 2
+        # §4.3): its clock, read once (GET only). None if unreadable.
+        clock = None
+        if executor.on_venue(model_key) and executor.broker is not None:
+            try:
+                c = executor.broker._request("GET", "/v2/clock")
+                clock = {"is_open": c.get("is_open"), "timestamp": c.get("timestamp"),
+                         "next_open": c.get("next_open")}
+            except Exception as ce:  # noqa: BLE001 — absence of evidence, recorded
+                clock = {"error": f"{type(ce).__name__}: {ce}"}
+        executions, open_orders, not_executable, unconfirmed = [], [], [], []
         for r in results:
             e = serialize_execution(r)
             c = confirmed.get(str(e.get("order_id") or ""))
@@ -310,14 +320,27 @@ def _write_eod_admin_row(model_key: str, portfolio: Any, results: list[Any],
                 open_orders.append({"client_order_id": e.get("order_id"),
                                     "status": c.get("status"), "error": c.get("error")})
             elif not e.get("executed") and executor.on_venue(model_key):
-                # §4 cases A/B: the venue rejected it, or accepted it for the
-                # next open and our deadline cancelled it. A detection by
-                # design, never stop_unprotected (consequence 1).
-                e["venue_constraint"] = e.get("constraint") or ""
-                e["constraint"] = EOD_STOP_NOT_EXECUTABLE
-                e["stop_unprotected"] = False
+                closed = ((clock or {}).get("is_open") is False
+                          or "market is closed" in str(e.get("error") or "").lower()
+                          or "market closed" in str(e.get("error") or "").lower())
+                if closed:
+                    # §4 cases A/B: the venue rejected it, or accepted it for
+                    # the next open and our deadline cancelled it, with the
+                    # venue's evidence that the market was closed. A detection
+                    # by design: stop_unprotected false, a WARN, never STOP
+                    # UNPROTECTED (r4_notes rev. 2 §4.4). The executor's own
+                    # stamp is overridden on the RECORD only, after the order
+                    # resolved; nothing that places, cancels or halts reads it.
+                    e["venue_constraint"] = e.get("constraint") or ""
+                    e["constraint"] = EOD_STOP_NOT_EXECUTABLE
+                    e["stop_unprotected"] = False
+                    not_executable.append(e.get("ticker"))
+                else:
+                    # No market-closed evidence: the tag is not valid, so the
+                    # executor's stamp stands and the event is paged.
+                    unconfirmed.append(e.get("ticker"))
             executions.append(e)
-        extra: dict[str, Any] = {}
+        extra: dict[str, Any] = {"venue_clock": clock}
         if open_orders:
             extra["eod_open_orders"] = open_orders
         row = log_administrative_row(
@@ -333,6 +356,22 @@ def _write_eod_admin_row(model_key: str, portfolio: Any, results: list[Any],
                     "%d open", model_key, len(executions),
                     sum(1 for e in executions if e.get("constraint") == EOD_STOP_NOT_EXECUTABLE),
                     len(open_orders))
+        if not_executable:
+            send_alert("WARN", f"EOD stop not executable (market closed): {model_key}",
+                       f"The end-of-day stop sweep triggered on {', '.join(not_executable)}; "
+                       f"the closed market did not execute it (refused, or cancelled at our "
+                       f"fill deadline). By design: the position is evaluated again at the "
+                       f"next session's first admitted tick. Not STOP UNPROTECTED.",
+                       {"model": model_key, "cycle_id": executor.cycle_id},
+                       kind="eod_stop_not_executable",
+                       dedup_key=f"eod_stop_not_executable:{model_key}:{executor.cycle_id}")
+        if unconfirmed:
+            send_alert("CRITICAL", f"EOD stop not executed, market state unconfirmed: {model_key}",
+                       f"The end-of-day stop on {', '.join(unconfirmed)} did not execute and "
+                       f"the venue gave no evidence the market was closed. Recorded as "
+                       f"stop_unprotected.", {"model": model_key, "cycle_id": executor.cycle_id},
+                       kind="stop_unprotected",
+                       dedup_key=f"eod_stop_unconfirmed:{model_key}:{executor.cycle_id}")
         if open_orders:
             send_alert("CRITICAL", f"EOD stop order left open at the venue: {model_key}",
                        f"The end-of-day stop sweep placed order(s) that are not terminal "
