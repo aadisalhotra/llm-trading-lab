@@ -291,9 +291,15 @@ def run_check(broker: Any, books: list[str], now_utc: datetime, *, scope: str,
               trades_dir: Path | None = None, repairs_path: Path | None = None,
               verdict_dir: Path | None = None,
               load_portfolios: Callable[[list[str]], list[Any]] | None = None,
+              quantity_test: Callable[[Any, list[str], str], Any] | None = None,
               ) -> list[dict[str, Any]]:
     """Evaluate (V) for every venue book and return one row per book. Pure of
-    side effects apart from venue GETs; the caller records and alerts."""
+    side effects apart from venue GETs; the caller records and alerts.
+
+    `quantity_test(broker, books, cycle_id)` replaces the production quantity
+    test for a caller that is not the validation account (the demonstrations
+    on the separate test account, whose unallocated cash and probe terms are
+    not the committed ones). Production passes nothing."""
     now_utc = now_utc.astimezone(timezone.utc)
     cycle_id = "pretrade-" + now_utc.strftime(CYCLE_FORMAT)
     months = _months(now_utc)
@@ -318,7 +324,8 @@ def run_check(broker: Any, books: list[str], now_utc: datetime, *, scope: str,
         opens = broker._request("GET", "/v2/orders", params={"status": "open", "limit": PAGE_LIMIT})
         open_count = len(opens)
         open_ids = [str(o.get("client_order_id")) for o in opens][:50]
-        quantity = _quantity_test(broker, books, cycle_id, load_portfolios)
+        quantity = (quantity_test(broker, books, cycle_id) if quantity_test is not None
+                    else _quantity_test(broker, books, cycle_id, load_portfolios))
     except Exception as e:  # noqa: BLE001 — unreachable is a verdict, not a crash
         reachable, error = False, f"{type(e).__name__}: {e}"
 

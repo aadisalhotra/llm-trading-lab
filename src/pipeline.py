@@ -848,6 +848,70 @@ def _withhold_tick(settings: dict[str, Any], run_date: datetime, *, guard: str,
     send_heartbeat(success=False, settings=settings)
 
 
+def _eod_admission(settings: dict[str, Any], run_date: datetime, force_trade: bool,
+                   logger: logging.Logger) -> tuple[str | None, bool]:
+    """EOD admission (tick_admission_guards_ruling.md rev. 5 section 2).
+
+    Returns (why the EOD stop sweep is suspended or None, whether the boundary
+    ledger was readable). See the call site in run_pipeline for the rules.
+    """
+    eod_stops_suspended: str | None = None
+    eod_ledger_readable = True
+    e_day = run_date.strftime("%Y-%m-%d")
+    _eledger, _eledger_err = load_ledger()
+    if _eledger_err is not None:
+        eod_ledger_readable = False
+        eod_stops_suspended = "guard_unreadable:boundary_ledger"
+        logger.error("Idempotency ledger unreadable (%s) — WITHHOLDING the EOD stop "
+                     "sweep for %s (snapshot and report still run)", _eledger_err, e_day)
+        send_alert("CRITICAL", "Duplicate guard unreadable at EOD: data/state/handled_boundaries.json",
+                   f"data/state/handled_boundaries.json could not be read ({_eledger_err}). "
+                   f"The {e_day} end-of-day stop sweep is WITHHELD: no stop was evaluated "
+                   f"and no order was submitted. The closing snapshot and report ran.",
+                   {"file": "data/state/handled_boundaries.json",
+                    "event": TICK_WITHHELD_GUARD_UNREADABLE, "scope": SCOPE_EOD},
+                   kind="idempotency_ledger", dedup_key=f"idempotency_ledger_unreadable_eod:{e_day}")
+        try:
+            record_withhold(build_withhold_event(
+                TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_BOUNDARY_LEDGER,
+                now_utc=run_date.astimezone(timezone.utc),
+                books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                files=["data/state/handled_boundaries.json"], reason="ledger_unreadable",
+                detail=str(_eledger_err), boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
+        except Exception as e:  # noqa: BLE001 — the sweep is suspended regardless
+            logger.error("EOD withhold event could not be written: %s", e)
+    elif is_boundary_handled(_eledger, e_day, EOD_SLOT):
+        # A duplicate EOD pass after a committed one submits nothing
+        # (demonstration (x), case 3). The rest of the pass is housekeeping
+        # with its own date de-duplication.
+        eod_stops_suspended = "eod_boundary_already_handled"
+        logger.info("EOD boundary %s already handled — stop sweep suspended "
+                    "(duplicate EOD pass submits nothing)", e_day)
+    if not force_trade and eod_stops_suspended is None:
+        e_verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
+        if e_verdict.withhold:
+            eod_stops_suspended = f"guard_unreadable:tick_spacing:{e_verdict.reason}"
+            logger.error("Spacing guard cannot answer at EOD (%s) — WITHHOLDING the EOD "
+                         "stop sweep", e_verdict.reason)
+            send_alert("CRITICAL", "Duplicate guard unreadable at EOD: decision logs",
+                       f"The spacing guard could not read the decision logs (verdict "
+                       f"{e_verdict.reason}; files {list(e_verdict.unreadable)}). The {e_day} "
+                       f"end-of-day stop sweep is WITHHELD: no stop was evaluated and no "
+                       f"order was submitted. The closing snapshot and report ran.",
+                       {"reason": e_verdict.reason, "scope": SCOPE_EOD},
+                       kind="guard_unreadable", dedup_key=f"guard_unreadable_eod:{e_day}")
+            try:
+                record_withhold(build_withhold_event(
+                    TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_SPACING,
+                    now_utc=run_date.astimezone(timezone.utc),
+                    books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                    files=list(e_verdict.unreadable), reason=e_verdict.reason,
+                    boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
+            except Exception as e:  # noqa: BLE001
+                logger.error("EOD withhold event could not be written: %s", e)
+    return eod_stops_suspended, eod_ledger_readable
+
+
 def run_pipeline(mode: str = "intraday", force: bool = False,
                  force_trade: bool = False) -> int:
     """Run one pipeline tick.
@@ -1044,58 +1108,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     eod_stops_suspended: str | None = None
     eod_ledger_readable = True
     if is_eod:
-        e_day = run_date.strftime("%Y-%m-%d")
-        _eledger, _eledger_err = load_ledger()
-        if _eledger_err is not None:
-            eod_ledger_readable = False
-            eod_stops_suspended = "guard_unreadable:boundary_ledger"
-            logger.error("Idempotency ledger unreadable (%s) — WITHHOLDING the EOD stop "
-                         "sweep for %s (snapshot and report still run)", _eledger_err, e_day)
-            send_alert("CRITICAL", "Duplicate guard unreadable at EOD: data/state/handled_boundaries.json",
-                       f"data/state/handled_boundaries.json could not be read ({_eledger_err}). "
-                       f"The {e_day} end-of-day stop sweep is WITHHELD: no stop was evaluated "
-                       f"and no order was submitted. The closing snapshot and report ran.",
-                       {"file": "data/state/handled_boundaries.json",
-                        "event": TICK_WITHHELD_GUARD_UNREADABLE, "scope": SCOPE_EOD},
-                       kind="idempotency_ledger", dedup_key=f"idempotency_ledger_unreadable_eod:{e_day}")
-            try:
-                record_withhold(build_withhold_event(
-                    TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_BOUNDARY_LEDGER,
-                    now_utc=run_date.astimezone(timezone.utc),
-                    books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
-                    files=["data/state/handled_boundaries.json"], reason="ledger_unreadable",
-                    detail=str(_eledger_err), boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
-            except Exception as e:  # noqa: BLE001 — the sweep is suspended regardless
-                logger.error("EOD withhold event could not be written: %s", e)
-        elif is_boundary_handled(_eledger, e_day, EOD_SLOT):
-            # A duplicate EOD pass after a committed one submits nothing
-            # (demonstration (x), case 3). The rest of the pass is housekeeping
-            # with its own date de-duplication.
-            eod_stops_suspended = "eod_boundary_already_handled"
-            logger.info("EOD boundary %s already handled — stop sweep suspended "
-                        "(duplicate EOD pass submits nothing)", e_day)
-        if not force_trade and eod_stops_suspended is None:
-            e_verdict = check_spacing(settings, run_date.astimezone(timezone.utc))
-            if e_verdict.withhold:
-                eod_stops_suspended = f"guard_unreadable:tick_spacing:{e_verdict.reason}"
-                logger.error("Spacing guard cannot answer at EOD (%s) — WITHHOLDING the EOD "
-                             "stop sweep", e_verdict.reason)
-                send_alert("CRITICAL", "Duplicate guard unreadable at EOD: decision logs",
-                           f"The spacing guard could not read the decision logs (verdict "
-                           f"{e_verdict.reason}; files {list(e_verdict.unreadable)}). The {e_day} "
-                           f"end-of-day stop sweep is WITHHELD: no stop was evaluated and no "
-                           f"order was submitted. The closing snapshot and report ran.",
-                           {"reason": e_verdict.reason, "scope": SCOPE_EOD},
-                           kind="guard_unreadable", dedup_key=f"guard_unreadable_eod:{e_day}")
-                try:
-                    record_withhold(build_withhold_event(
-                        TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_SPACING,
-                        now_utc=run_date.astimezone(timezone.utc),
-                        books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
-                        files=list(e_verdict.unreadable), reason=e_verdict.reason,
-                        boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
-                except Exception as e:  # noqa: BLE001
-                    logger.error("EOD withhold event could not be written: %s", e)
+        eod_stops_suspended, eod_ledger_readable = _eod_admission(
+            settings, run_date, force_trade, logger)
 
     # --- (V) pre-trade venue check, SHADOW (rev. 5 section 2; condition 3) --
     # Broker modes only, ahead of the stop sweep and of the fetch-start stamp,
