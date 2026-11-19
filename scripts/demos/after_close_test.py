@@ -86,7 +86,7 @@ def executor(client) -> Executor:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("phase", choices=("buy", "sell", "final"))
+    ap.add_argument("phase", choices=("buy", "sell", "final", "flatten"))
     ap.add_argument("--window", type=int, choices=(1, 2, 3))
     ap.add_argument("--symbol", default="BAC")
     a = ap.parse_args()
@@ -130,6 +130,27 @@ def main() -> int:
                     venue_response_at_submit=SUBMITTED[-1] if SUBMITTED else None,
                     deadline_hit=pl.constraint == "UNFILLED_AT_DEADLINE",
                     broker_order=o.to_dict() if o else None))
+        return 0
+    if a.phase == "flatten":
+        # Friday, in session: sell every position left on the TEST account
+        # (the after-close position and anything (x) left), under DEMOFLAT.
+        if not clock.get("is_open"):
+            sys.exit("flatten runs during the session; the market is closed")
+        settings = load_settings()
+        settings["mode"] = "broker_paper"
+        ex = Executor(datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+                      settings=settings, venue_books={"DEMOFLAT"})
+        ex.broker = client
+        done = []
+        for p in client.get_positions():
+            q = float(p["qty"])
+            if q > 1e-9:
+                pl = ex._place("DEMOFLAT", p["symbol"], q, "sell", float(p["current_price"]))
+                done.append({"symbol": p["symbol"], "qty": q, "moved": pl.moved,
+                             "filled_qty": pl.filled_qty, "error": pl.error})
+        record(dict(base, flattened=done,
+                    positions_after=[{k: p.get(k) for k in ("symbol", "qty")}
+                                     for p in client.get_positions()]))
         return 0
     # final: every DEMOAC order's state at the venue now
     orders = client._request("GET", "/v2/orders", params={

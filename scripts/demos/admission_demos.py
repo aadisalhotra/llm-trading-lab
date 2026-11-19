@@ -150,8 +150,12 @@ def gate_test_account() -> tuple[BrokerClient, str]:
     return client, acct["account_number"][-4:]
 
 
-def assert_flat(client) -> None:
-    pos = [p for p in client.get_positions() if abs(float(p["qty"])) > 1e-9]
+def assert_flat(client, allow_held: set[str] = frozenset()) -> None:
+    """No open orders, and no position except the declared `allow_held`
+    symbols (the after-close test's position), which each World carries as an
+    expected-side term so reconciliation accounts for it."""
+    pos = [p for p in client.get_positions() if abs(float(p["qty"])) > 1e-9
+           and broker_mod.from_venue_symbol(p["symbol"]) not in allow_held]
     opens = client._request("GET", "/v2/orders", params={"status": "open", "limit": 500})
     if pos or opens:
         sys.exit(f"Test account not flat: positions {pos}, open orders {len(opens)}. Nothing placed.")
@@ -176,6 +180,10 @@ class World:
         self.committed = copy.deepcopy(self.books)        # the "saved and pushed" books
         acct_cash = float(client.get_account()["cash"])
         self.unallocated = acct_cash - BOOK_CASH * len(BOOKS)
+        # Positions present before the scenario (only declared ones pass
+        # assert_flat): an expected-side term, as probe positions are.
+        self.baseline_positions = {broker_mod.from_venue_symbol(p["symbol"]): float(p["qty"])
+                                   for p in client.get_positions() if abs(float(p["qty"])) > 1e-9}
         settings = load_settings()
         settings["mode"] = "broker_paper"
         self.settings = settings
@@ -212,7 +220,8 @@ class World:
     def quantity_test(self, broker, books, cycle_id):
         return recon_mod.reconcile([self.committed[b] for b in books], broker, cycle_id,
                                    cash_tolerance_usd=1.0, unallocated_cash_usd=self.unallocated,
-                                   position_tolerance_usd=1.0)
+                                   position_tolerance_usd=1.0,
+                                   probe_positions=self.baseline_positions)
 
     def v(self, scope="intraday") -> dict[str, dict]:
         rows = vc.run_check(self.client, list(BOOKS), datetime.now(timezone.utc), scope=scope,
@@ -225,7 +234,8 @@ class World:
         """Sell every position this scenario created, under DEMOFLAT."""
         ex = self.executor(cyc())
         for p in self.client.get_positions():
-            q = float(p["qty"])
+            q = float(p["qty"]) - self.baseline_positions.get(
+                broker_mod.from_venue_symbol(p["symbol"]), 0.0)
             if q > 1e-9:
                 ex._place(FLAT_BOOK, broker_mod.from_venue_symbol(p["symbol"]), q, "sell",
                           self.price_fn())
@@ -485,6 +495,8 @@ def main() -> int:
     ap.add_argument("--demos", default="iii,iv,viii,x")
     ap.add_argument("--symbol", default="F")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--allow-held", default="",
+                    help="comma-separated symbols already held (the after-close test's)")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     logging.basicConfig(level=logging.INFO, stream=sys.stdout,
@@ -501,7 +513,7 @@ def main() -> int:
         price_fn = lambda: client.price
     else:
         client, acct = gate_test_account()
-        assert_flat(client)
+        assert_flat(client, {s for s in a.allow_held.split(",") if s})
 
         def price_fn():
             q = requests.get(f"https://data.alpaca.markets/v2/stocks/{a.symbol}/trades/latest",
