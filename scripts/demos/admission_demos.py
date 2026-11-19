@@ -516,9 +516,20 @@ def main() -> int:
         assert_flat(client, {s for s in a.allow_held.split(",") if s})
 
         def price_fn():
-            q = requests.get(f"https://data.alpaca.markets/v2/stocks/{a.symbol}/trades/latest",
-                             headers=client.headers, timeout=20).json()
-            return float(q["trade"]["p"])
+            # The market-data host times out intermittently from this machine
+            # (2026-11-19 09:37 and 09:38 ET: two (viii) runs lost to it while
+            # paper-api answered). Retry; raise if every attempt fails.
+            for attempt in range(5):
+                try:
+                    q = requests.get(
+                        f"https://data.alpaca.markets/v2/stocks/{a.symbol}/trades/latest",
+                        headers=client.headers, timeout=20).json()
+                    return float(q["trade"]["p"])
+                except requests.RequestException:
+                    if attempt == 4:
+                        raise
+                    logger.warning("quote fetch failed (attempt %d); retrying", attempt + 1)
+                    time.sleep(3 * (attempt + 1))
     results: dict[str, Any] = {"venue": a.venue, "account": f"...{acct}",
                                "started_utc": datetime.now(timezone.utc).isoformat(),
                                "symbol": a.symbol, "demos": {}}

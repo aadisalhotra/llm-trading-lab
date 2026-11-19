@@ -53,9 +53,17 @@ def record(row: dict) -> None:
 
 def latest_price(client, symbol: str) -> float:
     import requests
-    q = requests.get(f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest",
-                     headers=client.headers, timeout=20).json()
-    return float(q["trade"]["p"])
+    # Retried: the market-data host times out intermittently from this machine.
+    for attempt in range(5):
+        try:
+            q = requests.get(f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest",
+                             headers=client.headers, timeout=20).json()
+            return float(q["trade"]["p"])
+        except requests.RequestException:
+            if attempt == 4:
+                raise
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError("unreachable")
 
 
 SUBMITTED: list[dict] = []

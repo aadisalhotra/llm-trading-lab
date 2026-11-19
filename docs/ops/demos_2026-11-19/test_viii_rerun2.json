@@ -1,0 +1,111 @@
+{
+  "venue": "test",
+  "account": "...4J77",
+  "started_utc": "2026-11-19T14:40:41.284745+00:00",
+  "symbol": "F",
+  "demos": {
+    "viii": {
+      "checks": [
+        {
+          "check": "before-save: post-cycle reconciliation diverges",
+          "pass": true,
+          "detail": [
+            {
+              "kind": "cash",
+              "ticker": "",
+              "expected_value": 10463.911852000001,
+              "broker_value": 10451.88,
+              "delta": 12.03185200000189,
+              "tolerance": 1.0,
+              "mark": null,
+              "delta_usd": null
+            },
+            {
+              "kind": "position",
+              "ticker": "F",
+              "expected_value": 3.1761,
+              "broker_value": 4.2348,
+              "delta": -1.0587,
+              "tolerance": 1.0,
+              "mark": 11.35,
+              "delta_usd": 12.016245
+            }
+          ]
+        },
+        {
+          "check": "before-save: the handler halts EVERY venue book",
+          "pass": true,
+          "detail": [
+            "DEMOA",
+            "DEMOB"
+          ]
+        },
+        {
+          "check": "before-save: next tick's quantity test would withhold every book",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T144048Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "after-save: post-cycle reconciliation is clean",
+          "pass": true,
+          "detail": []
+        },
+        {
+          "check": "after-save: id test withholds DEMOA alone",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T144102Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "after-save: DEMOB proceeds",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [
+        [
+          "CRITICAL",
+          "G-BOOK reconciliation divergence \u2014 2 event(s)",
+          "Cycle 20261119T144048Z: cash expected=10463.9119 broker=10451.8800 delta=12.0319 (tolerance $1.00); position F expected=3.1761 broker=4.2348 delta=-1.0587 ($12.02) (tolerance $1.00)",
+          "{'cycle_id': '20261119T144048Z', 'books': ['DEMOA', 'DEMOB']}"
+        ]
+      ],
+      "passed": true
+    }
+  },
+  "finished_utc": "2026-11-19T14:41:13.943701+00:00",
+  "all_passed": true
+}
