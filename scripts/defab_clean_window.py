@@ -40,6 +40,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from src.record_class import is_administrative_row  # noqa: E402
+
 MODELS = ["claude", "claude_opus", "deepseek", "gemini", "gpt", "grok"]
 DISPLAY = {
     "claude": "Claude Sonnet 4.6",
@@ -118,7 +120,10 @@ def load_runs(model_key: str, months: list[str] = MONTHS) -> list[dict[str, Any]
                 if not line:
                     continue
                 rec = json.loads(line)
-                if not rec.get("api_success"):
+                # An execution replay: a failed call moved nothing, but an
+                # administrative row (an EOD stop) carries real fills and
+                # must be replayed, null api_success notwithstanding.
+                if not rec.get("api_success") and not is_administrative_row(rec):
                     continue
                 runs.append(rec)
     runs.sort(key=lambda r: (r.get("date", ""), r.get("timestamp", "")))

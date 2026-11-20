@@ -575,3 +575,114 @@ def test_executor_default_construction_unchanged():
     assert e.mode == e.settings["mode"]
     if e.mode == "paper":
         assert e.broker is None and e.venue_books == frozenset()
+
+
+# ------------------------------------------- 2026-11-18 lost record: J fixes
+class _Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+class _OpenThenFilled(_Venue):
+    """The venue lists the cleanup SELL as open for `stale_polls` reads after
+    it has filled -- the 20261118T153801Z shape."""
+    def __init__(self, stale_polls, **kw):
+        super().__init__([], 0, **kw)
+        self.stale_polls, self.open_reads = stale_polls, 0
+
+    def _request(self, method, path, params=None, body=None):
+        if path == "/v2/orders" and (params or {}).get("status") == "open":
+            self.open_reads += 1
+            if self.open_reads <= self.stale_polls:
+                return [{"symbol": "F", "client_order_id": f"{bp.CLEANUP_BOOK}-{CYC}-00-a0",
+                         "side": "sell", "status": "new", "qty": "8.8417"}]
+            return []
+        return super()._request(method, path, params, body)
+
+
+def test_repoll_clears_a_stale_open_listing():
+    c = _Clock()
+    opens, qty, polls, seen = bp._settled_symbol_state(
+        _OpenThenFilled(2), deadline_seconds=30, interval=2, sleep=c.sleep, clock=c)
+    assert opens == [] and qty == 0 and polls == 3
+    assert [s["client_order_id"] for s in seen] == [f"{bp.CLEANUP_BOOK}-{CYC}-00-a0"]
+
+
+def test_repoll_gives_up_at_the_deadline_and_reports_the_order():
+    c = _Clock()
+    opens, _, polls, _ = bp._settled_symbol_state(
+        _OpenThenFilled(10**6), deadline_seconds=10, interval=2, sleep=c.sleep, clock=c)
+    assert len(opens) == 1 and polls == 6          # t = 0, 2, 4, 6, 8, 10
+
+
+def test_one_poll_when_nothing_is_open():
+    c = _Clock()
+    _, _, polls, seen = bp._settled_symbol_state(_Venue([], 0), sleep=c.sleep, clock=c)
+    assert polls == 1 and seen == []
+
+
+def test_flat_account_with_open_order_is_not_called_not_flat(alerts):
+    v = _Venue([_o(bp.SEED_BOOK, "buy", 10, 11), _o(bp.SELL_BOOK, "sell", 10, 11),
+                _o(bp.BUY_BOOK, "buy", 9, 11), _o(bp.CLEANUP_BOOK, "sell", 9, 11)], 0)
+    rec_ = {"account_before": {"cash": 99999.99},
+            "cleanup": {"clean": False, "open_orders_in_symbol": 1, "open_order_polls": 16,
+                        "errors": []}}
+    code = bp.settle_record(v, rec_, CYC, datetime.now(timezone.utc), 0.0, False, bp.EXIT_OK)
+    assert code == bp.EXIT_FAIL and len(alerts) == 1
+    title, body, _ = alerts[0]
+    assert "open order in F" in title and "not flat" not in title
+    assert "position is flat" in body and rec_["critical_alert_title"] == title
+
+
+@pytest.mark.parametrize("delta,held,cleanup,expect", [
+    (None, None, {}, "unaccounted"),
+    ({"F": 9.0}, 9.0, {"open_orders_in_symbol": 0}, "position held"),
+    ({}, 0.0, {"errors": ["flatten: boom"]}, "cleanup errors"),
+])
+def test_alert_titles_name_the_true_condition(delta, held, cleanup, expect):
+    title, _ = bp.alert_text(delta, held, "x", cleanup)
+    assert expect in title and "not flat" not in title
+
+
+def test_critical_writes_no_tracked_alert_file(tmp_path, monkeypatch):
+    """The alert stack's three tracked files are untouched by a probe CRITICAL,
+    and the module paths are restored afterwards."""
+    from src.alerts import alert_state, alerter, email_alerts, events
+    tracked = {"log": tmp_path / "alerts.jsonl", "state": tmp_path / "state.json",
+               "email": tmp_path / "email_log.jsonl"}
+    monkeypatch.setattr(alerter, "ALERT_LOG", tracked["log"])
+    monkeypatch.setattr(alert_state, "STATE_FILE", tracked["state"])
+    monkeypatch.setattr(email_alerts, "EMAIL_LOG", tracked["email"])
+    wrote = {}
+
+    def fake_dispatch(**kw):
+        # What the real dispatch does on a send: state and email-log writes.
+        alert_state.save_state(alert_state._default_state())
+        email_alerts._log_email({"subject": kw["title"]})
+        wrote["state"], wrote["email"] = alert_state.STATE_FILE, email_alerts.EMAIL_LOG
+        return "sent"
+
+    monkeypatch.setattr(events, "dispatch_event", fake_dispatch)
+    assert bp.raise_critical("Barrier probe: t", "b", {"cycle_id": CYC}) is True
+    assert not any(p.exists() for p in tracked.values())
+    assert wrote["state"] != tracked["state"] and wrote["email"] != tracked["email"]
+    assert (alerter.ALERT_LOG, alert_state.STATE_FILE, email_alerts.EMAIL_LOG) == (
+        tracked["log"], tracked["state"], tracked["email"])
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_commit_step_sets_aside_stray_changes_before_the_rebase():
+    text = (ROOT / ".github" / "workflows" / "barrier_probe.yml").read_text(encoding="utf-8")
+    step = text[text.index("- name: Commit probe record"):text.index("- name: Fail the run")]
+    assert "git add data/barrier_probe/" in step
+    guard, pull = step.index("git status --porcelain"), step.index("git pull --rebase")
+    assert guard < pull and "git stash push --include-untracked" in step[guard:pull]
+    assert "::warning::" in step[guard:pull]

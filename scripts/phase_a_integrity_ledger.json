@@ -3760,6 +3760,87 @@
           "github_behaviour_unproven_live": "Three GitHub behaviours the fail-stop relies on are not yet observed live: an always() job running after a cancellation, GITHUB_TOKEN with actions: write disabling a workflow, and queued runs of a disabled workflow. The Thursday probe answers them.",
           "eod_stop_orders": "EOD places no model trades but can submit per-position stop orders: run_one_model runs the stop sweep (executor.force_liquidate, the venue in broker modes) before its is_eod early-return, which writes no decision row. Neither duplicate guard applies in EOD mode, so EOD admission coverage is pending (hub ruling 2026-11-17, Thursday's package: both guards and (V) before the stop sweep under an EOD-specific boundary key, and an administrative decision-log record for any EOD stop order). Base rate: the read-only order-id set difference over every venue order since the 2026-11-06 cutover through the 2026-11-17 EOD (origin/main 75d643ae5) is empty: 184 book orders across 121 book-cycles, all accounted, none submitted at or after 21:00Z."
         }
+      },
+      {
+        "id": "barrier_probe_record_lost_2026_11_18",
+        "date": "2026-11-18",
+        "type": "record_lost",
+        "class": "Administrative (barrier probe), paper account, outside every validation book. Not a book order: no book's record is affected.",
+        "what_happened": {
+          "run": "GitHub Actions run 44337543855 (Barrier Probe, workflow_dispatch by github-actions[bot] from intraday run 44336426216's probe-dispatch job, the 10:30 ET slot). Conclusion: failure. 'Run barrier probe' step: success (continue-on-error). 'Commit probe record' step: failure, 15:38:14Z to 15:39:30Z.",
+          "probe_cycle": "20261118T153801Z, symbol F",
+          "orders": "Four, all filled, net flat: FORCED_PROBE_SEED buy 10 @ 11.31 (15:38:04.94Z); FORCED_PROBE_SELL sell 10 @ 11.30 (15:38:06.68Z); FORCED_PROBE_BUY buy 8.8417 @ 11.31 (15:38:09.39Z); FORCED_PROBE_CLEANUP sell 8.8417 @ 11.30 (15:38:12.13Z). Each id is FORCED_PROBE_<book>-20261118T153801Z-00-a0. Read from the venue 2026-11-18 after the close.",
+          "alert": "CRITICAL email 15:38:13Z, 'Barrier probe: F not flat in the paper account', body: cleanup flatten filled 8.8417 of 8.8417, deadline_hit False, errors [], open_orders_in_symbol 1, position_in_symbol 0, clean False. The account was flat; the open order listed was most likely the CLEANUP sell, read about one second after it filled.",
+          "why_lost": "Sending the CRITICAL wrote three tracked files (logs/alerts.jsonl, data/alerts/state.json, data/alerts/email_log.jsonl). The commit step stages only data/barrier_probe/, so the checkout stayed dirty, and `git pull --rebase` refused five times (the step's 76 s is the five attempts plus 75 s of backoff). No commit reached origin/main between 15:35 and 16:05Z, so it was not a push race. Determined from step timings and code inspection: the run log is not readable from this machine (HTTP 403).",
+          "surviving_copy": "The CRITICAL email is the only surviving copy of any part of the record. The probe record itself was not reconstructed and will not be."
+        },
+        "consequences": {
+          "second_run": "The 12:00 ET slot's probe (run 44354755873, cycle 20261118T170736Z) found no COMPLETED record for the day on origin and ran in full. It is the day's only committed probe record, clean.",
+          "accounting": "The nightly set difference lists 20261118T153801Z as the only probe cycle at the venue with no committed probe record, and names this entry. Its four orders are the probe's segment: no book order is unaccounted (2026-11-18: 215 book orders, 0 unaccounted, 0 after the close).",
+          "account": "0 open orders and no F position, read 2026-11-18 17:20 ET. Nothing was cancelled."
+        },
+        "fixed_by": "Thursday 2026-11-19 package, commit 0c20e5ad9 on review/thursday-package-2026-11-19: the probe sends its CRITICAL without writing tracked files; the commit step names and sets aside any stray tracked change before the rebase; cleanup re-polls open orders until none or 30 s before declaring its state; alert titles state the true condition."
+      },
+      {
+        "id": "thursday_package_2026_11_19",
+        "date": "2026-11-19",
+        "type": "admission_control_change",
+        "class": "Mixed, each item classed in `items`. Admission class (tick_admission_guards_ruling.md §2): (V) in shadow and EOD admission. Record and scoring only: the EOD administrative row, the reader audit, Gate 4 scoring of EOD stops, the ACCOUNT_STATE classifier and annotations. Operations tooling: barrier probe fixes, repair runbook, nightly set difference, fail-stop live probe. The one line in src/execution/executor.py adds EOD_STOP_NOT_EXECUTABLE to REGISTERED_SKIP_CLASSES (a constant; hub ruling 2026-11-18). Nothing touches sizing, the validator, order construction, the barrier or the fill wait.",
+        "scope": "Every venue book. (V) runs before every intraday and EOD tick's data fetch and records a verdict without withholding. EOD admission governs the EOD pass's position-stop sweep. The administrative row is written by every EOD stop order in a venue mode.",
+        "authority": {
+          "rulings": [
+            {
+              "path": "docs/registrations/tick_admission_guards_ruling.md",
+              "revision": "rev. 5",
+              "sha256_prefix": "94a558c8fda20ac2",
+              "bytes": 37507,
+              "commit": "1287a63ed (committed blob, LF form)"
+            },
+            {
+              "path": "docs/registrations/eod_stop_record_and_evaluation_ruling.md",
+              "sha256_prefix": "a1c086cc51829e9c",
+              "bytes": 13331,
+              "commit": "0f990cd25 (committed blob, LF form)"
+            },
+            {
+              "path": "docs/registrations/r4_notes_gate_a_and_repair.md",
+              "revision": "rev. 2",
+              "sha256": "498bbccc5fafc5ac466cdcc714def18127fd037a5d4016637be366d0bf6592bb",
+              "bytes": 12932,
+              "where": "Research batch 2026-11-18 (hub manifest, hash-verified), not yet in the repo: the committed file at 0f990cd25 is the earlier revision (4,820 B). Gate 4 §4 scoring follows rev. 2. It lands with deposit batch 2."
+            }
+          ],
+          "hub": "HUB -> OPERATIONS 2026-11-18: Tuesday's dispatch Part 4 A-I on one review branch, staged during 2026-11-19, landing after that day's close on sign-off; J (barrier probe fixes and the lost-record entry); the amendment to I (after-close test through _place, a fractional SELL of a held position, one per window). Rulings the same evening: the memory feed includes administrative rows (EOD ruling §1); EOD_STOP_NOT_EXECUTABLE joins the one shared skip set; EOD spacing contributes only its unreadable-file conditions; no EOD-key marking over an unreadable ledger; the 39 original annotation rows carry the billing reason; runbook cancel-never-place is a rule; the test account is configured margin 1 / no shorting. Research batch additions accepted: Gate 4 per r4_notes rev. 2 §4, the stop_unprotected analysis, the T6/T7 history check (the memory SHORT/COVER filter stays), dated copies of the Anthropic pages."
+        },
+        "commits": "On review/thursday-package-2026-11-19, base 294857ae2 (main), oldest first: 0c20e5ad9, 503c71549, 158360bc8, 369b1690e, 50eeae712, ff6262c69, 86ebf4dcc, e8d544f3b, 8c9c1300a, 305fe16cf, 3eb05def7, de86fdf5e, a1c2038a2, 8584e2732, 43ae24d89, 1b0536d55, 17083d381, 95c70abb7, 807f0f2fb, 179cebc33, 68d9320f6; then this entry. The landing merge and window 3's record follow.",
+        "effective_from": "The first cycle after the push to main: the 2026-11-20 09:35 ET intraday cycle if pushed after the 2026-11-19 close. For EOD admission and the administrative row, the 2026-11-20 EOD pass. If the push slips, this entry is corrected before it lands.",
+        "items": {
+          "A_v_shadow": "src/logging/venue_check.py. Before the data fetch, each venue book gets a verdict: the id test (every venue order in the window belongs to a cycle this book's log records or a ledgered repair in data/admission/repairs.jsonl; the window never advances past an unaccounted order) and the quantity test (reconcile, called unchanged). Classes TICK_WITHHELD_VENUE_UNREACHABLE, BOOK_WITHHELD_UNACCOUNTED_ORDERS, TICK_WITHHELD_BOOKS_DIVERGED. SHADOW: verdicts go to data/admission/venue_check/{YYYY-MM}.jsonl and a would-withhold pages CRITICAL, but the tick proceeds. Withholding needs ruling §3 condition 3 (the shadow period) and its own sign-off.",
+          "B_eod_admission": "pipeline._eod_admission. The EOD stop sweep is suspended on an already-handled EOD boundary (slot \"EOD\" in handled_boundaries.json) or on the spacing guard's unreadable-file conditions. The EOD key is marked only when the ledger was readable.",
+          "C_eod_admin_row": "Every EOD position-stop order writes one decision-log row with record_class ADMINISTRATIVE and provider administrative, null model-call fields, written before save_portfolio. It reads GET /v2/clock into venue_clock. It tags EOD_STOP_NOT_EXECUTABLE only on market-closed evidence (is_open false, or a 'market closed' rejection) and then sends a WARN, not STOP UNPROTECTED. It pages CRITICAL when the order's terminal state is unconfirmed or still open.",
+          "D_reader_audit": "Every decision-log reader now separates administrative rows (src/record_class.py): completeness, cost, spacing, daily and monthly reports, RQ1 and RQ5 panels, intended-vs-expressed, the monthly data layer, defab load_runs, verify_session_cycles. The memory feed includes them (EOD ruling §1).",
+          "E_account_state": "ACCOUNT_STATE classifier synced to rossi_review_rulings.md 2.4, with an api_error_reason per form (billing or quota).",
+          "F_timeouts": "data/annotations/client_timeouts_retro_2026-11-19.jsonl: DeepSeek 2026-04-22 (120 s) and Grok 2026-11-05 (300 s).",
+          "G_runbook": "docs/ops/withhold_repair_runbook.md; hard rule 6, cancel never place. scripts/order_id_set_difference.py, the nightly set difference.",
+          "H_failstop_probe": "Throwaway workflows failstop_probe.yml and failstop_target.yml. Run once after landing, its answers ledgered, then deleted.",
+          "J_probe_fixes": "Barrier probe: CRITICAL sent without writing tracked files; the commit step sets stray tracked changes aside; cleanup re-polls open orders up to 30 s; truthful alert titles. See barrier_probe_record_lost_2026_11_18.",
+          "gate4_scoring": "Administrative rows are scored as cycles. The terminal state is read before the tag: (A) a rejection with market-closed evidence scores ok constraint EOD_STOP_NOT_EXECUTABLE; (B) cancelled unfilled scores ok terminal_canceled; (C) unresolved status fails; (D) a fill is a fill. Reported as administrative_cycles by outcome, plus rate_excluding_administrative.",
+          "annotation_backfill": "The 39 original rows of data/annotations/account_state_retro_2026-11-17.jsonl now carry api_error_reason \"billing\" (the existing key; the hub's text said \"reason\")."
+        },
+        "conditions": {
+          "1_diff_scope": "Nothing on the path from a parsed decision to a submitted order. executor.py: one constant only. broker.py: untouched.",
+          "2_verdict_replay": "scripts/replay_v_secondary.py (condition 2, secondary test): every intraday pair since 2026-11-11, the post-cycle reconciliation at t against the pre-trade quantity test at t+1. 82 pairs, 0 verdict differences, 0 unexplained gaps. 6 cent-level gaps are date-stamped FEE/DIV postings; between-tick fills are all F/probe.",
+          "3_shadow": "(V) lands in shadow. This entry starts the shadow period.",
+          "4_demonstrations": "Separate TEST paper account (...4J77, never the validation account ...MX6I), every order behind scripts/demos/admission_demos.gate_test_account. The gate reads both account numbers and requires margin 1 / no shorting. Results in docs/ops/demos_2026-11-19/. Fake-venue rehearsal: all pass. Test account: (iii) and (iv) pass on the first run. (viii), both branches, passes on the third run: the first two were lost to data.alpaca.markets quote timeouts, the second leaving 2.1238 F that was then flattened (test_viii_rerun_cleanup.jsonl); the quote fetch was then given retries, in scripts/demos only. (x), three cases, passes through the real close."
+        },
+        "after_close_test": "Hub amendment to I. Record: docs/ops/after_close_test_2026-11-19/results.jsonl. The session buy was 0.183 BAC at 49.188 (DEMOAC-20261119T144241Z-00-a0). Then one fractional SELL through Executor._place per window. Windows 1 (21:17:43Z; due ~21:05Z, started late because demo (x) held the slot until 21:16Z) and 2 (22:00:15Z): SELL 0.0457 each. The venue answered 'accepted' at submit both times, with venue_clock is_open false. Neither filled. At the 300 s deadline _place cancelled the remainder (UNFILLED_AT_DEADLINE; seconds in _place 302.4 and 302.1), and the venue showed 'canceled' when _place returned. Nothing was rejected. Window 3 (~01:00Z 2026-11-20) follows. Final states are read Friday 2026-11-20 morning and reported separately.",
+        "known_limits": {
+          "shadow_only": "(V) records and pages but withholds nothing until its sign-off.",
+          "demo_network": "From this machine, Alpaca's hosts time out intermittently (both data and paper-api). Three demo starts and one buy failed inside the gate and placed nothing. Every failure is kept in the result files."
+        },
+        "later_fixes": {
+          "defab_clean_window_help": "`python scripts/defab_clean_window.py --help` RUNS the script (it has no argument parser) and rewrites reports/monthly/2026-05/defab_clean_window.json. Found 2026-11-18, file restored by git checkout. Fix later: add argparse so --help exits without side effects."
+        }
       }
     ]
   }

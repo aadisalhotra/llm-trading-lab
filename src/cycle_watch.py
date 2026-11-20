@@ -34,6 +34,8 @@ from pathlib import Path
 from typing import Iterable, Mapping
 from zoneinfo import ZoneInfo
 
+from .record_class import is_administrative_row
+
 logger = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
@@ -79,6 +81,10 @@ def withhold_in_slot(admission_lines: Iterable[str], slot_utc: datetime) -> dict
             logger.warning("cycle_watch: admission line %d is not JSON; skipped", i + 1)
             continue
         if not isinstance(rec, dict) or not str(rec.get("event", "")).startswith(WITHHELD_PREFIX):
+            continue
+        # An EOD-scope withhold suspended the after-close stop sweep, not a
+        # decision tick: it never explains a missed intraday slot.
+        if rec.get("scope") == "EOD":
             continue
         try:
             t = parse_utc(str(rec.get("timestamp", "")))
@@ -143,6 +149,10 @@ def books_in_slot(lines_by_book: Mapping[str, Iterable[str]], slot_utc: datetime
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 logger.warning("cycle_watch: %s line %d is not JSON; skipped", book, i + 1)
+                continue
+            # An administrative row (an EOD stop, a boundary force-cover)
+            # records no model call, so it is never a cycle for this book.
+            if is_administrative_row(rec):
                 continue
             fetched = rec.get("fetch_started_at")
             if not fetched:

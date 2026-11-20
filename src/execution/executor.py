@@ -30,6 +30,7 @@ from ..data.price_validity import is_valid_price
 from ..portfolio import Portfolio
 from ..portfolio.settlement import settlement_days, settlement_enforcement_active
 from .barrier import CycleBarrier, Intent
+from ..record_class import EOD_STOP_NOT_EXECUTABLE
 from .broker import (
     BROKER_MODES,
     MIN_ORDER_NOTIONAL,
@@ -98,6 +99,12 @@ REGISTERED_SKIP_CLASSES = frozenset({
     CONSTRAINT_UNSETTLED_FUNDS_CAPPED,
     CONSTRAINT_BELOW_VENUE_MINIMUM,
     CONSTRAINT_WASH_REJECT_POST_BARRIER,
+    # eod_stop_record_and_evaluation_ruling.md section 4, cases A/B; hub ruling
+    # 2026-11-18 (pending Research's confirmation): the venue refusing an
+    # after-close stop is a legitimate market rejection. Classification only:
+    # set on the EOD administrative row's record (src/pipeline.py), never read
+    # by anything that places, sizes or waits on an order.
+    EOD_STOP_NOT_EXECUTABLE,
 })
 
 # NOT a class. The marker a skip carries when no registered class explains it.

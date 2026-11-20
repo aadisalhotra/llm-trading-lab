@@ -1,0 +1,387 @@
+{
+  "venue": "fake",
+  "account": "...FAKE",
+  "started_utc": "2026-11-19T00:55:04.050768+00:00",
+  "symbol": "F",
+  "demos": {
+    "iii": {
+      "checks": [
+        {
+          "check": "baseline (V) proceeds",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "proceed",
+              null,
+              [],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "the killed run's first order filled",
+          "pass": true,
+          "detail": {
+            "order_id": "DEMOA-20261119T005506Z-00-a0",
+            "filled_qty": 1.0667,
+            "moved": true,
+            "status": "filled",
+            "error": ""
+          }
+        },
+        {
+          "check": "same-slot re-run: id test names DEMOA's lost cycle",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T005506Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "same-slot re-run: quantity test fails",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "same-slot re-run: every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "same-slot re-run: books_to_repair names DEMOA",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: id test names DEMOA's lost cycle",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T005506Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "next slot's run: quantity test fails",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: books_to_repair names DEMOA",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "no halt flag set",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [],
+      "passed": true
+    },
+    "iv": {
+      "checks": [
+        {
+          "check": "id test names both books that traded",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T005509Z"
+              ],
+              [
+                "DEMOA",
+                "DEMOB"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T005509Z"
+              ],
+              [
+                "DEMOA",
+                "DEMOB"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "books_to_repair names each book",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [],
+      "passed": true
+    },
+    "viii": {
+      "checks": [
+        {
+          "check": "before-save: post-cycle reconciliation diverges",
+          "pass": true,
+          "detail": [
+            {
+              "kind": "cash",
+              "ticker": "",
+              "expected_value": 10463.998875,
+              "broker_value": 10452.0,
+              "delta": 11.998874999999316,
+              "tolerance": 1.0,
+              "mark": null,
+              "delta_usd": null
+            },
+            {
+              "kind": "position",
+              "ticker": "F",
+              "expected_value": 3.2001,
+              "broker_value": 4.2668,
+              "delta": -1.0667,
+              "tolerance": 1.0,
+              "mark": 11.25,
+              "delta_usd": 12.000375
+            }
+          ]
+        },
+        {
+          "check": "before-save: the handler halts EVERY venue book",
+          "pass": true,
+          "detail": [
+            "DEMOA",
+            "DEMOB"
+          ]
+        },
+        {
+          "check": "before-save: next tick's quantity test would withhold every book",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T005512Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "after-save: post-cycle reconciliation is clean",
+          "pass": true,
+          "detail": []
+        },
+        {
+          "check": "after-save: id test withholds DEMOA alone",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T005516Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "after-save: DEMOB proceeds",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [
+        [
+          "CRITICAL",
+          "G-BOOK reconciliation divergence \u2014 2 event(s)",
+          "Cycle 20261119T005512Z: cash expected=10463.9989 broker=10452.0000 delta=11.9989 (tolerance $1.00); position F expected=3.2001 broker=4.2668 delta=-1.0667 ($12.00) (tolerance $1.00)",
+          "{'cycle_id': '20261119T005512Z', 'books': ['DEMOA', 'DEMOB']}"
+        ]
+      ],
+      "passed": true
+    },
+    "x": {
+      "checks": [
+        {
+          "check": "case 1: the EOD stop sweep submitted an order",
+          "pass": true,
+          "detail": [
+            [
+              "DEMOA-20261119T005520Z-00-a0",
+              false,
+              "UNFILLED_AT_DEADLINE"
+            ]
+          ]
+        },
+        {
+          "check": "case 1: the administrative row was written with the EOD cycle",
+          "pass": true,
+          "detail": {
+            "constraint": "EOD_STOP_NOT_EXECUTABLE",
+            "stop_unprotected": false,
+            "venue_clock": {
+              "is_open": false,
+              "timestamp": "2026-11-19T00:55:23.910905+00:00",
+              "next_open": null
+            }
+          }
+        },
+        {
+          "check": "case 1: the next morning's first tick admits DEMOA",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "proceed",
+              null,
+              [],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 2: late/backup EOD pass would withhold DEMOA (id test names the EOD cycle)",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T005526Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 2: next morning's tick would withhold DEMOA (id test names the EOD cycle)",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T005526Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 3: a duplicate EOD pass suspends the stop sweep",
+          "pass": true,
+          "detail": "eod_boundary_already_handled"
+        },
+        {
+          "check": "case 3: it submits nothing",
+          "pass": true,
+          "detail": {
+            "orders_before": 23,
+            "orders_after": 23
+          }
+        }
+      ],
+      "alerts": [
+        [
+          "WARN",
+          "Position stop on DEMOA"
+        ],
+        [
+          "WARN",
+          "EOD stop not executable (market closed): DEMOA"
+        ],
+        [
+          "WARN",
+          "Position stop on DEMOA"
+        ]
+      ],
+      "passed": true
+    }
+  },
+  "finished_utc": "2026-11-19T00:55:30.260726+00:00",
+  "all_passed": true
+}

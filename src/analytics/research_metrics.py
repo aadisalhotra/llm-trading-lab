@@ -52,6 +52,7 @@ from .regime_classifier import (
     label_for_dates,
 )
 from .short_metrics import gross_hhi
+from ..record_class import is_administrative_row
 from .statistical_corrections import (
     DEFAULT_BLOCK_LENGTH,
     DEFAULT_FDR_Q,
@@ -334,7 +335,9 @@ def compute_rq1(
     ticks: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
     for key in model_keys:
         for rec in all_records.get(key, []):
-            if not rec.get("api_success"):
+            # RQ1 decision sets are a model-call population (explicitly: the
+            # BOUNDARY_ADMIN rows report api_success true).
+            if not rec.get("api_success") or is_administrative_row(rec):
                 continue
             h = rec.get("data_inputs_hash")
             raw = rec.get("raw_decisions") or []
@@ -1401,7 +1404,9 @@ def _rq5_trade_panel(records: list[dict[str, Any]], window_start: str) -> list[d
         by_day[r.get("date", "")].append(r)
     tickpos: dict[int, int] = {}
     for _d, rs in by_day.items():
-        for i, r in enumerate(sorted(rs, key=lambda x: x.get("timestamp", "")), 1):
+        # Tick position counts model ticks; an administrative row is no tick.
+        ticks = [x for x in rs if not is_administrative_row(x)]
+        for i, r in enumerate(sorted(ticks, key=lambda x: x.get("timestamp", "")), 1):
             tickpos[id(r)] = i
 
     peak = float("-inf")
@@ -1425,7 +1430,10 @@ def _rq5_trade_panel(records: list[dict[str, Any]], window_start: str) -> list[d
             fp = ex.get("fill_price")
             if fp is not None:
                 price_now.setdefault(str(ex.get("ticker")), float(fp))
-        if prev_holdings is not None:
+        # An administrative row (an EOD stop) moves the book, so it stays in
+        # the replay and updates prev_holdings below, but it is never an
+        # observation in the trade-driven series (eod_stop ruling §1).
+        if prev_holdings is not None and not is_administrative_row(r):
             # Signed shares * price gives a signed market value; gross_hhi takes
             # the magnitude, so a short re-prices into the pre-trade gross book.
             pre_mv = [sh * price_now[t] for t, sh in prev_holdings.items()

@@ -50,6 +50,8 @@ from typing import Any, Iterable
 from ..config_loader import RECONCILIATION_DIR, TRADES_DIR
 from ..execution.broker import TERMINAL_STATES
 from ..execution.executor import CONSTRAINT_WASH_TRADE_BLOCK, REGISTERED_SKIP_CLASSES
+from ..record_class import (ADMIN_CLASS_EOD_POSITION_STOP, EOD_STOP_NOT_EXECUTABLE,
+                            RECORD_CLASS_ADMINISTRATIVE)
 
 logger = logging.getLogger("llmlab.analytics.execution_metrics")
 
@@ -84,6 +86,12 @@ def classify_execution(e: dict[str, Any]) -> str:
         return "fail:unresolved_status"
 
     constraint = e.get("constraint") or ""
+    if constraint == EOD_STOP_NOT_EXECUTABLE:
+        # Valid only on an EOD administrative row with the venue's market-
+        # closed evidence (r4_notes rev. 2 §4.3), which classify_admin_execution
+        # checks. Reached here, the tag stands on a row that cannot carry it,
+        # so it explains nothing: unclassified, a failure.
+        return "fail:unclassified_skip"
     if constraint in _LEGIT_CONSTRAINTS:
         return f"ok:constraint_{constraint}"
     if constraint == CONSTRAINT_WASH_TRADE_BLOCK:
@@ -101,6 +109,39 @@ def classify_execution(e: dict[str, Any]) -> str:
     # An order id was minted, no venue order came back, no constraint explains
     # it: the submission itself failed.
     return "fail:submission_failed"
+
+
+def market_closed_evidence(row: dict[str, Any], e: dict[str, Any]) -> bool:
+    """The venue's own evidence that the market was closed (r4_notes rev. 2
+    §4.3): its clock as read by the EOD run, or its rejection reason."""
+    if (row.get("venue_clock") or {}).get("is_open") is False:
+        return True
+    err = str(e.get("error") or "").lower()
+    return "market is closed" in err or "market closed" in err
+
+
+def classify_admin_execution(e: dict[str, Any], row: dict[str, Any]) -> str:
+    """One execution on an ADMINISTRATIVE row (r4_notes rev. 2 §4).
+
+    A terminal state comes before the tag: an order not terminal, or one the
+    EOD run could not confirm, fails as unresolved_status whatever it carries
+    (case C). The tag is honoured only on an EOD_POSITION_STOP row with the
+    venue's market-closed evidence. Case A (refused) scores as a market
+    rejection; case B (accepted for the open, cancelled at our deadline) as a
+    resolved terminal state; case D (filled) as an ordinary fill.
+    """
+    bo = e.get("broker_order") or {}
+    status = str(bo.get("status") or "").lower()
+    if e.get("eod_open_order") or (bo and status not in TERMINAL_STATES):
+        return "fail:unresolved_status"
+    if e.get("constraint") == EOD_STOP_NOT_EXECUTABLE:
+        if (row.get("admin_class") != ADMIN_CLASS_EOD_POSITION_STOP
+                or not market_closed_evidence(row, e)):
+            return "fail:unclassified_skip"
+        if bo and status != "rejected":
+            return f"ok:terminal_{status}"                       # case B
+        return f"ok:constraint_{EOD_STOP_NOT_EXECUTABLE}"        # case A
+    return classify_execution(e)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -137,21 +178,32 @@ def load_reconciliation(recon_dir: Path | None = None) -> dict[str, bool]:
 
 def score_cycles(records: Iterable[dict[str, Any]],
                  recon_clean: dict[str, bool]) -> dict[str, Any]:
-    """Score one model's decision records (already restricted to one month)."""
+    """Score one model's decision records (already restricted to one month).
+
+    Administrative rows (r4_notes_gate_a_and_repair.md rev. 2 §4.1): an EOD
+    pass whose stop sweep intended an order is one execution cycle of the book.
+    It is admitted by record_class AHEAD of the api_success test (its
+    api_success is null by construction) and also counted separately in
+    `administrative_cycles`, by outcome, so the rate reads with and without
+    them (`execution_success_rate` / `rate_excluding_administrative`).
+    """
     cycles = successes = excluded = 0
+    admin_cycles = admin_successes = 0
+    admin_outcomes: Counter[str] = Counter()
     failures: Counter[str] = Counter()
     constraints: Counter[str] = Counter()
     unclassified_rejections = 0
     for rec in records:
         if rec.get("execution_mode") not in BROKER_MODES:
             continue
-        if not rec.get("api_success", True):
+        admin = rec.get("record_class") == RECORD_CLASS_ADMINISTRATIVE
+        if not admin and not rec.get("api_success", True):
             excluded += 1
             continue
         cycles += 1
         cycle_fail: list[str] = []
         for e in rec.get("executions") or []:
-            outcome = classify_execution(e)
+            outcome = classify_admin_execution(e, rec) if admin else classify_execution(e)
             if outcome == NO_ORDER:
                 continue
             if outcome.startswith("fail:"):
@@ -170,11 +222,21 @@ def score_cycles(records: Iterable[dict[str, Any]],
                 failures[reason] += 1
         else:
             successes += 1
+        if admin:
+            admin_cycles += 1
+            admin_successes += 0 if cycle_fail else 1
+            admin_outcomes["success" if not cycle_fail else
+                           "fail:" + ",".join(sorted(set(cycle_fail)))] += 1
     rate = (successes / cycles) if cycles else None
+    decision_cycles = cycles - admin_cycles
     return {
         "cycles": cycles,
         "successes": successes,
         "execution_success_rate": rate,
+        "rate_excluding_administrative": ((successes - admin_successes) / decision_cycles
+                                          if decision_cycles else None),
+        "administrative_cycles": {"cycles": admin_cycles, "successes": admin_successes,
+                                  "by_outcome": dict(sorted(admin_outcomes.items()))},
         "passes_gate_4": (rate >= EXECUTION_SUCCESS_THRESHOLD) if rate is not None else None,
         "threshold": EXECUTION_SUCCESS_THRESHOLD,
         "failure_cycles_by_reason": dict(sorted(failures.items())),

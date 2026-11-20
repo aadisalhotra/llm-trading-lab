@@ -18,6 +18,7 @@ import pandas as pd
 from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, effective_mode, load_settings,
                              starting_capital as _starting_capital_guarded)
 from ..portfolio.portfolio import read_book_inception
+from ..record_class import is_administrative_row
 
 
 def load_performance_history(model_key: str) -> pd.DataFrame:
@@ -562,7 +563,7 @@ def compute_api_cost_summary(model_key: str) -> dict[str, Any]:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if not rec.get("api_success"):
+                if not rec.get("api_success") or is_administrative_row(rec):
                     continue
                 calls += 1
                 in_tok += int(rec.get("input_tokens") or 0)
@@ -660,7 +661,7 @@ def compute_api_cost_summary_window(
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if not rec.get("api_success"):
+                if not rec.get("api_success") or is_administrative_row(rec):
                     continue
                 ts = _parse_log_timestamp(rec.get("timestamp", ""))
                 if ts is None:

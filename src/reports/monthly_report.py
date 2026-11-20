@@ -39,6 +39,7 @@ from ..config_loader import (
     load_settings,
 )
 from ..portfolio import load_portfolio
+from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.reports.monthly")
 
@@ -936,7 +937,7 @@ def _section_memory_impact(
         for rec in _walk_records_for_month(key, start, end):
             # Only count successful calls — a failed API call never saw the
             # memory context, so including it would dilute the signal.
-            if not rec.get("api_success"):
+            if not rec.get("api_success") or is_administrative_row(rec):
                 continue
             runs += 1
             if rec.get("memory_hit"):

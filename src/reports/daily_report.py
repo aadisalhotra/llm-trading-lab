@@ -45,6 +45,7 @@ from ..config_loader import (
 )
 from ..data.sentiment import score_headline, sentiment_label
 from ..portfolio import load_portfolio
+from ..record_class import is_administrative_row, last_model_call_row
 from .cash_defect_flag import FLAG_CODE, FLAG_TEXT, MARKER as CASH_FLAG_MARKER, cash_flag, footnote
 
 logger = logging.getLogger("llmlab.reports")
@@ -174,7 +175,10 @@ def _short_err(msg: str) -> str:
 # ===========================================================================
 
 def _read_today_trade_record(model_key: str, run_date: datetime) -> dict[str, Any] | None:
-    """Pull the most recent decision log entry for this model on run_date."""
+    """Pull the most recent MODEL-CALL decision log entry for this model on
+    run_date. An administrative row (the EOD stop row is the day's last row
+    when a stop fires after the close) records no call, so it never stands
+    for the model's health, latency or API status."""
     month_str = run_date.strftime("%Y-%m")
     path = TRADES_DIR / f"{model_key}_{month_str}.jsonl"
     if not path.exists():
@@ -190,7 +194,7 @@ def _read_today_trade_record(model_key: str, run_date: datetime) -> dict[str, An
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if rec.get("date") == target_date:
+            if rec.get("date") == target_date and not is_administrative_row(rec):
                 last_match = rec
     return last_match
 
@@ -529,8 +533,9 @@ def _build_performance_table(
             for e in rec.get("executions", []):
                 if e.get("executed") and e.get("side") in EXECUTED_TRADE_SIDES:
                     n_trades += 1
-        # Keep `record` pointing at the most recent tick for api_success display
-        record = records[-1] if records else None
+        # Keep `record` pointing at the most recent MODEL-CALL tick for the
+        # api_success display: an administrative row records no call.
+        record = last_model_call_row(records) if records else None
 
         api_success = bool(record.get("api_success", True)) if record else False
         rows_data.append({
@@ -599,7 +604,9 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
     if not records:
         return f"No decision log entry recorded for {model_key.upper()} today. Likely the model was disabled, the daily run skipped this slot, or the file has not yet been written."
 
-    last = records[-1]
+    # The last model-call row: an administrative row (an EOD stop) carries no
+    # call, so its null api_success must not read as "API call failed".
+    last = last_model_call_row(records) or records[-1]
     # Whole-day executed trades across every intraday tick, so the one-line
     # narrative matches the whole-day trade counts and the "Today's trades"
     # list below instead of describing only the final tick of the session.
@@ -612,7 +619,7 @@ def _model_breakdown(model_key: str, run_date: datetime) -> str:
         err = _short_err(last.get("api_error", "unknown error"))
         return f"API call failed: _{err}_. No trades executed. Portfolio unchanged from prior session."
 
-    overall = last.get("overall_reasoning", "").strip()
+    overall = (last.get("overall_reasoning") or "").strip()
     # EOD positioning comes from the latest tick that carries a portfolio snapshot.
     state_rec = next((r for r in reversed(records) if r.get("portfolio_after")), last)
     portfolio_after = state_rec.get("portfolio_after", {})

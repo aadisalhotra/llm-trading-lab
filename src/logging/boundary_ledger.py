@@ -6,17 +6,16 @@ decisions are made, and checks the ledger BEFORE prompting any model, so a
 duplicate run for the same boundary cleanly no-ops instead of re-prompting the
 models and double-trading.
 
-The EOD wrap-up is NOT guarded here. It places no MODEL trades, but it CAN submit
-per-position stop orders: run_one_model runs the stop sweep before its is_eod
-early-return (which writes no decision row), and in broker modes a triggered stop
-goes to the venue. So EOD does carry double-trade risk: a second EOD run (the
-22:00 UTC backup beside the chain post-close handoff) can re-run the stop sweep
-on a book the first run failed to commit. Its per-day idempotency today is
-log_daily_snapshot date-dedup, the once-per-day digest and the pipeline's
-_eod_skip_reason. EOD admission coverage — this ledger, the spacing guard and the
-pre-trade venue check, run before the stop sweep under an EOD-specific boundary
-key (one EOD per session) — is PENDING (hub ruling 2026-11-17, Thursday's
-package).
+The EOD wrap-up is keyed here too, under the slot "EOD" (one EOD per session;
+tick_admission_guards_ruling.md rev. 5 section 2). It places no MODEL trades,
+but it CAN submit per-position stop orders: run_one_model runs the stop sweep
+before its is_eod branch, and in broker modes a triggered stop goes to the
+venue. So a second EOD run (the 22:00 UTC backup beside the chain post-close
+handoff, or a late firing) could re-run the sweep. The pipeline checks this
+ledger, the spacing guard's fail-closed conditions and the pre-trade venue
+check (shadow) before the sweep; an unreadable ledger or an EOD key already
+handled suspends the stop sweep only, and the snapshot and report still run.
+The EOD key is marked at the end of the pass, never over an unreadable ledger.
 
 What this protects against: a Fix A dispatch retry, a manual force-run, a
 backup-cron double-fire, and multi-trigger redundancy (Path 1/2) — any of which

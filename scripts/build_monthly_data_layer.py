@@ -91,6 +91,7 @@ from src.config_loader import (  # noqa: E402
 )
 from src.portfolio.portfolio import Portfolio  # noqa: E402
 from src.reports.cash_defect_flag import window_flags  # noqa: E402
+from src.record_class import is_administrative_row  # noqa: E402
 
 logger = logging.getLogger("llmlab.data_layer")
 
@@ -287,7 +288,7 @@ def _correlation_matrix(may_records, model_keys, min_shared=3):
     ticks = defaultdict(dict)
     for key in model_keys:
         for rec in may_records.get(key, []):
-            if not rec.get("api_success"):
+            if not rec.get("api_success") or is_administrative_row(rec):
                 continue
             h = rec.get("data_inputs_hash")
             raw = rec.get("raw_decisions") or []
@@ -828,8 +829,9 @@ def _notable_events(full_records, model_keys, win_start, win_end):
         errors = []
         prev_halted = False
         for r in win:
-            # API / JSON error events
-            if not r.get("api_success"):
+            # API / JSON error events (model-call rows only: an administrative
+            # row's null api_success is no failed call)
+            if not r.get("api_success") and not is_administrative_row(r):
                 errors.append({"timestamp": r.get("timestamp"),
                                "type": _err_type(r.get("api_error"))})
             # Trades + stop-loss forced closes.
@@ -977,6 +979,12 @@ def _data_integrity(model_keys, win_start, win_end, settings, ledger):
                     except json.JSONDecodeError:
                         continue
                     if not _inwin(r.get("date", "")):
+                        continue
+                    # G-COMPLETE is a model-call population: an administrative
+                    # row records no call (eod_stop_record_and_evaluation_ruling
+                    # §1, §3 -- the 2026-10-23 rows report a call that never
+                    # happened).
+                    if is_administrative_row(r):
                         continue
                     n += 1
                     day = per_model_daily[key].setdefault(r.get("date"), [0, 0])
@@ -1230,6 +1238,8 @@ def _pinned_snapshots(model_keys, win_start, win_end, settings):
                     except json.JSONDecodeError:
                         continue
                     if not (_inwin(r.get("date", "")) and r.get("api_success")):
+                        continue
+                    if is_administrative_row(r):   # "n/a" is no identifier echo
                         continue
                     mid = r.get("model_id_returned")
                     d = r.get("date")

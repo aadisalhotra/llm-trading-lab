@@ -1,0 +1,190 @@
+{
+  "venue": "test",
+  "account": "...4J77",
+  "started_utc": "2026-11-19T14:36:50.193279+00:00",
+  "symbol": "F",
+  "demos": {
+    "iii": {
+      "checks": [
+        {
+          "check": "baseline (V) proceeds",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "proceed",
+              null,
+              [],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "the killed run's first order filled",
+          "pass": true,
+          "detail": {
+            "order_id": "DEMOA-20261119T143657Z-00-a0",
+            "filled_qty": 1.0615,
+            "moved": true,
+            "status": "filled",
+            "error": ""
+          }
+        },
+        {
+          "check": "same-slot re-run: id test names DEMOA's lost cycle",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T143657Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "same-slot re-run: quantity test fails",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "same-slot re-run: every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "same-slot re-run: books_to_repair names DEMOA",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: id test names DEMOA's lost cycle",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T143657Z"
+              ],
+              [
+                "DEMOA"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [],
+              [
+                "DEMOA"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "next slot's run: quantity test fails",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "next slot's run: books_to_repair names DEMOA",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "no halt flag set",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [],
+      "passed": true
+    },
+    "iv": {
+      "checks": [
+        {
+          "check": "id test names both books that traded",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T143709Z"
+              ],
+              [
+                "DEMOA",
+                "DEMOB"
+              ]
+            ],
+            "DEMOB": [
+              "would_withhold",
+              "TICK_WITHHELD_BOOKS_DIVERGED",
+              [
+                "20261119T143709Z"
+              ],
+              [
+                "DEMOA",
+                "DEMOB"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "every venue book would be withheld (BOOKS_DIVERGED)",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "check": "books_to_repair names each book",
+          "pass": true,
+          "detail": null
+        }
+      ],
+      "alerts": [],
+      "passed": true
+    },
+    "viii": {
+      "checks": [
+        {
+          "check": "ran",
+          "pass": false,
+          "detail": "ConnectTimeout: HTTPSConnectionPool(host='data.alpaca.markets', port=443): Max retries exceeded with url: /v2/stocks/F/trades/latest (Caused by ConnectTimeoutError(<HTTPSConnection(host='data.alpaca.markets', port=443) at 0x112d9341f90>, 'Connection to data.alpaca.markets timed out. (connect timeout=20)'))"
+        }
+      ],
+      "alerts": [
+        [
+          "CRITICAL",
+          "G-BOOK reconciliation divergence \u2014 2 event(s)",
+          "Cycle 20261119T143724Z: cash expected=10463.9084 broker=10451.9100 delta=11.9984 (tolerance $1.00); position F expected=3.1830 broker=4.2440 delta=-1.0610 ($12.01) (tolerance $1.00)",
+          "{'cycle_id': '20261119T143724Z', 'books': ['DEMOA', 'DEMOB']}"
+        ]
+      ],
+      "passed": false
+    }
+  },
+  "finished_utc": "2026-11-19T14:37:56.572413+00:00",
+  "all_passed": false
+}

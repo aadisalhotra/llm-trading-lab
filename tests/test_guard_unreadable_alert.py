@@ -125,13 +125,19 @@ PIPE = (ROOT / "src" / "pipeline.py").read_text(encoding="utf-8")
 
 
 def test_ledger_alert_uses_the_duplicate_guard_wording_and_withholds():
-    block = PIPE[PIPE.index("_ledger, _ledger_err = load_ledger()"):PIPE.index("elif is_boundary_handled(")]
+    # Anchored inside run_pipeline: the EOD admission function (2026-11-19)
+    # holds its own ledger check and its own "elif is_boundary_handled(".
+    body = PIPE[PIPE.index("def run_pipeline("):]
+    start = body.index("_ledger, _ledger_err = load_ledger()")
+    block = body[start:body.index("elif is_boundary_handled(", start)]
     assert '"Duplicate guard unreadable: data/state/handled_boundaries.json"' in block
     assert "_withhold_tick(" in block and block.rstrip().endswith("return 0")
 
 
 def test_spacing_alert_fires_per_unreadable_file_and_withhold_precedes_skip():
-    block = PIPE[PIPE.index("verdict = check_spacing("):PIPE.index("record_skip(verdict")]
+    body = PIPE[PIPE.index("def run_pipeline("):]
+    start = body.index("    verdict = check_spacing(")       # not EOD's e_verdict
+    block = body[start:body.index("record_skip(verdict", start)]
     assert 'f"Duplicate guard unreadable: {bad}"' in block
     assert "for bad in verdict.unreadable:" in block
     alert = block[block.index("if verdict.unreadable:"):block.index("if verdict.withhold:")]

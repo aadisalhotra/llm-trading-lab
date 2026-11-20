@@ -1,0 +1,125 @@
+name: Fail-stop Probe (throwaway)
+
+# THROWAWAY live probe of the three GitHub behaviours the intraday fail-stop
+# relies on (ledger gate_a_and_fail_stop_2026_11_18, known_limits
+# .github_behaviour_unproven_live; hub dispatch 2026-11-17, Part 4 H):
+#
+#   Q1  Does an always() job run after its workflow run is CANCELLED?
+#   Q2  Can GITHUB_TOKEN with `actions: write` disable a workflow?
+#   Q3  What happens to the disabled workflow's queued (pending) runs?
+#
+# It acts ONLY on the dummy .github/workflows/failstop_target.yml, never on
+# intraday.yml. It uses GITHUB_TOKEN and nothing else: no venue, mail or other
+# secret. It writes no file and commits nothing.
+#
+# HOW TO RUN (Actions UI, after this lands on main; it must be on the default
+# branch to be dispatched):
+#   1. Run "Fail-stop Probe (throwaway)" with mode = cancel_test.
+#   2. When its `run` job shows step "Hold for cancellation" in progress
+#      (about a minute in), CANCEL the workflow run.
+#   3. Leave everything else alone for 10 minutes.
+# Optional, only if Q1's answer is "no": run it again with mode = disable_only,
+# which answers Q2 without a cancellation.
+#
+# READING THE ANSWERS (the public API is enough; no log access needed):
+#   Q1  the `fail-stop` job of the cancelled run: started and concluded
+#       (success or failure) = yes; skipped / never started = no.
+#   Q2  GET /repos/{repo}/actions/workflows/failstop_target.yml -> "state":
+#       "disabled_manually" = yes. The disable step's own conclusion agrees.
+#   Q3  the two target runs the probe dispatched: the first was in progress at
+#       the disable, the second pending in the target's concurrency group.
+#       Their final status, conclusion and run_started_at say whether a
+#       disabled workflow still starts (or finishes) runs already queued.
+# Then re-enable nothing and delete both files in a follow-up commit.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "cancel_test (dispatch the target, then cancel this run by hand) or disable_only"
+        required: true
+        default: cancel_test
+        type: choice
+        options: [cancel_test, disable_only]
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: failstop-probe
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Dispatch the target twice (one running, one pending)
+        if: inputs.mode == 'cancel_test'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          API="https://api.github.com/repos/${REPO}/actions"
+          AUTH=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          for n in 1 2; do
+            curl -fsS -X POST "${AUTH[@]}" "${API}/workflows/failstop_target.yml/dispatches" \
+                 -d '{"ref":"main"}'
+            echo "dispatched target #${n}"
+            sleep 20
+          done
+      - name: Hold for cancellation
+        if: inputs.mode == 'cancel_test'
+        # Cancel the workflow run while this step is in progress.
+        run: sleep 900
+
+  fail-stop:
+    needs: [run]
+    # The intraday fail-stop's own condition, with disable_only added so Q2 can
+    # be answered on its own.
+    if: ${{ always() && (needs.run.result == 'failure' || needs.run.result == 'cancelled' || inputs.mode == 'disable_only') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Record what this job saw
+        run: |
+          echo "run job result: ${{ needs.run.result }}"
+          echo "mode: ${{ inputs.mode }}"
+      - name: Target runs before the disable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/failstop_target.yml/runs?per_page=5" \
+            | jq -r '.workflow_runs[] | "\(.id) \(.status) \(.conclusion) started=\(.run_started_at)"'
+      - name: Disable the target with GITHUB_TOKEN (Q2)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        # The intraday fail-stop's disable call, verbatim apart from the
+        # workflow file name. Fails the step if the API refuses.
+        run: |
+          code=$(curl -sS -o /tmp/disable.out -w "%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/failstop_target.yml/disable")
+          echo "disable HTTP ${code}"; cat /tmp/disable.out || true
+          [ "$code" = "204" ]
+      - name: Watch the target's runs after the disable (Q3)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        # Deliberately does NOT cancel anything: Q3 is what GitHub itself does
+        # with a disabled workflow's queued run.
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            date -u +%H:%M:%SZ
+            curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/actions/workflows/failstop_target.yml" | jq -r '"state=\(.state)"'
+            curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/actions/workflows/failstop_target.yml/runs?per_page=5" \
+              | jq -r '.workflow_runs[] | "  \(.id) \(.status) \(.conclusion) started=\(.run_started_at)"'
+            sleep 60
+          done

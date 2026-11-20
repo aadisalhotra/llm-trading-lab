@@ -1,0 +1,124 @@
+{
+  "venue": "test",
+  "account": "...4J77",
+  "started_utc": "2026-11-19T20:47:17.692981+00:00",
+  "symbol": "F",
+  "demos": {
+    "x": {
+      "checks": [
+        {
+          "check": "case 1: the EOD stop sweep submitted an order",
+          "pass": true,
+          "detail": [
+            [
+              "DEMOA-20261119T210038Z-00-a0",
+              false,
+              "UNFILLED_AT_DEADLINE"
+            ]
+          ]
+        },
+        {
+          "check": "case 1: the administrative row was written with the EOD cycle",
+          "pass": true,
+          "detail": {
+            "constraint": "EOD_STOP_NOT_EXECUTABLE",
+            "stop_unprotected": false,
+            "venue_clock": {
+              "is_open": false,
+              "timestamp": "2026-11-19T16:05:40.381827372-05:00",
+              "next_open": "2026-11-20T09:30:00-05:00"
+            }
+          }
+        },
+        {
+          "check": "case 1: the next morning's first tick admits DEMOA",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "proceed",
+              null,
+              [],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 2: late/backup EOD pass would withhold DEMOA (id test names the EOD cycle)",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T210542Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 2: next morning's tick would withhold DEMOA (id test names the EOD cycle)",
+          "pass": true,
+          "detail": {
+            "DEMOA": [
+              "would_withhold",
+              "BOOK_WITHHELD_UNACCOUNTED_ORDERS",
+              [
+                "20261119T210542Z"
+              ],
+              null
+            ],
+            "DEMOB": [
+              "proceed",
+              null,
+              [],
+              null
+            ]
+          }
+        },
+        {
+          "check": "case 3: a duplicate EOD pass suspends the stop sweep",
+          "pass": true,
+          "detail": "eod_boundary_already_handled"
+        },
+        {
+          "check": "case 3: it submits nothing",
+          "pass": true,
+          "detail": {
+            "orders_before": 31,
+            "orders_after": 31
+          }
+        }
+      ],
+      "alerts": [
+        [
+          "WARN",
+          "Position stop on DEMOA"
+        ],
+        [
+          "WARN",
+          "EOD stop not executable (market closed): DEMOA"
+        ],
+        [
+          "WARN",
+          "Position stop on DEMOA"
+        ]
+      ],
+      "passed": true
+    }
+  },
+  "finished_utc": "2026-11-19T21:16:16.709992+00:00",
+  "all_passed": true
+}

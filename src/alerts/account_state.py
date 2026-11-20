@@ -37,16 +37,21 @@ def alert_if_account_state(model_key: str, decision_result: Any, cycle_id: str,
             return False
         provider = getattr(decision_result, "provider", "") or ""
         name = PROVIDER_NAMES.get(provider, provider or "unknown provider")
+        reason = getattr(decision_result, "error_reason", None) or "unspecified"
+        fix_hint = {"billing": "fund the account (balance, credits or spending limit)",
+                    "quota": "the per-day request quota is exhausted: tier, pacing or "
+                             "retry policy"}.get(reason, "check the account")
         if send_alert_fn is None:
             from .alerter import send_alert as send_alert_fn
         send_alert_fn(
             "CRITICAL",
-            f"ACCOUNT_STATE: {model_key} — {name} refused the call",
+            f"ACCOUNT_STATE ({reason}): {model_key} — {name} refused the call",
             (f"Book {model_key}: {name} rejected the decision call on the lab's own "
-             f"account standing (balance, credits or team access), not provider "
-             f"availability. This book's leg is missing until the account is fixed. "
+             f"account standing, not provider availability. Reason: {reason} -- "
+             f"{fix_hint}. This book's leg is missing until it is fixed. "
              f"Cycle {cycle_id}. Provider error: {(decision_result.error or '')[:300]}"),
-            {"model": model_key, "provider": provider, "cycle_id": cycle_id},
+            {"model": model_key, "provider": provider, "cycle_id": cycle_id,
+             "reason": reason},
             kind="account_state",
             dedup_key=f"account_state:{model_key}:{cycle_id}",
         )

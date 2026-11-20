@@ -47,6 +47,7 @@ from ..config_loader import (
 from .alert_state import ensure_daily, load_state, save_state
 from .email_alerts import send_email
 from ..price_checks import is_finite_number
+from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.alerts.events")
 
@@ -1317,9 +1318,10 @@ def detect_completeness_degradation(settings: dict[str, Any], date_str: str) -> 
     Closes the monitoring hole exposed in July 2026: Gemini failed 11 of 13
     cycles on 2026-07-14 while the daily digest reported status OK with 0
     violations — the digest keys off runs/violations and is blind to parse
-    failures. This reads the decision log directly; every row there is a real
-    API decision cycle (the EOD pass never writes one), so mean(api_success)
-    over the day IS the day's completeness, the same quantity the monthly
+    failures. This reads the decision log directly; every model-call row there
+    is a real API decision cycle (administrative rows -- the EOD stop row, the
+    boundary force-cover rows -- record no call and are excluded), so
+    mean(api_success) over those rows IS the day's completeness, the same quantity the monthly
     0.80 inclusion gate aggregates.
     """
     alerts_cfg = settings.get("alerts", {}) or {}
@@ -1332,7 +1334,10 @@ def detect_completeness_degradation(settings: dict[str, Any], date_str: str) -> 
 
     specs: list[dict[str, Any]] = []
     for key in _enabled_model_keys(settings):
-        recs = _read_today_trade_records(key, date_str)
+        # Model-call population only: an administrative row (an EOD stop)
+        # records no call, and its null api_success would read as a failure.
+        recs = [r for r in _read_today_trade_records(key, date_str)
+                if not is_administrative_row(r)]
         n = len(recs)
         if n < min_cycles:
             continue

@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..config_loader import DATA_DIR, TRADES_DIR
+from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.analytics.intended_vs_expressed")
 
@@ -58,8 +59,12 @@ def session_row(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
     nav = 0.0
     n = 0
     for rec in records:
-        n += 1
         nav = float((rec.get("portfolio_after") or {}).get("total_value") or nav)
+        # An administrative row (an EOD stop) is no decision cycle and every
+        # execution on it is forced: it moves the NAV and nothing else here.
+        if is_administrative_row(rec):
+            continue
+        n += 1
         for e in rec.get("executions") or []:
             if str(e.get("order_id") or "").startswith("FORCED_"):
                 continue

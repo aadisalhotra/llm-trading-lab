@@ -14,9 +14,19 @@ Only one class exists in code so far, because only Gate A has landed:
 The other four section 4 classes (TICK_WITHHELD_VENUE_UNREACHABLE,
 BOOK_WITHHELD_UNACCOUNTED_ORDERS, TICK_WITHHELD_BOOKS_DIVERGED,
 DECISION_RECORD_LOST) belong to the pre-trade venue check (V) and the offline
-replay. They are deliberately NOT defined here: a class exists in code when the
-code that emits it lands, and the closed set is checked by
+replay. They are deliberately NOT withhold classes here: (V) runs in shadow
+(src/logging/venue_check.py), where the first three appear only as a
+`would_withhold_class` on a verdict row in data/admission/venue_check/, never
+as an event in this file. A class becomes a withhold event when the code that
+enforces it lands, and the closed set is checked by
 `REGISTERED_WITHHOLD_CLASSES`.
+
+Scope (rev. 5). The guards also run at end of day, under an EOD boundary key,
+before the EOD stop sweep. An EOD withhold suspends only that sweep; the
+closing snapshot and the report still run. Its event carries `scope: "EOD"`.
+It is not a G-COMPLETE miss (no decision was due), so the slot watcher skips
+EOD-scope rows; it counts toward unprotected time, since a stop evaluation
+point was lost.
 
 Durability. Events go to data/admission/{YYYY-MM}.jsonl, which the workflow's
 "Commit + push updated data" step commits (it adds all of data/). The pipeline
@@ -52,6 +62,10 @@ GUARD_BOUNDARY_LEDGER = "boundary_ledger"
 GUARD_SPACING = "tick_spacing"
 _GUARDS = frozenset({GUARD_BOUNDARY_LEDGER, GUARD_SPACING})
 
+SCOPE_INTRADAY = "intraday"
+SCOPE_EOD = "EOD"
+_SCOPES = frozenset({SCOPE_INTRADAY, SCOPE_EOD})
+
 
 def admission_log_path(now_utc: datetime, directory: Path | None = None) -> Path:
     """Monthly event file, keyed on the UTC month of the withheld tick."""
@@ -69,6 +83,7 @@ def build_withhold_event(
     reason: str,
     detail: str = "",
     boundary: tuple[str, str] | None = None,
+    scope: str = SCOPE_INTRADAY,
 ) -> dict[str, Any]:
     """Compose one withhold row. Raises ValueError on an unregistered class or
     guard — an untagged withhold is the no-third-state failure in a new place."""
@@ -76,6 +91,8 @@ def build_withhold_event(
         raise ValueError(f"unregistered withhold class {event_class!r}")
     if guard not in _GUARDS:
         raise ValueError(f"unknown admission guard {guard!r}")
+    if scope not in _SCOPES:
+        raise ValueError(f"unknown admission scope {scope!r}")
     row: dict[str, Any] = {
         "event": event_class,
         "timestamp": now_utc.astimezone(timezone.utc).isoformat(),
@@ -85,7 +102,12 @@ def build_withhold_event(
         "files": list(files),
         "models_prompted": 0,
         "orders_submitted": 0,
+        "scope": scope,
     }
+    if scope == SCOPE_EOD:
+        # What an EOD withhold suspends (ruling rev. 5 section 2): the stop
+        # sweep only. The snapshot and report ran.
+        row["suspended"] = "eod_stop_sweep"
     if boundary is not None:
         row["boundary_day"], row["boundary_slot"] = boundary
     if detail:
