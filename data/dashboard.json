@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T19:34:22.156196",
+  "generated_at": "2026-11-20T20:04:58.623112",
   "phase": "Phase A - Paper Trading",
   "mode": "broker_paper",
   "experiment_day": 226,
@@ -117,6 +117,13 @@
       "display_name": "GPT-5.4",
       "recent_summaries": [
         {
+          "timestamp": "2026-11-20T20:04:55.869989",
+          "side": "SELL",
+          "ticker": "AMZN",
+          "confidence": 7,
+          "summary": "Trim Amazon to reduce position size after continued weakness left it both the largest holding and the biggest drawdown."
+        },
+        {
           "timestamp": "2026-11-20T18:34:53.764296",
           "side": "SELL",
           "ticker": "AVGO",
@@ -129,13 +136,6 @@
           "ticker": "AVGO",
           "confidence": 7,
           "summary": "Trim Broadcom further to keep only a small residual position while semiconductor momentum remains poor."
-        },
-        {
-          "timestamp": "2026-11-20T16:34:53.685466",
-          "side": "SELL",
-          "ticker": "NVDA",
-          "confidence": 8,
-          "summary": "Exit the remaining NVIDIA position as the semiconductor breakdown has invalidated the original near-term timing thesis."
         }
       ]
     },
@@ -205,25 +205,25 @@
       "display_name": "Claude Sonnet 4.6",
       "recent_summaries": [
         {
+          "timestamp": "2026-11-20T20:04:55.954016",
+          "side": "SELL",
+          "ticker": "ADBE",
+          "confidence": 6,
+          "summary": "Exiting ADBE fully as the thesis is invalidated \u2014 down -7.15% at 30-day lows with no near-term catalyst identified."
+        },
+        {
+          "timestamp": "2026-11-20T20:04:55.777251",
+          "side": "SELL",
+          "ticker": "AXP",
+          "confidence": 6,
+          "summary": "Exiting AXP fully as the position is down -6.42% with no recovery catalyst and financial sector ETF outflows continuing."
+        },
+        {
           "timestamp": "2026-11-20T17:35:04.688965",
           "side": "SELL",
           "ticker": "AMZN",
           "confidence": 6,
           "summary": "Exiting AMZN as the position is down -7.72% with tech broadly selling off and no near-term catalyst to reverse the trend."
-        },
-        {
-          "timestamp": "2026-11-20T17:35:04.540714",
-          "side": "SELL",
-          "ticker": "AVGO",
-          "confidence": 7,
-          "summary": "Exiting AVGO fully as the Anthropic IPO catalyst has explicitly failed and the position is down -12%, approaching the 15% stop-loss trigger."
-        },
-        {
-          "timestamp": "2026-11-20T16:34:53.527083",
-          "side": "BUY",
-          "ticker": "LOW",
-          "confidence": 5,
-          "summary": "Initiating small LOW position on today's earnings-beat catalyst: tariff refunds saved LOW from a miss and the MyLow AI assistant is a positive near-term story."
         }
       ]
     },
@@ -249,6 +249,13 @@
       "display_name": "Grok 4.20 (Reasoning)",
       "recent_summaries": [
         {
+          "timestamp": "2026-11-20T20:04:55.799597",
+          "side": "SELL",
+          "ticker": "CSCO",
+          "confidence": 5,
+          "summary": "Exiting CSCO on continued post-purchase weakness and margin concerns."
+        },
+        {
           "timestamp": "2026-11-20T19:04:56.319731",
           "side": "SELL",
           "ticker": "CRM",
@@ -261,13 +268,6 @@
           "ticker": "UNH",
           "confidence": 7,
           "summary": "Adding to UNH to bring it toward a 10% weight on continued positive analyst momentum following the recent initiation."
-        },
-        {
-          "timestamp": "2026-11-20T17:04:57.313030",
-          "side": "BUY",
-          "ticker": "COST",
-          "confidence": 7,
-          "summary": "Initiating an 8% position in COST on its new all-time high and $30/share special dividend announcement."
         }
       ]
     },
@@ -297,158 +297,134 @@
   "portfolios": [
     {
       "model_key": "claude",
-      "total_value": 1906.77619406496,
-      "cash": 308.5817692000002,
-      "cash_pct": 0.1618342887647188,
+      "total_value": 1908.7236936826114,
+      "cash": 451.9443176000002,
+      "cash_pct": 0.23677828231284634,
       "settled_cash": 11.451726200000223,
-      "unsettled_cash": 297.130043,
-      "settled_cash_pct": 0.006005805104786244,
+      "unsettled_cash": 440.4925914,
+      "settled_cash_pct": 0.005999677291114747,
       "holdings": [
         {
           "ticker": "KO",
           "shares": 2.1105,
           "avg_cost": 94.88,
-          "current_price": 97.19499969482422,
-          "market_value": 205.1300468559265,
-          "weight": 0.10757950906583331,
-          "gross_weight": 0.10757950906583331,
+          "current_price": 97.0999984741211,
+          "market_value": 204.92954677963257,
+          "weight": 0.10736470001283953,
+          "gross_weight": 0.10736470001283953,
           "direction": "long",
-          "unrealized_pl": 4.885806855926523,
-          "unrealized_pl_pct": 0.02439923793027221
+          "unrealized_pl": 4.685306779632578,
+          "unrealized_pl_pct": 0.023397960309033516
         },
         {
           "ticker": "WMT",
           "shares": 1.8877000000000002,
           "avg_cost": 125.06009143402024,
-          "current_price": 128.5500030517578,
-          "market_value": 242.66384076080325,
-          "weight": 0.12726393454885782,
-          "gross_weight": 0.12726393454885782,
+          "current_price": 128.6999969482422,
+          "market_value": 242.9469842391968,
+          "weight": 0.12728242701826847,
+          "gross_weight": 0.12728242701826847,
           "direction": "long",
-          "unrealized_pl": 6.5879061608032226,
-          "unrealized_pl_pct": 0.027905877708227944
+          "unrealized_pl": 6.8710496391967775,
+          "unrealized_pl_pct": 0.029105252302988438
         },
         {
           "ticker": "PG",
           "shares": 1.2036,
           "avg_cost": 166.37,
-          "current_price": 169.8300018310547,
-          "market_value": 204.40739020385743,
-          "weight": 0.10720051511031907,
-          "gross_weight": 0.10720051511031907,
+          "current_price": 170.22999572753906,
+          "market_value": 204.888822857666,
+          "weight": 0.1073433643307283,
+          "gross_weight": 0.1073433643307283,
           "direction": "long",
-          "unrealized_pl": 4.164458203857416,
-          "unrealized_pl_pct": 0.020797029699192615
+          "unrealized_pl": 4.64589085766601,
+          "unrealized_pl_pct": 0.023201272630516634
         },
         {
           "ticker": "LLY",
           "shares": 0.1918,
           "avg_cost": 1397.0762002085507,
-          "current_price": 1348.0799560546875,
-          "market_value": 258.56173557128903,
-          "weight": 0.13560151232016082,
-          "gross_weight": 0.13560151232016082,
+          "current_price": 1352.2900390625,
+          "market_value": 259.3692294921875,
+          "weight": 0.1358862104298456,
+          "gross_weight": 0.1358862104298456,
           "direction": "long",
-          "unrealized_pl": -9.39747962871097,
-          "unrealized_pl_pct": -0.03507055960623284
+          "unrealized_pl": -8.589985707812533,
+          "unrealized_pl_pct": -0.032057063987894985
         },
         {
           "ticker": "RTX",
           "shares": 0.6262,
           "avg_cost": 192.662,
-          "current_price": 191.1999969482422,
-          "market_value": 119.72943808898926,
-          "weight": 0.06279155281131557,
-          "gross_weight": 0.06279155281131557,
+          "current_price": 191.8769989013672,
+          "market_value": 120.15337671203613,
+          "weight": 0.0629495914519808,
+          "gross_weight": 0.0629495914519808,
           "direction": "long",
-          "unrealized_pl": -0.915506311010746,
-          "unrealized_pl_pct": -0.007588434936613431
-        },
-        {
-          "ticker": "AXP",
-          "shares": 0.24939999999999998,
-          "avg_cost": 325.252,
-          "current_price": 304.1499938964844,
-          "market_value": 75.8550084777832,
-          "weight": 0.03978181011169,
-          "gross_weight": 0.03978181011169,
-          "direction": "long",
-          "unrealized_pl": -5.262840322216799,
-          "unrealized_pl_pct": -0.06487894341469269
-        },
-        {
-          "ticker": "ADBE",
-          "shares": 0.3057,
-          "avg_cost": 238.182,
-          "current_price": 221.5500030517578,
-          "market_value": 67.72783593292237,
-          "weight": 0.035519551871757336,
-          "gross_weight": 0.035519551871757336,
-          "direction": "long",
-          "unrealized_pl": -5.084401467077633,
-          "unrealized_pl_pct": -0.06982894151632857
+          "unrealized_pl": -0.491567687963871,
+          "unrealized_pl_pct": -0.004074498856198039
         },
         {
           "ticker": "SBUX",
           "shares": 0.9344,
           "avg_cost": 107.1,
-          "current_price": 103.41000366210938,
-          "market_value": 96.626307421875,
-          "weight": 0.050675222253473935,
-          "gross_weight": 0.050675222253473935,
+          "current_price": 103.51000213623047,
+          "market_value": 96.71974599609375,
+          "weight": 0.05067247099001885,
+          "gross_weight": 0.05067247099001885,
           "direction": "long",
-          "unrealized_pl": -3.4479325781249948,
-          "unrealized_pl_pct": -0.03445374731924011
+          "unrealized_pl": -3.3544940039062445,
+          "unrealized_pl_pct": -0.03352005475041575
         },
         {
           "ticker": "TJX",
           "shares": 0.6443,
           "avg_cost": 142.68,
-          "current_price": 140.19000244140625,
-          "market_value": 90.32441857299804,
-          "weight": 0.047370225647950834,
-          "gross_weight": 0.047370225647950834,
+          "current_price": 140.2949981689453,
+          "market_value": 90.39206732025146,
+          "weight": 0.04735733496651513,
+          "gross_weight": 0.04735733496651513,
           "direction": "long",
-          "unrealized_pl": -1.6043054270019574,
-          "unrealized_pl_pct": -0.01745162292258029
+          "unrealized_pl": -1.5366566797485395,
+          "unrealized_pl_pct": -0.0167157403353988
         },
         {
           "ticker": "COST",
           "shares": 0.12,
           "avg_cost": 1120.24,
-          "current_price": 1107.06494140625,
-          "market_value": 132.84779296874999,
-          "weight": 0.06967141365738287,
-          "gross_weight": 0.06967141365738287,
+          "current_price": 1107.3349609375,
+          "market_value": 132.8801953125,
+          "weight": 0.0696173027831632,
+          "gross_weight": 0.0696173027831632,
           "direction": "long",
-          "unrealized_pl": -1.581007031250001,
-          "unrealized_pl_pct": -0.011760924974782205
+          "unrealized_pl": -1.548604687500001,
+          "unrealized_pl_pct": -0.011519887758426828
         },
         {
           "ticker": "LOW",
           "shares": 0.4704,
           "avg_cost": 224.264,
-          "current_price": 221.77000427246094,
-          "market_value": 104.32061000976562,
-          "weight": 0.0547104638365396,
-          "gross_weight": 0.0547104638365396,
+          "current_price": 222.1501007080078,
+          "market_value": 104.49940737304688,
+          "weight": 0.054748315703793723,
+          "gross_weight": 0.054748315703793723,
           "direction": "long",
-          "unrealized_pl": -1.1731755902343797,
-          "unrealized_pl_pct": -0.011120802837455313
+          "unrealized_pl": -0.9943782269531297,
+          "unrealized_pl_pct": -0.009425941265616355
         }
       ],
       "halted": false,
       "inception_value": 2000.0,
       "inception_date": "2026-11-06",
-      "cumulative_return": -0.04661190296752005,
-      "gross_long_value": 1598.1944248649597,
+      "cumulative_return": -0.04563815315869435,
+      "gross_long_value": 1456.7793760826112,
       "gross_short_value": 0.0,
-      "gross_value": 1598.1944248649597,
-      "net_value": 1598.1944248649597,
-      "long_exposure_pct": 0.8381657112352812,
+      "gross_value": 1456.7793760826112,
+      "net_value": 1456.7793760826112,
+      "long_exposure_pct": 0.7632217176871536,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.8381657112352812,
-      "net_exposure_pct": 0.8381657112352812,
+      "gross_exposure_pct": 0.7632217176871536,
+      "net_exposure_pct": 0.7632217176871536,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "anthropic",
@@ -459,110 +435,110 @@
     },
     {
       "model_key": "gpt",
-      "total_value": 1915.29499021834,
-      "cash": 375.5396563927401,
-      "cash_pct": 0.19607405559491872,
+      "total_value": 1919.3628623326076,
+      "cash": 473.16700639274006,
+      "cash_pct": 0.24652295596555346,
       "settled_cash": 46.55471199274007,
-      "unsettled_cash": 328.9849444,
-      "settled_cash_pct": 0.024306810298414094,
+      "unsettled_cash": 426.6122944,
+      "settled_cash_pct": 0.024255294768057552,
       "holdings": [
         {
           "ticker": "PG",
           "shares": 1.2254,
           "avg_cost": 163.88,
-          "current_price": 169.8300018310547,
-          "market_value": 208.1096842437744,
-          "weight": 0.10865672666958227,
-          "gross_weight": 0.10865672666958227,
+          "current_price": 170.22999572753906,
+          "market_value": 208.59983676452637,
+          "weight": 0.10868181356338964,
+          "gross_weight": 0.10868181356338964,
           "direction": "long",
-          "unrealized_pl": 7.2911322437744195,
-          "unrealized_pl_pct": 0.036307065115051884
+          "unrealized_pl": 7.781284764526373,
+          "unrealized_pl_pct": 0.0387478382202775
         },
         {
           "ticker": "WMT",
           "shares": 1.6108,
           "avg_cost": 124.0,
-          "current_price": 128.5500030517578,
-          "market_value": 207.0683449157715,
-          "weight": 0.10811303009369126,
-          "gross_weight": 0.10811303009369126,
+          "current_price": 128.6999969482422,
+          "market_value": 207.3099550842285,
+          "weight": 0.10800977717797669,
+          "gross_weight": 0.10800977717797669,
           "direction": "long",
-          "unrealized_pl": 7.329144915771485,
-          "unrealized_pl_pct": 0.036693572998046875
+          "unrealized_pl": 7.570755084228516,
+          "unrealized_pl_pct": 0.03790320119550161
         },
         {
           "ticker": "KO",
           "shares": 2.1141,
           "avg_cost": 94.88,
-          "current_price": 97.19499969482422,
-          "market_value": 205.47994885482788,
-          "weight": 0.10728370820382273,
-          "gross_weight": 0.10728370820382273,
+          "current_price": 97.0999984741211,
+          "market_value": 205.27910677413942,
+          "weight": 0.10695169256565852,
+          "gross_weight": 0.10695169256565852,
           "direction": "long",
-          "unrealized_pl": 4.89414085482789,
-          "unrealized_pl_pct": 0.02439923793027221
+          "unrealized_pl": 4.693298774139414,
+          "unrealized_pl_pct": 0.023397960309033516
         },
         {
           "ticker": "BAC",
           "shares": 4.0077,
           "avg_cost": 50.11,
-          "current_price": 47.380001068115234,
-          "market_value": 189.8848302806854,
-          "weight": 0.09914129742439252,
-          "gross_weight": 0.09914129742439252,
+          "current_price": 47.48500061035156,
+          "market_value": 190.30563694610595,
+          "weight": 0.09915042157001357,
+          "gross_weight": 0.09915042157001357,
           "direction": "long",
-          "unrealized_pl": -10.941016719314572,
-          "unrealized_pl_pct": -0.05448012236848465
+          "unrealized_pl": -10.52021005389404,
+          "unrealized_pl_pct": -0.05238474136197235
         },
         {
           "ticker": "AMZN",
-          "shares": 1.1657,
+          "shares": 0.7722,
           "avg_cost": 272.8942317920563,
-          "current_price": 247.01499938964844,
-          "market_value": 287.9453847885132,
-          "weight": 0.1503399665634211,
-          "gross_weight": 0.1503399665634211,
+          "current_price": 248.60499572753906,
+          "market_value": 191.97277770080566,
+          "weight": 0.10001901228176341,
+          "gross_weight": 0.10001901228176341,
           "direction": "long",
-          "unrealized_pl": -30.167421211486847,
-          "unrealized_pl_pct": -0.09483246396401546
+          "unrealized_pl": -18.75614808902021,
+          "unrealized_pl_pct": -0.08900604422824698
         },
         {
           "ticker": "RTX",
           "shares": 1.042999999,
           "avg_cost": 192.74,
-          "current_price": 191.1999969482422,
-          "market_value": 199.42159662581662,
-          "weight": 0.10412056505357586,
-          "gross_weight": 0.10412056505357586,
+          "current_price": 191.8769989013672,
+          "market_value": 200.127709662249,
+          "weight": 0.1042677826010623,
+          "gross_weight": 0.1042677826010623,
           "direction": "long",
-          "unrealized_pl": -1.606223181443405,
-          "unrealized_pl_pct": -0.007990054227237864
+          "unrealized_pl": -0.9001101450110319,
+          "unrealized_pl_pct": -0.004477540202515451
         },
         {
           "ticker": "LLY",
           "shares": 0.1794,
           "avg_cost": 1397.874,
-          "current_price": 1348.0799560546875,
-          "market_value": 241.84554411621093,
-          "weight": 0.12627065039659557,
-          "gross_weight": 0.12627065039659557,
+          "current_price": 1352.2900390625,
+          "market_value": 242.6008330078125,
+          "weight": 0.12639654427458233,
+          "gross_weight": 0.12639654427458233,
           "direction": "long",
-          "unrealized_pl": -8.933051483789066,
-          "unrealized_pl_pct": -0.03562126768600926
+          "unrealized_pl": -8.177762592187504,
+          "unrealized_pl_pct": -0.032609491940976065
         }
       ],
       "halted": false,
       "inception_value": 2000.0,
       "inception_date": "2026-11-06",
-      "cumulative_return": -0.04235250489082998,
-      "gross_long_value": 1539.7553338255998,
+      "cumulative_return": -0.04031856883369622,
+      "gross_long_value": 1446.1958559398672,
       "gross_short_value": 0.0,
-      "gross_value": 1539.7553338255998,
-      "net_value": 1539.7553338255998,
-      "long_exposure_pct": 0.8039259444050812,
+      "gross_value": 1446.1958559398672,
+      "net_value": 1446.1958559398672,
+      "long_exposure_pct": 0.7534770440344464,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.8039259444050812,
-      "net_exposure_pct": 0.8039259444050812,
+      "gross_exposure_pct": 0.7534770440344464,
+      "net_exposure_pct": 0.7534770440344464,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "openai",
@@ -573,206 +549,206 @@
     },
     {
       "model_key": "gemini",
-      "total_value": 1949.7800753938914,
+      "total_value": 1950.4693093778853,
       "cash": 481.67374356730005,
-      "cash_pct": 0.24704003782067221,
+      "cash_pct": 0.24695274170754986,
       "settled_cash": 3.3471791673000553,
       "unsettled_cash": 478.3265644,
-      "settled_cash_pct": 0.0017166957491982083,
+      "settled_cash_pct": 0.001716089123374958,
       "holdings": [
         {
           "ticker": "ISRG",
           "shares": 0.2337,
           "avg_cost": 442.164,
-          "current_price": 403.44000244140625,
-          "market_value": 94.28392857055664,
-          "weight": 0.04835618630040086,
-          "gross_weight": 0.04835618630040086,
+          "current_price": 403.4674987792969,
+          "market_value": 94.29035446472167,
+          "weight": 0.0483423932954865,
+          "gross_weight": 0.0483423932954865,
           "direction": "long",
-          "unrealized_pl": -9.049798229443356,
-          "unrealized_pl_pct": -0.08757835906720979
+          "unrealized_pl": -9.043372335278317,
+          "unrealized_pl_pct": -0.08751617323143246
         },
         {
           "ticker": "SBUX",
           "shares": 0.9443,
           "avg_cost": 107.272,
-          "current_price": 103.41000366210938,
-          "market_value": 97.65006645812988,
-          "weight": 0.05008260556688825,
-          "gross_weight": 0.05008260556688825,
+          "current_price": 103.51000213623047,
+          "market_value": 97.74449501724243,
+          "weight": 0.05011332121314878,
+          "gross_weight": 0.05011332121314878,
           "direction": "long",
-          "unrealized_pl": -3.6468831418701226,
-          "unrealized_pl_pct": -0.03600190485765742
+          "unrealized_pl": -3.5524545827575738,
+          "unrealized_pl_pct": -0.03506970937215248
         },
         {
           "ticker": "DIS",
           "shares": 0.8466,
           "avg_cost": 119.43,
-          "current_price": 118.01499938964844,
-          "market_value": 99.91149848327638,
-          "weight": 0.05124244510658076,
-          "gross_weight": 0.05124244510658076,
+          "current_price": 118.43000030517578,
+          "market_value": 100.26283825836182,
+          "weight": 0.051404468543184256,
+          "gross_weight": 0.051404468543184256,
           "direction": "long",
-          "unrealized_pl": -1.1979395167236386,
-          "unrealized_pl_pct": -0.011847949513117073
+          "unrealized_pl": -0.8465997416381894,
+          "unrealized_pl_pct": -0.008373103029592488
         },
         {
           "ticker": "CSCO",
           "shares": 1.0593,
           "avg_cost": 93.73415557443595,
-          "current_price": 90.90499877929688,
-          "market_value": 96.29566520690918,
-          "weight": 0.04938796247954051,
-          "gross_weight": 0.04938796247954051,
+          "current_price": 91.15499877929688,
+          "market_value": 96.56049020690917,
+          "weight": 0.049506285355347505,
+          "gross_weight": 0.049506285355347505,
           "direction": "long",
-          "unrealized_pl": -2.996925793090817,
-          "unrealized_pl_pct": -0.03018277358771726
+          "unrealized_pl": -2.732100793090817,
+          "unrealized_pl_pct": -0.02751565615898588
         },
         {
           "ticker": "SLB",
           "shares": 2.0712,
           "avg_cost": 49.1,
-          "current_price": 46.095001220703125,
-          "market_value": 95.47196652832032,
-          "weight": 0.04896550525527,
-          "gross_weight": 0.04896550525527,
+          "current_price": 46.06999969482422,
+          "market_value": 95.42018336791993,
+          "weight": 0.04892165332165868,
+          "gross_weight": 0.04892165332165868,
           "direction": "long",
-          "unrealized_pl": -6.223953471679691,
-          "unrealized_pl_pct": -0.061201604466331494
+          "unrealized_pl": -6.275736632080082,
+          "unrealized_pl_pct": -0.06171080051274502
         },
         {
           "ticker": "HON",
           "shares": 0.4589,
           "avg_cost": 221.072,
-          "current_price": 214.19500732421875,
-          "market_value": 98.29408886108398,
-          "weight": 0.05041291071826486,
-          "gross_weight": 0.05041291071826486,
+          "current_price": 214.67999267578125,
+          "market_value": 98.51664863891601,
+          "weight": 0.050509202152141795,
+          "gross_weight": 0.050509202152141795,
           "direction": "long",
-          "unrealized_pl": -3.1558519389160167,
-          "unrealized_pl_pct": -0.0311074793541527
+          "unrealized_pl": -2.9332921610839855,
+          "unrealized_pl_pct": -0.028913690219560806
         },
         {
           "ticker": "PFE",
           "shares": 3.6951,
           "avg_cost": 27.45,
-          "current_price": 27.510000228881836,
-          "market_value": 101.65220184574127,
-          "weight": 0.052135214185736134,
-          "gross_weight": 0.052135214185736134,
+          "current_price": 27.565000534057617,
+          "market_value": 101.8554334733963,
+          "weight": 0.05222098752524527,
+          "gross_weight": 0.05222098752524527,
           "direction": "long",
-          "unrealized_pl": 0.2217068457412746,
-          "unrealized_pl_pct": 0.0021858006878630043
+          "unrealized_pl": 0.4249384733963039,
+          "unrealized_pl_pct": 0.004189454792627334
         },
         {
           "ticker": "LOW",
           "shares": 0.4597,
           "avg_cost": 219.702,
-          "current_price": 221.77000427246094,
-          "market_value": 101.94767096405029,
-          "weight": 0.052286753901439366,
-          "gross_weight": 0.052286753901439366,
+          "current_price": 222.1501007080078,
+          "market_value": 102.12240129547119,
+          "weight": 0.052357861159088824,
+          "gross_weight": 0.052357861159088824,
           "direction": "long",
-          "unrealized_pl": 0.9506615640502938,
-          "unrealized_pl_pct": 0.00941276944434244
+          "unrealized_pl": 1.1253918954711923,
+          "unrealized_pl_pct": 0.01114282395248023
         },
         {
           "ticker": "CRM",
           "shares": 0.5335,
           "avg_cost": 189.018,
-          "current_price": 183.06500244140625,
-          "market_value": 97.66517880249023,
-          "weight": 0.05009035636122196,
-          "gross_weight": 0.05009035636122196,
+          "current_price": 182.63999938964844,
+          "market_value": 97.43843967437743,
+          "weight": 0.04995640751991942,
+          "gross_weight": 0.04995640751991942,
           "direction": "long",
-          "unrealized_pl": -3.1759241975097656,
-          "unrealized_pl_pct": -0.03149434211870694
+          "unrealized_pl": -3.4026633256225587,
+          "unrealized_pl_pct": -0.03374282137336959
         },
         {
           "ticker": "ABT",
           "shares": 0.9492,
           "avg_cost": 104.72714959966288,
-          "current_price": 103.58000183105469,
-          "market_value": 98.31813773803711,
-          "weight": 0.0504252448667448,
-          "gross_weight": 0.0504252448667448,
+          "current_price": 103.6050033569336,
+          "market_value": 98.34186918640137,
+          "weight": 0.050419593229984294,
+          "gross_weight": 0.050419593229984294,
           "direction": "long",
-          "unrealized_pl": -1.0888726619628963,
-          "unrealized_pl_pct": -0.01095368080763548
+          "unrealized_pl": -1.0651412135986387,
+          "unrealized_pl_pct": -0.010714950679158952
         },
         {
           "ticker": "UNH",
           "shares": 0.2868,
           "avg_cost": 345.32,
-          "current_price": 342.2699890136719,
-          "market_value": 98.1630328491211,
-          "weight": 0.05034569492628052,
-          "gross_weight": 0.05034569492628052,
+          "current_price": 341.6700134277344,
+          "market_value": 97.99095985107422,
+          "weight": 0.050239683023943126,
+          "gross_weight": 0.050239683023943126,
           "direction": "long",
-          "unrealized_pl": -0.8747431508789043,
-          "unrealized_pl_pct": -0.008832419165782812
+          "unrealized_pl": -1.0468161489257792,
+          "unrealized_pl_pct": -0.010569867289081492
         },
         {
           "ticker": "NFLX",
           "shares": 1.6879,
           "avg_cost": 58.93,
-          "current_price": 57.3650016784668,
-          "market_value": 96.8263863330841,
-          "weight": 0.049660157858328405,
-          "gross_weight": 0.049660157858328405,
+          "current_price": 57.23500061035156,
+          "market_value": 96.6069575302124,
+          "weight": 0.04953010901823716,
+          "gross_weight": 0.04953010901823716,
           "direction": "long",
-          "unrealized_pl": -2.641560666915893,
-          "unrealized_pl_pct": -0.026556903470782323
+          "unrealized_pl": -2.8609894697875973,
+          "unrealized_pl_pct": -0.028762928723034764
         },
         {
           "ticker": "EOG",
           "shares": 0.648,
           "avg_cost": 151.74,
-          "current_price": 149.9199981689453,
-          "market_value": 97.14815881347657,
-          "weight": 0.049825187999139264,
-          "gross_weight": 0.049825187999139264,
+          "current_price": 149.55999755859375,
+          "market_value": 96.91487841796875,
+          "weight": 0.04968797917096187,
+          "gross_weight": 0.04968797917096187,
           "direction": "long",
-          "unrealized_pl": -1.1793611865234435,
-          "unrealized_pl_pct": -0.011994212673353766
+          "unrealized_pl": -1.412641582031256,
+          "unrealized_pl_pct": -0.01436669593651152
         },
         {
           "ticker": "HD",
           "shares": 0.2863,
           "avg_cost": 343.574,
-          "current_price": 340.54998779296875,
-          "market_value": 97.49946150512696,
-          "weight": 0.05000536354615803,
-          "gross_weight": 0.05000536354615803,
+          "current_price": 341.3450012207031,
+          "market_value": 97.7270738494873,
+          "weight": 0.05010438943059195,
+          "gross_weight": 0.05010438943059195,
           "direction": "long",
-          "unrealized_pl": -0.8657746948730504,
-          "unrealized_pl_pct": -0.00880163285647706
+          "unrealized_pl": -0.6381623505126989,
+          "unrealized_pl_pct": -0.006487681778297838
         },
         {
           "ticker": "COST",
           "shares": 0.0876,
           "avg_cost": 1118.638,
-          "current_price": 1107.06494140625,
-          "market_value": 96.9788888671875,
-          "weight": 0.04973837310733416,
-          "gross_weight": 0.04973837310733416,
+          "current_price": 1107.3349609375,
+          "market_value": 97.002542578125,
+          "weight": 0.04973292433351058,
+          "gross_weight": 0.04973292433351058,
           "direction": "long",
-          "unrealized_pl": -1.013799932812493,
-          "unrealized_pl_pct": -0.010345669102739152
+          "unrealized_pl": -0.9901462218749929,
+          "unrealized_pl_pct": -0.01010428669730501
         }
       ],
       "halted": false,
       "inception_value": 2000.0,
       "inception_date": "2026-11-06",
-      "cumulative_return": -0.02510996230305429,
-      "gross_long_value": 1468.1063318265915,
+      "cumulative_return": -0.02476534531105734,
+      "gross_long_value": 1468.7955658105852,
       "gross_short_value": 0.0,
-      "gross_value": 1468.1063318265915,
-      "net_value": 1468.1063318265915,
-      "long_exposure_pct": 0.7529599621793279,
+      "gross_value": 1468.7955658105852,
+      "net_value": 1468.7955658105852,
+      "long_exposure_pct": 0.7530472582924501,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.7529599621793279,
-      "net_exposure_pct": 0.7529599621793279,
+      "gross_exposure_pct": 0.7530472582924501,
+      "net_exposure_pct": 0.7530472582924501,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "google",
@@ -783,206 +759,194 @@
     },
     {
       "model_key": "grok",
-      "total_value": 1921.627521736792,
-      "cash": 290.0855548291001,
-      "cash_pct": 0.1509582640484442,
+      "total_value": 1922.5672647278138,
+      "cash": 346.1657134291001,
+      "cash_pct": 0.18005388928647356,
       "settled_cash": 0.0,
-      "unsettled_cash": 290.2202004,
+      "unsettled_cash": 346.300359,
       "settled_cash_pct": 0.0,
       "holdings": [
         {
           "ticker": "PG",
           "shares": 0.3501000000000002,
           "avg_cost": 163.86,
-          "current_price": 169.8300018310547,
-          "market_value": 59.45748364105228,
-          "weight": 0.030941211534748332,
-          "gross_weight": 0.030941211534748332,
+          "current_price": 170.22999572753906,
+          "market_value": 59.59752150421146,
+          "weight": 0.030998926590300048,
+          "gross_weight": 0.030998926590300048,
           "direction": "long",
-          "unrealized_pl": 2.0900976410522425,
-          "unrealized_pl_pct": 0.03643355200204246
+          "unrealized_pl": 2.230135504211422,
+          "unrealized_pl_pct": 0.03887462301683775
         },
         {
           "ticker": "MCD",
           "shares": 0.7321,
           "avg_cost": 270.44,
-          "current_price": 274.32000732421875,
-          "market_value": 200.82967736206055,
-          "weight": 0.10451020038500909,
-          "gross_weight": 0.10451020038500909,
+          "current_price": 274.29998779296875,
+          "market_value": 200.81502106323242,
+          "weight": 0.10445149293211474,
+          "gross_weight": 0.10445149293211474,
           "direction": "long",
-          "unrealized_pl": 2.8405533620605485,
-          "unrealized_pl_pct": 0.014347017172824827
+          "unrealized_pl": 2.8258970632324236,
+          "unrealized_pl_pct": 0.014272991395388068
         },
         {
           "ticker": "KO",
           "shares": 2.0096,
           "avg_cost": 94.88,
-          "current_price": 97.19499969482422,
-          "market_value": 195.32307138671874,
-          "weight": 0.10164460551136528,
-          "gross_weight": 0.10164460551136528,
+          "current_price": 97.0999984741211,
+          "market_value": 195.13215693359373,
+          "weight": 0.10149562021239317,
+          "gross_weight": 0.10149562021239317,
           "direction": "long",
-          "unrealized_pl": 4.652223386718759,
-          "unrealized_pl_pct": 0.02439923793027221
+          "unrealized_pl": 4.461308933593759,
+          "unrealized_pl_pct": 0.023397960309033516
         },
         {
           "ticker": "WMT",
           "shares": 1.3963,
           "avg_cost": 126.07783906553031,
-          "current_price": 128.5500030517578,
-          "market_value": 179.49436926116945,
-          "weight": 0.09340747217178702,
-          "gross_weight": 0.09340747217178702,
+          "current_price": 128.6999969482422,
+          "market_value": 179.70380573883057,
+          "weight": 0.0934707508214398,
+          "gross_weight": 0.0934707508214398,
           "direction": "long",
-          "unrealized_pl": 3.451882573969458,
-          "unrealized_pl_pct": 0.01960823571018344
+          "unrealized_pl": 3.661319051630591,
+          "unrealized_pl_pct": 0.020797928503113017
         },
         {
           "ticker": "JNJ",
           "shares": 0.2174,
           "avg_cost": 273.35,
-          "current_price": 271.32000732421875,
-          "market_value": 58.98496959228516,
-          "weight": 0.030695318902892156,
-          "gross_weight": 0.030695318902892156,
+          "current_price": 271.94000244140625,
+          "market_value": 59.11975653076172,
+          "weight": 0.03075042294508825,
+          "gross_weight": 0.03075042294508825,
           "direction": "long",
-          "unrealized_pl": -0.4413204077148487,
-          "unrealized_pl_pct": -0.007426349646172614
+          "unrealized_pl": -0.3065334692382862,
+          "unrealized_pl_pct": -0.0051582131282010835
         },
         {
           "ticker": "NVDA",
           "shares": 0.0001,
           "avg_cost": 187.93,
-          "current_price": 129.28500366210938,
-          "market_value": 0.012928500366210937,
-          "weight": 6.7278909257742055e-06,
-          "gross_weight": 6.7278909257742055e-06,
+          "current_price": 128.9550018310547,
+          "market_value": 0.012895500183105469,
+          "weight": 6.707437716064067e-06,
+          "gross_weight": 6.707437716064067e-06,
           "direction": "long",
-          "unrealized_pl": -0.005864499633789063,
-          "unrealized_pl_pct": -0.31205766156489456
+          "unrealized_pl": -0.0058974998168945325,
+          "unrealized_pl_pct": -0.31381364427683345
         },
         {
           "ticker": "SBUX",
           "shares": 1.2791000000000001,
           "avg_cost": 108.518818387929,
-          "current_price": 103.41000366210938,
-          "market_value": 132.27173568420412,
-          "weight": 0.0688331813465365,
-          "gross_weight": 0.0688331813465365,
+          "current_price": 103.51000213623047,
+          "market_value": 132.3996437324524,
+          "weight": 0.06886606578688252,
+          "gross_weight": 0.06886606578688252,
           "direction": "long",
-          "unrealized_pl": -6.534684915795886,
-          "unrealized_pl_pct": -0.04707768478971852
-        },
-        {
-          "ticker": "CSCO",
-          "shares": 0.6159,
-          "avg_cost": 95.33463289495046,
-          "current_price": 90.90499877929688,
-          "market_value": 55.988388748168944,
-          "weight": 0.029135921563803326,
-          "gross_weight": 0.029135921563803326,
-          "direction": "long",
-          "unrealized_pl": -2.728211651831043,
-          "unrealized_pl_pct": -0.046464060133683094
+          "unrealized_pl": -6.4067768675475945,
+          "unrealized_pl_pct": -0.046156199690575384
         },
         {
           "ticker": "TJX",
           "shares": 0.0447,
           "avg_cost": 142.712,
-          "current_price": 140.19000244140625,
-          "market_value": 6.266493109130859,
-          "weight": 0.0032610342213808016,
-          "gross_weight": 0.0032610342213808016,
+          "current_price": 140.2949981689453,
+          "market_value": 6.271186418151855,
+          "weight": 0.0032618814088877634,
+          "gross_weight": 0.0032618814088877634,
           "direction": "long",
-          "unrealized_pl": -0.11273329086914013,
-          "unrealized_pl_pct": -0.017671937598756515
+          "unrealized_pl": -0.10803998184814403,
+          "unrealized_pl_pct": -0.016936220016919967
         },
         {
           "ticker": "LOW",
           "shares": 0.8626,
           "avg_cost": 221.9285267795038,
-          "current_price": 221.77000427246094,
-          "market_value": 191.2988056854248,
-          "weight": 0.09955040897443354,
-          "gross_weight": 0.09955040897443354,
+          "current_price": 222.1501007080078,
+          "market_value": 191.62667687072755,
+          "weight": 0.09967228735575968,
+          "gross_weight": 0.09967228735575968,
           "direction": "long",
-          "unrealized_pl": -0.13674151457518385,
-          "unrealized_pl_pct": -0.000714295315447977
+          "unrealized_pl": 0.19112967072755055,
+          "unrealized_pl_pct": 0.0009984021960554035
         },
         {
           "ticker": "PFE",
           "shares": 3.5079,
           "avg_cost": 27.65,
-          "current_price": 27.510000228881836,
-          "market_value": 96.5023298028946,
-          "weight": 0.05021906103617549,
-          "gross_weight": 0.05021906103617549,
+          "current_price": 27.565000534057617,
+          "market_value": 96.69526537342071,
+          "weight": 0.05029486725766668,
+          "gross_weight": 0.05029486725766668,
           "direction": "long",
-          "unrealized_pl": -0.4911051971054027,
-          "unrealized_pl_pct": -0.0050632828614163294
+          "unrealized_pl": -0.29816962657927965,
+          "unrealized_pl_pct": -0.003074121733901647
         },
         {
           "ticker": "ABT",
           "shares": 0.1453,
           "avg_cost": 104.766,
-          "current_price": 103.58000183105469,
-          "market_value": 15.050174266052247,
-          "weight": 0.007831993503324568,
-          "gross_weight": 0.007831993503324568,
+          "current_price": 103.6050033569336,
+          "market_value": 15.053806987762453,
+          "weight": 0.0078300547730868,
+          "gross_weight": 0.0078300547730868,
           "direction": "long",
-          "unrealized_pl": -0.1723255339477547,
-          "unrealized_pl_pct": -0.011320449086013817
+          "unrealized_pl": -0.16869281223754962,
+          "unrealized_pl_pct": -0.011081807485886719
         },
         {
           "ticker": "UNH",
           "shares": 0.5621,
           "avg_cost": 345.14291691869767,
-          "current_price": 342.2699890136719,
-          "market_value": 192.389960824585,
-          "weight": 0.10011823761282335,
-          "gross_weight": 0.10011823761282335,
+          "current_price": 341.6700134277344,
+          "market_value": 192.0527145477295,
+          "weight": 0.09989388567630648,
+          "gross_weight": 0.09989388567630648,
           "direction": "long",
-          "unrealized_pl": -1.6148727754149967,
-          "unrealized_pl_pct": -0.008323879077902552
+          "unrealized_pl": -1.9521190522704654,
+          "unrealized_pl_pct": -0.010062218636754938
         },
         {
           "ticker": "GOOGL",
           "shares": 0.3507,
           "avg_cost": 275.738,
-          "current_price": 269.6449890136719,
-          "market_value": 94.56449764709473,
-          "weight": 0.04921062827078273,
-          "gross_weight": 0.04921062827078273,
+          "current_price": 270.25,
+          "market_value": 94.776675,
+          "weight": 0.049296935789353485,
+          "gross_weight": 0.049296935789353485,
           "direction": "long",
-          "unrealized_pl": -2.1368189529052732,
-          "unrealized_pl_pct": -0.022097102997512552
+          "unrealized_pl": -1.9246416,
+          "unrealized_pl_pct": -0.019902951352370746
         },
         {
           "ticker": "COST",
           "shares": 0.1383,
           "avg_cost": 1118.638,
-          "current_price": 1107.06494140625,
-          "market_value": 153.10708139648438,
-          "weight": 0.07967573302556794,
-          "gross_weight": 0.07967573302556794,
+          "current_price": 1107.3349609375,
+          "market_value": 153.14442509765627,
+          "weight": 0.07965621172653098,
+          "gross_weight": 0.07965621172653098,
           "direction": "long",
-          "unrealized_pl": -1.600554003515614,
-          "unrealized_pl_pct": -0.010345669102739152
+          "unrealized_pl": -1.563210302343739,
+          "unrealized_pl_pct": -0.01010428669730501
         }
       ],
       "halted": false,
       "inception_value": 2000.0,
       "inception_date": "2026-11-06",
-      "cumulative_return": -0.03918623913160402,
-      "gross_long_value": 1631.5419669076919,
+      "cumulative_return": -0.038716367636093096,
+      "gross_long_value": 1576.4015512987137,
       "gross_short_value": 0.0,
-      "gross_value": 1631.5419669076919,
-      "net_value": 1631.5419669076919,
-      "long_exposure_pct": 0.8490417359515557,
+      "gross_value": 1576.4015512987137,
+      "net_value": 1576.4015512987137,
+      "long_exposure_pct": 0.8199461107135264,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.8490417359515557,
-      "net_exposure_pct": 0.8490417359515557,
+      "gross_exposure_pct": 0.8199461107135264,
+      "net_exposure_pct": 0.8199461107135264,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "xai",
@@ -993,254 +957,254 @@
     },
     {
       "model_key": "deepseek",
-      "total_value": 120521.95403545955,
+      "total_value": 120742.9268543362,
       "cash": 157.91922415792942,
-      "cash_pct": 0.0013102942565258026,
+      "cash_pct": 0.0013078962741100567,
       "settled_cash": 157.91922415792942,
       "unsettled_cash": 0.0,
-      "settled_cash_pct": 0.0013102942565258026,
+      "settled_cash_pct": 0.0013078962741100567,
       "holdings": [
         {
           "ticker": "PM",
           "shares": 39.7723,
           "avg_cost": 194.10477491894983,
-          "current_price": 185.1199951171875,
-          "market_value": 7362.647981799317,
-          "weight": 0.06108968312638794,
-          "gross_weight": 0.06108968312638794,
+          "current_price": 184.76499938964844,
+          "market_value": 7348.528985224915,
+          "weight": 0.060860947938508665,
+          "gross_weight": 0.060860947938508665,
           "direction": "long",
-          "unrealized_pl": -357.3453577096319,
-          "unrealized_pl_pct": -0.04628829870627349
+          "unrealized_pl": -371.46435428403373,
+          "unrealized_pl_pct": -0.04811718585079272
         },
         {
           "ticker": "V",
           "shares": 19.3654,
           "avg_cost": 371.58682199791383,
-          "current_price": 403.625,
-          "market_value": 7816.359575,
-          "weight": 0.06485423869497087,
-          "gross_weight": 0.06485423869497087,
+          "current_price": 404.94989013671875,
+          "market_value": 7842.016602453614,
+          "weight": 0.06494804132016936,
+          "gross_weight": 0.06494804132016936,
           "direction": "long",
-          "unrealized_pl": 620.4321322815996,
-          "unrealized_pl_pct": 0.08621989829947752
+          "unrealized_pl": 646.0891597352128,
+          "unrealized_pl_pct": 0.08978539109493022
         },
         {
           "ticker": "MA",
           "shares": 11.484599999999997,
           "avg_cost": 574.6428100014641,
-          "current_price": 626.97998046875,
-          "market_value": 7200.614283691404,
-          "weight": 0.05974525007761544,
-          "gross_weight": 0.05974525007761544,
+          "current_price": 629.4099731445312,
+          "market_value": 7228.521777575682,
+          "weight": 0.05986704120810441,
+          "gross_weight": 0.05986704120810441,
           "direction": "long",
-          "unrealized_pl": 601.0714679485914,
-          "unrealized_pl_pct": 0.09107774352410769
+          "unrealized_pl": 628.9789618328687,
+          "unrealized_pl_pct": 0.09530644461196269
         },
         {
           "ticker": "MSFT",
           "shares": 9.8584,
           "avg_cost": 498.4294852732432,
-          "current_price": 486.6700134277344,
-          "market_value": 4797.787660375976,
-          "weight": 0.03980841249026204,
-          "gross_weight": 0.03980841249026204,
+          "current_price": 486.8894958496094,
+          "market_value": 4799.9514058837885,
+          "weight": 0.03975347898990747,
+          "gross_weight": 0.03975347898990747,
           "direction": "long",
-          "unrealized_pl": -115.92957724176408,
-          "unrealized_pl_pct": -0.023593050156457296
+          "unrealized_pl": -113.76583173395157,
+          "unrealized_pl_pct": -0.023152702166701622
         },
         {
           "ticker": "DIS",
           "shares": 68.9109,
           "avg_cost": 101.38644778646619,
-          "current_price": 118.01499938964844,
-          "market_value": 8132.519821440124,
-          "weight": 0.06747749724541806,
-          "gross_weight": 0.06747749724541806,
+          "current_price": 118.43000030517578,
+          "market_value": 8161.117908029937,
+          "weight": 0.06759085704353911,
+          "gross_weight": 0.06759085704353911,
           "direction": "long",
-          "unrealized_pl": 1145.8884566717313,
-          "unrealized_pl_pct": 0.16401158109616643
+          "unrealized_pl": 1174.4865432615445,
+          "unrealized_pl_pct": 0.16810483936280773
         },
         {
           "ticker": "TMO",
           "shares": 11.096499999999999,
           "avg_cost": 658.8492931566216,
-          "current_price": 672.875,
-          "market_value": 7466.5574375,
-          "weight": 0.06195184518252347,
-          "gross_weight": 0.06195184518252347,
+          "current_price": 674.0599975585938,
+          "market_value": 7479.706762908935,
+          "weight": 0.06194736998493025,
+          "gross_weight": 0.06194736998493025,
           "direction": "long",
-          "unrealized_pl": 155.63625598754874,
-          "unrealized_pl_pct": 0.021288186826731836
+          "unrealized_pl": 168.78558139648428,
+          "unrealized_pl_pct": 0.023086773500349267
         },
         {
           "ticker": "ABBV",
           "shares": 43.8172,
           "avg_cost": 269.68956856591655,
-          "current_price": 288.2799987792969,
-          "market_value": 12631.622362512207,
-          "weight": 0.1048076465703151,
-          "gross_weight": 0.1048076465703151,
+          "current_price": 288.42999267578125,
+          "market_value": 12638.194675073242,
+          "weight": 0.1046702693427327,
+          "gross_weight": 0.1046702693427327,
           "direction": "long",
-          "unrealized_pl": 814.5805987457286,
-          "unrealized_pl_pct": 0.0689327003348168
+          "unrealized_pl": 821.1529113067637,
+          "unrealized_pl_pct": 0.06948887274178817
         },
         {
           "ticker": "SLB",
           "shares": 136.63979999999998,
           "avg_cost": 50.31317074865498,
-          "current_price": 46.095001220703125,
-          "market_value": 6298.41174779663,
-          "weight": 0.05225945594894299,
-          "gross_weight": 0.05225945594894299,
+          "current_price": 46.06999969482422,
+          "market_value": 6294.995544300841,
+          "weight": 0.05213552220657281,
+          "gross_weight": 0.05213552220657281,
           "direction": "long",
-          "unrealized_pl": -576.3698406654362,
-          "unrealized_pl_pct": -0.08383827664179999
+          "unrealized_pl": -579.7860441612247,
+          "unrealized_pl_pct": -0.08433519475502738
         },
         {
           "ticker": "RTX",
           "shares": 45.855599999999995,
           "avg_cost": 183.51154633199937,
-          "current_price": 191.1999969482422,
-          "market_value": 8767.590580059814,
-          "weight": 0.07274683397084852,
-          "gross_weight": 0.07274683397084852,
+          "current_price": 191.8769989013672,
+          "market_value": 8798.634910821533,
+          "weight": 0.07287081024163156,
+          "gross_weight": 0.07287081024163156,
           "direction": "long",
-          "unrealized_pl": 352.55851607818414,
-          "unrealized_pl_pct": 0.04189627720935496
+          "unrealized_pl": 383.6028468399029,
+          "unrealized_pl_pct": 0.045585429018365264
         },
         {
           "ticker": "UNP",
           "shares": 8.460000000000003,
           "avg_cost": 289.7699565620175,
-          "current_price": 288.6050109863281,
-          "market_value": 2441.598392944337,
-          "weight": 0.020258536400977852,
-          "gross_weight": 0.020258536400977852,
+          "current_price": 288.82501220703125,
+          "market_value": 2443.4596032714853,
+          "weight": 0.020236875707173023,
+          "gross_weight": 0.020236875707173023,
           "direction": "long",
-          "unrealized_pl": -9.85543957033222,
-          "unrealized_pl_pct": -0.0040202427798620155
+          "unrealized_pl": -7.9942292431837805,
+          "unrealized_pl_pct": -0.003261015621486729
         },
         {
           "ticker": "BLK",
           "shares": 4.3871,
           "avg_cost": 1105.4560076691018,
-          "current_price": 1103.0,
-          "market_value": 4838.9713,
-          "weight": 0.040150123176531764,
-          "gross_weight": 0.040150123176531764,
+          "current_price": 1108.9200439453125,
+          "market_value": 4864.94312479248,
+          "weight": 0.04029174421671531,
+          "gross_weight": 0.04029174421671531,
           "direction": "long",
-          "unrealized_pl": -10.774751245116668,
-          "unrealized_pl_pct": -0.0022217145251038906
+          "unrealized_pl": 15.197073547363802,
+          "unrealized_pl_pct": 0.0031335813023574133
         },
         {
           "ticker": "PFE",
           "shares": 239.92309999999998,
           "avg_cost": 29.497157036004833,
-          "current_price": 27.510000228881836,
-          "market_value": 6600.284535914039,
-          "weight": 0.05476416797865828,
-          "gross_weight": 0.05476416797865828,
+          "current_price": 27.565000534057617,
+          "market_value": 6613.480379632759,
+          "weight": 0.0547732322872315,
+          "gross_weight": 0.0547732322872315,
           "direction": "long",
-          "unrealized_pl": -476.76482135105135,
-          "unrealized_pl_pct": -0.06736774004008017
+          "unrealized_pl": -463.5689776323319,
+          "unrealized_pl_pct": -0.06550314322118522
         },
         {
           "ticker": "LLY",
           "shares": 5.5531,
           "avg_cost": 1324.6589562432787,
-          "current_price": 1348.0799560546875,
-          "market_value": 7486.022803967285,
-          "weight": 0.06211335406796319,
-          "gross_weight": 0.06211335406796319,
+          "current_price": 1352.2900390625,
+          "market_value": 7509.401815917969,
+          "weight": 0.062193306155128095,
+          "gross_weight": 0.062193306155128095,
           "direction": "long",
-          "unrealized_pl": 130.0591540527343,
-          "unrealized_pl_pct": 0.0176807771547709
+          "unrealized_pl": 153.4381660034179,
+          "unrealized_pl_pct": 0.020859016344541015
         },
         {
           "ticker": "PG",
           "shares": 48.806700000000006,
           "avg_cost": 164.60732397504304,
-          "current_price": 169.8300018310547,
-          "market_value": 8288.841950367738,
-          "weight": 0.06877454001392164,
-          "gross_weight": 0.06877454001392164,
+          "current_price": 170.22999572753906,
+          "market_value": 8308.364332475281,
+          "weight": 0.0688103605646272,
+          "gross_weight": 0.0688103605646272,
           "direction": "long",
-          "unrealized_pl": 254.90167131500348,
-          "unrealized_pl_pct": 0.031728101337723524
+          "unrealized_pl": 274.42405342254744,
+          "unrealized_pl_pct": 0.03415808979039414
         },
         {
           "ticker": "TMUS",
           "shares": 14.3388,
           "avg_cost": 149.2899932861328,
-          "current_price": 166.52000427246094,
-          "market_value": 2387.697037261963,
-          "weight": 0.019811303727779447,
-          "gross_weight": 0.019811303727779447,
+          "current_price": 166.4149932861328,
+          "market_value": 2386.1913057312013,
+          "weight": 0.019762576309003122,
+          "gross_weight": 0.019762576309003122,
           "direction": "long",
-          "unrealized_pl": 247.05768153076173,
-          "unrealized_pl_pct": 0.11541303343288845
+          "unrealized_pl": 245.55195,
+          "unrealized_pl_pct": 0.11470963071970819
         },
         {
           "ticker": "AXP",
           "shares": 20.0524,
           "avg_cost": 323.4649963378906,
-          "current_price": 304.1499938964844,
-          "market_value": 6098.937337609863,
-          "weight": 0.05060436819515434,
-          "gross_weight": 0.05060436819515434,
+          "current_price": 304.3800048828125,
+          "market_value": 6103.549609912109,
+          "weight": 0.05054995575248402,
+          "gross_weight": 0.05054995575248402,
           "direction": "long",
-          "unrealized_pl": -387.31215495605466,
-          "unrealized_pl_pct": -0.059712805589727136
+          "unrealized_pl": -382.6998826538086,
+          "unrealized_pl_pct": -0.05900172096254275
         },
         {
           "ticker": "COST",
           "shares": 3.8913,
           "avg_cost": 1055.18994140625,
-          "current_price": 1107.06494140625,
-          "market_value": 4307.921806494141,
-          "weight": 0.035743876217163545,
-          "gross_weight": 0.035743876217163545,
+          "current_price": 1107.3349609375,
+          "market_value": 4308.972533496094,
+          "weight": 0.03568716318012087,
+          "gross_weight": 0.03568716318012087,
           "direction": "long",
-          "unrealized_pl": 201.8611875,
-          "unrealized_pl_pct": 0.049161765066549235
+          "unrealized_pl": 202.91191450195313,
+          "unrealized_pl_pct": 0.04941766167876516
         },
         {
           "ticker": "WMT",
           "shares": 25.2134,
           "avg_cost": 124.94999694824219,
-          "current_price": 128.5500030517578,
-          "market_value": 3241.1826469451903,
-          "weight": 0.02689288165699322,
-          "gross_weight": 0.02689288165699322,
+          "current_price": 128.6999969482422,
+          "market_value": 3244.9645030548095,
+          "weight": 0.02687498628362324,
+          "gross_weight": 0.02687498628362324,
           "direction": "long",
-          "unrealized_pl": 90.76839389038086,
-          "unrealized_pl_pct": 0.02881157416119695
+          "unrealized_pl": 94.55025,
+          "unrealized_pl_pct": 0.030012005534928887
         },
         {
           "ticker": "CSCO",
           "shares": 46.1852,
           "avg_cost": 94.37000274658203,
-          "current_price": 90.90499877929688,
-          "market_value": 4198.465549621582,
-          "weight": 0.034835691001046366,
-          "gross_weight": 0.034835691001046366,
+          "current_price": 91.15499877929688,
+          "market_value": 4210.011849621582,
+          "weight": 0.03486756499368716,
+          "gross_weight": 0.03486756499368716,
           "direction": "long",
-          "unrealized_pl": -160.0319012298584,
-          "unrealized_pl_pct": -0.036717218040037136
+          "unrealized_pl": -148.48560122985842,
+          "unrealized_pl_pct": -0.034068071142464795
         }
       ],
       "halted": false,
       "inception_value": 100000.0,
       "inception_date": "2026-04-09",
-      "cumulative_return": 0.20521954035459555,
-      "gross_long_value": 120364.03481130162,
+      "cumulative_return": 0.20742926854336208,
+      "gross_long_value": 120585.00763017827,
       "gross_short_value": 0.0,
-      "gross_value": 120364.03481130162,
-      "net_value": 120364.03481130162,
-      "long_exposure_pct": 0.9986897057434742,
+      "gross_value": 120585.00763017827,
+      "net_value": 120585.00763017827,
+      "long_exposure_pct": 0.9986921037258899,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.9986897057434742,
-      "net_exposure_pct": 0.9986897057434742,
+      "gross_exposure_pct": 0.9986921037258899,
+      "net_exposure_pct": 0.9986921037258899,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "deepseek",
@@ -1251,194 +1215,194 @@
     },
     {
       "model_key": "claude_opus",
-      "total_value": 1911.4213331066683,
+      "total_value": 1914.614501559122,
       "cash": 401.1250650785996,
-      "cash_pct": 0.20985695729713535,
+      "cash_pct": 0.20950696067117047,
       "settled_cash": 135.89789987859967,
       "unsettled_cash": 265.22716519999994,
-      "settled_cash_pct": 0.07109782522816271,
+      "settled_cash_pct": 0.07097924922637658,
       "holdings": [
         {
           "ticker": "KO",
           "shares": 1.4917,
           "avg_cost": 93.87,
-          "current_price": 97.19499969482422,
-          "market_value": 144.98578104476928,
-          "weight": 0.07585234010605146,
-          "gross_weight": 0.07585234010605146,
+          "current_price": 97.0999984741211,
+          "market_value": 144.84406772384645,
+          "weight": 0.07565181795389936,
+          "gross_weight": 0.07565181795389936,
           "direction": "long",
-          "unrealized_pl": 4.95990204476928,
-          "unrealized_pl_pct": 0.03542132411658905
+          "unrealized_pl": 4.818188723846429,
+          "unrealized_pl_pct": 0.034409273187611555
         },
         {
           "ticker": "WMT",
           "shares": 1.1276,
           "avg_cost": 124.04,
-          "current_price": 128.5500030517578,
-          "market_value": 144.9529834411621,
-          "weight": 0.07583518135458253,
-          "gross_weight": 0.07583518135458253,
+          "current_price": 128.6999969482422,
+          "market_value": 145.1221165588379,
+          "weight": 0.07579704240235362,
+          "gross_weight": 0.07579704240235362,
           "direction": "long",
-          "unrealized_pl": 5.085479441162102,
-          "unrealized_pl_pct": 0.0363592635581893
+          "unrealized_pl": 5.254612558837883,
+          "unrealized_pl_pct": 0.03756850167883097
         },
         {
           "ticker": "PFE",
           "shares": 4.2705,
           "avg_cost": 28.76127318145416,
-          "current_price": 27.510000228881836,
-          "market_value": 117.48145597743988,
-          "weight": 0.06146287788181955,
-          "gross_weight": 0.06146287788181955,
+          "current_price": 27.565000534057617,
+          "market_value": 117.71633478069306,
+          "weight": 0.06148304772831998,
+          "gross_weight": 0.06148304772831998,
           "direction": "long",
-          "unrealized_pl": -5.343561143960115,
-          "unrealized_pl_pct": -0.0435054785189124
+          "unrealized_pl": -5.108682340706941,
+          "unrealized_pl_pct": -0.041593174260725174
         },
         {
           "ticker": "AAPL",
           "shares": 0.4029,
           "avg_cost": 348.546,
-          "current_price": 342.8699951171875,
-          "market_value": 138.14232103271485,
-          "weight": 0.07227204104088845,
-          "gross_weight": 0.07227204104088845,
+          "current_price": 344.7049865722656,
+          "market_value": 138.8816390899658,
+          "weight": 0.07253765130101687,
+          "gross_weight": 0.07253765130101687,
           "direction": "long",
-          "unrealized_pl": -2.286862367285153,
-          "unrealized_pl_pct": -0.016284808555578012
+          "unrealized_pl": -1.5475443100341766,
+          "unrealized_pl_pct": -0.01102010474294457
         },
         {
           "ticker": "LLY",
           "shares": 0.11479999999999999,
           "avg_cost": 1381.1323275261325,
-          "current_price": 1348.0799560546875,
-          "market_value": 154.7595789550781,
-          "weight": 0.08096570665743513,
-          "gross_weight": 0.08096570665743513,
+          "current_price": 1352.2900390625,
+          "market_value": 155.24289648437497,
+          "weight": 0.08108310908433866,
+          "gross_weight": 0.08108310908433866,
           "direction": "long",
-          "unrealized_pl": -3.794412244921884,
-          "unrealized_pl_pct": -0.02393135749030506
+          "unrealized_pl": -3.311094715625009,
+          "unrealized_pl_pct": -0.02088307390161115
         },
         {
           "ticker": "RTX",
           "shares": 0.5227,
           "avg_cost": 192.662,
-          "current_price": 191.1999969482422,
-          "market_value": 99.9402384048462,
-          "weight": 0.05228582347274083,
-          "gross_weight": 0.05228582347274083,
+          "current_price": 191.8769989013672,
+          "market_value": 100.29410732574463,
+          "weight": 0.05238344703023635,
+          "gross_weight": 0.05238344703023635,
           "direction": "long",
-          "unrealized_pl": -0.7641889951538119,
-          "unrealized_pl_pct": -0.007588434936613431
+          "unrealized_pl": -0.41032007425537437,
+          "unrealized_pl_pct": -0.004074498856198039
         },
         {
           "ticker": "MA",
           "shares": 0.1842,
           "avg_cost": 655.46,
-          "current_price": 626.97998046875,
-          "market_value": 115.48971240234376,
-          "weight": 0.0604208556229914,
-          "gross_weight": 0.0604208556229914,
+          "current_price": 629.4099731445312,
+          "market_value": 115.93731705322266,
+          "weight": 0.06055386970004238,
+          "gross_weight": 0.06055386970004238,
           "direction": "long",
-          "unrealized_pl": -5.2460195976562565,
-          "unrealized_pl_pct": -0.04345043104270285
+          "unrealized_pl": -4.798414946777351,
+          "unrealized_pl_pct": -0.039743122166827516
         },
         {
           "ticker": "AXP",
           "shares": 0.3092,
           "avg_cost": 325.252,
-          "current_price": 304.1499938964844,
-          "market_value": 94.04317811279296,
-          "weight": 0.04920065319138343,
-          "gross_weight": 0.04920065319138343,
+          "current_price": 304.3800048828125,
+          "market_value": 94.11429750976562,
+          "weight": 0.04915574254406087,
+          "gross_weight": 0.04915574254406087,
           "direction": "long",
-          "unrealized_pl": -6.524740287207034,
-          "unrealized_pl_pct": -0.06487894341469269
+          "unrealized_pl": -6.453620890234378,
+          "unrealized_pl_pct": -0.06417176563768245
         },
         {
           "ticker": "GOOGL",
           "shares": 0.3854,
           "avg_cost": 290.0988894654904,
-          "current_price": 269.6449890136719,
-          "market_value": 103.92117876586914,
-          "weight": 0.05436853558444079,
-          "gross_weight": 0.05436853558444079,
+          "current_price": 270.25,
+          "market_value": 104.15435000000001,
+          "weight": 0.05439964541957889,
+          "gross_weight": 0.05439964541957889,
           "direction": "long",
-          "unrealized_pl": -7.882933234130861,
-          "unrealized_pl_pct": -0.07050664857595634
+          "unrealized_pl": -7.649762000000001,
+          "unrealized_pl_pct": -0.06842111495863412
         },
         {
           "ticker": "BRK-B",
           "shares": 0.1225,
           "avg_cost": 578.466,
-          "current_price": 567.2899780273438,
-          "market_value": 69.49302230834961,
-          "weight": 0.03635672632961636,
-          "gross_weight": 0.03635672632961636,
+          "current_price": 570.260009765625,
+          "market_value": 69.85685119628906,
+          "weight": 0.03648611829660892,
+          "gross_weight": 0.03648611829660892,
           "direction": "long",
-          "unrealized_pl": -1.3690626916503916,
-          "unrealized_pl_pct": -0.01932010173917964
+          "unrealized_pl": -1.0052338037109385,
+          "unrealized_pl_pct": -0.01418577796166931
         },
         {
           "ticker": "TJX",
           "shares": 0.5541,
           "avg_cost": 142.68,
-          "current_price": 140.19000244140625,
-          "market_value": 77.67928035278321,
-          "weight": 0.04063953823646493,
-          "gross_weight": 0.04063953823646493,
+          "current_price": 140.2949981689453,
+          "market_value": 77.7374584854126,
+          "weight": 0.040602146501088815,
+          "gross_weight": 0.040602146501088815,
           "direction": "long",
-          "unrealized_pl": -1.3797076472168008,
-          "unrealized_pl_pct": -0.01745162292258029
+          "unrealized_pl": -1.3215295145874062,
+          "unrealized_pl_pct": -0.0167157403353988
         },
         {
           "ticker": "DIS",
           "shares": 0.6581,
           "avg_cost": 120.22,
-          "current_price": 118.01499938964844,
-          "market_value": 77.66567109832764,
-          "weight": 0.040632418270699217,
-          "gross_weight": 0.040632418270699217,
+          "current_price": 118.43000030517578,
+          "market_value": 77.93878320083618,
+          "weight": 0.040707298068289224,
+          "gross_weight": 0.040707298068289224,
           "direction": "long",
-          "unrealized_pl": -1.4511109016723627,
-          "unrealized_pl_pct": -0.01834137922435175
+          "unrealized_pl": -1.1779987991638177,
+          "unrealized_pl_pct": -0.014889366950792016
         },
         {
           "ticker": "MSFT",
           "shares": 0.1943,
           "avg_cost": 503.142,
-          "current_price": 486.6700134277344,
-          "market_value": 94.5599836090088,
-          "weight": 0.04947103078279382,
-          "gross_weight": 0.04947103078279382,
+          "current_price": 486.8894958496094,
+          "market_value": 94.6026290435791,
+          "weight": 0.04941079729968704,
+          "gross_weight": 0.04941079729968704,
           "direction": "long",
-          "unrealized_pl": -3.2005069909912103,
-          "unrealized_pl_pct": -0.03273824600662556
+          "unrealized_pl": -3.157861556420898,
+          "unrealized_pl_pct": -0.032302022392069474
         },
         {
           "ticker": "UNH",
           "shares": 0.2255,
           "avg_cost": 345.32,
-          "current_price": 342.2699890136719,
-          "market_value": 77.18188252258301,
-          "weight": 0.040379314170956686,
-          "gross_weight": 0.040379314170956686,
+          "current_price": 341.6700134277344,
+          "market_value": 77.0465880279541,
+          "weight": 0.040241305999308474,
+          "gross_weight": 0.040241305999308474,
           "direction": "long",
-          "unrealized_pl": -0.6877774774169907,
-          "unrealized_pl_pct": -0.008832419165782812
+          "unrealized_pl": -0.8230719720458969,
+          "unrealized_pl_pct": -0.010569867289081492
         }
       ],
       "halted": false,
       "inception_value": 2000.0,
       "inception_date": "2026-11-06",
-      "cumulative_return": -0.04428933344666586,
-      "gross_long_value": 1510.2962680280687,
+      "cumulative_return": -0.042692749220439086,
+      "gross_long_value": 1513.4894364805223,
       "gross_short_value": 0.0,
-      "gross_value": 1510.2962680280687,
-      "net_value": 1510.2962680280687,
-      "long_exposure_pct": 0.7901430427028646,
+      "gross_value": 1513.4894364805223,
+      "net_value": 1513.4894364805223,
+      "long_exposure_pct": 0.7904930393288295,
       "short_exposure_pct": 0.0,
-      "gross_exposure_pct": 0.7901430427028646,
-      "net_exposure_pct": 0.7901430427028646,
+      "gross_exposure_pct": 0.7904930393288295,
+      "net_exposure_pct": 0.7904930393288295,
       "short_utilization": 0.0,
       "num_shorts": 0,
       "provider": "anthropic",
@@ -1449,6 +1413,58 @@
     }
   ],
   "recent_trades": [
+    {
+      "timestamp": "2026-11-20T20:04:55.954016",
+      "date": "2026-11-20",
+      "model_key": "claude",
+      "side": "SELL",
+      "ticker": "ADBE",
+      "shares": 0.3057,
+      "fill_price": 220.8,
+      "notional": 67.49856000000001,
+      "confidence": 6,
+      "summary": "Exiting ADBE fully as the thesis is invalidated \u2014 down -7.15% at 30-day lows with no near-term catalyst identified.",
+      "reasoning": "ADBE has declined from my entry at $238.18 to $221.15, a -7.15% loss approaching territory where the 15% stop-loss becomes relevant within modest further decline. I already trimmed the position on 11/19. Despite slightly positive sentiment today (AI/cloud growth narrative), the stock continues making new 30-day lows and no specific catalyst has emerged to reverse the trend. The 'Snowflake vs. Adobe' article frames ADBE as a comparison target rather than a clear winner. At 3.54% weight this is not meaningful upside exposure. Exiting frees capital for redeployment tomorrow when unsettled cash settles."
+    },
+    {
+      "timestamp": "2026-11-20T20:04:55.869989",
+      "date": "2026-11-20",
+      "model_key": "gpt",
+      "side": "SELL",
+      "ticker": "AMZN",
+      "shares": 0.3935,
+      "fill_price": 248.1,
+      "notional": 97.62735,
+      "confidence": 7,
+      "summary": "Trim Amazon to reduce position size after continued weakness left it both the largest holding and the biggest drawdown.",
+      "reasoning": "AMZN is currently our largest position at 15.10% of portfolio value and is down 8.90% from cost, making it the clearest source of idiosyncratic risk in the book. While news sentiment is still mildly positive, price action remains weak across the day and over the past month, and the recent catalyst tied to Anthropic has not improved near-term trading behavior. This is not a full exit because the broader long-term quality case is still plausible, but reducing the weight to 10% improves portfolio balance and lowers the chance that one discretionary name dominates short-horizon results."
+    },
+    {
+      "timestamp": "2026-11-20T20:04:55.799597",
+      "date": "2026-11-20",
+      "model_key": "grok",
+      "side": "SELL",
+      "ticker": "CSCO",
+      "shares": 0.6159,
+      "fill_price": 91.054,
+      "notional": 56.080158600000004,
+      "confidence": 5,
+      "summary": "Exiting CSCO on continued post-purchase weakness and margin concerns.",
+      "reasoning": "Bought recently but stock has declined ~4.4% with the tech pullback; news highlights record revenue yet slipped margins and questions ongoing buy-worthiness, plus broader bearish chip sector trades warrant trimming exposure to reallocate to higher-conviction names once cash settles."
+    },
+    {
+      "timestamp": "2026-11-20T20:04:55.777251",
+      "date": "2026-11-20",
+      "model_key": "claude",
+      "side": "SELL",
+      "ticker": "AXP",
+      "shares": 0.2494,
+      "fill_price": 304.186,
+      "notional": 75.8639884,
+      "confidence": 6,
+      "summary": "Exiting AXP fully as the position is down -6.42% with no recovery catalyst and financial sector ETF outflows continuing.",
+      "reasoning": "AXP has declined from my entry at $325.25 to $304.38, a -6.42% loss. I already trimmed once on 11/19. The stock is near its 30-day low of $304.01. While one analyst piece suggests undervaluation, the ETF outflow pressure is a concrete headwind. With only 3.98% portfolio weight, the position is too small to matter on the upside but enough to drag on risk-adjusted returns. Exiting avoids approaching the 15% stop-loss and frees capital for the unsettled cash deployment tomorrow into better-positioned names."
+    },
     {
       "timestamp": "2026-11-20T19:04:56.319731",
       "date": "2026-11-20",
@@ -2046,58 +2062,6 @@
       "confidence": 7,
       "summary": "Trim AMD because it is the weakest holding today and its near-term momentum thesis has deteriorated.",
       "reasoning": "AMD is down sharply on the day and is now the clearest relative laggard in the semiconductor group, underperforming both peers and the broader market. My prior adds were based on improving AI-related relative strength; that condition is no longer present today. The position is small, so I am not forcing a full exit, but I want to cut risk and free some capital from a weakened setup while preserving a residual stake in case the longer-term AI thesis reasserts itself."
-    },
-    {
-      "timestamp": "2026-11-19T19:05:19.304145",
-      "date": "2026-11-19",
-      "model_key": "gemini",
-      "side": "SELL",
-      "ticker": "TSLA",
-      "shares": 0.2682,
-      "fill_price": 376.478,
-      "notional": 100.9713996,
-      "confidence": 7,
-      "summary": "Trimming Tesla exposure from 10% to 5% due to reported demand headwinds in the critical Chinese market.",
-      "reasoning": "Reports indicating falling China sales and the corresponding need to shift Shanghai production strategies represent a concrete fundamental headwind. Given the outsized 10% weight of this position, reducing exposure to 5% prudently manages single-name risk and regional exposure while retaining some upside participation."
-    },
-    {
-      "timestamp": "2026-11-19T18:34:26.224413",
-      "date": "2026-11-19",
-      "model_key": "claude_opus",
-      "side": "BUY",
-      "ticker": "MSFT",
-      "shares": 0.1943,
-      "fill_price": 503.142,
-      "notional": 97.7604906,
-      "confidence": 7,
-      "summary": "Initiating MSFT position on Anthropic's $47.2B minimum Azure commitment providing multi-year revenue visibility.",
-      "reasoning": "MSFT is down 4% over 5 days creating an entry point, while the Anthropic Azure commitment of $47.2B minimum is a massive, concrete revenue driver. MSFT is at its 30-day low, and Bill Ackman's concentrated bet adds institutional conviction. The Anthropic deal alone could add meaningful cloud revenue growth."
-    },
-    {
-      "timestamp": "2026-11-19T18:04:51.972019",
-      "date": "2026-11-19",
-      "model_key": "claude_opus",
-      "side": "SELL",
-      "ticker": "ISRG",
-      "shares": 0.0942,
-      "fill_price": 412.938,
-      "notional": 38.8987596,
-      "confidence": 6,
-      "summary": "Exiting remaining ISRG position as stock continues downtrend near stop-loss with no catalyst for reversal.",
-      "reasoning": "ISRG is down 10.39% from entry, approaching the 15% stop-loss. Already trimmed earlier today. The stock is trading near 30-day lows with neutral sentiment. No specific positive catalyst on the horizon to justify holding through further potential losses. Capital better deployed elsewhere."
-    },
-    {
-      "timestamp": "2026-11-19T17:34:48.516645",
-      "date": "2026-11-19",
-      "model_key": "claude_opus",
-      "side": "SELL",
-      "ticker": "ISRG",
-      "shares": 0.0801,
-      "fill_price": 416.166,
-      "notional": 33.3348966,
-      "confidence": 5,
-      "summary": "Trimming ISRG as position nears stop-loss with persistent downtrend and no near-term catalyst.",
-      "reasoning": "ISRG is down 9.55% from my $460.72 entry, approaching the 15% stop-loss. The stock has been trending lower with the 30-day range showing weakness (high $425, now $416.73). No clear catalyst for reversal. Trimming roughly half to reduce risk exposure while maintaining a small position in case of recovery. The surgical robotics thesis is long-term valid but entry timing was poor."
     }
   ],
   "equity_curves": {
@@ -7679,6 +7643,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 5,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 1908.7236936826114,
+        "benchmark": 694.3255004882812,
+        "trades_today": 7,
+        "runs_today": 12
       }
     ],
     "gpt": [
@@ -7758,6 +7729,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 6,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 1919.3628623326076,
+        "benchmark": 694.3255004882812,
+        "trades_today": 7,
+        "runs_today": 12
       }
     ],
     "gemini": [
@@ -7837,6 +7815,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 12,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 1950.4693093778853,
+        "benchmark": 694.3255004882812,
+        "trades_today": 12,
+        "runs_today": 12
       }
     ],
     "grok": [
@@ -7916,6 +7901,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 9,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 1922.5672647278138,
+        "benchmark": 694.3255004882812,
+        "trades_today": 10,
+        "runs_today": 12
       }
     ],
     "deepseek": [
@@ -7995,6 +7987,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 0,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 120742.9268543362,
+        "benchmark": 694.3255004882812,
+        "trades_today": 0,
+        "runs_today": 12
       }
     ],
     "claude_opus": [
@@ -8074,6 +8073,13 @@
         "benchmark": 693.760009765625,
         "trades_today": 4,
         "runs_today": 11
+      },
+      {
+        "timestamp": "2026-11-20T15:02:37.960685-05:00",
+        "value": 1914.614501559122,
+        "benchmark": 694.3255004882812,
+        "trades_today": 4,
+        "runs_today": 12
       }
     ]
   },
@@ -8540,95 +8546,95 @@
   "cost_tracker": [
     {
       "model_key": "claude",
-      "cost_today_usd": 1.0395,
-      "cost_week_usd": 7.2739,
-      "cost_month_usd": 18.2459,
-      "cost_total_usd": 184.7143,
-      "cost_per_trade_usd": 0.1584,
-      "trades_executed_total": 1166,
-      "trades_executed_month": 57,
-      "trades_executed_today": 5,
+      "cost_today_usd": 1.1476,
+      "cost_week_usd": 7.3819,
+      "cost_month_usd": 18.354,
+      "cost_total_usd": 184.8223,
+      "cost_per_trade_usd": 0.1582,
+      "trades_executed_total": 1168,
+      "trades_executed_month": 59,
+      "trades_executed_today": 7,
       "gross_pnl_usd": -70.33,
-      "net_pnl_usd": -255.04,
+      "net_pnl_usd": -255.15,
       "is_profitable": false
     },
     {
       "model_key": "gpt",
-      "cost_today_usd": 0.7153,
-      "cost_week_usd": 4.4698,
-      "cost_month_usd": 11.1991,
-      "cost_total_usd": 113.5529,
+      "cost_today_usd": 0.7862,
+      "cost_week_usd": 4.5406,
+      "cost_month_usd": 11.27,
+      "cost_total_usd": 113.6238,
       "cost_per_trade_usd": 0.0549,
-      "trades_executed_total": 2067,
-      "trades_executed_month": 32,
-      "trades_executed_today": 6,
+      "trades_executed_total": 2068,
+      "trades_executed_month": 33,
+      "trades_executed_today": 7,
       "gross_pnl_usd": -45.02,
-      "net_pnl_usd": -158.58,
+      "net_pnl_usd": -158.65,
       "is_profitable": false
     },
     {
       "model_key": "gemini",
-      "cost_today_usd": 0.4993,
-      "cost_week_usd": 3.2991,
-      "cost_month_usd": 8.0865,
-      "cost_total_usd": 69.7588,
+      "cost_today_usd": 0.5435,
+      "cost_week_usd": 3.3432,
+      "cost_month_usd": 8.1306,
+      "cost_total_usd": 69.8029,
       "cost_per_trade_usd": 0.0276,
       "trades_executed_total": 2532,
       "trades_executed_month": 131,
       "trades_executed_today": 12,
       "gross_pnl_usd": -13.86,
-      "net_pnl_usd": -83.62,
+      "net_pnl_usd": -83.66,
       "is_profitable": false
     },
     {
       "model_key": "grok",
-      "cost_today_usd": 0.2165,
-      "cost_week_usd": 1.4481,
-      "cost_month_usd": 3.5559,
-      "cost_total_usd": 39.2055,
+      "cost_today_usd": 0.2362,
+      "cost_week_usd": 1.4679,
+      "cost_month_usd": 3.5757,
+      "cost_total_usd": 39.2252,
       "cost_per_trade_usd": 0.0125,
-      "trades_executed_total": 3139,
-      "trades_executed_month": 105,
-      "trades_executed_today": 9,
+      "trades_executed_total": 3140,
+      "trades_executed_month": 106,
+      "trades_executed_today": 10,
       "gross_pnl_usd": -75.31,
-      "net_pnl_usd": -114.51,
+      "net_pnl_usd": -114.53,
       "is_profitable": false
     },
     {
       "model_key": "deepseek",
-      "cost_today_usd": 0.2085,
-      "cost_week_usd": 1.3986,
-      "cost_month_usd": 3.2803,
-      "cost_total_usd": 28.8192,
+      "cost_today_usd": 0.2273,
+      "cost_week_usd": 1.4174,
+      "cost_month_usd": 3.2991,
+      "cost_total_usd": 28.838,
       "cost_per_trade_usd": 0.0182,
       "trades_executed_total": 1585,
       "trades_executed_month": 25,
       "trades_executed_today": 0,
       "gross_pnl_usd": 119359.75,
-      "net_pnl_usd": 119330.93,
+      "net_pnl_usd": 119330.92,
       "is_profitable": true
     },
     {
       "model_key": "claude_opus",
-      "cost_today_usd": 1.6558,
-      "cost_week_usd": 10.4777,
-      "cost_month_usd": 25.971,
-      "cost_total_usd": 273.9653,
-      "cost_per_trade_usd": 0.2401,
+      "cost_today_usd": 1.7945,
+      "cost_week_usd": 10.6164,
+      "cost_month_usd": 26.1098,
+      "cost_total_usd": 274.1041,
+      "cost_per_trade_usd": 0.2402,
       "trades_executed_total": 1141,
       "trades_executed_month": 52,
       "trades_executed_today": 4,
       "gross_pnl_usd": -58.5,
-      "net_pnl_usd": -332.46,
+      "net_pnl_usd": -332.6,
       "is_profitable": false
     }
   ],
   "budget_status": {
     "providers": {
       "anthropic": {
-        "spend_usd": 44.217,
+        "spend_usd": 44.4638,
         "cap_usd": 150.0,
-        "pct_of_cap": 0.2948,
+        "pct_of_cap": 0.2964,
         "status": "ok",
         "models": [
           "claude",
@@ -8636,36 +8642,36 @@
         ]
       },
       "openai": {
-        "spend_usd": 11.1991,
+        "spend_usd": 11.27,
         "cap_usd": 20.0,
-        "pct_of_cap": 0.56,
+        "pct_of_cap": 0.5635,
         "status": "ok",
         "models": [
           "gpt"
         ]
       },
       "google": {
-        "spend_usd": 8.0865,
+        "spend_usd": 8.1306,
         "cap_usd": 10.0,
-        "pct_of_cap": 0.8086,
+        "pct_of_cap": 0.8131,
         "status": "warn",
         "models": [
           "gemini"
         ]
       },
       "xai": {
-        "spend_usd": 3.5559,
+        "spend_usd": 3.5757,
         "cap_usd": 15.0,
-        "pct_of_cap": 0.2371,
+        "pct_of_cap": 0.2384,
         "status": "ok",
         "models": [
           "grok"
         ]
       },
       "deepseek": {
-        "spend_usd": 3.2803,
+        "spend_usd": 3.2991,
         "cap_usd": 8.0,
-        "pct_of_cap": 0.41,
+        "pct_of_cap": 0.4124,
         "status": "ok",
         "models": [
           "deepseek"
@@ -8692,7 +8698,7 @@
       ],
       "avg_weight": 0.0863,
       "avg_confidence": null,
-      "avg_pl_pct": 0.0299
+      "avg_pl_pct": 0.0311
     },
     {
       "ticker": "LLY",
@@ -8704,9 +8710,9 @@
         "deepseek",
         "claude_opus"
       ],
-      "avg_weight": 0.1012,
+      "avg_weight": 0.1014,
       "avg_confidence": null,
-      "avg_pl_pct": -0.0192
+      "avg_pl_pct": -0.0162
     },
     {
       "ticker": "KO",
@@ -8718,9 +8724,9 @@
         "grok",
         "claude_opus"
       ],
-      "avg_weight": 0.0981,
+      "avg_weight": 0.0979,
       "avg_confidence": null,
-      "avg_pl_pct": 0.0272
+      "avg_pl_pct": 0.0262
     },
     {
       "ticker": "PG",
@@ -8732,9 +8738,9 @@
         "grok",
         "deepseek"
       ],
-      "avg_weight": 0.0789,
+      "avg_weight": 0.079,
       "avg_confidence": null,
-      "avg_pl_pct": 0.0313
+      "avg_pl_pct": 0.0337
     },
     {
       "ticker": "RTX",
@@ -8746,9 +8752,9 @@
         "deepseek",
         "claude_opus"
       ],
-      "avg_weight": 0.073,
+      "avg_weight": 0.0731,
       "avg_confidence": null,
-      "avg_pl_pct": 0.0047
+      "avg_pl_pct": 0.0082
     },
     {
       "ticker": "COST",
@@ -8762,7 +8768,7 @@
       ],
       "avg_weight": 0.0587,
       "avg_confidence": 7.3,
-      "avg_pl_pct": 0.0042
+      "avg_pl_pct": 0.0044
     },
     {
       "ticker": "PFE",
@@ -8774,9 +8780,9 @@
         "deepseek",
         "claude_opus"
       ],
-      "avg_weight": 0.0546,
+      "avg_weight": 0.0547,
       "avg_confidence": null,
-      "avg_pl_pct": -0.0284
+      "avg_pl_pct": -0.0265
     },
     {
       "ticker": "LOW",
@@ -8787,9 +8793,9 @@
         "gemini",
         "grok"
       ],
-      "avg_weight": 0.0688,
+      "avg_weight": 0.0689,
       "avg_confidence": 5.5,
-      "avg_pl_pct": -0.0008
+      "avg_pl_pct": 0.0009
     },
     {
       "ticker": "UNH",
@@ -8800,9 +8806,9 @@
         "grok",
         "claude_opus"
       ],
-      "avg_weight": 0.0636,
+      "avg_weight": 0.0635,
       "avg_confidence": 6.8,
-      "avg_pl_pct": -0.0087
+      "avg_pl_pct": -0.0104
     },
     {
       "ticker": "SBUX",
@@ -8813,9 +8819,9 @@
         "gemini",
         "grok"
       ],
-      "avg_weight": 0.0565,
+      "avg_weight": 0.0566,
       "avg_confidence": null,
-      "avg_pl_pct": -0.0392
+      "avg_pl_pct": -0.0382
     },
     {
       "ticker": "DIS",
@@ -8826,35 +8832,9 @@
         "deepseek",
         "claude_opus"
       ],
-      "avg_weight": 0.0531,
+      "avg_weight": 0.0532,
       "avg_confidence": null,
-      "avg_pl_pct": 0.0446
-    },
-    {
-      "ticker": "AXP",
-      "model_count": 3,
-      "total_models": 6,
-      "models": [
-        "claude",
-        "deepseek",
-        "claude_opus"
-      ],
-      "avg_weight": 0.0465,
-      "avg_confidence": null,
-      "avg_pl_pct": -0.0632
-    },
-    {
-      "ticker": "CSCO",
-      "model_count": 3,
-      "total_models": 6,
-      "models": [
-        "gemini",
-        "grok",
-        "deepseek"
-      ],
-      "avg_weight": 0.0378,
-      "avg_confidence": 6.0,
-      "avg_pl_pct": -0.0378
+      "avg_pl_pct": 0.0483
     },
     {
       "ticker": "TJX",
@@ -8867,13 +8847,13 @@
       ],
       "avg_weight": 0.0304,
       "avg_confidence": null,
-      "avg_pl_pct": -0.0175
+      "avg_pl_pct": -0.0168
     }
   ],
   "agreement_returns": {
-    "high_avg": 0.0156,
+    "high_avg": 0.0157,
     "high_count": 2201,
-    "low_avg": 0.0047,
+    "low_avg": 0.0049,
     "low_count": 2380
   },
   "confidence_calibration": {
@@ -8901,27 +8881,27 @@
         },
         {
           "confidence": 5,
-          "avg_return": -0.0383,
+          "avg_return": -0.0382,
           "count": 17
         },
         {
           "confidence": 6,
-          "avg_return": 0.0386,
+          "avg_return": 0.0387,
           "count": 136
         },
         {
           "confidence": 7,
-          "avg_return": 0.0168,
+          "avg_return": 0.0169,
           "count": 310
         },
         {
           "confidence": 8,
-          "avg_return": 0.0239,
+          "avg_return": 0.0241,
           "count": 134
         },
         {
           "confidence": 9,
-          "avg_return": 0.0083,
+          "avg_return": 0.0086,
           "count": 9
         },
         {
@@ -8958,12 +8938,12 @@
         },
         {
           "confidence": 5,
-          "avg_return": 0.0107,
+          "avg_return": 0.011,
           "count": 18
         },
         {
           "confidence": 6,
-          "avg_return": 0.0002,
+          "avg_return": 0.0003,
           "count": 168
         },
         {
@@ -8973,7 +8953,7 @@
         },
         {
           "confidence": 8,
-          "avg_return": 0.0087,
+          "avg_return": 0.0089,
           "count": 319
         },
         {
@@ -8987,7 +8967,7 @@
           "count": 0
         }
       ],
-      "calibration_score": 0.037,
+      "calibration_score": 0.038,
       "total_trades": 974,
       "min_trades": 20
     },
@@ -9020,7 +9000,7 @@
         },
         {
           "confidence": 6,
-          "avg_return": -0.002,
+          "avg_return": -0.0018,
           "count": 51
         },
         {
@@ -9077,17 +9057,17 @@
         },
         {
           "confidence": 6,
-          "avg_return": -0.0113,
+          "avg_return": -0.0102,
           "count": 171
         },
         {
           "confidence": 7,
-          "avg_return": -0.001,
+          "avg_return": -0.0007,
           "count": 950
         },
         {
           "confidence": 8,
-          "avg_return": 0.0085,
+          "avg_return": 0.0086,
           "count": 448
         },
         {
@@ -9101,7 +9081,7 @@
           "count": 0
         }
       ],
-      "calibration_score": 0.073,
+      "calibration_score": 0.071,
       "total_trades": 1594,
       "min_trades": 20
     },
@@ -9129,17 +9109,17 @@
         },
         {
           "confidence": 5,
-          "avg_return": -0.0021,
+          "avg_return": -0.0017,
           "count": 71
         },
         {
           "confidence": 6,
-          "avg_return": 0.0052,
+          "avg_return": 0.0055,
           "count": 160
         },
         {
           "confidence": 7,
-          "avg_return": 0.0168,
+          "avg_return": 0.0169,
           "count": 298
         },
         {
@@ -9158,7 +9138,7 @@
           "count": 0
         }
       ],
-      "calibration_score": 0.061,
+      "calibration_score": 0.059,
       "total_trades": 807,
       "min_trades": 20
     },
@@ -9186,22 +9166,22 @@
         },
         {
           "confidence": 5,
-          "avg_return": -0.0046,
+          "avg_return": -0.0044,
           "count": 61
         },
         {
           "confidence": 6,
-          "avg_return": 0.0198,
+          "avg_return": 0.0199,
           "count": 201
         },
         {
           "confidence": 7,
-          "avg_return": 0.0291,
+          "avg_return": 0.0293,
           "count": 273
         },
         {
           "confidence": 8,
-          "avg_return": 0.0604,
+          "avg_return": 0.0609,
           "count": 39
         },
         {
@@ -9298,98 +9278,98 @@
   },
   "mvp_trade": {
     "date": "2026-11-20",
-    "model_key": "grok",
-    "display_name": "Grok 4.20 (Reasoning)",
+    "model_key": "gemini",
+    "display_name": "Gemini 3.1 Pro",
     "side": "BUY",
-    "ticker": "UNH",
-    "fill_price": 344.436,
-    "confidence": 7,
-    "summary": "Adding to UNH to bring it toward a 10% weight on continued positive analyst momentum following the recent initiation.",
-    "pnl_pct": -0.0063,
-    "current_price": 342.27,
+    "ticker": "HD",
+    "fill_price": 343.574,
+    "confidence": 6,
+    "summary": "Initiating a 5% position in Home Depot to capitalize on potential benefits from massive tariff refunds.",
+    "pnl_pct": -0.0065,
+    "current_price": 341.35,
     "selection_reason": "highest_gain"
   },
   "ticker_tape": [
     {
       "symbol": "WMT",
       "name": "Walmart",
-      "price": 128.56,
-      "change_pct": 0.02,
+      "price": 128.7,
+      "change_pct": 0.0211,
       "holders": 5
     },
     {
       "symbol": "COST",
       "name": "Costco",
-      "price": 1105.57,
-      "change_pct": 0.0107,
+      "price": 1107.42,
+      "change_pct": 0.0124,
       "holders": 4
     },
     {
       "symbol": "KO",
       "name": "Coca-Cola",
-      "price": 97.24,
-      "change_pct": 0.0119,
+      "price": 97.11,
+      "change_pct": 0.0106,
       "holders": 4
     },
     {
       "symbol": "LLY",
       "name": "Eli Lilly",
-      "price": 1350.71,
-      "change_pct": -0.0003,
+      "price": 1351.58,
+      "change_pct": 0.0003,
       "holders": 4
     },
     {
       "symbol": "PFE",
       "name": "Pfizer",
-      "price": 27.51,
-      "change_pct": -0.0009,
+      "price": 27.56,
+      "change_pct": 0.0007,
       "holders": 4
     },
     {
       "symbol": "PG",
       "name": "Procter & Gamble",
-      "price": 169.95,
-      "change_pct": 0.0125,
+      "price": 170.2,
+      "change_pct": 0.014,
       "holders": 4
     },
     {
       "symbol": "RTX",
       "name": "RTX Corp",
-      "price": 191.27,
-      "change_pct": -0.0112,
+      "price": 191.82,
+      "change_pct": -0.0084,
       "holders": 4
-    },
-    {
-      "symbol": "AXP",
-      "name": "American Express",
-      "price": 304.34,
-      "change_pct": -0.0218,
-      "holders": 3
-    },
-    {
-      "symbol": "CSCO",
-      "name": "Cisco Systems",
-      "price": 90.89,
-      "change_pct": -0.0402,
-      "holders": 3
     },
     {
       "symbol": "DIS",
       "name": "Walt Disney",
-      "price": 118.1,
-      "change_pct": -0.0179,
+      "price": 118.3,
+      "change_pct": -0.0162,
+      "holders": 3
+    },
+    {
+      "symbol": "LOW",
+      "name": "Lowe's",
+      "price": 222.15,
+      "change_pct": 0.0137,
+      "holders": 3
+    },
+    {
+      "symbol": "SBUX",
+      "name": "Starbucks",
+      "price": 103.43,
+      "change_pct": -0.01,
       "holders": 3
     }
   ],
   "market_brief": {
-    "brief": "Welcome. U.S. equities: S&P -3.13%, Nasdaq -4.67%, Dow -1.43%. Consumer Staples led sectors (+1.03%) while Technology lagged (-5.91%). DeepSeek V4 Pro led the day at -1.83%. 0 of 6 models green on the day. Cumulative leader: DeepSeek V4 Pro at +21.36%. Key headline: AMD\u2019s China ties complicate its appeal as Nvidia\u2019s rival. - Hunterbrook \u2014 market reaction muted.",
-    "key_moves": "AMD -13.4% (held by 0/6) | AVGO -12.5% (held by 0/6) | NVDA -11.7% (held by 1/6)",
+    "brief": "Welcome. U.S. equities: S&P -3.11%, Nasdaq -4.66%, Dow -1.40%. Consumer Staples led sectors (+0.99%) while Technology lagged (-5.80%). DeepSeek V4 Pro led the day at -1.83%. 0 of 6 models green on the day. Cumulative leader: DeepSeek V4 Pro at +21.36%. Key headline: Dow dives 800 points as Anthropic IPO milestone causes investors to take profits: Live updates - CNBC \u2014 market reaction muted.",
+    "key_moves": "AVGO -12.3% (held by 0/6) | AMD -12.3% (held by 0/6) | NVDA -12.3% (held by 1/6)",
     "as_of_date": "Friday, November 20",
-    "macro_sentence": "Key headline: AMD\u2019s China ties complicate its appeal as Nvidia\u2019s rival. - Hunterbrook \u2014 market reaction muted.",
+    "macro_sentence": "Key headline: Dow dives 800 points as Anthropic IPO milestone causes investors to take profits: Live updates - CNBC \u2014 market reaction muted.",
     "macro_sentiment": "neutral"
   },
   "universe_coverage": {
     "total_tracked": 79,
-    "actively_held": 40
+    "actively_held": 39
   }
 }
