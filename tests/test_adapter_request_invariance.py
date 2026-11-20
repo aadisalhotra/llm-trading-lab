@@ -189,6 +189,26 @@ def wire(monkeypatch):
     return sent
 
 
+# The one deliberate request change since BASE_COMMIT: the output-budget
+# equalization (docs/registrations/output_budget_equalization_ruling.md,
+# 2026-11-19) raised three adapters' budget from 4096 to 16384. Each body
+# must differ from the fixture by exactly this substitution, applied once, and
+# by nothing else. Gemini and DeepSeek must still be byte-identical.
+REGISTERED_BODY_DELTA = {
+    "anthropic": (b'"max_tokens":4096', b'"max_tokens":16384'),
+    "openai": (b'"max_completion_tokens":4096', b'"max_completion_tokens":16384'),
+    "xai": (b'"max_tokens": 4096', b'"max_tokens": 16384'),
+}
+
+
+def _expected_after(name: str, body_before: bytes) -> bytes:
+    if name not in REGISTERED_BODY_DELTA:
+        return body_before
+    old, new = REGISTERED_BODY_DELTA[name]
+    assert body_before.count(old) == 1, f"{name}: the fixture body lacks {old!r}"
+    return body_before.replace(old, new)
+
+
 @pytest.mark.parametrize("name", sorted(PINNED_BLOBS))
 def test_fixture_is_the_pre_package_source(name):
     data = (FIXTURES / f"{name}_adapter.py.txt").read_bytes()
@@ -206,8 +226,9 @@ def test_request_bytes_identical_before_and_after(name, with_images, wire):
     (m0, u0, b0), (m1, u1, b1) = wire
     assert (m0, u0) == (m1, u1)
     assert b0, "captured an empty body: the fake transport saw nothing"
-    assert b0 == b1, (
-        f"{name} request body changed:\nbefore: {b0[:400]!r}\nafter:  {b1[:400]!r}")
+    assert _expected_after(name, b0) == b1, (
+        f"{name} request body changed beyond the registered delta:\n"
+        f"before: {b0[:400]!r}\nafter:  {b1[:400]!r}")
 
 
 @pytest.mark.parametrize("name", sorted(PINNED_BLOBS))
@@ -227,4 +248,7 @@ def test_probe_temperature_request_identical_too(name, wire):
             outcomes.append(("raised", type(e).__name__, str(e), len(wire) - before))
         else:
             outcomes.append(("sent",) + wire[-1])
+    if outcomes[0][0] == "sent":
+        m, u, b = outcomes[0][1:]
+        outcomes[0] = ("sent", m, u, _expected_after(name, b))
     assert outcomes[0] == outcomes[1]
