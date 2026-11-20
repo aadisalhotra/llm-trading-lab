@@ -41,14 +41,15 @@
   },
   "daily": {
     "date": "2026-11-20",
-    "sent_count": 2,
+    "sent_count": 3,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "fill_overrun:grok:20261120T183311Z:grok-20261120T183311Z-01-a0"
+      "fill_overrun:grok:20261120T183311Z:grok-20261120T183311Z-01-a0",
+      "budget:warn"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -73,6 +74,14 @@
         "timestamp": "2026-11-20T18:34:53.513051+00:00",
         "disposition": "sent",
         "dispatch_id": "4f6aa603f609"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-11-20T22:07:39.828323+00:00",
+        "disposition": "sent",
+        "dispatch_id": "f8a087206654"
       }
     ]
   },
