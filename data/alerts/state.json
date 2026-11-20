@@ -40,57 +40,30 @@
     ]
   },
   "daily": {
-    "date": "2026-11-19",
-    "sent_count": 4,
+    "date": "2026-11-20",
+    "sent_count": 1,
     "dedup_keys": [
-      "macro_event:Geopolitical shock",
-      "negative:gpt",
-      "negative:gemini",
-      "news:RTX:51eac2f9df"
+      "macro_event:Geopolitical shock"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
       {
         "kind": "macro_event",
         "severity": "CRITICAL",
         "title": "Major Market Event Detected",
-        "timestamp": "2026-11-19T22:07:32.301254+00:00",
+        "timestamp": "2026-11-20T15:02:44.155809+00:00",
         "trigger": {
-          "headline": "Backing Trump, US Senate Republicans block Iran war resolution - Reuters",
-          "source": "Reuters",
-          "headline_time": "2026-11-19T21:28:39+00:00",
+          "headline": "The Iran War Could Permanently Slash Reliance on Hormuz, IEA Says - WSJ",
+          "source": "The Wall Street Journal",
+          "headline_time": "2026-11-19T05:55:00Z",
           "category": "Geopolitical shock",
-          "matched_term": "war",
-          "score": -0.9274
+          "matched_term": "War",
+          "score": -0.7269
         },
         "disposition": "sent",
-        "dispatch_id": "b294fd333c29"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "GPT-5.4 went negative",
-        "timestamp": "2026-11-19T22:07:57.556659+00:00",
-        "disposition": "sent",
-        "dispatch_id": "7e28020d2206"
-      },
-      {
-        "kind": "negative_return",
-        "severity": "WARN",
-        "title": "Gemini 3.1 Pro went negative",
-        "timestamp": "2026-11-19T22:07:57.558376+00:00",
-        "disposition": "sent",
-        "dispatch_id": "647fca9473e1"
-      },
-      {
-        "kind": "news_impact",
-        "severity": "WARN",
-        "title": "Very Positive news on RTX (held by 4)",
-        "timestamp": "2026-11-19T22:07:57.622063+00:00",
-        "disposition": "sent",
-        "dispatch_id": "704bccc9a0c5"
+        "dispatch_id": "bc14e605aac6"
       }
     ]
   },
