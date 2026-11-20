@@ -41,9 +41,10 @@
   },
   "daily": {
     "date": "2026-11-20",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "fill_overrun:grok:20261120T183311Z:grok-20261120T183311Z-01-a0"
     ],
     "overflow": [],
     "continuing": [],
@@ -64,6 +65,14 @@
         },
         "disposition": "sent",
         "dispatch_id": "bc14e605aac6"
+      },
+      {
+        "kind": "fill_overrun",
+        "severity": "WARN",
+        "title": "FILL_OVERRUN: grok UNH",
+        "timestamp": "2026-11-20T18:34:53.513051+00:00",
+        "disposition": "sent",
+        "dispatch_id": "4f6aa603f609"
       }
     ]
   },
