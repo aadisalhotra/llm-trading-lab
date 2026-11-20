@@ -46,7 +46,8 @@ class XAIAdapter(BaseAdapter):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
-            "max_tokens": 4096,
+            # Budget equalization, 4096 -> 16384 (output_budget_equalization_ruling.md, 2026-11-19).
+            "max_tokens": 16384,
             "response_format": {"type": "json_object"},
         }
         if self.temperature is not None:
