@@ -3841,6 +3841,19 @@
         "later_fixes": {
           "defab_clean_window_help": "`python scripts/defab_clean_window.py --help` RUNS the script (it has no argument parser) and rewrites reports/monthly/2026-05/defab_clean_window.json. Found 2026-11-18, file restored by git checkout. Fix later: add argparse so --help exits without side effects."
         }
+      },
+      {
+        "id": "failstop_live_probe_2026_11_20",
+        "date": "2026-11-20",
+        "type": "instrument_verification",
+        "class": "Operations instrument check. It touches no book, no venue and no validation record.",
+        "answers_for": "gate_a_and_fail_stop_2026_11_18, known_limits: the three GitHub behaviours the intraday fail-stop relies on, unproven live until now.",
+        "run": "failstop_probe.yml run 44656406954, mode cancel_test, dispatched by hand 2026-11-20 01:49:35Z and cancelled by hand. Its `run` job was cancelled 02:00:58Z. Its `fail-stop` job ran 02:01:01Z-02:09:09Z, conclusion success. Read from the public API by scripts/read_failstop_probe.py at 02:15Z. Record: docs/ops/failstop_probe_2026-11-20/answers.json.",
+        "Q1_always_job_after_cancel": "YES. After the workflow run was cancelled, the job with `if: always() && (needs.run.result == 'failure' || needs.run.result == 'cancelled' ...)` started and concluded success. intraday.yml's fail-stop job uses the same condition.",
+        "Q2_github_token_disables": "YES. PUT .../workflows/failstop_target.yml/disable with GITHUB_TOKEN (permissions actions: write) succeeded: the step concluded success, and the workflow's state afterwards is disabled_manually.",
+        "Q3_queued_runs_of_disabled_workflow": "NOT ANSWERED by this run. The cancel came about 11 minutes in, not about 1. Both target runs, each a 240 s sleep, had already finished (44656416185: 01:49:40Z-01:53:48Z; 44656457816: queued at 01:50:01Z and done by 01:57:52Z, both success) before the disable at about 02:01Z, so no queued run existed to observe. The open question stands: does a disabled workflow still start a run already pending in its concurrency group? Answering it needs the target re-enabled by hand and a second cancel_test cancelled within about 3 minutes.",
+        "intraday_yml": "state active at about 01:47Z (read after the main push, before the dispatch) and at 02:15Z (after). The probe workflow names only failstop_target.yml, so it cannot address intraday.yml. GitHub's API keeps no state history, so 'throughout' rests on those two reads plus that inspection.",
+        "target_left": "failstop_target.yml stays disabled_manually. The design re-enables nothing. The re-enable needed for a Q3 rerun, and the deletion of both throwaway files, wait for the hub's decision."
       }
     ]
   }
