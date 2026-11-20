@@ -1,0 +1,235 @@
+{
+  "what": "R-5's RQ1 table reproduced from the committed compute_rq1 (hub F4, 2026-11-19 night)",
+  "call": "compute_rq1(load_decision_records(k) for the five-model cohort, {}, cohort, n_permutations=300, seed=11, domain=..., exclude_truncated=..., window=('2026-08-03','2026-10-22'), survivor_set=['gpt','gemini','grok'])",
+  "data": "decision logs at origin/main e800658c0",
+  "targets_with_exclusion": {
+    "explicit": {
+      "N": 340,
+      "excess": 0.0143
+    },
+    "carried": {
+      "N": 6567,
+      "excess": 0.0168
+    },
+    "survivor_set": {
+      "N": 1967,
+      "excess": 0.0178
+    },
+    "tolerance": "counts exact, excess within +/-0.001"
+  },
+  "targets_without_exclusion_R5": {
+    "explicit": {
+      "N": 402,
+      "excess": 0.019
+    },
+    "carried": {
+      "N": 6788,
+      "excess": 0.017
+    },
+    "survivor_set": {
+      "N": 1967,
+      "excess": 0.018
+    }
+  },
+  "reference_pilot_runs": "rq1_domain_pilot.py (707dc36c...) and rq1_domain_pilot_excl.py (bb41a1b9...), run unchanged on the same data: explicit 402 +0.0187 / 340 +0.0144; held 6788 +0.0165 / 6567 +0.0168; survivor 1967 +0.0177 / 1967 +0.0176.",
+  "results": {
+    "explicit excl=False": {
+      "N": 402,
+      "ticks": 313,
+      "excess": 0.0187,
+      "p": 0.0033,
+      "survivor_N": 2,
+      "survivor_excess": 0.2422,
+      "survivor_p": 0.1628,
+      "truncated_excluded": {},
+      "pairs": {
+        "claude/claude_opus": [
+          267,
+          0.0243
+        ],
+        "claude/gpt": [
+          70,
+          0.0037
+        ],
+        "claude_opus/gpt": [
+          54,
+          0.0061
+        ],
+        "claude/gemini": [
+          5,
+          -0.0067
+        ],
+        "claude_opus/gemini": [
+          2,
+          0.0
+        ],
+        "claude_opus/grok": [
+          2,
+          0.0
+        ],
+        "gemini/grok": [
+          1,
+          0.4844
+        ],
+        "gpt/gemini": [
+          1,
+          0.0
+        ]
+      }
+    },
+    "explicit excl=True": {
+      "N": 340,
+      "ticks": 269,
+      "excess": 0.0149,
+      "p": 0.0033,
+      "survivor_N": 2,
+      "survivor_excess": 0.25,
+      "survivor_p": 0.1561,
+      "truncated_excluded": {
+        "claude": 54,
+        "claude_opus": 3
+      },
+      "pairs": {
+        "claude/claude_opus": [
+          222,
+          0.0189
+        ],
+        "claude/gpt": [
+          57,
+          0.0016
+        ],
+        "claude_opus/gpt": [
+          53,
+          0.0054
+        ],
+        "claude/gemini": [
+          2,
+          0.0
+        ],
+        "claude_opus/gemini": [
+          2,
+          0.0
+        ],
+        "claude_opus/grok": [
+          2,
+          0.0
+        ],
+        "gemini/grok": [
+          1,
+          0.5
+        ],
+        "gpt/gemini": [
+          1,
+          0.0
+        ]
+      }
+    },
+    "carried excl=False": {
+      "N": 6788,
+      "ticks": 735,
+      "excess": 0.0164,
+      "p": 0.0033,
+      "survivor_N": 1967,
+      "survivor_excess": 0.0178,
+      "survivor_p": 0.0033,
+      "truncated_excluded": {},
+      "pairs": {
+        "claude/claude_opus": [
+          735,
+          0.0192
+        ],
+        "claude/gpt": [
+          735,
+          0.0171
+        ],
+        "claude_opus/gpt": [
+          735,
+          0.0181
+        ],
+        "claude/grok": [
+          716,
+          0.0144
+        ],
+        "claude_opus/grok": [
+          716,
+          0.0146
+        ],
+        "gpt/grok": [
+          713,
+          0.0156
+        ],
+        "claude/gemini": [
+          642,
+          0.0116
+        ],
+        "gemini/grok": [
+          636,
+          0.0266
+        ],
+        "gpt/gemini": [
+          618,
+          0.0115
+        ],
+        "claude_opus/gemini": [
+          542,
+          0.0151
+        ]
+      }
+    },
+    "carried excl=True": {
+      "N": 6567,
+      "ticks": 735,
+      "excess": 0.0169,
+      "p": 0.0033,
+      "survivor_N": 1967,
+      "survivor_excess": 0.0178,
+      "survivor_p": 0.0033,
+      "truncated_excluded": {
+        "claude": 54,
+        "claude_opus": 3
+      },
+      "pairs": {
+        "claude_opus/gpt": [
+          732,
+          0.0181
+        ],
+        "claude_opus/grok": [
+          713,
+          0.0144
+        ],
+        "gpt/grok": [
+          713,
+          0.0154
+        ],
+        "claude/gpt": [
+          681,
+          0.018
+        ],
+        "claude/claude_opus": [
+          678,
+          0.0192
+        ],
+        "claude/grok": [
+          664,
+          0.0164
+        ],
+        "gemini/grok": [
+          636,
+          0.0262
+        ],
+        "gpt/gemini": [
+          618,
+          0.0117
+        ],
+        "claude/gemini": [
+          592,
+          0.0129
+        ],
+        "claude_opus/gemini": [
+          540,
+          0.0156
+        ]
+      }
+    }
+  }
+}

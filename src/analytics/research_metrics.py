@@ -305,6 +305,168 @@ def _bootstrap_index_ci(
 # RQ1 — Decision convergence under identical information sets (PRIMARY)
 # ==========================================================================
 
+# --- RQ1 decision domain and truncated-record exclusion ---------------------
+# Registered: docs/registrations/rq1_cohort_reduction_and_decision_domain.md
+# §§1, 3 (Research 2026-11-18) and output_budget_equalization_ruling.md §3
+# (2026-11-19). Analysis code only: no order path, no prompt, no S1 cost.
+RQ1_DOMAINS = ("explicit", "carried")
+
+# A response that ended on its output budget (ruling §3): the provider's
+# finish reason is a budget stop. Before 2026-09-10 no finish reason was
+# recorded; then a response is cut when output_tokens reached the arm's budget.
+_BUDGET_STOP_REASONS = {"max_tokens", "length", "MAX_TOKENS"}
+_BUDGET_EQUALIZATION_DATE = "2026-11-23"       # first tick at 16384 for the arms below
+_ARMS_RAISED_TO_16384 = {"claude", "claude_opus", "gpt", "grok"}
+
+
+def _output_budget(model_key: str, date: str) -> int | None:
+    """The output-token budget the arm ran under on `date` (None = not one of
+    the arms whose pre-boundary budget identifies a cut without a finish
+    reason)."""
+    if model_key in _ARMS_RAISED_TO_16384:
+        return 4096 if (date or "") < _BUDGET_EQUALIZATION_DATE else 16384
+    return None
+
+
+def is_truncated_record(rec: dict[str, Any], model_key: str) -> bool:
+    """True when the model's decision list was cut at the output budget, so
+    the record is not an estimable decision record (ruling §3.1)."""
+    reason = rec.get("api_finish_reason")
+    if reason is not None:
+        return str(reason) in _BUDGET_STOP_REASONS
+    budget = _output_budget(model_key, rec.get("date") or "")
+    return budget is not None and int(rec.get("output_tokens") or 0) >= budget
+
+
+def _carried_longs(portfolio: dict[str, Any] | None,
+                   marks: dict[str, float]) -> set[str]:
+    """Long positions held in `portfolio` (the previous record's
+    portfolio_after), less dust: a holding below BEHAVIOURAL_NOTIONAL_FLOOR at
+    the tick's mark is outside the domain. The mark is the tick's own
+    portfolio_after price for the ticker when it has one, else the carried
+    holding's last price. Short holdings are outside the domain."""
+    from ..execution.broker import BEHAVIOURAL_NOTIONAL_FLOOR
+    holdings = (portfolio or {}).get("holdings") or []
+    if isinstance(holdings, dict):
+        holdings = [dict(v, ticker=t) if isinstance(v, dict) else {"ticker": t, "shares": v}
+                    for t, v in holdings.items()]
+    out: set[str] = set()
+    for h in holdings:
+        if not isinstance(h, dict):
+            continue
+        try:
+            shares = float(h.get("shares") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if shares <= 0 or _holding_segment(h) != "long":
+            continue
+        t = str(h.get("ticker", "")).upper().strip()
+        if not t:
+            continue
+        mark = marks.get(t)
+        if mark is None:
+            try:
+                mark = float(h.get("current_price") or 0.0)
+            except (TypeError, ValueError):
+                mark = 0.0
+        if mark > 0 and shares * mark < BEHAVIOURAL_NOTIONAL_FLOOR:
+            continue
+        out.add(t)
+    return out
+
+
+def _tick_marks(portfolio: dict[str, Any] | None) -> dict[str, float]:
+    marks: dict[str, float] = {}
+    holdings = (portfolio or {}).get("holdings") or []
+    for h in holdings if isinstance(holdings, list) else []:
+        try:
+            marks[str(h.get("ticker", "")).upper().strip()] = float(h.get("current_price"))
+        except (TypeError, ValueError):
+            continue
+    return marks
+
+
+def _rq1_permutation_stats(tick_payloads: list[dict[str, Any]], n_permutations: int,
+                           seed: int,
+                           pair_filter: Callable[[str, str], bool] | None = None
+                           ) -> dict[str, Any] | None:
+    """Pooled concordance, its shuffled null and the per-pair table, over the
+    (pair, tick) observations that pass `pair_filter`.
+
+    Every tick with >= 2 present models is visited and every present model's
+    action vector is shuffled, in model order, on every permutation, whether or
+    not the filter keeps any of its pairs. The null of every filtered statistic
+    is therefore taken from the same permutation draws as the headline's
+    (common random numbers; registered §1), and with no filter the RNG stream
+    is exactly the one compute_rq1 used before 2026-11-20.
+    """
+    keep = [[(a, b, sh) for a, b, sh in p["pairs"] if pair_filter is None or pair_filter(a, b)]
+            for p in tick_payloads]
+    pairs = sorted({(a, b) for kp in keep for a, b, _ in kp})
+    if not pairs:
+        return None
+    idx = {p: i for i, p in enumerate(pairs)}
+    n = np.zeros(len(pairs))
+    obs = np.zeros(len(pairs))
+    shared_n = np.zeros(len(pairs))
+    acted = np.zeros(len(pairs))
+    obs_values: list[float] = []     # in tick, then pair, order: the pooled mean's order
+    for payload, kp in zip(tick_payloads, keep):
+        cur = payload["actions"]
+        for a, b, sh in kp:
+            i = idx[(a, b)]
+            c = float(np.mean([1.0 if cur[a][t] == cur[b][t] else 0.0 for t in sh]))
+            n[i] += 1
+            shared_n[i] += len(sh)
+            obs[i] += c
+            obs_values.append(c)
+            acted[i] += float(np.mean([1.0 if (cur[a][t] != 2 or cur[b][t] != 2) else 0.0
+                                       for t in sh]))
+    rng = np.random.default_rng(seed)
+    nul = np.zeros((n_permutations, len(pairs)))
+    draws = np.empty(n_permutations, dtype=float)
+    for q in range(n_permutations):
+        vals: list[float] = []
+        for payload, kp in zip(tick_payloads, keep):
+            shuffled: dict[str, dict[str, int]] = {}
+            for k, arr in payload["models"].items():
+                perm = arr.copy()
+                rng.shuffle(perm)
+                shuffled[k] = dict(zip(payload["tickers"][k], perm))
+            for a, b, sh in kp:
+                v = float(np.mean([1.0 if shuffled[a][t] == shuffled[b][t] else 0.0 for t in sh]))
+                nul[q, idx[(a, b)]] += v
+                vals.append(v)
+        # Pooled exactly as before 2026-11-20 (np.mean over the values in order),
+        # so the default call's null and p are bit-identical to the old code's.
+        draws[q] = float(np.mean(vals))
+    total = float(n.sum())
+    observed = float(np.mean(obs_values))
+    null_mean = float(np.mean(draws))
+    per_pair = []
+    for (a, b), i in idx.items():
+        per_pair.append({
+            "pair": f"{a}/{b}", "n_observations": int(n[i]),
+            "share_of_observations": float(n[i] / total),
+            "mean_shared_tickers": float(shared_n[i] / n[i]),
+            "observed_concordance": float(obs[i] / n[i]),
+            "null_concordance_mean": float(nul[:, i].mean() / n[i]),
+            "excess": float(obs[i] / n[i] - nul[:, i].mean() / n[i]),
+            "share_of_cells_with_a_non_hold_action": float(acted[i] / n[i]),
+        })
+    per_pair.sort(key=lambda r: -r["n_observations"])
+    return {
+        "n_pairwise_observations": int(total),
+        "n_ticks_with_pairs": int(sum(1 for kp in keep if kp)),
+        "observed_action_concordance": observed,
+        "null_action_concordance_mean": null_mean,
+        "concordance_excess_over_chance": observed - null_mean,
+        "permutation_p_value": float((1 + np.sum(draws >= observed)) / (n_permutations + 1)),
+        "n_permutations": int(n_permutations),
+        "per_pair": per_pair,
+    }
+
+
 def compute_rq1(
     all_records: dict[str, list[dict[str, Any]]],
     regime_map: dict[str, str],
@@ -313,6 +475,11 @@ def compute_rq1(
     n_resamples: int = DEFAULT_N_RESAMPLES,
     min_shared: int = 3,
     seed: int = 11,
+    *,
+    domain: str = "explicit",
+    exclude_truncated: bool = False,
+    window: tuple[str, str] | None = None,
+    survivor_set: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Do models converge on identical decisions given identical inputs?
 
@@ -329,35 +496,81 @@ def compute_rq1(
     The shuffled-permutation null independently permutes each model's action
     vector within the tick (preserving each model's BUY/SELL/HOLD base rates,
     destroying cross-model alignment), giving the chance level of agreement.
+
+    Decision domain (rq1_cohort_reduction_and_decision_domain.md §3):
+      * ``domain="explicit"`` (the default; the domain as first registered):
+        the tickers the model lists with BUY, SELL or HOLD.
+      * ``domain="carried"``: those, plus every long position the model
+        carried into the tick (its previous record's portfolio_after, whatever
+        that record was), taken as HOLD when it listed no action for it. SHORT
+        and COVER rows, short holdings and dust holdings stay outside; a
+        ticker listed with SHORT or COVER is not filled in as a HOLD.
+      The weight correlation stays on explicitly listed rows, which state a
+      target_weight.
+
+    ``exclude_truncated`` (output_budget_equalization_ruling.md §3.1): drop
+    records whose decision list was cut at the output budget
+    (:func:`is_truncated_record`). A switch, off by default.
+
+    ``window`` = (start, end) dates, inclusive, on the record's ``date``.
+
+    ``survivor_set``: also report the survivor-set companion (§1.2), the
+    same statistic on pairs among these models only, with the null from the
+    same permutation draws.
+
+    With every new argument at its default the result is unchanged from the
+    pre-2026-11-20 implementation; new keys are added alongside.
     """
+    if domain not in RQ1_DOMAINS:
+        raise ValueError(f"domain must be one of {RQ1_DOMAINS}, not {domain!r}")
     # Group decision vectors by data_inputs_hash
     # tick -> {model_key: {"actions": {ticker: code}, "weights": {ticker: w}, "date": d}}
     ticks: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    n_truncated_excluded: dict[str, int] = defaultdict(int)
     for key in model_keys:
+        prev_portfolio: dict[str, Any] | None = None
         for rec in all_records.get(key, []):
+            # The carried state is whatever the previous record left, whether
+            # that record was a model call, a failure or an administrative row.
+            carried_from = prev_portfolio
+            prev_portfolio = rec.get("portfolio_after") or prev_portfolio
             # RQ1 decision sets are a model-call population (explicitly: the
             # BOUNDARY_ADMIN rows report api_success true).
             if not rec.get("api_success") or is_administrative_row(rec):
                 continue
+            date = rec.get("date", "")
+            if window is not None and not (window[0] <= date <= window[1]):
+                continue
+            if exclude_truncated and is_truncated_record(rec, key):
+                n_truncated_excluded[key] += 1
+                continue
             h = rec.get("data_inputs_hash")
             raw = rec.get("raw_decisions") or []
-            if not h or not raw:
+            if not h or (not raw and domain == "explicit"):
                 continue
             actions: dict[str, int] = {}
             weights: dict[str, float] = {}
+            outside: set[str] = set()
             for d in raw:
                 t = str(d.get("ticker", "")).upper().strip()
                 a = str(d.get("action", "")).upper()
-                if not t or a not in _ACTION_CODE:
+                if not t:
+                    continue
+                if a not in _ACTION_CODE:
+                    outside.add(t)
                     continue
                 actions[t] = _ACTION_CODE[a]
                 try:
                     weights[t] = float(d.get("target_weight", 0.0))
                 except (TypeError, ValueError):
                     weights[t] = 0.0
+            if domain == "carried":
+                marks = _tick_marks(rec.get("portfolio_after"))
+                for t in sorted(_carried_longs(carried_from, marks)):
+                    if t not in actions and t not in outside:
+                        actions[t] = _ACTION_CODE["HOLD"]
             if actions:
-                ticks[h][key] = {"actions": actions, "weights": weights,
-                                 "date": rec.get("date", "")}
+                ticks[h][key] = {"actions": actions, "weights": weights, "date": date}
 
     # Per (pair, tick) observations
     obs_conc: list[float] = []          # observed action concordance
@@ -373,6 +586,7 @@ def compute_rq1(
             continue
         date = per_model[present[0]]["date"]
         regime = regime_map.get(date, INSUFFICIENT)
+        tick_pairs: list[tuple[str, str, list[str]]] = []
         # observed pairwise
         for i in range(len(present)):
             for j in range(i + 1, len(present)):
@@ -383,57 +597,48 @@ def compute_rq1(
                 shared = [t for t in a if t in b]
                 if len(shared) < min_shared:
                     continue
+                tick_pairs.append((present[i], present[j], shared))
                 conc = float(np.mean([1.0 if a[t] == b[t] else 0.0 for t in shared]))
                 obs_conc.append(conc)
                 obs_regime.append(regime)
                 obs_order.append(h)
-                # weight correlation
-                xa = np.array([wa[t] for t in shared], dtype=float)
-                xb = np.array([wb[t] for t in shared], dtype=float)
-                if xa.std() > 0 and xb.std() > 0 and len(shared) >= 3:
+                # weight correlation, on explicitly listed rows only
+                wshared = [t for t in shared if t in wa and t in wb]
+                xa = np.array([wa[t] for t in wshared], dtype=float)
+                xb = np.array([wb[t] for t in wshared], dtype=float)
+                if len(wshared) >= 3 and xa.std() > 0 and xb.std() > 0:
                     obs_wcorr.append(float(np.corrcoef(xa, xb)[0, 1]))
         # payload for permutation: each model's action array on its tickers
         tick_payloads.append({
             "regime": regime,
             "models": {k: np.array(list(per_model[k]["actions"].values())) for k in present},
             "tickers": {k: list(per_model[k]["actions"].keys()) for k in present},
+            "actions": {k: per_model[k]["actions"] for k in present},
+            "pairs": tick_pairs,
         })
 
+    domain_meta = {
+        "decision_domain": domain,
+        "exclude_truncated": exclude_truncated,
+        "n_truncated_records_excluded": dict(n_truncated_excluded),
+        "window": list(window) if window else None,
+    }
     n_obs = len(obs_conc)
     if n_obs == 0:
         return {"status": "Open", "n_ticks": len(ticks), "n_pairwise_observations": 0,
-                "note": "No ticks with >=2 models sharing >=3 decided tickers yet."}
+                "note": "No ticks with >=2 models sharing >=3 decided tickers yet.",
+                **domain_meta}
 
     observed_conc = float(np.mean(obs_conc))
     observed_wcorr = float(np.mean(obs_wcorr)) if obs_wcorr else None
 
-    # Permutation null: shuffle each model's action vector within each tick
-    rng = np.random.default_rng(seed)
-    null_means = np.empty(n_permutations, dtype=float)
-    for p in range(n_permutations):
-        vals: list[float] = []
-        for payload in tick_payloads:
-            shuffled: dict[str, dict[str, int]] = {}
-            for k, arr in payload["models"].items():
-                perm = arr.copy()
-                rng.shuffle(perm)
-                shuffled[k] = dict(zip(payload["tickers"][k], perm))
-            present = list(shuffled.keys())
-            for i in range(len(present)):
-                for j in range(i + 1, len(present)):
-                    a = shuffled[present[i]]
-                    b = shuffled[present[j]]
-                    shared = [t for t in a if t in b]
-                    if len(shared) < min_shared:
-                        continue
-                    vals.append(float(np.mean([1.0 if a[t] == b[t] else 0.0 for t in shared])))
-        null_means[p] = float(np.mean(vals)) if vals else np.nan
-    null_means = null_means[np.isfinite(null_means)]
-    null_mean = float(np.mean(null_means)) if len(null_means) else None
-    # one-sided p: chance of null concordance >= observed
-    perm_p = None
-    if len(null_means):
-        perm_p = float((1 + np.sum(null_means >= observed_conc)) / (len(null_means) + 1))
+    # Permutation null: shuffle each model's action vector within each tick.
+    # Pooled over (pair, tick) observations, this is the same quantity and the
+    # same RNG stream as before; the per-pair table and the survivor set come
+    # from the same draws.
+    headline = _rq1_permutation_stats(tick_payloads, n_permutations, seed)
+    null_mean = headline["null_action_concordance_mean"]
+    perm_p = headline["permutation_p_value"]
 
     # Block-bootstrap CI on observed concordance (order by tick for blocks)
     ci = bca_bootstrap_ci(np.array(obs_conc), np.mean, alpha=0.10,
@@ -456,20 +661,32 @@ def compute_rq1(
             "ci_low": rci.ci_low, "ci_high": rci.ci_high,
         }
 
+    survivor = None
+    if survivor_set is not None:
+        members = set(survivor_set)
+        survivor = _rq1_permutation_stats(
+            tick_payloads, n_permutations, seed,
+            pair_filter=lambda a, b: a in members and b in members)
+        survivor = {"models": sorted(members), **(survivor or {"n_pairwise_observations": 0})}
+
     excess = observed_conc - null_mean if null_mean is not None else None
     return {
         "status": "Testing",
         "n_ticks": len(tick_payloads),
+        "n_ticks_with_pairs": headline["n_ticks_with_pairs"],
         "n_pairwise_observations": n_obs,
         "observed_action_concordance": observed_conc,
         "null_action_concordance_mean": null_mean,
         "concordance_excess_over_chance": excess,
         "permutation_p_value": perm_p,
-        "n_permutations": int(len(null_means)),
+        "n_permutations": int(n_permutations),
         "observed_weight_correlation": observed_wcorr,
         "ci_action_concordance": {"low": ci.ci_low, "high": ci.ci_high, "method": ci.method},
         "by_regime": by_regime,
         "headline_p_value": perm_p,
+        "per_pair": headline["per_pair"],
+        "survivor_set": survivor,
+        **domain_meta,
         "interpretation": (
             "Action concordance above the shuffled-null mean indicates models "
             "converge on the same buy/sell/hold calls more than chance under "
