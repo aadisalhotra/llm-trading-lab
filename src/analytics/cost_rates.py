@@ -198,6 +198,27 @@ RATE_HISTORY: dict[str, list[dict]] = {
             "note": "Confirmed vs current Anthropic list 2026-08-02; unchanged over the lab window.",
         },
     ],
+    # Refreshed confirmatory arms (cohort_refresh_ruling.md rev. 2). Opus 5.5:
+    # "$4 USD per million input tokens and $20 USD per million output tokens"
+    # (what's-new page saved 2026-11-21, docs/ops/provider_pages_2026-11-21/
+    # anthropic_whats_new_opus_5_5.html). Sonnet 5.5: "the same prices as
+    # Claude Sonnet 5, except for prompt cache reads" (same folder,
+    # anthropic_whats_new_sonnet_5_5.html), $2/$10. Thinking tokens bill as
+    # output and are included in output_tokens.
+    "claude-sonnet-5-5": [
+        {
+            "effective_from": None,
+            "tiers": [{"max_input_tokens": None, "input": 2.00, "output": 10.00}],
+            "note": "$2/$10, same as Claude Sonnet 5; provider page saved 2026-11-21.",
+        },
+    ],
+    "claude-opus-5-5": [
+        {
+            "effective_from": None,
+            "tiers": [{"max_input_tokens": None, "input": 4.00, "output": 20.00}],
+            "note": "$4/$20; provider page saved 2026-11-21.",
+        },
+    ],
     # Opus 4.6 launched 2026-02-05 at $5/$25 ("Pricing remains the same at
     # $5/$25" — anthropic.com/news/claude-opus-4-6); the Opus line moved off
     # $15/$75 at Opus 4.5's launch, 2025-11-24. SINGLE tier: the provider page

@@ -56,6 +56,18 @@ API_CALL_TIMEOUT_SECONDS = 300
 ERROR_CLASS_TIMEOUT = "TIMEOUT"              # client-side deadline hit in _call_api
 ERROR_CLASS_API_ERROR = "API_ERROR"          # any other exception from _call_api
 ERROR_CLASS_PARSE_FAILURE = "PARSE_FAILURE"  # response unparseable after the retry
+# A response whose stop reason is a refusal (cohort_refresh_ruling.md rev. 2
+# section 6 item 2): its own class, a failed decision for the completeness
+# gate, never retried -- not on this model and never on another one.
+ERROR_CLASS_REFUSAL = "REFUSAL"
+
+
+class ModelRefusal(RuntimeError):
+    """Raised by an adapter's _call_api when the provider reports a refusal.
+
+    generate_decision returns it as a failed DecisionResult with error_class
+    REFUSAL on the first attempt: a refusal is not a parse failure, so the
+    parse-retry does not apply, and no other model is ever asked."""
 # The lab's own account standing at the provider (an exhausted balance, credit
 # or spending limit, or an exhausted per-day quota):
 # docs/registrations/rossi_review_rulings.md section 2.4. Keyed on the error
@@ -377,7 +389,8 @@ class BaseAdapter(ABC):
                     error=str(e),
                     # Logging only: the fail-fast return above is identical
                     # for every class; the class changes attribution, never flow.
-                    error_class=(ERROR_CLASS_TIMEOUT if is_client_timeout(e)
+                    error_class=(ERROR_CLASS_REFUSAL if isinstance(e, ModelRefusal)
+                                 else ERROR_CLASS_TIMEOUT if is_client_timeout(e)
                                  else ERROR_CLASS_ACCOUNT_STATE
                                  if is_account_state(self.provider_name, str(e))
                                  else ERROR_CLASS_API_ERROR),
