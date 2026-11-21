@@ -238,3 +238,33 @@ def test_pipeline_retains_the_objects_it_hands_the_adapter():
     assert 'CallInput("screen", screening_sys, screening_user)' in block
     assert 'CallInput("trade", system_prompt, user_prompt, list(images_for_call or []))' in block
     assert body.count("call_inputs=call_inputs,") == 2          # both log_decision_run calls
+
+
+# ---------------------------------- image_bytes_reason (hub H-OPS-00, Batch 1)
+@pytest.mark.parametrize("t,reason", [
+    (datetime(2026, 11, 23, 9, 35, tzinfo=ET), "rq6_rotation"),         # n=0, slot 1
+    (datetime(2026, 11, 23, 12, 35, tzinfo=ET), "rq6_rotation"),        # n=0, slot 7
+    (datetime(2026, 11, 23, 10, 35, tzinfo=ET), "calibration_window"),  # n=0, slot 3
+    (datetime(2026, 11, 25, 15, 35, tzinfo=ET), "calibration_window"),  # n=2, slot 13
+    (datetime(2026, 11, 25, 10, 35, tzinfo=ET), "rq6_rotation"),        # n=2, slot 3
+    (datetime(2026, 11, 27, 11, 5, tzinfo=ET), "rq6_rotation"),         # after the window
+    (datetime(2026, 11, 27, 10, 35, tzinfo=ET), None),                  # kept by neither
+])
+def test_image_bytes_reason(t, reason):
+    assert ci.image_bytes_reason(t) == reason
+    assert ci.keeps_image_bytes(t) is (reason is not None)
+
+
+def test_the_row_carries_the_reason(tmp_path, monkeypatch):
+    t = datetime(2026, 11, 24, 13, 5, tzinfo=ET)                        # n=1: slots 2, 8 -> 8
+    f = ci.retain_call_inputs("C9", "grok", t, "v4", _calls(), tmp_path / "prompts")
+    assert f["image_bytes_retained"] is True and f["image_bytes_reason"] == "rq6_rotation"
+    g = ci.retain_call_inputs("C9", "grok", datetime(2026, 11, 24, 13, 35, tzinfo=ET), "v4",
+                              _calls(), tmp_path / "prompts")
+    assert g["image_bytes_reason"] == "calibration_window"
+    h = ci.retain_call_inputs("C9", "grok", datetime(2026, 11, 30, 10, 35, tzinfo=ET), "v4",
+                              _calls(), tmp_path / "prompts")
+    assert h["image_bytes_retained"] is False and h["image_bytes_reason"] is None
+    row = _log(tmp_path, monkeypatch, _dr("{}"), call_inputs=g)
+    assert row["image_bytes_reason"] == "calibration_window"
+    assert _log(tmp_path, monkeypatch, _dr("{}"))["image_bytes_reason"] is None
