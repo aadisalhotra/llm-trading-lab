@@ -1,0 +1,190 @@
+[
+  {
+    "probe": "level_sent",
+    "model_requested": "claude-sonnet-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
+      }
+    },
+    "started_utc": "2026-11-21T18:48:01+00:00",
+    "ok": false,
+    "error_type": "APIConnectionError",
+    "error": "Connection error.",
+    "latency_s": 21.15
+  },
+  {
+    "probe": "level_omitted",
+    "model_requested": "claude-sonnet-5-5",
+    "sent": {
+      "thinking": "omitted",
+      "output_config": "omitted"
+    },
+    "started_utc": "2026-11-21T18:48:22+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCQLy772svBdHMqgzb",
+      "container": null,
+      "content": [
+        {
+          "citations": null,
+          "text": "{\"answer\": 391, \"note\": \"17 times 23 equals 391\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-sonnet-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 67,
+        "output_tokens": 26,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 16.28
+  },
+  {
+    "probe": "temperature",
+    "model_requested": "claude-sonnet-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
+      },
+      "temperature": 0.3
+    },
+    "started_utc": "2026-11-21T18:48:38+00:00",
+    "ok": false,
+    "error_type": "BadRequestError",
+    "error": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking'}, 'request_id': 'req_011ChGaCVFPjwrVVVR6kc2j8'}",
+    "error_body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking\"},\"request_id\":\"req_011ChGaCVFPjwrVVVR6kc2j8\"}",
+    "latency_s": 0.13
+  },
+  {
+    "probe": "small_cap_heavy",
+    "model_requested": "claude-sonnet-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
+      },
+      "max_tokens": 300
+    },
+    "started_utc": "2026-11-21T18:48:38+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCVsqe8xQZhVJe7Mm8",
+      "container": null,
+      "content": [
+        {
+          "citations": null,
+          "text": "The number of representations r2(n) = 4(d1(n) − d3(n)). For n = 5^10, the only prime factor is 5, which is 1 mod 4, so r2 = 4(10+1) = 44.\n\nCheck with a small case: 5^1 = 5 has r2 = 4·2 = 8, namely (±1, ±2) and (±2, ±1), which is 8 pairs. This matches.\n\nSo for 5^10 the count is 44.\n\n{\"answer\": 44, \"note\": \"r2(5^10)=4*(10+1)=44\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-sonnet-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 107,
+        "output_tokens": 181,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 2.1
+  },
+  {
+    "probe": "level_sent_heavy",
+    "model_requested": "claude-sonnet-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
+      }
+    },
+    "started_utc": "2026-11-21T18:48:40+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCes64br7zEN7H2MsK",
+      "container": null,
+      "content": [
+        {
+          "signature": "CAQStAYKEAgUGAI4AUIIdGhpbmtpbmcSDFx/NxpxSSRxguux+xoMp5N31rJUHT90MxYKIjCVGTbOT7f6AysXJZsm0eG2WO/yAMbFx7b1CAURRpgrB1wCzcxPkCCm4Y4dJkgCoXoq0QUlIRxLTsN0hrp3HtwEYoI8TfZXLSGoeKcAdrl3KpkQxwNSB9Mjty5aGmEfxYtZES7azHlMQcIrjQWOdewmRkb5AD6pqpaa9X3K7qzh5ZuZmZCPf7o/yhh3mrwNCZKpNkPXZ+zUrT9nHchuWXtQ6HbheSNUyZljowwqm5Fq7Z1OPFpf7sAab5XCMteN0H66zYDKk7cKqROEz5koV0645CexAo4UIcD0fe0HgkjuQOkYLEERW2YDSqiIwwSOzkLLwX/sene9XijL5iUx7v8OO0wyPe1TGyZRH5c/eBW9uYOMvJKNdseZ0CYJmo141kPh2nM5LbVvYaqShhIOrwJaWB+9Bo/EyuelUiI405VW8o9Dcxbqz9H3ASahlcDWc31QvaXn2GlhALVnmWzmV50ZU/lQak90hT9cOPEGDPqdwE0qNJA0tl/rzVznEkkFFo8fzDQ4Z2ap/rkMgHaQ4pF7I3ZO22BIl5tcMp6p/FhheaG78Nhwsoov5NuH7IIiedDJZH+vtUAXCrrHWsuNY9hFrjIH8Jzs3wF5BShnIqKDc5pYORkPPSPr4pEOGiaEZrEKXT6iFgVCc6gq2Ls4Xi+QDcTTTgT3fTCxktVSm5tZz6Wr46k4NncefCUltp7aLx0edW1kFqB7NkSFWRM4eLA4oMvPU+HWOdMQSQ4L9I43eCGj6RKua9qQP4KJhQU8OoKNOdCy8XoMENNdcLcQF55UIy/iQ/wj1PMxjrsOySOaR/OWSyxrIIWKdCI/xiJfT33IQoz73qU4jYkRy4hBOhEn5eqtXGm/sdMEjh+5oLQSvGowdJ1gwn5SFtmC/E34i1uH7Tb5sLVeLjsQAJOj3qzKlDVczaPTgS4JJyjlLwCvOSOonn7xWnbqiwDCWzK47hgIrrdPGs3bLtigTEdCV4+hwONlnHGFjYI6owo6H5e3k4lv1FuG/TuotoAAdU2xRhqBcgaCGAE=",
+          "thinking": "",
+          "type": "thinking"
+        },
+        {
+          "citations": null,
+          "text": "{\"answer\": 44, \"note\": \"r2(5^10)=4*(10+1)=44 by the sum-of-two-squares formula\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-sonnet-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 107,
+        "output_tokens": 181,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 134
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 2.18
+  }
+]

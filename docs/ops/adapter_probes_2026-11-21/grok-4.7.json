@@ -1,0 +1,253 @@
+[
+  {
+    "probe": "chat_level_sent",
+    "model_requested": "grok-4.7",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "high"
+    },
+    "started_utc": "2026-11-21T18:47:59+00:00",
+    "ok": true,
+    "raw": {
+      "id": "738360dc-9d9c-4f62-9d47-63fee31a97e5",
+      "object": "chat.completion",
+      "created": 1795286913,
+      "model": "grok-4.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"answer\": 391, \"note\": \"Seventeen times twenty-three\"}",
+            "reasoning_content": "I will calculate 17 multiplied by 23 and return the result as JSON with the specified format.",
+            "refusal": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1307,
+        "completion_tokens": 16,
+        "total_tokens": 1513,
+        "prompt_tokens_details": {
+          "text_tokens": 1307,
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "cached_tokens": 1152
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 190,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "cost_in_usd_ticks": 21220000
+      },
+      "system_fingerprint": "fp_c60958d81f66f847",
+      "service_tier": "default"
+    },
+    "latency_s": 38.58
+  },
+  {
+    "probe": "chat_level_omitted",
+    "model_requested": "grok-4.7",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "omitted"
+    },
+    "started_utc": "2026-11-21T18:48:38+00:00",
+    "ok": true,
+    "raw": {
+      "id": "94796cf3-647f-9108-94e4-0fbccc017e41",
+      "object": "chat.completion",
+      "created": 1795286916,
+      "model": "grok-4.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"answer\": 391, \"note\": \"seventeen times twenty-three\"}",
+            "refusal": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1307,
+        "completion_tokens": 16,
+        "total_tokens": 1378,
+        "prompt_tokens_details": {
+          "text_tokens": 1307,
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "cached_tokens": 1152
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 55,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "cost_in_usd_ticks": 13120000
+      },
+      "system_fingerprint": "fp_c60958d81f66f847",
+      "service_tier": "default"
+    },
+    "latency_s": 1.59
+  },
+  {
+    "probe": "temperature",
+    "model_requested": "grok-4.7",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "high",
+      "temperature": 0.3
+    },
+    "started_utc": "2026-11-21T18:48:39+00:00",
+    "ok": true,
+    "raw": {
+      "id": "7f403e5c-7a3e-9178-bb09-b66a0c1c87b4",
+      "object": "chat.completion",
+      "created": 1795286918,
+      "model": "grok-4.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"answer\": 391, \"note\": \"seventeen times twenty-three\"}",
+            "reasoning_content": "Calculating 17 × 23 and preparing a JSON response.",
+            "refusal": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1307,
+        "completion_tokens": 16,
+        "total_tokens": 1488,
+        "prompt_tokens_details": {
+          "text_tokens": 1307,
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "cached_tokens": 1280
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 165,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "cost_in_usd_ticks": 17800000
+      },
+      "system_fingerprint": "fp_c60958d81f66f847",
+      "service_tier": "default"
+    },
+    "latency_s": 2.4
+  },
+  {
+    "probe": "small_cap_heavy",
+    "model_requested": "grok-4.7",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "high",
+      "max_tokens": 300
+    },
+    "started_utc": "2026-11-21T18:48:42+00:00",
+    "ok": true,
+    "raw": {
+      "id": "045e5362-cc8c-4a06-984f-611e448c9997",
+      "object": "chat.completion",
+      "created": 1795286920,
+      "model": "grok-4.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"answer\": 44, \"note\": \"r_2(5^10)=4*11 via mod 4\"}",
+            "reasoning_content": "I need to count ordered pairs of integers (x, y) satisfying x² + y² = 5¹⁰.\n\nI'll use the formula r₂(n) = 4(d₁ − d₃), where d₁ counts divisors ≡ 1 (mod 4) and d₃ counts those ≡ 3 (mod 4).\n\nAll divisors of 5¹⁰ are odd and ≡ 1 (mod 4), so χ(d) = 1 for all 11 divisors. This gives r₂(5¹⁰) = 4 × 11 = 44. I am checking whether this count includes all ordered pairs with signs and orders.\n\nThe formula counts all ordered pairs with signs and order. A quick check on 5 = 1² + 2² confirms the count of 8. For 5¹⁰, all 11 divisors are ≡ 1 (mod 4), so the total is 44. This includes all representations, including cases where x equals y.",
+            "refusal": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1333,
+        "completion_tokens": 26,
+        "total_tokens": 4606,
+        "prompt_tokens_details": {
+          "text_tokens": 1333,
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "cached_tokens": 1152
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3247,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "cost_in_usd_ticks": 205760000
+      },
+      "system_fingerprint": "fp_a931a2f918",
+      "service_tier": "default"
+    },
+    "latency_s": 58.57
+  },
+  {
+    "probe": "chat_level_sent_heavy",
+    "model_requested": "grok-4.7",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "high"
+    },
+    "started_utc": "2026-11-21T18:49:40+00:00",
+    "ok": true,
+    "raw": {
+      "id": "936d3c35-24b0-4997-b6ae-8ba17dccad82",
+      "object": "chat.completion",
+      "created": 1795286986,
+      "model": "grok-4.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"answer\": 44, \"note\": \"four times the eleven divisors\"}",
+            "reasoning_content": "I need to count ordered integer pairs (x, y) such that x² + y² = 5¹⁰.\n\nI'll use the prime factorization of 5¹⁰ to count representations as sums of two squares.\n\nAll divisors of 5¹⁰ are congruent to 1 modulo 4. The formula gives 4(11 − 0) = 44 ordered pairs.\n\nI verified the formula for 5² = 25. The twelve ordered pairs are (±5, 0), (0, ±5), and (±3, ±4) and (±4, ±3). This confirms the count.\n\nI'm also checking the Gaussian integer factorization. Any Gaussian integer with norm 5¹⁰ must be a unit times (1+2i) raised to some power k and (1−2i) raised to 10−k, where k ranges from 0 to 10.\n\nThe norm check confirms the factorization. Each k value contributes four distinct representations from the four units. I am checking whether different k values could produce the same ordered pair, but the differing powers of the prime factors suggest they do not overlap.\n\nI considered factoring out the gcd first. Setting d = gcd(x, y) = 5^m gives (x/d)² + (y/d)² = 5^{10−2m} with gcd(x/d, y/d) = 1. I then checked what it means for a number to be a sum of two coprime squares, but this path seems to complicate the count rather than simplify it.\n\nThe common factor of x and y is 5 raised to the power of min(k, 10−k). This confirms the 44 ordered pairs are distinct and complete.\n\nI checked whether any ordered pair satisfies |x| = |y|. That would require x² = 5¹⁰/2, which is not an integer, so no such pair exists. I also confirmed that k and 10−k yield conjugate representations with identical absolute values, and that different k values produce distinct ordered pairs.\n\nI verified the count for 5³ = 125. Only two coprime representations exist: (5, 10) and (2, 11). Each contributes eight ordered pairs, giving 16 total. This confirms the formula 4(k+1) holds for smaller powers.",
+            "refusal": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1333,
+        "completion_tokens": 17,
+        "total_tokens": 7223,
+        "prompt_tokens_details": {
+          "text_tokens": 1333,
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "cached_tokens": 1280
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5873,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "cost_in_usd_ticks": 360860000
+      },
+      "system_fingerprint": "fp_a931a2f918",
+      "service_tier": "default"
+    },
+    "latency_s": 113.16
+  }
+]

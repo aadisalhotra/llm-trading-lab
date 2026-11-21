@@ -1,0 +1,282 @@
+[
+  {
+    "probe": "hard_level_sent_medium",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "medium"
+    },
+    "started_utc": "2026-11-21T18:52:40+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkUfChBhZYNx647onLgIZ0elQc8G",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"answer\":668,\"note\":\"Verified N=660 and M=8.\"}",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795287173,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 121,
+        "prompt_tokens": 129,
+        "total_tokens": 250,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 92,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 19.71
+  },
+  {
+    "probe": "hard_level_omitted",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "omitted"
+    },
+    "started_utc": "2026-11-21T18:53:00+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkUkEL8uYa94ju134PYpJPtLPkT4",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"answer\":668,\"note\":\"N = 660; M = 8.\"}",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795287178,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 154,
+        "prompt_tokens": 129,
+        "total_tokens": 283,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 124,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 5.25
+  },
+  {
+    "probe": "hard_tiny_cap",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "max_completion_tokens": 64
+    },
+    "started_utc": "2026-11-21T18:53:05+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkUpC4afh7kxgue87n9fq5VtE5cG",
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795287183,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 64,
+        "prompt_tokens": 129,
+        "total_tokens": 193,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 64,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 3.46
+  },
+  {
+    "probe": "responses_level_omitted_hard",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "responses",
+      "reasoning": "omitted"
+    },
+    "started_utc": "2026-11-21T18:53:08+00:00",
+    "ok": true,
+    "raw": {
+      "id": "resp_0770d98df5719826006b01e892edac87d297322c6679d050f6",
+      "created_at": 1795287187.0,
+      "error": null,
+      "incomplete_details": null,
+      "instructions": "Respond with one JSON object only: {\"answer\": <integer>, \"note\": \"<at most ten words>\"}. No prose, no code fences.",
+      "metadata": {},
+      "model": "gpt-6-astra",
+      "object": "response",
+      "output": [
+        {
+          "id": "rs_0770d98df5719826006b01e896114087d29fb54904894a3256",
+          "summary": [],
+          "type": "reasoning",
+          "content": [],
+          "encrypted_content": "gAAAAABrAeiWnbL8X6vUncq2hM5yFvSTfQ6rMhQs_rqG82roUv3Svoo3za4gpHpP1xOtYo3fWM2sCacubz7sdoCTWx3gkJfUrv0zPUcfDOMUjO7lAfd0f2lC8ZSWNOncer9OjmxhMj02UlkDjAX1208yxHXVIpEpMTE0jdolNuGC3fGpTzCCDtmMuBfobrbbgGuzZHYFWrHEfV1sJ_WNFs9koJzmPrzqUyH73myrismSeLpJlgu88GRWGzdOfT0RFvaPgXRf0YRBKaWvYVQmLwT9P8Uqnt8mTmqvF8ZRMmMfMgkNFJIqwmOnJR3Qm09j3m9ycwPNuYqAGW7KaT05S4ZCMjxsaEqGClTzmfxwwPw7_QX2xRuB_86GVzFHQFhk5jFI3O5cGbtyaj_hkw4bqmR7dagkvHJgY4I9-ymleIM6seb_5QDiATw1QupNM4xnPlGfqoL0BbxgNkd8Qdrjuzes0zN2PW8VkGrzHx9BEgy0ClRgu0aGo4ZlbNyvwFdFLqIuTHjTeizGmrkojK6ijfUBafu3ongAXJ2k91T6k0eYLb1Hf4VUL7xgCimqA7_Cv4IOtGkxX1p95S2WEMiy6Ea0ADndRyMxdXUKM92qVQLCvRYIAysKgsK2CxsEwzM3iVlKXzzs30iqM21NzSb0mu2oFECOiHeDheGPnaTzZJW0ZVGaqOSY_MWmxbULsxm6J9xFf3uekOblFgVzdedebn1OJnzE3hlJq4DO9DMimoS_xJ9GQdQnkTlN5yyUoTmjmtEgF7-XfWPmR2jMmCGdOqqEH6Gvp2CyPbOIl3HhXzn21dldgSmTErHSg5o5GNt1KJ0_aEZvtkvZk1N9FBTpD-Sq2RY-xu56unVjsKOelXDCHuvq9Yx-Ysk2nFYdCeyyL9lIew3Lcqap0GlXfYUSyrzNgmDCqlaMuXmn_pYDRN474wLHrCOOtiZGNE6LUjlH2mXyevTQEB_ovJtp2NUweMO53HBmANiFOzFfeOYOMf8U8BQYUYGIeUadSgOPwiCklVFPGk-KUP---YDFnVtiFoK_bA2wXZhUiKhzll7-SdOvjF7pRKjDOqXwHD5DVlVKnUElCIxA2zaxtD6oKFtgFfQDOMojkxMnScKzGVW89xA3xO5o76dy0GLFvqHiUZr2J2fLh3qK_arB3gt6P4bTUrVQxns6DUqKBYB11PPS7l7BmJmIvZB4NNomRGFoBsrfgqRJLe2Ejn6_IminSg2rZFPgNBM4NMjSuTB3F25uNTbMzQSpf3dB3w4KykbHlGIRygmCjZjZ5Hgg7idvvuS460KhWuWJlE8nWPMlOmUo0Q8FMKc9I8d0PxdS2OJVyI2lwWRgNYFBSMOyKOqOD6XvbDRI6A04gKZEtGY_aLMVt276Fv9vdGUHXwriqpF_i1ANhx07_-JRVY9mOh2hvcBnK3z7U4xGUBS-8g6kqDWKSCeurDmvR0-A0DoFGkbDqYh6lRu6oFBlGldrJ0EI3tmxhGNcMBxyYHM6IErHEu6bos-C-C7iaJ1YkFfw-sH6BFqCV9IlX0r7R6M5zg3t_PHH1NAkH9sdTFqEnW9WAwDfHyswTIfcL-xU5KWmNM_ojuBctDhqUb1QlnaxMmIMlg1YOKXcuCPvqkriWM3CJWXhD-kIxde6ETS5WlF1b-CtcrEq0gtdwd9bD9cwakGZhTrZNeRunx9gN4_gZl7L63FUb4NyhH_x4TBjcxjdz90V4N8-AXrs2zGvAcVDdV3A3m68VKu8C-fOBScJ4EYPa3BAdxuXMnq1TXC5LRlCsqqCdTSZKjLsVn2anRSOHMQgIJ5BQyKYMLuy9pbhAU0wus9TeDTcsriGHcUq5AMvzBxAgN03o6e-lXqSoVwb7G8zT3KOO9UowShnuKLMtr08HI3NEIvB2LtcGIWFd7QFMoyiSYxYSgx3vndJp9X5Fsqtnqg7t5CRTUsJ8uuJt7qfiJF5hCw4LvyNFJ7OsxkMvmnPubEZ6MDzxa0XlsiW69wWuGYbND8viB0bVVTKiFM2Fu8Zb8EefK6V2XHZp3IoDcZymF0NjsoYxCxiWfEqghW_E_jYjLyE43cnWFSZ3RqwrqDmSCF-WoZjteqxMjdPZkIXwIk3K5tiCIsJ-SJ1uSbFsk4eUZ-PAJa1aR3-FfxN2eeTxLfYutarTGHO0B-3NTJ63OoK9EA0VA1bpqLrAmxXKuZ1MnJ3_0Qe6Mw9iMagx-JrR995J-UEukw6UPSawOdctlC-zGO0O4HjOHPZjqPpNp7-dIh1swCt-sEqcfBc6qFUunH8an0nlVGpm-Wzn3DRGUan57OLZ7OMg-JWEXjwhWqURygGTd1S13XqgVq1-FJ66HkaVcHhdIN4iSQ9fP3DpNnljlfKrDqZgAOwNRnRPINGjqRS-yNhH9Qmnt68Oq-Sr_KZf54z_Ju_D37lqXFV16Z-juVjMgtXCT1o4XQNg_C-I1d59KtNTURUhgjqtuH3K2so4EEaLEDNjPloidVM-rEo2kssZlSv1uaDra1FHg-sDgjyNen6nX7FhRUyK0D3eoQtzaSWj--uNCNP_VhzTwCPP5u6uNTT11iAmH28wFwTYP3xSAjfEX4z0IIHuxMSCGRllWn90P9w7Y5_0iANlSOsLrdKmBm1uzGE8EjiZvYGOTR8AhIHwsmO9Jg8XnYrm-jFUACU3t5iLFHNwx-3QncUlhrZiSn_AKcpmfuBH2XW3rUdxGoU7NF2SNHTGF7-mQdJ1akoRvF3_KgANzUIM779jeDyItvzQC_JpGrScHOWksWWr_omrImrSMG41m-kHfgvuI_01BbrRp_6qjlegLZj2RjmquekRYTFgDShUf3rfqMg0KWoU-FlN5hCy9TtFnwjDBEl1nc8oIRMTDgpMb-uxUh8iLQr8zhUVM4zSNaVPBmlNVB1vUmxlv9TjrOPcHz1I1Le1E6TsqIp_mnG4lsYzaIpDzy50HKfPpJFb6g6Ze7KSN8BxiHi4pTPVcwgkhxpZavVcTwYrvSCB8kmtx1hsX-lVPqhz3px-HyUqZYLAuammpa8DLhG_mj3IqH29rGNjKx35xzfaFDJq1qtCjJPQwUChFie6tYzdcCnIusfu8E-SOncGK8INAf8JvBJeOBizoe8p-HT69rsvrd5KqMyRcoNfJvCLpS0yFRLEjUX-j_EJvHz_0dZyZCwkihJWpLkO0t5yJUEL9SMQw3-YM3ahRvJrHcfohrYg9Jcfu-Bp9vj417Qtl7QgvpOaJR_iZN8j4M0YGH5xPIVDRlPtT7lyg10NdzSajRq08eAX2kg1ZRott9IAdg1vokUOE4cCcFJY2UQzqg1E95AtcmFPk8fc_nYI2Qk7biKN8WJLhO70y5PSjHQVFxijGg9dzEanOwwj9H4ZFi4-Bg6tizjbUnjDTv-CbhoUPkacmjIq2p-vOMcMPeIO2yfFTEb8tj5n1sX7DXuhBHYcz4lFRT3FSGQaHY5j7LSP0UWsEeKBBfd3Cdd3eMZcpB__V6PgzC1klPzXhjDKmovdPIFmTb0DB1XuoYDcKCGyXhwAVPKbhIKl2boSMxbRAapPUVvc6i0UFFnu1roKAfe2wNtO41aZto36fA0XZu7XpyJrcRpJmArrNgJnkkcawyO7W_qHjzGI9xrUkI0LxGzdLPcjJHxhZDkgu0E5tvFCmSTgN45eMOWl7zjmAcK8PmDt8Ep_8MF3zx1ij1sip6CJ7xMU0EXkeSZipDEJmvtPFKb",
+          "status": null
+        },
+        {
+          "id": "msg_0770d98df5719826006b01e896283087d28e03d73b186a29e6",
+          "content": [
+            {
+              "annotations": [],
+              "text": "{\"answer\":668,\"note\":\"Verified N = 660 and M = 8.\"}",
+              "type": "output_text",
+              "logprobs": []
+            }
+          ],
+          "role": "assistant",
+          "status": "completed",
+          "type": "message",
+          "phase": "final_answer"
+        }
+      ],
+      "parallel_tool_calls": true,
+      "temperature": 1.0,
+      "tool_choice": "auto",
+      "tools": [],
+      "top_p": 0.98,
+      "background": false,
+      "completed_at": 1795287190.0,
+      "conversation": null,
+      "max_output_tokens": 16384,
+      "max_tool_calls": null,
+      "previous_response_id": null,
+      "prompt": null,
+      "prompt_cache_key": null,
+      "prompt_cache_retention": "24h",
+      "reasoning": {
+        "effort": "medium",
+        "generate_summary": null,
+        "summary": null,
+        "context": "all_turns",
+        "mode": "standard"
+      },
+      "safety_identifier": null,
+      "service_tier": "default",
+      "status": "completed",
+      "text": {
+        "format": {
+          "type": "text"
+        },
+        "verbosity": "medium"
+      },
+      "top_logprobs": 0,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 129,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 131,
+        "output_tokens_details": {
+          "reasoning_tokens": 106
+        },
+        "total_tokens": 260
+      },
+      "user": null,
+      "access_programs": {
+        "cyber": "standard"
+      },
+      "billing": {
+        "payer": "openai"
+      },
+      "frequency_penalty": 0.0,
+      "image": {
+        "context_compression": "disabled"
+      },
+      "input_transformations": [],
+      "moderation": null,
+      "presence_penalty": 0.0,
+      "store": true,
+      "tool_usage": {
+        "image_gen": {
+          "input_tokens": 0,
+          "input_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "total_tokens": 0
+        },
+        "web_search": {
+          "num_requests": 0
+        }
+      }
+    },
+    "latency_s": 4.08
+  }
+]

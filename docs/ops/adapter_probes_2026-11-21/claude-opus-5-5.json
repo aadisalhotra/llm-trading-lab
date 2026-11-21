@@ -1,0 +1,195 @@
+[
+  {
+    "probe": "level_sent",
+    "model_requested": "claude-opus-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      }
+    },
+    "started_utc": "2026-11-21T18:48:01+00:00",
+    "ok": false,
+    "error_type": "APIConnectionError",
+    "error": "Connection error.",
+    "latency_s": 21.13
+  },
+  {
+    "probe": "level_omitted",
+    "model_requested": "claude-opus-5-5",
+    "sent": {
+      "thinking": "omitted",
+      "output_config": "omitted"
+    },
+    "started_utc": "2026-11-21T18:48:22+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCQNCr3tUoXnGLruyV",
+      "container": null,
+      "content": [
+        {
+          "citations": null,
+          "text": "{\"answer\": 391, \"note\": \"17 times 23 equals 391\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 67,
+        "output_tokens": 26,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 15.77
+  },
+  {
+    "probe": "temperature",
+    "model_requested": "claude-opus-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      },
+      "temperature": 0.3
+    },
+    "started_utc": "2026-11-21T18:48:37+00:00",
+    "ok": false,
+    "error_type": "BadRequestError",
+    "error": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking'}, 'request_id': 'req_011ChGaCSwF3JD1W7AEA9ZVd'}",
+    "error_body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking\"},\"request_id\":\"req_011ChGaCSwF3JD1W7AEA9ZVd\"}",
+    "latency_s": 0.12
+  },
+  {
+    "probe": "small_cap_heavy",
+    "model_requested": "claude-opus-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      },
+      "max_tokens": 300
+    },
+    "started_utc": "2026-11-21T18:48:38+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCTZwPQN3Vhq176j5V",
+      "container": null,
+      "content": [
+        {
+          "signature": "CAQSowUKEAgUGAI4AUIIdGhpbmtpbmcSDIbNaR0s9oeuJFybRRoMKMXjNH0jaUwpKHOCIjCy3o+LCgDdQJHPl4N/gUBqGbZ901g/MegMnpYjTUPcxrJj3pNtXRgBhpQcgr5qmNUqwAQLkxvlVYZhmqALikLODOdacIW0l/nf27BeF/P9dqhurbzQiofCLNF4ADf/O7F3OCx+xf85aeyypvgxR6xr3zp5B7C3hnoEUUdA8Iju0HTWO69/FDIlrOoBszmdFGinqpC9lbSTw1fvKh77uYJwPENhfM8OL1fPKfHcehudDGMb3BxqQqG0Y5KU6Is/Ov92kq/9o7jBlBvRHrAx56qRSpSqNWA17h34wVwnAg+wa4OsDR43dE6q3+kwVl0LOii1apflAiTq0yp/7p0sdKb5/dKt+dM0Y0y1t+D3VhbJCuig+yN2yVDI8nNlvd+QeNJVdh6fVx7XvSi3Xtmoztn1bMxQnOaxwJv7JcnIiYlPwauROGbWSVV/xdLP91JbpE/xDZtL0+vPmvhNSGId3cxjC6Ri90IdYEBj+h8SZE6dGkpR4WpZEsDtj2AN+amOEkXyDp6FKEpkrs4UEWyUmDCjyFuoSgk4tmdp/5msgBX+ZyJ/9YsGTFMuw+usNT892GjBJ2AwpR6jGCQtC6//+rydzkCAM71piR81OJhZ3OxXVglNbBcFHgvCV17Y2BRz/hF8Ch9n7fukE2YZVaQ1o/I3xHt1a0bOq7QP3MglkVqkjjEfnExNWytPIyen39mZF0ZDOVdcEKXPpJfkCS1lhu/1N3iMdKL9NoX/YDJ5+kkCBjlcFNjiwGc5J7oWGpWLJ5LeUvfJ92oplV/1sm0xW1mIiV5zOX5x951A/4iR5Jb516Tafe+gjv7FvJPfjmHejsAyfzwYAQ==",
+          "thinking": "",
+          "type": "thinking"
+        },
+        {
+          "citations": null,
+          "text": "{\"answer\": 44, \"note\": \"r2(n)=4(d1-d3); 5^10 has 11 divisors\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 107,
+        "output_tokens": 103,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 61
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 1.91
+  },
+  {
+    "probe": "level_sent_heavy",
+    "model_requested": "claude-opus-5-5",
+    "sent": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      }
+    },
+    "started_utc": "2026-11-21T18:48:40+00:00",
+    "ok": true,
+    "raw": {
+      "id": "msg_011ChGaCbiphXNfpmPWPYKxq",
+      "container": null,
+      "content": [
+        {
+          "signature": "CAQSowUKEAgUGAI4AUIIdGhpbmtpbmcSDJh1hLFCgy9Q+wDUnRoMISMn+pxKoLHCbSsTIjB9qCJGF1+VpU7wr2mnyIGIAMi/mBxoBXVbVFESJZatDZ0f9EpaWbi1zozpJmRfZ/UqwARMLCP45fyfCUjywysy5OEQvbgOhuwXjYeC3nVjkIiup6wXiywVJ9WoDLC7iTYh8Q8Ij/PbY8krdCWEaTquT4qL+ZleOIVAWbvt/uQyo/KR/B7xCLpm+Bk1bSJ/u5UUbv2MQR9N+yDQY4J/b5+lgza9WNZbaYJvFzr/+t+pjofxxKFnITVIrvX532LAvX3Z7kVjHZNQB1fznOZgCUpeWDEfUBcV5MDimfDqLd6V9k1a224lCsYPzab5CFepwo9VEEXc0Ih9Q0e4YTXFCqYDv81rmZtRmXUNETQSHm9yaFI6/DEUkohTK7BlUQyClLv9D92wBVOWF5E2js8dN7m3jsgVIfieBqdbUuhhOZNWpCsI+IAEi8wwM2R3VvQMxekT6K+zBGMMfWHS9MHz9CM7s6LkPpBForA2Sx+cfLUawBce5twm1iklJu21HiTQh3diwdSAAerPs4d0t5MfIC/Wtr0olM453AB98znamSol4Z4VuzZUtqLKngFQ53VDM1Ebsz8VgPua1VP26MhcuxDAtrBFV7xyeAsaUEOHGsDM/WvDQJMjTYxSOofX/AWLgNZtV8WLOd+GZDjx7WHkzvBJVkScVABXIcLjaihmffTSeUAK8eiIkK147c1bZzE5FwutZnyCHz1PyO9iEo9SNpFFPpxVLhsFbh2A5lswK98FGhGpTFc/FAWplnQX98OCZcJQ1dJoe8i3xaPP7ZkDRjpk49iXhCbnRCZZ90ZoA5RwWR+Wcm2gGu/9sOcS1zO7k3m0C20YAQ==",
+          "thinking": "",
+          "type": "thinking"
+        },
+        {
+          "citations": null,
+          "text": "{\"answer\": 44, \"note\": \"r2(n)=4(d1-d3); 5^10 has 11 divisors\"}",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-5-5",
+      "role": "assistant",
+      "stop_details": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "type": "message",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": "global",
+        "input_tokens": 107,
+        "output_tokens": 103,
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 61
+        },
+        "speed": "standard"
+      },
+      "diagnostics": null
+    },
+    "latency_s": 1.95
+  }
+]

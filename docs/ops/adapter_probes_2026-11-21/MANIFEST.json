@@ -1,0 +1,639 @@
+{
+  "generated_utc": "2026-11-21T18:51:34+00:00",
+  "purpose": "Hub 2026-11-21 item 2: refreshed-cohort adapter probes. Induced tests; enter no series. Synthetic input, not the calibration set. No orders. No server-side fallback field sent.",
+  "system": "Respond with one JSON object only: {\"answer\": <integer>, \"note\": \"<at most ten words>\"}. No prose, no code fences.",
+  "inputs": {
+    "short": "What is 17 * 23? Output json only.",
+    "heavy": "How many ordered pairs of integers (x, y) satisfy x^2 + y^2 = 5^10? Reason carefully and check your count before answering. Output json only.",
+    "hard": "Let N be the number of ordered pairs of integers (x, y) with x^2 + y^2 = 5^10 * 13^4 * 17^2. Also let M be the number of those pairs with x > 0 and y > 0 and gcd(x, y) = 1. Work it out step by step internally and verify both counts. Output json with answer = N + M."
+  },
+  "small_cap": 300,
+  "files": [
+    {
+      "file": "claude-opus-5-5.json",
+      "bytes": 7276,
+      "sha256": "8227309dfba216aaf4141eea4fc260f4609f000da0b612a7096d5c7291abfb03"
+    },
+    {
+      "file": "claude-sonnet-5-5.json",
+      "bytes": 6758,
+      "sha256": "f7028bcc6af72bf5d1c44bb57531413ede3e02fe63d78a7f5b39a211ec028f45"
+    },
+    {
+      "file": "gpt-6-astra.json",
+      "bytes": 11142,
+      "sha256": "7e98c6f617e9a4a267ca0eea39862f225b6a5aeeff142b8af9cd88ecb936e5a7"
+    },
+    {
+      "file": "gemini-4-argon.json",
+      "bytes": 20488,
+      "sha256": "10dd262d5d5d101ba4eee24f9209125af24e5bcb9f4f3c863bb6c58961da5662"
+    },
+    {
+      "file": "grok-4.7.json",
+      "bytes": 9548,
+      "sha256": "7cc3424c715c0f5bc999e41ffeb7076b35adfe7b816c55fcea7734dbe6fff462"
+    },
+    {
+      "file": "claude-sonnet-5-5_round2.json",
+      "bytes": 9386,
+      "sha256": "a7ad69bd754194a07b55ae01d7c285a1ebbbe5cc1cdb2a9099c932b765190ae0"
+    },
+    {
+      "file": "claude-opus-5-5_round2.json",
+      "bytes": 9229,
+      "sha256": "8cec6749ff0fc0ba5508b71140a320856ba8b3555ab4aab6d5e30da62743efa5"
+    },
+    {
+      "file": "gemini-4-argon_round2.json",
+      "bytes": 9888,
+      "sha256": "474bb6bb2929dc231ad77674decad698be5e66dc1592f5dc2f0ac79215334c82"
+    },
+    {
+      "file": "gpt-6-astra_round2.json",
+      "bytes": 11255,
+      "sha256": "714d0939458e5b5eb7107332a84cc4eea02e1bbee4a44bff1ddaed9bce606994"
+    },
+    {
+      "file": "grok-4.7_round2.json",
+      "bytes": 35588,
+      "sha256": "7723c1532ed29666e3bbc67bed60cdd7c0ab3f473eb18390d0fb6a75af0df322"
+    }
+  ],
+  "summary": {
+    "claude-opus-5-5": [
+      {
+        "probe": "level_sent",
+        "ok": false,
+        "latency_s": 21.13,
+        "error": "Connection error.",
+        "cost_usd": 0.0
+      },
+      {
+        "probe": "level_omitted",
+        "ok": true,
+        "latency_s": 15.77,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 67,
+        "output": 26,
+        "reasoning": 0,
+        "blocks": [
+          "text"
+        ],
+        "cost_usd": 0.00079
+      },
+      {
+        "probe": "temperature",
+        "ok": false,
+        "latency_s": 0.12,
+        "error": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking'}, 'request_id': 're",
+        "cost_usd": 0.0
+      },
+      {
+        "probe": "small_cap_heavy",
+        "ok": true,
+        "latency_s": 1.91,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 107,
+        "output": 103,
+        "reasoning": 61,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00249
+      },
+      {
+        "probe": "level_sent_heavy",
+        "ok": true,
+        "latency_s": 1.95,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 107,
+        "output": 103,
+        "reasoning": 61,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00249
+      }
+    ],
+    "claude-sonnet-5-5": [
+      {
+        "probe": "level_sent",
+        "ok": false,
+        "latency_s": 21.15,
+        "error": "Connection error.",
+        "cost_usd": 0.0
+      },
+      {
+        "probe": "level_omitted",
+        "ok": true,
+        "latency_s": 16.28,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 67,
+        "output": 26,
+        "reasoning": 0,
+        "blocks": [
+          "text"
+        ],
+        "cost_usd": 0.00039
+      },
+      {
+        "probe": "temperature",
+        "ok": false,
+        "latency_s": 0.13,
+        "error": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` may only be set to 1 when thinking is enabled or in adaptive mode. Please consult our documentation at https://platform.claude.com/docs/en/build-with-claude/extended-thinking'}, 'request_id': 're",
+        "cost_usd": 0.0
+      },
+      {
+        "probe": "small_cap_heavy",
+        "ok": true,
+        "latency_s": 2.1,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 107,
+        "output": 181,
+        "reasoning": 0,
+        "blocks": [
+          "text"
+        ],
+        "cost_usd": 0.00202
+      },
+      {
+        "probe": "level_sent_heavy",
+        "ok": true,
+        "latency_s": 2.18,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 107,
+        "output": 181,
+        "reasoning": 134,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00202
+      }
+    ],
+    "gpt-6-astra": [
+      {
+        "probe": "chat_level_omitted",
+        "ok": true,
+        "latency_s": 39.28,
+        "model": "gpt-6-astra",
+        "finish": "stop",
+        "input": 52,
+        "output": 35,
+        "reasoning": 7,
+        "text": "{\"answer\":391,\"note\":\"17 times 23 equals 391.\"}",
+        "cost_usd": 0.00227
+      },
+      {
+        "probe": "responses_level_omitted",
+        "ok": true,
+        "latency_s": 2.65,
+        "model": "gpt-6-astra",
+        "finish": "completed",
+        "reasoning_reported": {
+          "effort": "medium",
+          "generate_summary": null,
+          "summary": null,
+          "context": "all_turns",
+          "mode": "standard"
+        },
+        "input": 52,
+        "output": 32,
+        "reasoning": 12,
+        "cost_usd": 0.00212
+      },
+      {
+        "probe": "temperature",
+        "ok": false,
+        "latency_s": 0.46,
+        "error": "Error code: 400 - {'error': {'message': \"Unsupported value: 'temperature' does not support 0.3 with this model. Only the default (1) value is supported.\", 'type': 'invalid_request_error', 'param': 'temperature', 'code': 'unsupported_value'}}",
+        "cost_usd": 0.0
+      },
+      {
+        "probe": "small_cap_heavy",
+        "ok": true,
+        "latency_s": 6.68,
+        "model": "gpt-6-astra",
+        "finish": "stop",
+        "input": 78,
+        "output": 222,
+        "reasoning": 182,
+        "text": "{\"answer\":44,\"note\":\"Sum-of-two-squares formula gives 4 × (10 + 1) = 44.\"}",
+        "cost_usd": 0.01188
+      },
+      {
+        "probe": "chat_level_omitted_heavy",
+        "ok": true,
+        "latency_s": 4.01,
+        "model": "gpt-6-astra",
+        "finish": "stop",
+        "input": 78,
+        "output": 104,
+        "reasoning": 63,
+        "text": "{\"answer\":44,\"note\":\"Sum-of-two-squares formula: 4(10+1)=44, including signs and order.\"}",
+        "cost_usd": 0.00598
+      }
+    ],
+    "gemini-4-argon": [
+      {
+        "probe": "level_sent",
+        "ok": true,
+        "latency_s": 40.62,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 147,
+        "output": 31,
+        "reasoning": null,
+        "total": 178,
+        "cost_usd": 0.0006
+      },
+      {
+        "probe": "level_omitted",
+        "ok": true,
+        "latency_s": 3.31,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 147,
+        "output": 31,
+        "reasoning": null,
+        "total": 178,
+        "cost_usd": 0.0006
+      },
+      {
+        "probe": "temperature",
+        "ok": true,
+        "latency_s": 3.69,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 147,
+        "output": 31,
+        "reasoning": null,
+        "total": 178,
+        "cost_usd": 0.0006
+      },
+      {
+        "probe": "small_cap_heavy",
+        "ok": true,
+        "latency_s": 4.45,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 172,
+        "output": 28,
+        "reasoning": 156,
+        "total": 356,
+        "cost_usd": 0.00218
+      },
+      {
+        "probe": "level_sent_heavy",
+        "ok": true,
+        "latency_s": 7.46,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 172,
+        "output": 39,
+        "reasoning": 127,
+        "total": 338,
+        "cost_usd": 0.002
+      },
+      {
+        "probe": "level_omitted_heavy",
+        "ok": true,
+        "latency_s": 6.65,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 172,
+        "output": 39,
+        "reasoning": 91,
+        "total": 302,
+        "cost_usd": 0.00164
+      }
+    ],
+    "grok-4.7": [
+      {
+        "probe": "chat_level_sent",
+        "ok": true,
+        "latency_s": 38.58,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1307,
+        "output": 16,
+        "reasoning": 190,
+        "text": "{\"answer\": 391, \"note\": \"Seventeen times twenty-three\"}",
+        "cost_usd": 0.00385
+      },
+      {
+        "probe": "chat_level_omitted",
+        "ok": true,
+        "latency_s": 1.59,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1307,
+        "output": 16,
+        "reasoning": 55,
+        "text": "{\"answer\": 391, \"note\": \"seventeen times twenty-three\"}",
+        "cost_usd": 0.00304
+      },
+      {
+        "probe": "temperature",
+        "ok": true,
+        "latency_s": 2.4,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1307,
+        "output": 16,
+        "reasoning": 165,
+        "text": "{\"answer\": 391, \"note\": \"seventeen times twenty-three\"}",
+        "cost_usd": 0.0037
+      },
+      {
+        "probe": "small_cap_heavy",
+        "ok": true,
+        "latency_s": 58.57,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1333,
+        "output": 26,
+        "reasoning": 3247,
+        "text": "{\"answer\": 44, \"note\": \"r_2(5^10)=4*11 via mod 4\"}",
+        "cost_usd": 0.0223
+      },
+      {
+        "probe": "chat_level_sent_heavy",
+        "ok": true,
+        "latency_s": 113.16,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1333,
+        "output": 17,
+        "reasoning": 5873,
+        "text": "{\"answer\": 44, \"note\": \"four times the eleven divisors\"}",
+        "cost_usd": 0.03801
+      }
+    ],
+    "claude-sonnet-5-5_round2": [
+      {
+        "probe": "level_sent",
+        "ok": true,
+        "latency_s": 16.39,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 67,
+        "output": 25,
+        "reasoning": 0,
+        "blocks": [
+          "text"
+        ],
+        "cost_usd": 0.00038
+      },
+      {
+        "probe": "hard_level_sent",
+        "ok": true,
+        "latency_s": 3.71,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 166,
+        "output": 321,
+        "reasoning": 281,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00354
+      },
+      {
+        "probe": "hard_level_omitted",
+        "ok": true,
+        "latency_s": 4.1,
+        "model": "claude-sonnet-5-5",
+        "finish": "end_turn",
+        "input": 166,
+        "output": 355,
+        "reasoning": 315,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00388
+      },
+      {
+        "probe": "hard_tiny_cap",
+        "ok": true,
+        "latency_s": 1.53,
+        "model": "claude-sonnet-5-5",
+        "finish": "max_tokens",
+        "input": 166,
+        "output": 64,
+        "reasoning": 64,
+        "blocks": [
+          "thinking"
+        ],
+        "cost_usd": 0.00097
+      }
+    ],
+    "claude-opus-5-5_round2": [
+      {
+        "probe": "level_sent",
+        "ok": true,
+        "latency_s": 15.86,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 67,
+        "output": 26,
+        "reasoning": 0,
+        "blocks": [
+          "text"
+        ],
+        "cost_usd": 0.00079
+      },
+      {
+        "probe": "hard_level_sent",
+        "ok": true,
+        "latency_s": 4.3,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 166,
+        "output": 298,
+        "reasoning": 259,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00662
+      },
+      {
+        "probe": "hard_level_omitted",
+        "ok": true,
+        "latency_s": 4.84,
+        "model": "claude-opus-5-5",
+        "finish": "end_turn",
+        "input": 166,
+        "output": 325,
+        "reasoning": 282,
+        "blocks": [
+          "thinking",
+          "text"
+        ],
+        "cost_usd": 0.00716
+      },
+      {
+        "probe": "hard_tiny_cap",
+        "ok": true,
+        "latency_s": 2.93,
+        "model": "claude-opus-5-5",
+        "finish": "max_tokens",
+        "input": 166,
+        "output": 64,
+        "reasoning": 64,
+        "blocks": [
+          "thinking"
+        ],
+        "cost_usd": 0.00194
+      }
+    ],
+    "gemini-4-argon_round2": [
+      {
+        "probe": "hard_level_sent",
+        "ok": true,
+        "latency_s": 16.19,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 226,
+        "output": 28,
+        "reasoning": 165,
+        "total": 419,
+        "cost_usd": 0.00238
+      },
+      {
+        "probe": "hard_level_omitted",
+        "ok": true,
+        "latency_s": 3.56,
+        "model": "gemini-4-argon",
+        "finish": "STOP",
+        "input": 226,
+        "output": 28,
+        "reasoning": null,
+        "total": 254,
+        "cost_usd": 0.00073
+      },
+      {
+        "probe": "hard_tiny_cap",
+        "ok": true,
+        "latency_s": 12.61,
+        "model": "gemini-4-argon",
+        "finish": "MAX_TOKENS",
+        "input": 226,
+        "output": 3,
+        "reasoning": 61,
+        "total": 290,
+        "cost_usd": 0.00109
+      }
+    ],
+    "gpt-6-astra_round2": [
+      {
+        "probe": "hard_level_sent_medium",
+        "ok": true,
+        "latency_s": 19.71,
+        "model": "gpt-6-astra",
+        "finish": "stop",
+        "input": 129,
+        "output": 121,
+        "reasoning": 92,
+        "text": "{\"answer\":668,\"note\":\"Verified N=660 and M=8.\"}",
+        "cost_usd": 0.00734
+      },
+      {
+        "probe": "hard_level_omitted",
+        "ok": true,
+        "latency_s": 5.25,
+        "model": "gpt-6-astra",
+        "finish": "stop",
+        "input": 129,
+        "output": 154,
+        "reasoning": 124,
+        "text": "{\"answer\":668,\"note\":\"N = 660; M = 8.\"}",
+        "cost_usd": 0.00899
+      },
+      {
+        "probe": "hard_tiny_cap",
+        "ok": true,
+        "latency_s": 3.46,
+        "model": "gpt-6-astra",
+        "finish": "length",
+        "input": 129,
+        "output": 64,
+        "reasoning": 64,
+        "text": "",
+        "cost_usd": 0.00449
+      },
+      {
+        "probe": "responses_level_omitted_hard",
+        "ok": true,
+        "latency_s": 4.08,
+        "model": "gpt-6-astra",
+        "finish": "completed",
+        "reasoning_reported": {
+          "effort": "medium",
+          "generate_summary": null,
+          "summary": null,
+          "context": "all_turns",
+          "mode": "standard"
+        },
+        "input": 129,
+        "output": 131,
+        "reasoning": 106,
+        "cost_usd": 0.00784
+      }
+    ],
+    "grok-4.7_round2": [
+      {
+        "probe": "hard_level_sent",
+        "ok": true,
+        "latency_s": 177.17,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1385,
+        "output": 18,
+        "reasoning": 10000,
+        "text": "{\"answer\": 668, \"note\": \"N=660 and M=8\"}",
+        "cost_usd": 0.06288
+      },
+      {
+        "probe": "hard_level_omitted",
+        "ok": true,
+        "latency_s": 283.06,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1385,
+        "output": 17,
+        "reasoning": 16685,
+        "text": "{\"answer\": 668, \"note\": \"N=660 M=8\"}",
+        "cost_usd": 0.10298
+      },
+      {
+        "probe": "hard_tiny_cap",
+        "ok": true,
+        "latency_s": 177.51,
+        "model": "grok-4.7",
+        "finish": "stop",
+        "input": 1385,
+        "output": 18,
+        "reasoning": 9432,
+        "text": "{\"answer\": 668, \"note\": \"N=660 primitive M=8\"}",
+        "cost_usd": 0.05947
+      }
+    ]
+  },
+  "total_cost_usd": 0.3944,
+  "round2_utc": "2026-11-21T19:03:17+00:00",
+  "tiny_cap": 64,
+  "grok_cost_reported_by_xai_usd": 0.2816
+}

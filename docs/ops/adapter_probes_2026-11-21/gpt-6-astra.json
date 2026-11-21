@@ -1,0 +1,298 @@
+[
+  {
+    "probe": "chat_level_omitted",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "reasoning_effort": "omitted",
+      "response_format": {
+        "type": "json_object"
+      }
+    },
+    "started_utc": "2026-11-21T18:48:00+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkQWPgTKHm3xVtGOWdDvx7FjaShQ",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"answer\":391,\"note\":\"17 times 23 equals 391.\"}",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795286916,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 35,
+        "prompt_tokens": 52,
+        "total_tokens": 87,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 7,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 39.28
+  },
+  {
+    "probe": "responses_level_omitted",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "responses",
+      "reasoning": "omitted"
+    },
+    "started_utc": "2026-11-21T18:48:40+00:00",
+    "ok": true,
+    "raw": {
+      "id": "resp_0b63763fa8ab1785006b01e786612087d2836990032bfc9091",
+      "created_at": 1795286918.0,
+      "error": null,
+      "incomplete_details": null,
+      "instructions": "Respond with one JSON object only: {\"answer\": <integer>, \"note\": \"<at most ten words>\"}. No prose, no code fences.",
+      "metadata": {},
+      "model": "gpt-6-astra",
+      "object": "response",
+      "output": [
+        {
+          "id": "rs_0b63763fa8ab1785006b01e788214087d2bc086137af484835",
+          "summary": [],
+          "type": "reasoning",
+          "content": [],
+          "encrypted_content": "gAAAAABrAeeIKVlZXw5axCnrlnAGD3kCYBfooOMqhQ6XyWIoiM2WlYAr6xAH9eB6HlNcO10ymAg3pL8-Sct171k4C3xpGdL-PxYrMqUQIPNIdcO6VENglVnd0VHG3TafNGY1u9km0uFxTdRTqGFC5dR21KR2JOO1xWAz8zG9DZVvi_5gOl8LNoct_szrCfffGXWKZcljxjSgpzzrZN0RspGTUqNUOFno1d4XZzlug9H6Ql192qWVkY5Cu992oh81NzkFKIVcL-rt50xTMku4zt1oLrwlyWPbqAB1C0lSlOS99PHGefF9i6qAMOdN8KRt461MgRo-c1rKmMw6ai-ZYVAzmnx4_IsgcKesjnRlOkLUCbl18FexXUcdXQGOmHV9r7KvNKWHwJyE3yHj0EkZBckChFTFEkjAh1TU7gIN8_hqhdWE_4LAWOux4d_lZuZ_DATLcebawu6iuaFD5ZA0_OR9jTQWPmJioqCjAGW2D0AxmrHtcEpHJrB-SdINz19XAb165CYGntZ6l-UW1PEI9GtQ3bEO5Oudn1oMSqtAEU_08UhEWh-T65H8ie0EnqHTIW4gnxUkzgbdXFXexZ1eO4-xgJy44cWFol32To8qHqgaRIxQbs86YnVIGZtGtZQfx5NAVsZgV98Z_ENE4FiH-WO17InrLbF0_594dU1d5mpFYISBF9tenFihlR26xanxL92sYHCZWmzx4JLAl6QdS0tN-EgO2qJXDcIsZ99dGVG_Tfw9aJ0siezb1Tdzq-O0-_bWzNkXhIKXtDhPc1FKDHwBcHxUKltWIbM00Outz5l9IX1IeXKAPXkVYpbVwUR4glLqk4kQPgor6Gds3qh8vHW1iG6OT6r4L4WuwkYsptxnkvj5zafmNt_2NtpistGILgo5VMgwWJ2WUonkgg8IGVIDcPI4BvEaK5m7gWtlsletfGZ6l1Gu-5XMAdk0zmHaLXG9QVtaTbOuQX23lkh6huwrNuFZLjxYrnp8J81OHy8RKG41KmP7YUNE9GuYOaSkJnEXweaJHGXEDgwW0Mp5vOWHQxAW1kBVBzf2WeVfNAo4WaGZwo8u0LOgidQK9MWwZ6_bRwuisT8SASrR8Ii-1WfUemxAO9unymvqhwuY7M8qQWJCeuqz1V8RaOAqrm5tqJtiYBgUrwn6Ef_XNpACGzHHLFYKCHVcv2N5clH6t6GuZidwbuR3AXzrLUhBCW3ALXgi6sYLPLzPHkyD2RlO4I2GMt_CiGUtv-QE-XfFp9PlQPif2Z1iPpejAn1fz3YfI4qS7dlKpOzbLQPGq9sxU2PmqH7Ec46gVt2VmY-Yu3XoWK96xp9P122V9oYiUjvs4lXBhkte-P13ZZ2JPKNnKTOab1kiHkW_Wp2xC-Q4006ca2PNpYBwFsU-pcagGafv2gCCwB9KoWlAo65lM11G8oQPAhmkUEnvDton11L-mfC0TWWFvD6dX334nWab-fLuVjLSfrcNJ1TA5DN35y2rwTkOiQxo1qPbnL1prx4v7Y5RprG7DH63WrsVI6vC8aU1bjDxqOGUi_dXEieuwqhCjtPE1DeBPldT3Q79-5tRJmpdheWDWL02A8uCSqUOUDkDY4-_mq9v4B1mBQlQ9Wbvie2_spTxYU1_8I9ENlG0Q8cbnS9GgM1Ct4JSL6VKn_fkXSRkQys7v100WBWTHPqRfTlLWKIbR7m3DLCt6oXDe1rBd0CD6uqGzLQxRwW84S3l1KRRsWwy7G0sfnQFoh-6A4L2QIAzP_bAqaMX_S4EOtl-q4OOQuxsH8KTVSbOzeEiaNzxSlTdI7LAkTmZKSXMdPJ0cwtnjqlTkckWSKqjvfjtH61_5bYzs7zjWvefR6UP_Umd8Jl3qybaiPq7F-EYvFR5mtvwwC40n55XMOHJ7bBi1W03zHs7XJUKzeAuSjtkFAqWRRBU3sjkkUjbtWrfWxcHKbgBh-DlXYVhjxyZipjqKrs4kz85VdPr2mdfsNycUcUvJzWcljsFEWtoAXQt2jnnqiyMFyGuAjvhlG629huI26GJxrQuM1NFx_40cyZma59wfeNspUURRn2c023rZoMdLlc1sJF8ZUzBU66aVUy22cNrHKCLBlWouOxXzFwoFMsy82D_h7Nfjmzut63JKqzEPEx1nMqm6zDnNXAWSLzVS_5MSitNqE2Xtolxa_BpecN7UXBLJ2_hyB1Jy9T544usdugUycuOO-m6GQMovkF_WuTEJD_VLDDfO2AYtWe2ntV1Y_lPasjU7Nd41Zy_z8qhIGLFDJ5RnO8D1yHFzX3yZeEmfKzHNOHZxCzBHYtcQvDkiflExlZsG0SSjEemvPaoEtnm5SDGfCnW0rcyiRZgZHwK8aLTSDEUCMBWoC6U0OQ7aG6ADLovhFx5H_VDTio4SF10AHj3_AtqnbP-lAfqO4QV3vLn0RH0BPFudE4xvet951o1TcLnqV1Ha1gTPztU5hJuzleTUNyiDo_ESPQ0bncLjanesQ72oENiN1lODfssY66M7eJ8pN4Z2PMj4da7Iw4hfDWV2tKzGrc9y1EsiDs69bsguaDvTEHXJA9iUGikkkGxbY4sYYAjlvS_VzqS7QlVw8QUMzmDOd-7BClPmzTuKU1sAkQLJnCNP4pdNpveUi7SPKnc",
+          "status": null
+        },
+        {
+          "id": "msg_0b63763fa8ab1785006b01e788212487d2917a92a65ec97444",
+          "content": [
+            {
+              "annotations": [],
+              "text": "{\"answer\":391,\"note\":\"17 multiplied by 23.\"}",
+              "type": "output_text",
+              "logprobs": []
+            }
+          ],
+          "role": "assistant",
+          "status": "completed",
+          "type": "message",
+          "phase": "final_answer"
+        }
+      ],
+      "parallel_tool_calls": true,
+      "temperature": 1.0,
+      "tool_choice": "auto",
+      "tools": [],
+      "top_p": 0.98,
+      "background": false,
+      "completed_at": 1795286920.0,
+      "conversation": null,
+      "max_output_tokens": 16384,
+      "max_tool_calls": null,
+      "previous_response_id": null,
+      "prompt": null,
+      "prompt_cache_key": null,
+      "prompt_cache_retention": "24h",
+      "reasoning": {
+        "effort": "medium",
+        "generate_summary": null,
+        "summary": null,
+        "context": "all_turns",
+        "mode": "standard"
+      },
+      "safety_identifier": null,
+      "service_tier": "default",
+      "status": "completed",
+      "text": {
+        "format": {
+          "type": "text"
+        },
+        "verbosity": "medium"
+      },
+      "top_logprobs": 0,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 52,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 32,
+        "output_tokens_details": {
+          "reasoning_tokens": 12
+        },
+        "total_tokens": 84
+      },
+      "user": null,
+      "access_programs": {
+        "cyber": "standard"
+      },
+      "billing": {
+        "payer": "openai"
+      },
+      "frequency_penalty": 0.0,
+      "image": {
+        "context_compression": "disabled"
+      },
+      "input_transformations": [],
+      "moderation": null,
+      "presence_penalty": 0.0,
+      "store": true,
+      "tool_usage": {
+        "image_gen": {
+          "input_tokens": 0,
+          "input_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "total_tokens": 0
+        },
+        "web_search": {
+          "num_requests": 0
+        }
+      }
+    },
+    "latency_s": 2.65
+  },
+  {
+    "probe": "temperature",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "temperature": 0.3
+    },
+    "started_utc": "2026-11-21T18:48:42+00:00",
+    "ok": false,
+    "error_type": "BadRequestError",
+    "error": "Error code: 400 - {'error': {'message': \"Unsupported value: 'temperature' does not support 0.3 with this model. Only the default (1) value is supported.\", 'type': 'invalid_request_error', 'param': 'temperature', 'code': 'unsupported_value'}}",
+    "error_body": "{\n  \"error\": {\n    \"message\": \"Unsupported value: 'temperature' does not support 0.3 with this model. Only the default (1) value is supported.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"temperature\",\n    \"code\": \"unsupported_value\"\n  }\n}",
+    "latency_s": 0.46
+  },
+  {
+    "probe": "small_cap_heavy",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions",
+      "max_completion_tokens": 300
+    },
+    "started_utc": "2026-11-21T18:48:43+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkQbHm2r9XY7ObLqNsuQtKtMq2fR",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"answer\":44,\"note\":\"Sum-of-two-squares formula gives 4 × (10 + 1) = 44.\"}",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795286921,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 222,
+        "prompt_tokens": 78,
+        "total_tokens": 300,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 182,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 6.68
+  },
+  {
+    "probe": "chat_level_omitted_heavy",
+    "model_requested": "gpt-6-astra",
+    "sent": {
+      "api": "chat.completions"
+    },
+    "started_utc": "2026-11-21T18:48:50+00:00",
+    "ok": true,
+    "raw": {
+      "id": "chatcmpl-EmkQic3USdYoAtv0x1QZokrbpF38R",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"answer\":44,\"note\":\"Sum-of-two-squares formula: 4(10+1)=44, including signs and order.\"}",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1795286928,
+      "model": "gpt-6-astra",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 104,
+        "prompt_tokens": 78,
+        "total_tokens": 182,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 63,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      }
+    },
+    "latency_s": 4.01
+  }
+]
