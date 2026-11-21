@@ -62,6 +62,59 @@ ERROR_CLASS_PARSE_FAILURE = "PARSE_FAILURE"  # response unparseable after the re
 ERROR_CLASS_REFUSAL = "REFUSAL"
 
 
+# A streamed response that ended without its terminal event
+# (reasoning_allowance_limit_ruling.md section 3 item 5): a failed call of its
+# own class, never parsed or repaired as a success, never retried.
+ERROR_CLASS_STREAM_INCOMPLETE = "STREAM_INCOMPLETE"
+
+
+class StreamIncomplete(RuntimeError):
+    """A stream that ended without its terminal event."""
+
+
+class WallClockTimeout(TimeoutError):
+    """The adapter's total wall-clock deadline for one call passed
+    (reasoning_allowance_limit_ruling.md section 3 item 4). A TimeoutError,
+    so is_client_timeout() classifies it as TIMEOUT."""
+
+
+class StreamDeadline:
+    """Total wall-clock deadline for a streamed call, enforced by the adapter.
+
+    A transport timeout bounds each read, not the call: a stream that keeps
+    delivering chunks never trips it. At the deadline this closes the stream
+    from a timer thread (`close`), which ends the consuming loop; `expired`
+    then tells the caller to raise WallClockTimeout instead of reading a
+    truncated stream as complete.
+    """
+
+    def __init__(self, seconds: float, close) -> None:
+        import threading
+        self.seconds = float(seconds)
+        self._expired = threading.Event()
+        self._timer = threading.Timer(self.seconds, self._fire, args=(close,))
+        self._timer.daemon = True
+
+    def _fire(self, close) -> None:
+        self._expired.set()
+        try:
+            close()
+        except Exception:  # noqa: BLE001 -- the flag is what the caller reads
+            logger.exception("closing a stream at its deadline failed")
+
+    @property
+    def expired(self) -> bool:
+        return self._expired.is_set()
+
+    def __enter__(self) -> "StreamDeadline":
+        self._timer.start()
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        self._timer.cancel()
+        return False
+
+
 class ModelRefusal(RuntimeError):
     """Raised by an adapter's _call_api when the provider reports a refusal.
 
@@ -390,6 +443,7 @@ class BaseAdapter(ABC):
                     # Logging only: the fail-fast return above is identical
                     # for every class; the class changes attribution, never flow.
                     error_class=(ERROR_CLASS_REFUSAL if isinstance(e, ModelRefusal)
+                                 else ERROR_CLASS_STREAM_INCOMPLETE if isinstance(e, StreamIncomplete)
                                  else ERROR_CLASS_TIMEOUT if is_client_timeout(e)
                                  else ERROR_CLASS_ACCOUNT_STATE
                                  if is_account_state(self.provider_name, str(e))
