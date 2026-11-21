@@ -285,3 +285,12 @@ def test_the_deadline_counts_the_wait_for_the_first_byte(fake, monkeypatch):
     assert r.error_class == "TIMEOUT"
     assert elapsed < 0.6 + 0.35, elapsed            # total, not headers + a fresh 0.6 s
     assert rec.calls[0][1]["timeout"] == 0.6
+
+
+def test_a_snapshot_refusal_keeps_the_old_handling(fake, monkeypatch):
+    """REFUSAL is the refreshed arms' class (section 6 item 2); a snapshot's
+    empty refusal reply still goes down the parse path, as before."""
+    monkeypatch.setattr("src.adapters.base._RETRY_DELAY_SECONDS", 0)
+    rec = fake(lambda kw: _message(kw["model"], stop="refusal", text="", thinking=None))
+    r = get_adapter("anthropic", "claude-opus-4-6").generate_decision("S", "U")
+    assert r.error_class == "PARSE_FAILURE" and len(rec.calls) == 2

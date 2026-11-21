@@ -170,7 +170,9 @@ class AnthropicAdapter(BaseAdapter):
             )
         # From the stream on the refreshed path; from the Message otherwise.
         stop_reason = facts["stop_reason"] if facts else getattr(response, "stop_reason", None)
-        if stop_reason == "refusal":
+        # A refusal is its own class on the refreshed arms only (section 6
+        # item 2); the snapshots' response handling is unchanged.
+        if refreshed and stop_reason == "refusal":
             details = getattr(response, "stop_details", None)
             raise ModelRefusal(
                 f"refusal: model={facts.get('model') or getattr(response, 'model', self.model)} "
