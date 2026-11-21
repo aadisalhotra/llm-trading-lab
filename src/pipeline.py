@@ -70,6 +70,7 @@ from .data import (
     is_market_open_today,
 )
 from .data.market_data import session_bounds
+from .data.prompt_frame import PromptFrame, build_prompt_frame
 from .data.sentiment import compute_sentiment_dict
 from .logging import (
     log_decision_run,
@@ -412,8 +413,15 @@ def run_one_model(
     ingestion: PriceIngestion | None = None,
     marks_by_book: dict[str, dict[str, tuple[float, str]]] | None = None,
     eod_stops_suspended: str | None = None,
+    prompt_frame: PromptFrame | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
+    # The prompt builders see the prompt frame (daily history + today's partial
+    # bar, src/data/prompt_frame.py); everything that prices, sizes, validates
+    # or executes keeps `market_data` / `prices` from the guard. No prompt
+    # frame (an EOD pass, which prompts nothing) means the guard's frame.
+    prompt_data = prompt_frame.frames if prompt_frame is not None else market_data
+    frame_fields = prompt_frame.row_fields() if prompt_frame is not None else {}
 
     portfolio = load_portfolio(model_key)
 
@@ -456,7 +464,10 @@ def run_one_model(
 
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
-    data_hash = hash_inputs(market_data)
+    # data_inputs_hash: the sha256 of the frame the models see (daily history
+    # ruling 3); the guard's intraday frame is hashed as execution_frame_hash.
+    data_hash = (prompt_frame.data_inputs_hash if prompt_frame is not None
+                 else hash_inputs(market_data))
     from .config_loader import universe_symbols as _universe_symbols
 
     # EOD pass: no MODEL trading — only snapshot, log, and report. The EOD cron
@@ -508,7 +519,7 @@ def run_one_model(
 
     # ---- Step 1: Screening call (lightweight — all 79 assets) ----
     screening_sys, screening_user = build_screening_prompt(
-        market_data, snapshot_before, run_date,
+        prompt_data, snapshot_before, run_date,
         news_data=news_data, sentiment_data=sentiment_data,
         ticker_order=ticker_order,
     )
@@ -565,7 +576,7 @@ def run_one_model(
     # ---- Step 2: Trading decision call (full data, shortlisted stocks) ----
     system_prompt, user_prompt, prompt_version, images = build_prompts(
         snapshot_before,
-        market_data,
+        prompt_data,
         run_date,
         trades_executed_today=portfolio.intraday.trades_executed_today,
         runs_today=portfolio.intraday.runs_today,
@@ -652,6 +663,7 @@ def run_one_model(
             screening_latency_seconds=_scr_latency,
             stop_dust_exempt=stop_dust_exempt,
             call_inputs=call_inputs,
+            **frame_fields,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -767,6 +779,7 @@ def run_one_model(
         screening_latency_seconds=_scr_latency,
         stop_dust_exempt=stop_dust_exempt,
         call_inputs=call_inputs,
+        **frame_fields,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])
@@ -1178,6 +1191,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             send_heartbeat(success=False, settings=settings)
         return 1
 
+    # The prompt frame (daily_history_restoration, hub GO 2026-11-21): real
+    # daily history for the text block and the chart, built AFTER the guard
+    # from its accepted frames and prices, which it never modifies. Only the
+    # two prompt builders read it. Any failure falls the whole tick back to the
+    # intraday frame, flagged on every row, with one WARN. Never raises. An EOD
+    # pass prompts nothing and builds none.
+    prompt_frame = (None if is_eod else
+                    build_prompt_frame(market_data, prices, run_date, send_alert=send_alert))
+
     # EOD valuation guard. A missing or non-finite close for any held name or
     # the benchmark aborts the valuation outputs (performance and intraday rows,
     # dashboard, daily report, leaderboard, digest and its threshold sweep) with
@@ -1288,6 +1310,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 ingestion=ingestion,
                 marks_by_book=marks_by_book,
                 eod_stops_suspended=eod_stops_suspended,
+                prompt_frame=prompt_frame,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)

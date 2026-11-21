@@ -1,0 +1,125 @@
+{
+  "generated_utc": "2026-11-21T16:28:38+00:00",
+  "cycle_id": "20261120T160248Z",
+  "model": "claude",
+  "fetch_started_at": "2026-11-20T16:02:08.647040+00:00",
+  "tick_et": "2026-11-20 11:02 ET",
+  "shortlist": [
+    "KO",
+    "WMT",
+    "PG",
+    "LLY",
+    "RTX",
+    "AMZN",
+    "AXP",
+    "ADBE",
+    "AVGO",
+    "SBUX",
+    "TJX",
+    "GOOGL",
+    "NFLX",
+    "UNH",
+    "ISRG",
+    "MRK",
+    "NKE",
+    "ABT",
+    "MA",
+    "QCOM"
+  ],
+  "logged_data_inputs_hash_legacy": "d17f142a039ea088",
+  "reconstructed_hash_inputs_legacy": "4762ae3eb7bf5f9f",
+  "legacy_hash_matches": false,
+  "held_price_check": {
+    "ADBE": {
+      "recorded": 225.13999938964844,
+      "reconstructed": 225.13999938964844,
+      "abs_diff": 0.0
+    },
+    "AMZN": {
+      "recorded": 253.57000732421875,
+      "reconstructed": 253.61500549316406,
+      "abs_diff": 0.044998
+    },
+    "AVGO": {
+      "recorded": 314.3500061035156,
+      "reconstructed": 314.57000732421875,
+      "abs_diff": 0.220001
+    },
+    "AXP": {
+      "recorded": 309.2699890136719,
+      "reconstructed": 309.3900146484375,
+      "abs_diff": 0.120026
+    },
+    "KO": {
+      "recorded": 97.5,
+      "reconstructed": 97.47000122070312,
+      "abs_diff": 0.029999
+    },
+    "LLY": {
+      "recorded": 1355.65625,
+      "reconstructed": 1356.6199951171875,
+      "abs_diff": 0.963745
+    },
+    "PG": {
+      "recorded": 171.03500366210938,
+      "reconstructed": 170.97000122070312,
+      "abs_diff": 0.065002
+    },
+    "RTX": {
+      "recorded": 193.94000244140625,
+      "reconstructed": 193.85499572753906,
+      "abs_diff": 0.085007
+    },
+    "SBUX": {
+      "recorded": 105.16500091552734,
+      "reconstructed": 105.18000030517578,
+      "abs_diff": 0.014999
+    },
+    "TJX": {
+      "recorded": 139.86000061035156,
+      "reconstructed": 139.82000732421875,
+      "abs_diff": 0.039993
+    },
+    "WMT": {
+      "recorded": 130.2449951171875,
+      "reconstructed": 130.22000122070312,
+      "abs_diff": 0.024994
+    }
+  },
+  "held_prices_matching_exactly": 1,
+  "held_prices_total": 11,
+  "max_abs_price_diff": 0.963745,
+  "max_rel_price_diff": 0.000711,
+  "prompt_frame": "daily",
+  "fallback_alerts": 0,
+  "data_inputs_hash_daily": "75e8d40e33666b5ae3e9be8e7f3fdfc00d6d4851c2fe119f02c672e46706c038",
+  "execution_frame_hash": "2da74045fe16b971fb8b627922bc80945f25d5c9ac1feae05ed5ec7d925e5014",
+  "bars_per_priced_ticker": {
+    "intraday": 4,
+    "daily": 31
+  },
+  "daily_sessions": [
+    "2026-10-09",
+    "2026-11-19"
+  ],
+  "sma_drawn": {
+    "intraday": false,
+    "daily": true
+  },
+  "unpriced_tickers": [],
+  "files": [
+    "chart_daily.png",
+    "chart_intraday.png",
+    "chart_side_by_side.png",
+    "market_daily.txt",
+    "market_intraday.txt",
+    "screening_daily.txt",
+    "screening_intraday.txt",
+    "side_by_side.md"
+  ],
+  "notes": [
+    "The intraday frame is reconstructed from 1-minute bars before the fetch minute; Yahoo's live in-progress bar at fetch time can differ from the minute bars served later, so held_price_check states how close it is.",
+    "Daily bars were fetched on the demo date for sessions before the tick's session; vendor revisions since then, if any, are not visible here.",
+    "Rendered with the production prompt_builder and chart code, unchanged."
+  ]
+}
