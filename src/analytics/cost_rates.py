@@ -214,6 +214,23 @@ RATE_HISTORY: dict[str, list[dict]] = {
     # (xAI language-models API, 2026-11-21: 20000 / 5000 / 60000 in 1e-4 USD
     # per 1M; grok_4_7.html saved 2026-11-21: "Input price $2.00 / 1M tokens,
     # Output price $6.00 / 1M tokens"). Reasoning bills as output.
+    # gemini-4-argon, Gemini API pricing page (read 2026-11-21, ai.google.dev/
+    # gemini-api/docs/pricing, Standard paid tier): input "$2.00 through November
+    # 30, 2026. $4.00 starting December 1, 2026."; output "(including thinking
+    # tokens)" "$10.00 through November 30, 2026. $20.00 starting December 1,
+    # 2026." The adapter prices thought tokens as output on this arm.
+    "gemini-4-argon": [
+        {
+            "effective_from": None,
+            "tiers": [{"max_input_tokens": None, "input": 2.00, "output": 10.00}],
+            "note": "$2/$10 through 2026-11-30 (Gemini API pricing, read 2026-11-21).",
+        },
+        {
+            "effective_from": "2026-12-01",
+            "tiers": [{"max_input_tokens": None, "input": 4.00, "output": 20.00}],
+            "note": "$4/$20 from 2026-12-01 (Gemini API pricing, read 2026-11-21).",
+        },
+    ],
     "grok-4.7": [
         {
             "effective_from": None,

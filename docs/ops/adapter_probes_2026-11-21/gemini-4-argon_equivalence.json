@@ -1,0 +1,145 @@
+{
+  "generated_utc": "2026-11-21T20:20:50+00:00",
+  "purpose": "cohort_refresh_ruling.md rev. 2 section 5 item 2: send/omit equivalence by reasoning-token counts. Preliminary; induced tests; enter no series.",
+  "arm": "gemini-4-argon",
+  "system": "Respond with one JSON object only: {\"decisions\": [], \"overall_reasoning\": \"<the answer as an integer>\"}. No prose, no code fences.",
+  "prompt": "Let N be the number of ordered pairs of integers (x, y) with x^2 + y^2 = 5^10 * 13^4 * 17^2. Also let M be the number of those pairs with x > 0 and y > 0 and gcd(x, y) = 1. Work it out and verify both counts. Put N + M in overall_reasoning.",
+  "pairs": 5,
+  "summary": {
+    "send": {
+      "n": 5,
+      "median": 0,
+      "min": 0,
+      "max": 0,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "omit": {
+      "n": 0,
+      "median": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "models_echoed": [
+      "gemini-4-argon"
+    ],
+    "finishes": [
+      "FinishReason.STOP",
+      "STOP"
+    ],
+    "failures": []
+  },
+  "records": [
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "STOP",
+      "reasoning_tokens": 0,
+      "output_tokens": 18,
+      "level_sent": "MEDIUM",
+      "error_class": null,
+      "error": null,
+      "latency_s": 26.22
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "FinishReason.STOP",
+      "reasoning_tokens": null,
+      "output_tokens": 18,
+      "latency_s": 26.69
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "STOP",
+      "reasoning_tokens": 0,
+      "output_tokens": 18,
+      "level_sent": "MEDIUM",
+      "error_class": null,
+      "error": null,
+      "latency_s": 25.73
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "FinishReason.STOP",
+      "reasoning_tokens": null,
+      "output_tokens": 18,
+      "latency_s": 26.85
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "STOP",
+      "reasoning_tokens": 0,
+      "output_tokens": 18,
+      "level_sent": "MEDIUM",
+      "error_class": null,
+      "error": null,
+      "latency_s": 4.75
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "FinishReason.STOP",
+      "reasoning_tokens": null,
+      "output_tokens": 18,
+      "latency_s": 5.28
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "STOP",
+      "reasoning_tokens": 0,
+      "output_tokens": 18,
+      "level_sent": "MEDIUM",
+      "error_class": null,
+      "error": null,
+      "latency_s": 6.23
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "FinishReason.STOP",
+      "reasoning_tokens": null,
+      "output_tokens": 18,
+      "latency_s": 8.21
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "STOP",
+      "reasoning_tokens": 0,
+      "output_tokens": 18,
+      "level_sent": "MEDIUM",
+      "error_class": null,
+      "error": null,
+      "latency_s": 4.96
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gemini-4-argon",
+      "finish": "FinishReason.STOP",
+      "reasoning_tokens": null,
+      "output_tokens": 18,
+      "latency_s": 4.37
+    }
+  ]
+}

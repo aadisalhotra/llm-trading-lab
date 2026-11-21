@@ -4,8 +4,34 @@ from __future__ import annotations
 import os
 from typing import Any
 
+import logging
+
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+
+logger = logging.getLogger("llmlab.adapters.gemini")
+
+# The refreshed confirmatory arm (cohort_refresh_ruling.md rev. 2, section 5).
+# gemini-4-argon's documented default thinking_level is MEDIUM (Google Cloud
+# thinking table, google_cloud_thinking.html saved 2026-11-21), sent
+# explicitly as thinking_level, never as a thinking budget (a budget returns
+# 400 on Gemini 4). Keyed by the exact identifier; gemini-3.1-pro-preview (the
+# Phase A snapshot) keeps its request byte for byte: no thinking_config.
+REFRESHED_ARMS: dict[str, dict[str, str]] = {
+    "gemini-4-argon": {"thinking_level": "MEDIUM"},
+}
+# Thinking counts against max_output_tokens on Argon (probe 2026-11-21: a
+# 64-token cap ended MAX_TOKENS with 61 thought tokens). The provider limit for
+# this request shape (non-streaming) is 32,768 (Models API outputTokenLimit;
+# release notes: 65,536 per streaming segment). Calibration runs at 32,768;
+# reasoning_allowance_limit_ruling.md then decides the cap: rung 1 or 2 keeps
+# this shape (L = 32,768, H = 16,384, so rung 1 needs R <= 8,192); rung 3 moves
+# to streaming under that ruling's section 3 conditions.
+REFRESHED_MAX_OUTPUT_TOKENS = 32768
+# Finish or block reasons that are the model declining, recorded as REFUSAL on
+# the refreshed arm (section 6 item 2). Gemini has no "refusal" stop reason;
+# this mapping is Operations' reading, flagged for Research.
+REFUSAL_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"})
 
 
 class GeminiAdapter(BaseAdapter):
@@ -73,11 +99,38 @@ class GeminiAdapter(BaseAdapter):
         else:
             contents = user_prompt
 
+        refreshed = REFRESHED_ARMS.get(self.model)
+        if refreshed:
+            if self.temperature is not None:
+                # Nothing is sent to a refreshed arm until Research rules
+                # (hub 2026-11-21).
+                logger.warning("[%s] temperature %s not sent to a refreshed arm",
+                               self.model, self.temperature)
+            config = genai_types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                max_output_tokens=REFRESHED_MAX_OUTPUT_TOKENS,
+                thinking_config=genai_types.ThinkingConfig(
+                    thinking_level=refreshed["thinking_level"]),
+                http_options=genai_types.HttpOptions(timeout=API_CALL_TIMEOUT_SECONDS * 1000),
+            )
+
         response = client.models.generate_content(
             model=self.model,
             contents=contents,
             config=config,
         )
+        if refreshed:
+            cands = list(getattr(response, "candidates", None) or [])
+            fr = getattr(cands[0], "finish_reason", None) if cands else None
+            fr_name = getattr(fr, "name", str(fr)) if fr is not None else None
+            fb = getattr(response, "prompt_feedback", None)
+            block = getattr(fb, "block_reason", None) if fb else None
+            if block is not None or fr_name in REFUSAL_FINISH_REASONS:
+                raise ModelRefusal(
+                    f"refusal: model={getattr(response, 'model_version', None) or self.model} "
+                    f"finish_reason={fr_name} block_reason="
+                    f"{getattr(block, 'name', block) if block is not None else None}")
 
         # response.text concatenates the visible text parts and is None — not
         # an exception — when the response has no usable part. An empty
@@ -114,7 +167,12 @@ class GeminiAdapter(BaseAdapter):
             in_tok = int(getattr(usage, "prompt_token_count", 0) or 0)
             out_tok = int(getattr(usage, "candidates_token_count", 0) or 0)
         # Cost stays keyed on the configured id (unchanged) — pricing is out of scope.
-        cost = compute_call_cost_usd(self.model, in_tok, out_tok)
+        # On the refreshed arm thought tokens, billed as output but reported
+        # outside candidates_token_count, are priced too; the snapshot's cost
+        # line is left as it was.
+        thought_tok = int(getattr(usage, "thoughts_token_count", 0) or 0) if usage else 0
+        cost = compute_call_cost_usd(self.model, in_tok,
+                                     out_tok + (thought_tok if refreshed else 0))
         metadata: dict[str, Any] = {
             "input_tokens": in_tok,
             "output_tokens": out_tok,
@@ -166,6 +224,11 @@ class GeminiAdapter(BaseAdapter):
         br = getattr(feedback, "block_reason", None) if feedback else None
         metadata["block_reason"] = getattr(br, "name", str(br)) if br is not None else None
         cached = getattr(usage, "cached_content_token_count", None) if usage else None
+        if refreshed:
+            metadata["thoughts_tokens"] = thought_tok
+            metadata["reasoning_effort_sent"] = refreshed["thinking_level"]
+            metadata["max_tokens_sent"] = REFRESHED_MAX_OUTPUT_TOKENS
+            metadata["transport"] = "non-streaming"
         metadata["cache_hit_tokens"] = cached
         metadata["cache_miss_tokens"] = (
             max(0, in_tok - int(cached)) if cached is not None else None
