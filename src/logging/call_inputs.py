@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from ..config_loader import DATA_DIR
 
@@ -39,6 +40,17 @@ PROMPTS_DIR = DATA_DIR / "prompts"
 RETENTION_BOUNDARY_SESSION = "2026-11-23"
 TICKS_PER_SESSION = 13
 FIRST_SLOT_MINUTES = 9 * 60 + 30
+
+# Calibration window (hub 2026-11-21, item (a); Research's agreement on rq6
+# section 2.4 is the landing condition). The refreshed cohort's calibration
+# set is drawn from the snapshots' retained inputs of 2026-11-23..25 and must
+# cover all thirteen tick positions with the exact images sent. Inside this
+# window every scheduled tick keeps its image bytes; outside it the section
+# 2.4 two-slot rotation applies unchanged. The window closes by itself at the
+# close of Wednesday 2026-11-25: no revert needs to land.
+ET = ZoneInfo("America/New_York")
+FULL_IMAGE_RETENTION_START = datetime(2026, 11, 23, 0, 0, tzinfo=ET)
+FULL_IMAGE_RETENTION_END = datetime(2026, 11, 25, 16, 0, tzinfo=ET)
 
 # output_budget_equalization_ruling.md §3: a budget stop, by provider.
 BUDGET_STOP_REASONS = frozenset({"max_tokens", "length", "MAX_TOKENS"})
@@ -119,11 +131,21 @@ def tick_slot(run_date: datetime) -> int | None:
     return k if 1 <= k <= TICKS_PER_SESSION else None
 
 
+def in_full_retention_window(run_date: datetime) -> bool:
+    """True from the 2026-11-23 session through the close of 2026-11-25 (ET).
+    A naive run_date is read as ET, as the pipeline's run date is."""
+    t = run_date if run_date.tzinfo else run_date.replace(tzinfo=ET)
+    return FULL_IMAGE_RETENTION_START <= t < FULL_IMAGE_RETENTION_END
+
+
 def keeps_image_bytes(run_date: datetime) -> bool:
-    """True when this tick is one of today's two retained slots."""
+    """True when this tick keeps its image bytes: every scheduled tick inside
+    the calibration window, otherwise only today's two retained slots."""
     n = session_index(run_date.date())
     slot = tick_slot(run_date)
-    return n is not None and slot is not None and slot in retained_slots(n)
+    if n is None or slot is None:
+        return False
+    return in_full_retention_window(run_date) or slot in retained_slots(n)
 
 
 # --------------------------------------------------------------- retention

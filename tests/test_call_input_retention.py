@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -37,16 +37,16 @@ def _calls():
 
 # ------------------------------------------------------------------ the file
 def test_one_line_per_call_with_texts_exactly_as_passed(tmp_path):
-    run = datetime(2026, 11, 23, 10, 5, tzinfo=ET)            # slot 2: no image bytes
-    f = ci.retain_call_inputs("20261123T150512Z", "claude", run, "v4", _calls(), tmp_path)
+    run = datetime(2026, 11, 30, 10, 5, tzinfo=ET)            # n=4, slot 2: no image bytes
+    f = ci.retain_call_inputs("20261130T150512Z", "claude", run, "v4", _calls(), tmp_path)
     lines = [json.loads(x) for x in
-             (tmp_path / "2026-11" / "20261123T150512Z.jsonl").read_text(encoding="utf-8").splitlines()]
+             (tmp_path / "2026-11" / "20261130T150512Z.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [ln["stage"] for ln in lines] == ["screen", "trade"]
     for ln, c in zip(lines, _calls()):
         assert (ln["system"], ln["user"]) == (c.system, c.user)
         assert ln["system_sha256"] == _sha(c.system.encode("utf-8"))
         assert ln["user_sha256"] == _sha(c.user.encode("utf-8"))
-        assert ln["cycle_id"] == "20261123T150512Z" and ln["model_key"] == "claude"
+        assert ln["cycle_id"] == "20261130T150512Z" and ln["model_key"] == "claude"
         assert ln["prompt_version"] == "v4"
     assert lines[1]["images"] == [{"sha256": _sha(PNG_A), "bytes": len(PNG_A)},
                                   {"sha256": _sha(PNG_B), "bytes": len(PNG_B)}]
@@ -103,17 +103,45 @@ def test_tick_slot(hh, mm, slot):
 
 
 def test_image_bytes_kept_only_on_a_retained_slot(tmp_path):
-    kept = ci.retain_call_inputs("20261123T143512Z", "grok",
-                                 datetime(2026, 11, 23, 9, 35, tzinfo=ET), "v4", _calls(), tmp_path)
+    # 2026-11-30 is session n=4, after the calibration window: slots 5 and 11.
+    kept = ci.retain_call_inputs("20261130T163512Z", "grok",
+                                 datetime(2026, 11, 30, 11, 35, tzinfo=ET), "v4", _calls(), tmp_path)
     assert kept["image_bytes_retained"] is True
     img = tmp_path / "2026-11" / "images"
     assert sorted(p.name for p in img.iterdir()) == sorted(f"{_sha(b)}.png" for b in (PNG_A, PNG_B))
     assert (img / f"{_sha(PNG_A)}.png").read_bytes() == PNG_A
-    # session 0 keeps slots 1 and 7; slot 3 keeps nothing
+    # slot 3 of that session keeps nothing
     other = tmp_path / "other"
-    f = ci.retain_call_inputs("20261123T153512Z", "grok",
-                              datetime(2026, 11, 23, 10, 35, tzinfo=ET), "v4", _calls(), other)
+    f = ci.retain_call_inputs("20261130T153512Z", "grok",
+                              datetime(2026, 11, 30, 10, 35, tzinfo=ET), "v4", _calls(), other)
     assert f["image_bytes_retained"] is False and not (other / "2026-11" / "images").exists()
+
+
+# ------------------------------------- calibration window (hub 2026-11-21, (a))
+@pytest.mark.parametrize("day", ["2026-11-23", "2026-11-24", "2026-11-25"])
+def test_every_tick_keeps_its_images_inside_the_calibration_window(day):
+    y, m, d = map(int, day.split("-"))
+    ticks = [datetime(y, m, d, tzinfo=ET) + timedelta(minutes=9 * 60 + 35 + 30 * k)
+             for k in range(13)]                        # 09:35 .. 15:35 ET
+    assert [ci.tick_slot(t) for t in ticks] == list(range(1, 14))
+    assert all(ci.keeps_image_bytes(t) for t in ticks)
+
+
+@pytest.mark.parametrize("t,kept", [
+    (datetime(2026, 11, 25, 15, 35, tzinfo=ET), True),    # last tick of the window
+    (datetime(2026, 11, 25, 16, 0, tzinfo=ET), False),    # the close: not a tick slot
+    (datetime(2026, 11, 27, 10, 35, tzinfo=ET), False),   # n=3 keeps slots 4 and 10, not 3
+    (datetime(2026, 11, 27, 11, 5, tzinfo=ET), True),     # slot 4
+    (datetime(2026, 11, 20, 9, 35, tzinfo=ET), False),    # before the retention boundary
+    (datetime(2026, 11, 24, 12, 5, tzinfo=None), True),   # naive run dates read as ET
+])
+def test_the_window_closes_by_itself(t, kept):
+    assert ci.keeps_image_bytes(t) is kept
+
+
+def test_window_bounds_are_the_three_sessions():
+    assert ci.FULL_IMAGE_RETENTION_START == datetime(2026, 11, 23, 0, 0, tzinfo=ET)
+    assert ci.FULL_IMAGE_RETENTION_END == datetime(2026, 11, 25, 16, 0, tzinfo=ET)
 
 
 # ------------------------------------------------------- flags and the WARN §3
