@@ -3934,6 +3934,74 @@
         "first_effective_tick": "The first intraday tick of Monday 2026-11-23, if the branch lands Sunday 2026-11-22 night as signed off. If the landing slips, this entry is corrected before it lands. The same tick is the output-budget boundary (output_budget_equalization) and the call-input retention boundary (logging package, main 1abb146d5), so all three changes share it.",
         "latency": "The batched daily fetch measured 0.85-0.97 s for 80 symbols (first tick of a session); a cache hit 0.11 s. The intraday fetch is unchanged.",
         "replay_demo": "docs/ops/daily_history_2026-11-21/ (scripts/demos/daily_history_replay.py): Friday 2026-11-20 11:02 ET, cycle 20261120T160248Z, claude's 20-name shortlist, both frames side by side (blocks, charts, replay.json). The intraday frame is reconstructed from 1-minute bars cut at the recorded fetch time: of 11 held names, 1 price matches the record exactly and all are within 0.0711%, so the legacy hash does not reproduce; stated in replay.json."
+      },
+      {
+        "id": "cohort_refresh_2026_11_21",
+        "date": "2026-11-21",
+        "type": "cohort_decision",
+        "scope": "experiment",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/cohort_refresh_ruling.md",
+            "revision": "rev. 2 (replaces rev. 1, 3a7317d4..., 12,397 B, which is not committed)",
+            "sha256": "f6aa5f8c4d132686cb6a2a41891c2f2dad7c608de19cb079aea4edbc1b41e6f2",
+            "bytes": 16057
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-21: option B (Research's) decided and ratified; rev. 2 confirmed by hash the same evening, with the handover ruled (snapshot venue series end at the close of 2026-12-04; refreshed arms' venue books incept for the 2026-12-07 open).",
+          "options_ruling": "cohort_options_ruling_2026-11-21.md rev. 2, 396bc1332d457448a0b244d0b7e8db667691986b9b6c136449df2fccbcfe9baa (24,201 B), kept outside the tree as the record of the three options considered (ruling, Decided)."
+        },
+        "decision": "The registered cohort rule (Tier 2, T2.6) is executed: each confirmatory arm is pinned to its provider's newest generally available own-tier flagship as of 2026-10-26, the date the rule registered. The resolution date is not moved (ruling section 1).",
+        "cohort": {
+          "claude (Sonnet)": "Phase A snapshot claude-sonnet-4-6 -> confirmatory claude-sonnet-5-5",
+          "claude_opus": "Phase A snapshot claude-opus-4-6 -> confirmatory claude-opus-5-5",
+          "gpt": "Phase A snapshot gpt-5.4-2026-03-05 -> confirmatory gpt-6-astra",
+          "grok": "Phase A snapshot grok-4.20-0309-reasoning -> confirmatory grok-4.7",
+          "gemini": "Phase A snapshot gemini-3.1-pro-preview -> confirmatory gemini-4-argon",
+          "deepseek": "deepseek-v4-pro unchanged: exploratory, paper-only"
+        },
+        "supersedes": "Ruling section 2: the pre-deposit amendment of 2026-11-08 (cohort pinned to the deployed snapshots); the Gemini exception, for this refresh; the Phase B boundary (moved to 2027-01-04, entry phase_b_boundary_moved_to_2027_01_04); the filing of 2026-11-23 and the freeze-day plan for 2026-11-22. The 2026-10-26 pin was still missed; that disclosure stands.",
+        "schedule": "Ruling sections 3, 4 and 7: shakedown on fresh internal-paper books admissible from 2026-12-01 once calibration is done and caps and timeout are set (not counted toward the 15); section 7's table: 'Calibration runs complete; caps and timeout frozen' by Friday 2026-12-04, while section 3 item 8 lets caps and timeout be corrected on what the shakedown shows until the open of 2026-12-07, when they freeze (both quoted; the two are not reconciled here); handover of the venue path the weekend of 2026-12-05/06; first validated session Monday 2026-12-07 (18 sessions), hard limit the open of 2026-12-10 (15); verification record closes at the close of 2026-12-17; freeze 2026-12-20, filing 2026-12-21; second filing date 2026-12-28 (freeze 2026-12-27); last admissible filing 2026-12-30.",
+        "snapshots": "Ruling section 4: all five Phase A snapshots keep running through 2026-12-31 as registered fallbacks, with separate identity, book, state and logs; on the venue path through the close of 2026-12-04, paper-only from the handover. Each snapshot's venue book closes as a series at 2026-12-04 with terminal equity at that day's closing marks recorded in the ledger, its state file archived read-only and pinned by commit, and it incepts fresh on internal paper at the registered Phase B book capital (paper_epoch_retirement.md section 1). No position is sold to do this. If the venue's paper account can only be cleared by orders, those fills are administrative, recorded on the snapshot's venue book before its series closes, and censored under T2.3. Configuration unchanged: provider-default reasoning with no parameter sent, 16,384-token budget, the cohort-wide timeout of section 5.",
+        "reasoning_levels": {
+          "rule": "Ruling section 5: each confirmatory arm at its provider's documented default level, never chosen; sent explicitly where the default is documented and omitting is equivalent (shown by reasoning-token counts); where no default is documented or reported, nothing is sent.",
+          "claude-sonnet-5-5": "adaptive thinking, effort high, sent explicitly",
+          "claude-opus-5-5": "adaptive thinking, effort medium, sent explicitly",
+          "gpt-6-astra": "provider default; not sent, unless a default is documented or reported by the API",
+          "grok-4.7": "high, sent explicitly",
+          "gemini-4-argon": "MEDIUM, sent explicitly"
+        },
+        "budgets_and_timeout": "Ruling section 5: answer budget 16,384 for every arm; where reasoning shares the output cap, nominal cap = 16,384 + the arm's reasoning allowance = 2 x the largest reasoning-token count observed in calibration, rounded up to the next 4,096 and bounded by the provider maximum. Calibration: one input set, the same for every arm, of at least 100 retained trading-call inputs drawn from the Phase A snapshots' retained inputs from 2026-11-23, covering all thirteen tick positions, plus their screening calls, at the default level, cap at the provider maximum, 600 s timeout; the calls are induced tests. Timeout re-derived by api_call_timeout.md section 1 (highest successful latency + 40%, rounded up to 30 s, not below 300, cohort-wide) and must pass the 30-minute grid-occupancy check. Effort is not lowered to make an arm fit.",
+        "further_rules": "Ruling section 6: server-side fallback is never requested and a response naming another model is an identity event; a refusal is recorded as REFUSAL, counts as a failed decision and is never retried on another model; token counts are not comparable across the cohort boundary.",
+        "provider_pages": "docs/ops/provider_pages_2026-11-21/ (the 12 pages of the options ruling's section 9 and the Gemini API changelog, with MANIFEST.json). Operations' reading, accepted by the hub 2026-11-21: gpt-6-astra documents levels low..max with no none and no default on those pages; grok-4.7 documents high as the default when not specified, cap sharing not stated; gemini-4-argon documents thinking_level default MEDIUM, cap sharing stated for Neon and Hydrogen but not for Argon. Ruling section 8 item 2 stays open until calibration measures it.",
+        "status": "Docs-only. No adapter, configuration or venue change is made by this entry; the adapters are built on review branches from 2026-11-23."
+      },
+      {
+        "id": "phase_b_boundary_moved_to_2027_01_04",
+        "date": "2026-11-21",
+        "type": "boundary_amendment",
+        "scope": "experiment",
+        "ruling": {
+          "path": "docs/amendments/phase_b_boundary_amendment_2027-01-04.md",
+          "sha256": "879adb3d804623a17a664cd881cce8cca657de458ed150db3e399cfe83259d22",
+          "bytes": 4445,
+          "decided": "2026-11-21 (hub), pre-deposit; the boundary binds on the OSF deposit and this amendment class then closes."
+        },
+        "trigger": "The cohort refresh before filing (entry cohort_refresh_2026_11_21): a refreshed arm needs 15 validated sessions before live capital and none was available before 2026-12-01. The registered ranking applies: move the boundary, never compress the validation.",
+        "move": "Phase B live boundary 2026-12-01 -> 2027-01-04, the first NYSE session of 2027. The second move; the first (entry phase_b_boundary_moved_to_2026_12_01) took it from 2026-11-01 to 2026-12-01.",
+        "recompute": {
+          "confirmatory_window": "2026-12-01..2027-12-01 -> 2027-01-04..2028-01-03, 252 sessions",
+          "phase_a_pilot": "2026-04-09..2026-11-30 -> 2026-04-09..2026-12-31",
+          "validation_month": "November 2026 -> November 2026 for the venue path; December 2026 for the refreshed cohort (22 sessions; arms decide from 2026-12-07, 18; hard limit the open of 2026-12-10, 15)",
+          "go_no_go": "2026-11-30 -> between the close of 2026-12-31 and 2027-01-02",
+          "osf_deposit": "before 2026-12-01 -> before 2027-01-04; filing 2026-12-21, second date 2026-12-28, last admissible 2026-12-30",
+          "gemini_preview_validation_clock": "through 2026-11-30 -> through 2026-12-31, as the Google arm's registered fallback",
+          "anthropic_retirement_floors": "4.6 pair 45 and 52 sessions into the window -> 5.5 pair 180 (Opus, floor 2027-09-22) and 184 (Sonnet, floor 2027-09-28) sessions into the window",
+          "rq6_runs": "unchanged in content; months 3 and 9 are about April and October 2027",
+          "capstone": "December 2027 -> after the window closes, early 2028",
+          "paper": "SSRN, Fall 2027 -> after the confirmatory window closes"
+        },
+        "does_not_move": "Amendment section 3: the v4 prompt freeze of 2026-10-30; the cohort's resolution date 2026-10-26; the venue cutover of 2026-11-06 and its November record; the daily-history, output-budget and call-input-retention boundaries of November 2026.",
+        "sweep_status": "PENDING: the date translations go through the deposit documents by the companion splice (amendment section 5 item 2), and config/settings.json phase dates still carry the 2026-12-01 boundary until a landing sweep changes them; this entry changes no file other than the ledger."
       }
     ]
   }

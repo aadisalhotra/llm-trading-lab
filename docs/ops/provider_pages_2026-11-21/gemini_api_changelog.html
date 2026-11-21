@@ -1,0 +1,1875 @@
+<!doctype html><html lang="en-US" dir="ltr"><head><base href="https://aistudio.google.com/"><link rel="preconnect" href="//www.gstatic.com"><meta name="referrer" content="origin"><link rel="canonical" href="https://aistudio.google.com/docs/changelog"><meta property="og:type" content="website"><meta property="og:title" content="Google AI Studio"><meta property="og:description" content="The fastest path from prompt to production with Gemini"><meta property="og:image" content="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="628"><meta property="og:image:type" content="image/png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="application-name" content="AI Studio"><meta name="apple-mobile-web-app-title" content="AI Studio"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="theme-color" content="#000"><meta name="msapplication-tap-highlight" content="no"><link rel="preconnect" href="//fonts.googleapis.com"><link rel="preconnect" href="//fonts.gstatic.com"><link rel="preconnect" href="//www.gstatic.com"><link rel="preconnect" href="//alkalimakersuite-pa.clients6.google.com"><link rel="prefetch" href="//apis.google.com/js/api.js"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&amp;display=swap" nonce="G7jbisuHmjEUezqJ6qHa-A"><link rel="stylesheet" href="//fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Inter+Tight:wght@300;500;600&amp;display=swap" nonce="G7jbisuHmjEUezqJ6qHa-A"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap" nonce="G7jbisuHmjEUezqJ6qHa-A"><link rel="manifest" crossorigin="use-credentials" href="_/MakerSuite/manifest.json"><link rel="home" href="/prompts/new_chat?utm_source=pwa&amp;utm_medium=homescreen&amp;lfhs=2"><link rel="msapplication-starturl" href="/prompts/new_chat?utm_source=pwa&amp;utm_medium=homescreen&amp;lfhs=2"><link rel="icon" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-32dp/logo_ai_studio_color_1x_web_32dp.png" sizes="32x32"><link rel="apple-touch-icon-precomposed" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-32dp/logo_ai_studio_color_1x_web_32dp.png" sizes="32x32"><link rel="msapplication-square32x32logo" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-32dp/logo_ai_studio_color_1x_web_32dp.png" sizes="32x32"><link rel="icon" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-64dp/logo_ai_studio_color_1x_web_64dp.png" sizes="64x64"><link rel="apple-touch-icon-precomposed" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-64dp/logo_ai_studio_color_1x_web_64dp.png" sizes="64x64"><link rel="msapplication-square64x64logo" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-64dp/logo_ai_studio_color_1x_web_64dp.png" sizes="64x64"><link rel="icon" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_1x_web_96dp.png" sizes="96x96"><link rel="apple-touch-icon-precomposed" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_1x_web_96dp.png" sizes="96x96"><link rel="msapplication-square96x96logo" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_1x_web_96dp.png" sizes="96x96"><link rel="icon" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_2x_web_96dp.png" sizes="192x192"><link rel="apple-touch-icon-precomposed" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_2x_web_96dp.png" sizes="192x192"><link rel="msapplication-square192x192logo" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-96dp/logo_ai_studio_color_2x_web_96dp.png" sizes="192x192"><link rel="icon" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-512dp/logo_ai_studio_color_1x_web_512dp.png" sizes="512x512"><link rel="apple-touch-icon-precomposed" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-512dp/logo_ai_studio_color_1x_web_512dp.png" sizes="512x512"><link rel="msapplication-square512x512logo" href="https://www.gstatic.com/images/branding/productlogos/ai_studio/v1/web-512dp/logo_ai_studio_color_1x_web_512dp.png" sizes="512x512"><link rel="preload" href="https://www.gstatic.com/_/mss/boq-makersuite/_/js/k=boq-makersuite.MakerSuite.en_US.xzCpJ7091eE.2018.O/am=QaSaAAYeHAI/d=1/excm=_b/ed=1/dg=0/wt=2/ujg=1/rs=AMOXD29UloSCZaB9vazrSK07ME85eU7Feg/dti=1/m=_b" as="script" nonce="ykyOlgCOy_GXWNkRSpmpsA"><link rel="preload" href="https://www.gstatic.com/_/mss/boq-makersuite/_/js/k=boq-makersuite.MakerSuite.en_US.xzCpJ7091eE.2018.O/ck=boq-makersuite.MakerSuite.VFXjuyV6fDY.L.X.O/am=QaSaAAYeHAI/d=1/exm=_b/excm=_b/ed=1/wt=2/ujg=1/rs=AMOXD281IeOT03o5H7WvMuXo-WDmn9RxYg/dti=1/m=smxHue" as="script" nonce="ykyOlgCOy_GXWNkRSpmpsA"><script type="application/json" id="70b56b89-9b62-4d05-9d19-c8329915b572" nonce="ykyOlgCOy_GXWNkRSpmpsA">{"AfY8Hf":false,"CmfRSc":"0","CoJqbf":"https://alkalimakersuite-pa.clients6.google.com","DpimGf":false,"Dvqjfd":"","EBvNTe":"823511539352-ojaretejk1s95sdvkic0te923pt7knpu.apps.googleusercontent.com","EP1ykd":["/.well-known/*","/_/*","/accounts/*","/app","/app/*","/assets/*","/audio/*","/images/*","/music/*","/public/*","/templates/*"],"FdrFJe":"-7969218174418187312","HiPsbb":1,"IfHDGc":60000,"Im6cmf":"/_/MakerSuite","KU8tnd":"https://alkalimakersuiteapplets.pa.clients6.google.com","LoQv7e":true,"MT7f9b":[],"MUE6Ne":"alkali-makersuite","MsAAre":false,"NHyHAe":60000,"O7uJJ":"https://cloudconsole-pa.clients6.google.com","OC2PJe":"https://people-pa.clients6.google.com","Onibif":"https://webchannel-alkalimakersuite-pa.clients6.google.com","PeqOqb":"AIzaSyDHAQL7kdN6lNBcBok1eNB8dG7wwo6E6io","PgS1Kc":"https://content.googleapis.com","PqyQ6d":"","QrtxK":"","S06Grb":"","S6lZl":96797242,"TSDtV":"%.@.[[null,[[45847864,null,true,null,null,null,\"kE3j8b\"],[45750734,null,false,null,null,null,\"zNidwd\"],[45859437,null,null,null,\"\",null,\"iPg3y\"],[45786059,null,true,null,null,null,\"ZRXcme\"],[45800001,null,false,null,null,null,\"fEA85b\"],[45872738,null,false,null,null,null,\"Zemkge\"],[45815137,null,true,null,null,null,\"WRwkue\"],[45766584,null,false,null,null,null,\"uzk17e\"],[45898299,null,false,null,null,null,\"WbWsVb\"],[45812681,null,true,null,null,null,\"X7uB7c\"],[45870949,null,false,null,null,null,\"rOpvAb\"],[45864047,null,true,null,null,null,\"OHVamb\"],[45784561,null,false,null,null,null,\"LXfb5c\"],[45856904,null,true,null,null,null,\"FG6P7d\"],[45780874,null,false,null,null,null,\"Q1jbEd\"],[45772164,null,false,null,null,null,\"zeKiRd\"],[45764549,null,true,null,null,null,\"ZSgiif\"],[45841148,null,true,null,null,null,\"s6aszc\"],[45737435,null,true,null,null,null,\"QLHTQ\"],[45860610,null,false,null,null,null,\"pYjjGf\"],[45786683,null,true,null,null,null,\"SEwGId\"],[45860469,null,true,null,null,null,\"EuiBmf\"],[45714250,null,true,null,null,null,\"t52vxe\"],[45771578,null,true,null,null,null,\"FWnIxc\"],[45828307,null,false,null,null,null,\"yMyGUd\"],[45773098,null,true,null,null,null,\"tHUpTc\"],[45805229,null,false,null,null,null,\"s3lTDc\"],[45746196,null,true,null,null,null,\"Mkmxtb\"],[45820967,null,false,null,null,null,\"sFOxp\"],[45772817,null,true,null,null,null,\"fMTTic\"],[45884298,null,false,null,null,null,\"v5uyBe\"],[45824912,131072,null,null,null,null,\"b2C2B\"],[45773200,null,false,null,null,null,\"SNmu3c\"],[45784564,null,false,null,null,null,\"oj32cc\"],[45809279,null,false,null,null,null,\"PDJPhb\"],[45857667,null,false,null,null,null,\"NWij2c\"],[45796413,null,false,null,null,null,\"tO7rUe\"],[45837404,null,false,null,null,null,\"CT0XI\"],[45887590,null,false,null,null,null,\"zyZVKd\"],[45842046,null,null,null,null,null,\"f87Xt\",[\"[]\"]],[45776026,null,false,null,null,null,\"CEBNKb\"],[45777831,null,false,null,null,null,\"GPgspe\"],[45817873,null,true,null,null,null,\"TQ277c\"],[45896311,null,false,null,null,null,\"NhIrKf\"],[45845967,null,true,null,null,null,\"Sniiwc\"],[45854059,null,true,null,null,null,\"b40um\"],[45861368,null,false,null,null,null,\"lMSdOe\"],[45812538,null,false,null,null,null,\"eJaIR\"],[45784662,null,false,null,null,null,\"QdT1Z\"],[45764720,null,true,null,null,null,\"B2Bu0b\"],[45861278,null,false,null,null,null,\"V5KHhb\"],[45825903,null,false,null,null,null,\"mNGeee\"],[45862868,null,false,null,null,null,\"bfKXxd\"],[45879438,null,false,null,null,null,\"Aq2Vrc\"],[45773240,null,false,null,null,null,\"n7JOEb\"],[45772231,null,false,null,null,null,\"HsfSqc\"],[45632067,null,true,null,null,null,\"CyDiEf\"],[45820776,null,true,null,null,null,\"bFtnL\"],[45670190,null,false,null,null,null,\"ArIgzf\"],[45806859,null,true,null,null,null,\"RYGIvf\"],[45734881,null,false,null,null,null,\"RLIQje\"],[45834641,null,false,null,null,null,\"WHLyI\"],[45877221,null,true,null,null,null,\"km8lB\"],[45675258,null,false,null,null,null,\"z2PIFf\"],[45787299,null,true,null,null,null,\"h85Kkd\"],[45866857,null,false,null,null,null,\"xpMubf\"],[45875820,null,false,null,null,null,\"WtdpB\"],[45812905,null,true,null,null,null,\"Y9AUte\"],[45799321,null,false,null,null,null,\"Qsarhc\"],[45836227,null,false,null,null,null,\"FAv3Rc\"],[45874376,null,false,null,null,null,\"hAJked\"],[45784559,null,true,null,null,null,\"quitKc\"],[45806340,null,true,null,null,null,\"OEiE2c\"],[45820497,null,false,null,null,null,\"oYprSb\"],[45894921,null,true,null,null,null,\"KcFMF\"],[45762876,null,false,null,null,null,\"JRm6id\"],[45737434,null,true,null,null,null,\"LYXRQd\"],[45899084,null,false,null,null,null,\"MS0H4\"],[45876363,null,false,null,null,null,\"F175qf\"],[45833843,null,false,null,null,null,\"NYdl8e\"],[45851528,null,false,null,null,null,\"COIM7c\"],[45882926,null,false,null,null,null,\"YYknXb\"],[45884321,null,false,null,null,null,\"sioIbb\"],[45768537,null,true,null,null,null,\"HzvgYb\"],[45788298,null,false,null,null,null,\"ET3a6d\"],[45763863,null,false,null,null,null,\"srRqFc\"],[45777963,null,false,null,null,null,\"JE0rH\"],[45853662,null,false,null,null,null,\"z4Szhe\"],[45865399,null,false,null,null,null,\"DFzY9e\"],[45834985,null,true,null,null,null,\"sAqbnd\"],[45849298,null,false,null,null,null,\"j578Be\"],[45827384,null,false,null,null,null,\"g3QGVd\"],[45822819,null,true,null,null,null,\"YalIlf\"],[45742893,null,true,null,null,null,\"Irsrgf\"],[45827530,null,true,null,null,null,\"KGZnYc\"],[45713337,null,true,null,null,null,\"yauate\"],[45775967,null,true,null,null,null,\"h9YtGf\"],[45781210,null,true,null,null,null,\"ZAVYX\"],[45892153,null,false,null,null,null,\"TaScsb\"],[45784560,null,true,null,null,null,\"aUo2dd\"],[45862407,null,false,null,null,null,\"xzAHle\"],[45786621,null,false,null,null,null,\"u5h94\"],[45856905,null,true,null,null,null,\"YyN5cb\"],[45721377,null,null,null,\"\",null,\"bXSQ7e\"],[45772596,null,true,null,null,null,\"AYGfy\"],[45817527,null,true,null,null,null,\"KAsw\"],[45850100,null,false,null,null,null,\"HIcJUb\"],[45817874,null,true,null,null,null,\"a6JmIf\"],[45733504,null,false,null,null,null,\"JZ5hpd\"],[45786417,null,false,null,null,null,\"jL0KB\"],[45781629,null,false,null,null,null,\"T92pzc\"],[45746822,null,true,null,null,null,\"Evf1d\"],[45885152,null,false,null,null,null,\"rZqh3\"],[45848811,null,false,null,null,null,\"UBGA9b\"],[45797765,null,false,null,null,null,\"LMH9V\"],[45784562,null,true,null,null,null,\"B7YKqc\"],[45870781,null,false,null,null,null,\"NryDGf\"],[45869556,null,false,null,null,null,\"tScIGe\"],[45806420,null,true,null,null,null,\"fEQEmb\"],[45767301,null,true,null,null,null,\"XNnQfb\"],[45790102,null,false,null,null,null,\"gWraHd\"],[45775806,null,false,null,null,null,\"f1cyrc\"],[45852907,null,true,null,null,null,\"a8lhaf\"],[45890186,null,false,null,null,null,\"CLydhf\"],[45865262,null,false,null,null,null,\"Bh3Ol\"],[45776819,null,true,null,null,null,\"CWdxXd\"],[45823295,null,false,null,null,null,\"Arlbpd\"],[45871674,null,false,null,null,null,\"o8NB9c\"],[45830082,null,false,null,null,null,\"ZUp3se\"],[45836590,null,null,0,null,null,\"vIGve\"],[45801163,null,true,null,null,null,\"VDs51c\"],[45858220,null,false,null,null,null,\"YAQRrc\"],[45796593,null,true,null,null,null,\"piQlge\"],[45751428,null,false,null,null,null,\"w8d1bc\"],[45837256,null,false,null,null,null,\"qckzOe\"],[45857099,null,false,null,null,null,\"cIG1vc\"],[45898499,null,false,null,null,null,\"BJoJeb\"],[45815733,null,true,null,null,null,\"ht9f6e\"],[45739638,null,true,null,null,null,\"hPR2wd\"],[45866669,null,true,null,null,null,\"xk2TDe\"],[45784349,null,true,null,null,null,\"xNyUwf\"],[45725952,null,false,null,null,null,\"LGSclc\"],[45716130,null,null,null,\"\",null,\"Qy4uld\"],[45773243,null,false,null,null,null,\"MLsv8b\"],[45793959,null,false,null,null,null,\"hOMnHf\"],[45646711,null,false,null,null,null,\"aKSrdd\"],[45773517,null,true,null,null,null,\"C4cpEd\"],[45863024,null,null,null,\"models/gemini-4-hydrogen\",null,\"SzcwOb\"],[45808440,null,false,null,null,null,\"OgCwYe\"],[45826997,null,true,null,null,null,\"XjAiEc\"],[45745504,null,false,null,null,null,\"II2tFb\"],[45830858,null,false,null,null,null,\"mJ13bb\"],[45786476,null,true,null,null,null,\"NtxR6e\"],[45832772,null,true,null,null,null,\"NrZPHe\"],[45765786,null,false,null,null,null,\"B1GdRb\"],[45780375,null,true,null,null,null,\"GAbK3d\"],[45785393,null,false,null,null,null,\"JVB6z\"],[45797100,null,false,null,null,null,\"iB2O1e\"],[45791779,null,false,null,null,null,\"DQg7Hb\"],[45767507,null,true,null,null,null,\"Zn5Ej\"],[45775384,null,true,null,null,null,\"DqVejd\"],[45802372,null,true,null,null,null,\"XXFwZe\"],[45716158,null,false,null,null,null,\"j1MtL\"],[45784330,null,true,null,null,null,\"WWo53e\"],[45869663,null,false,null,null,null,\"TDErSd\"],[106136619,null,true,null,null,null,\"iGreoe\"],[45794982,null,true,null,null,null,\"EW5nff\"],[45818348,null,false,null,null,null,\"r6kKsf\"],[45746195,null,true,null,null,null,\"eXVehb\"],[45898955,null,null,null,null,null,\"RXWwjd\",[\"[]\"]],[45865704,null,false,null,null,null,\"zgb7I\"],[45896756,null,false,null,null,null,\"BW7O9d\"],[45877248,null,false,null,null,null,\"ol8MBf\"],[45694412,null,false,null,null,null,\"SbCVZ\"],[45732213,null,false,null,null,null,\"w7xKfd\"],[45785017,null,true,null,null,null,\"ri7Eac\"],[45854438,null,false,null,null,null,\"YxfQyc\"],[45898956,null,false,null,null,null,\"qXpphf\"],[45762227,null,true,null,null,null,\"Z4Lh5e\"],[45865613,null,true,null,null,null,\"TYumuf\"],[45828311,null,false,null,null,null,\"HUhtxc\"],[45773733,null,true,null,null,null,\"EGfkj\"],[45772448,null,true,null,null,null,\"i07PMb\"],[45827223,null,true,null,null,null,\"Jtk3bf\"],[45875790,null,false,null,null,null,\"ATPIeb\"],[45854328,null,true,null,null,null,\"UeVFAf\"],[45772059,null,true,null,null,null,\"R59tgd\"],[45798215,null,false,null,null,null,\"HCx3Oc\"],[45747021,null,true,null,null,null,\"pKd73e\"],[45834001,null,true,null,null,null,\"hfCZid\"],[45823372,null,false,null,null,null,\"oMK3Y\"],[45830753,null,null,0,null,null,\"cRQlrb\"],[45741743,null,false,null,null,null,\"FpM8Qe\"],[45800793,null,true,null,null,null,\"ou8vKf\"],[45822392,null,true,null,null,null,\"wJ3FQd\"],[45862259,null,false,null,null,null,\"sZycyd\"],[45816582,null,false,null,null,null,\"dSJ7Bd\"],[45835850,null,true,null,null,null,\"L6pDkb\"],[45889740,null,false,null,null,null,\"z92e3c\"],[45772137,null,false,null,null,null,\"ishS2b\"],[45724978,null,false,null,null,null,\"OWw3ld\"],[45773922,null,true,null,null,null,\"RSYlDb\"],[45851577,null,false,null,null,null,\"Imb3Ce\"],[45837097,null,false,null,null,null,\"Ace8lb\"],[45776579,null,true,null,null,null,\"clXDpe\"],[45826123,null,true,null,null,null,\"I4xrBe\"],[45780339,null,true,null,null,null,\"RajHhe\"],[45786812,null,true,null,null,null,\"rG2Adf\"],[45896855,null,false,null,null,null,\"UuJZLc\"],[45872515,null,false,null,null,null,\"o84zEc\"],[45897846,null,false,null,null,null,\"higYlf\"],[45818351,null,false,null,null,null,\"jif7mb\"],[45872481,null,false,null,null,null,\"ZL3igd\"],[45797782,null,false,null,null,null,\"KGod8d\"],[45865396,null,true,null,null,null,\"F7dvAc\"],[45843340,null,false,null,null,null,\"DRXio\"],[45824509,null,true,null,null,null,\"j3c7ob\"],[45883228,null,false,null,null,null,\"nma2yd\"],[45814275,null,true,null,null,null,\"RkNCqf\"],[45857186,null,false,null,null,null,\"yZGRVd\"],[45750201,null,true,null,null,null,\"eOwTyc\"],[45869948,null,true,null,null,null,\"Fr9VSd\"],[45725932,null,false,null,null,null,\"Gb1Jaf\"],[45886982,null,false,null,null,null,\"KO1zzd\"],[45882374,null,false,null,null,null,\"pfT1bf\"],[45846308,null,true,null,null,null,\"I5yZof\"],[45818257,null,false,null,null,null,\"IXqyUd\"],[45791794,null,false,null,null,null,\"kc5JKd\"],[45741421,null,null,null,\"models/gemini-4-hydrogen\",null,\"PH4l9d\"],[45868031,null,false,null,null,null,\"OcMSwf\"],[45817341,null,false,null,null,null,\"E9pnPd\"],[45881088,null,false,null,null,null,\"v26dNe\"],[45821529,null,true,null,null,null,\"wXqG7\"],[45869851,null,true,null,null,null,\"XtjyHc\"],[45740367,null,true,null,null,null,\"jCr8Db\"],[45765657,null,false,null,null,null,\"TQncq\"],[45788850,null,true,null,null,null,\"Bh3THc\"],[45812131,null,false,null,null,null,\"tUuz0c\"],[45867460,null,false,null,null,null,\"UCMFWd\"],[45817301,null,true,null,null,null,\"QPlsw\"],[45794311,null,false,null,null,null,\"s5sys\"],[45798403,null,false,null,null,null,\"x2wuHf\"],[45880297,null,true,null,null,null,\"dtWFPb\"],[45722603,null,true,null,null,null,\"iWkpJ\"],[45708381,null,false,null,null,null,\"JkACyc\"],[45842058,null,false,null,null,null,\"BeXieb\"],[45831005,null,false,null,null,null,\"DHRiDc\"],[45835180,null,false,null,null,null,\"hBbzle\"],[45755068,null,true,null,null,null,\"EB2qEd\"],[45772802,null,true,null,null,null,\"gENGMb\"],[45787653,null,true,null,null,null,\"N0vGQ\"],[45796979,null,false,null,null,null,\"cElYhd\"],[45723374,null,false,null,null,null,\"FK7eJd\"],[45831247,null,false,null,null,null,\"dTRbcc\"],[45844654,null,false,null,null,null,\"Ll0PNe\"],[45897004,null,false,null,null,null,\"zcioRe\"],[45753184,null,false,null,null,null,\"yUHVge\"],[45781083,null,false,null,null,null,\"NNIf1e\"],[45865261,null,true,null,null,null,\"HmKYT\"],[45737499,null,true,null,null,null,\"dIQ2Ic\"],[45861680,null,true,null,null,null,\"gXEGbd\"],[45796324,null,true,null,null,null,\"sFBYxc\"],[45836224,null,false,null,null,null,\"QODXE\"],[45712153,null,false,null,null,null,\"aynkwb\"],[45726760,null,null,null,\"\",null,\"OZtjO\"],[45807399,20000,null,null,null,null,\"Fklxcf\"],[45825002,null,false,null,null,null,\"UYZwfb\"],[45747224,null,true,null,null,null,\"hLDizc\"],[45778977,null,true,null,null,null,\"BQF0Ib\"],[45854839,null,false,null,null,null,\"Q2VwPe\"],[45788754,null,null,null,null,null,\"CAlZbf\",[\"[[[\\\"supercloud\\\",\\\"https://www.gstatic.com/images/branding/productlogos/google_cloud_2026/v1/192px.svg\\\",\\\"https://www.gstatic.com/images/branding/productlogos/google_cloud_2026/v1/192px.svg\\\"],[\\\"gemini\\\",\\\"https://www.gstatic.com/images/branding/productlogos/gemini_2026/v1/192px.svg\\\",\\\"https://www.gstatic.com/images/branding/productlogos/gemini_2026/v1/192px.svg\\\"]]]\"]],[45886867,null,false,null,null,null,\"o1mLC\"],[45854420,null,true,null,null,null,\"vYFiN\"],[45773239,null,false,null,null,null,\"FR4WA\"],[45828912,null,null,null,\"\",null,\"M4rIM\"],[45826452,null,true,null,null,null,\"fyn48c\"],[45757828,null,true,null,null,null,\"Q8uuOb\"],[45784563,null,false,null,null,null,\"E8pjWd\"],[45879950,null,true,null,null,null,\"EzTFA\"],[45799359,null,true,null,null,null,\"B1kymf\"],[45828251,null,false,null,null,null,\"y14pld\"],[45721546,null,true,null,null,null,\"kNlqGe\"],[45759847,null,true,null,null,null,\"yRDM\"],[45818673,null,false,null,null,null,\"qxbq6e\"],[45825960,null,true,null,null,null,\"v240vc\"],[45778471,null,true,null,null,null,\"GxQ9o\"],[45737255,null,true,null,null,null,\"ra4Rcf\"],[45740401,null,true,null,null,null,\"kAmEsf\"],[45782135,null,true,null,null,null,\"aWuK4b\"],[45870488,null,false,null,null,null,\"P7LWqb\"],[45789764,null,true,null,null,null,\"q7jIFe\"],[45799173,null,null,null,null,null,\"AyrXXd\",[\"[]\"]],[106476711,null,true,null,null,null,\"oGx9Pd\"],[45747468,null,true,null,null,null,\"gjSq0\"],[45825901,null,true,null,null,null,\"dAUG8e\"],[45775030,null,true,null,null,null,\"yT9XMb\"],[45785071,null,true,null,null,null,\"jCAPEe\"],[45792594,null,false,null,null,null,\"pl1NXc\"],[45868792,null,false,null,null,null,\"vvpGyc\"],[497238176,null,true,null,null,null,\"WSAzh\"],[45845522,null,false,null,null,null,\"p7emWb\"]],\"CAMSrQEdrQbx4LI1FoCDFQ+AngUP/QIPl5UGD4oJD9g7D/DHBg+/HQ+CQxWlKACQJw+kNg+9kAYPg4oFD79cD8mtBg+xBg+aCw/GqAMPxVkPlNQED+aVBQ/0Lg+PjQUPvmoPvRYP9koPgbUEAIOXBQ/aZA/NNw/5AA+m1gUPxA4P8i0PlD4P8vsDD4stD++rAg+NfwCtuQYP7DcPsGkPsdwGD9nNBg/jngQP6RsProIBDw\\u003d\\u003d\"]]]","TwvH1d":false,"UUFaWc":"%.@.null,1000,2]","UsvuEb":true,"Vvafkd":false,"WIu0Nc":"AIzaSyDdP816MREB3SkjZO04QXbjsigfcI0GWOs","Z8v1ze":["clients6.google.com"],"ZGhOkf":false,"ZLEzG":"","ZOkjLb":"54874113115-ivo4l7hvbtc8bkvot7mjgnbnftkhfc9n.apps.googleusercontent.com","ax6qJc":false,"b5W2zf":"default_MakerSuite","cfb2h":"boq_alkali-makersuite_20261119.01_p1","eptZe":"/_/MakerSuite/","gGcLoe":false,"gTCm1":true,"goX6ee":[1706538,106240713,106421007,106640299,106821707,106848712,106596088,106070698,106034713,106313915,106090184,106460446,106091999,107005844,106326023,106274811,106168017,106168006,106278925,106735891,106874967,106654356,106889123,106124489,106136612,106620816,106827696,106705624,106153117,106577085,106729386,106602757,106115617,106741289,106621491,107045340,107003409,106889112,106647031,106888705,106099784,106486688,106426380,106737938,106127883,106828955,106823440,106206959,107100637,107110258,107088561,106995630,107098329,106868706,106641528,106108827,106146800,106782647,106844334,106142671,106296617,106476709,106474465,106589860,106385828,106240521,106999334,106071470,106917208,106218673,106115994,106943168,106518858,106748851,106238854,106190114,1714255,99469040,99469328,99469609,99470393,99470679,99471524,99472155,99472926,99473637,99474981,99475402,99476943,99479565,99479846,99481326,99483077,99485065,99487566,99488547,99490006,99498692,99502615,99504449,99506563,99507754,99511369,99513771,99515732,99519349,99521548,99526247,99592562,99592777,99593568,99593858,99594420,99595828,99597466,99598317,99599022,99600005,99601757,99603298,99603798,99605903,99610507,99612559,99615958,99618112,99620681,99624125,99627490,99628907,99631437,99634103,99636535,99643472,99645643,99649844,99663832,99670414,99674197,99684869,99690681,99697492,99698403,99706776,99709717,99722747,99730398,99818970,99819041,99819340,99819949,99822046,99824019,99825651,99831348,99835421,99836192,99843086,99846648,99848142,99851364,99853544,99856069,99858536,99864886,99871499,99874442,99880739,99888733,99892726,99895597,99900709,99922483,99925708,99934497,99939538,99947946,99948577,99955158,99964540,99966081,99976514,99982051,99986742,99988913,100006208,100011249,100015463,100022604,100024075,100036047,100048871,100056082,100056853,100066649,100072726,100080155,100085346,100091451,100116451,100130512,100133257,102390179,100153255,100161733,100167195,100175036,100190926,100196807,100225440,101401158,101401299,101401510,101404177,101404458,101404529,101412504,101413212,101413334,101415147,101415231,101415391,101415975,101416286,101416393,101421792,101422070,101422874,101425631,101425703,101426080,99654660,99671466,99689210,99823318,99826772,99827753,99837674,99866822,99898118,100098744,100138718,100182209,101413115,99820707,99885802,98419872,98419863,98419856,98419879,106242288,106065558,106821660,106895299,106895288,106542255,106195246,107047065,117434431,106641106,106597120,106793981,106808637,117071028,105901316,97785988,105739272,106846274,119919289,102936975,106172513,106240704,106420998,106640290,106821698,106848703,106596079,106070689,106034704,106313906,106090175,106460437,106091990,107005835,106326014,106274802,106168008,106167997,106278916,106735882,106874958,106654347,106889114,106124480,106136593,106620807,106827687,106705615,106153108,106577076,106729377,106602748,106115608,106741280,106621482,107045331,107003400,106889103,106647022,106888696,106099775,106486679,106426371,106737929,106127874,106828946,106823431,106206950,107100628,107110249,107088552,106995621,107098320,106868697,106641519,106108819,106146791,106782639,106844326,106142663,106296608,106476700,106474456,106589851,106385819,106240512,106999325,106071461,106917199,106218664,106115985,106943159,106518849,106748842,106238845,106190105,99469021,99469309,99469590,99470374,99470660,99471505,99472136,99472907,99473618,99474962,99475383,99476924,99479546,99479827,99481307,99483058,99485046,99487547,99488528,99489987,99498673,99502596,99504430,99506544,99507735,99511350,99513752,99515713,99519330,99521529,99526228,99592543,99592758,99593549,99593839,99594401,99595809,99597447,99598298,99599003,99599986,99601738,99603279,99603779,99605884,99610488,99612540,99615939,99618093,99620662,99624106,99627471,99628888,99631418,99634084,99636516,99643453,99645624,99649825,99663813,99670395,99674178,99684850,99690662,99697473,99698384,99706757,99709698,99722728,99730379,99818951,99819022,99819321,99819930,99822027,99824000,99825632,99831329,99835402,99836173,99843067,99846629,99848123,99851345,99853525,99856050,99858517,99864867,99871480,99874423,99880720,99888714,99892707,99895578,99900690,99922464,99925689,99934478,99939519,99947927,99948558,99955139,99964521,99966062,99976495,99982032,99986723,99988894,100006189,100011230,100015444,100022585,100024056,100036028,100048852,100056063,100056834,100066630,100072707,100080136,100085327,100091432,100116432,100130493,100133238,102390160,100153236,100161714,100167176,100175017,100190907,100196788,100225421,101401139,101401280,101401491,101404158,101404439,101404510,101412485,101413193,101413315,101415128,101415212,101415372,101415956,101416267,101416374,101421773,101422051,101422855,101425612,101425684,101426061,99654641,99671447,99689191,99823299,99826753,99827734,99837655,99866803,99898099,100098725,100138699,100182190,101413096,99820688,99885783,98419868,98419859,98419852,98419875,106242279,106065549,106821651,106895290,106895279,106542247,106195237,107047057,117434412,106641098,106597111,106808635,117071024,97785970,105739254,106846269,119919287,102936956,106172504],"hOXil":["FaxEntityService"],"hsFLT":"%.@.null,10,3]","iRz4i":3,"jfZ45e":"","k76Vlc":[],"kFsUdb":"https://docs.google.com/picker","kPYdqb":false,"mXaIFf":false,"nPAWmd":"https://cloudconsole-pa.clients6.google.com","nQyAE":{},"nfd52d":"google-ai-studio","p9hQne":"https://www.gstatic.com/_/boq-makersuite/_/r/","pm20lb":"cloudconsole-pa.clients6.google.com","qc58fc":"","qocwD":false,"qwAQke":"MakerSuite","rU9UAf":86400000,"rtQCxc":300,"syGxEd":false,"teM9xe":"a450385c-f8dc-42c6-882f-d8ab90aed789","tkHyOe":"MUST_PROVIDE_AN_API_KEY","u4g7r":"%.@.null,1,3]","wpAUPe":false,"xnI9P":false,"xuUxD":600000,"xwAfE":true,"y2FhP":"prod","yFnxrf":1957,"yWAmtc":false,"yueqgf":false,"z6uGHf":"6LfMhuItAAAAAPMRs5Icz9eJnvIjRlxrxvJQ6ABh","zBpHOc":"https://accounts.google.com/o/oauth2/auth","zChJod":"%.@.]","zQKvjb":25,"zSAhZc":"https://accounts.google.com/o/oauth2/iframe"}</script><script nonce="ykyOlgCOy_GXWNkRSpmpsA">window["_F_toggles_default_MakerSuite"] = [0x9aa441, 0x8707818, 0x18001001, ];</script><script nonce="ykyOlgCOy_GXWNkRSpmpsA"></script><script nonce="ykyOlgCOy_GXWNkRSpmpsA">var _F_cssRowKey = 'boq-makersuite.MakerSuite.VFXjuyV6fDY.L.X.O';var _F_combinedSignature = 'AMOXD281IeOT03o5H7WvMuXo-WDmn9RxYg';function _DumpException(e) {throw e;}</script><link rel="stylesheet" href="https://www.gstatic.com/_/mss/boq-makersuite/_/ss/k=boq-makersuite.MakerSuite.VFXjuyV6fDY.L.X.O/am=QaSaAAYeHBIAAYAB/d=1/ed=1/rs=AMOXD2_vvWElZ2mIKY9X_W_SszRk8LeQ1w/m=_b" data-id="_cl" nonce="G7jbisuHmjEUezqJ6qHa-A"><style data-font-stylesheet nonce="G7jbisuHmjEUezqJ6qHa-A">@font-face{font-family:'Product Sans';font-style:normal;font-weight:400;font-display:block;src:url(https://fonts.gstatic.com/s/productsans/v9/pxiDypQkot1TnFhsFMOfGShVF9eL.ttf)format('truetype');}@font-face{font-family:'Google Sans';font-style:normal;font-weight:400;font-display:block;src:url(https://fonts.gstatic.com/s/googlesans/v62/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrwEIJllpyw.ttf)format('truetype');}@font-face{font-family:'Google Sans';font-style:normal;font-weight:500;font-display:block;src:url(https://fonts.gstatic.com/s/googlesans/v62/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrw2IJllpyw.ttf)format('truetype');}@font-face{font-family:'Google Sans';font-style:normal;font-weight:700;font-display:block;src:url(https://fonts.gstatic.com/s/googlesans/v62/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrzjJ5llpyw.ttf)format('truetype');}@font-face{font-family:'Google Sans Mono';font-style:normal;font-weight:400;font-display:block;src:url(https://fonts.gstatic.com/s/googlesansmono/v15/P5sUzYWFYtnZ_Cg-t0Uq_rfivrdYH4RE8-pZ5gQ1abT53wVQGrw.ttf)format('truetype');}@font-face{font-family:'Google Sans Mono';font-style:normal;font-weight:500;font-display:block;src:url(https://fonts.gstatic.com/s/googlesansmono/v15/P5sUzYWFYtnZ_Cg-t0Uq_rfivrdYH4RE8-pZ5gQ1abTL3wVQGrw.ttf)format('truetype');}@font-face{font-family:'Google Sans Display';font-style:normal;font-weight:400;font-display:block;src:url(https://fonts.gstatic.com/s/googlesansdisplay/v14/ea8FacM9Wef3EJPWRrHjgE4B6CnlZxHVDv79pA.ttf)format('truetype');}@font-face{font-family:'Google Sans Display';font-style:normal;font-weight:500;font-display:block;src:url(https://fonts.gstatic.com/s/googlesansdisplay/v14/ea8IacM9Wef3EJPWRrHjgE4B6CnlZxHVBg3etBD7SQ.ttf)format('truetype');}@font-face{font-family:'Google Symbols';font-style:normal;font-weight:300;font-display:block;src:url(https://fonts.gstatic.com/l/font?kit=HhzMU5Ak9u-oMExPeInvcuEmPosC9zyteYEFU68cPrjdKM1XLPTxlGmzczpgWvF1d8Yp7AudBnt3CPar1JFWjoLAUv3G2tSNljixIIGUsC62cdTKiAkecSathI2-Ama_9tgxECbWyWdcPvfEJGvEQgr6-vH_5FdLAwAw6VG8UVin4vJWnDEuNkOg_Yu5j43CpNBozuwHmZ8fWrE9Lf4MNKI8Ob1p3vhM5MmL1xPtYWJxn249etAwJOtWcK4TGbpR9kT-hxSQZneh0280ej7HGssaEg83Dl7y2HGz0kOBfNx3wEu0X_XuCaG3cN2lRqWIbdLNSNDJRROijuPx8l9LJ9MUc3YVaAy_FvW5Mqt0GUo25_KQiw1hKNLtEJaxxjaMHUnuguCLmBasc_FprKmQJwcnLLo8bdqtzSuhFP_31k52MdmRBrH3GvPp7bHNbT4EXm1lWgmcIdjLuuJhef26zX41OuqUtxjwb8NDNZa8Q6TNW_dJyeL-gWgc_ClBMu341gqZlWdWoPecEu3euEPGsLoo4vfChyzXDI2WqoSMlLm-9pkpNBDu59zXyx5iF00pAp2AABx0R33XwMfUTHMtQMlXylX0za0M7FckJGLshp-5a4dlVw&skey=f8ec4d50247dc1c1&v=v472)format('truetype');}.google-symbols{font-family:'Google Symbols';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;}</style><title>Release notes - Gemini API | Google AI Studio</title><meta name="description" content="Keep track of updates to the Gemini API"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"><script nonce="ykyOlgCOy_GXWNkRSpmpsA">
+      function glueCookieNotificationBarLoaded() {
+        const {instance} = window.glue.CookieNotificationBar;
+        instance.listen('visibilitychange', (event) => {
+          const cookieBanner = document.getElementsByClassName('glue-cookie-notification-bar')[0];
+          if (event.detail.visible) {
+            cookieBanner.classList.add('visible');
+          } else {
+            cookieBanner.classList.remove('visible');
+          }
+        });
+
+        (function (w, d, s, l) {
+          w[l] = w[l] || [];
+          w[l].push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+          var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != 'dataLayer' ? '&l=' + l : '',
+            e=d.querySelector('script[nonce]'),n=e&&(e['nonce']||e.getAttribute('nonce'));
+          j.async = true;
+          j.setAttribute('nonce', n);
+          if (self.trustedTypes && self.trustedTypes.createPolicy) {var policy = self.trustedTypes.createPolicy('aistudio', {createScriptURL: function(unused) { return 'https:\/\/www.googletagmanager.com\/gtm.js?id\x3dGTM-TT9C75WP'; }}); j.src = policy.createScriptURL('');} else {j.src = 'https:\/\/www.googletagmanager.com\/gtm.js?id\x3dGTM-TT9C75WP';}
+
+          f.parentNode.insertBefore(j, f);
+
+          window[l].push({'event': 'dataLayer_initialized', 'page_name': 'Google AI Studio'});
+        })(window, document, 'script', 'dataLayer');
+      }
+    </script><!-- Cookie Consent --><script src="https://www.gstatic.com/glue/cookienotificationbar/cookienotificationbar.min.js" data-glue-cookie-notification-bar-category="2A" data-glue-cookie-notification-bar-site-id="Google AI Studio" nonce="ykyOlgCOy_GXWNkRSpmpsA"></script><!-- End Cookie Consent  --><link rel="llms.txt" href="/llms.txt"><link rel="alternate" type="text/markdown" href="/docs/changelog.md"><script nonce="ykyOlgCOy_GXWNkRSpmpsA">var AF_initDataKeys = window.AF_initDataKeys || {}; var AF_dataServiceRequests = window.AF_dataServiceRequests || {}; var AF_initDataChunkQueue = window.AF_initDataChunkQueue || {}; var AF_initDataCallback = window.AF_initDataCallback || {}; var AF_initDataInitializeCallback = window.AF_initDataInitializeCallback || {}; AF_initDataKeys['70b56b89-9b62-4d05-9d19-c8329915b572'] = []; AF_dataServiceRequests['70b56b89-9b62-4d05-9d19-c8329915b572'] = {}; AF_initDataChunkQueue['70b56b89-9b62-4d05-9d19-c8329915b572'] = AF_initDataChunkQueue['70b56b89-9b62-4d05-9d19-c8329915b572'] || []; if (AF_initDataInitializeCallback['70b56b89-9b62-4d05-9d19-c8329915b572']) {AF_initDataInitializeCallback['70b56b89-9b62-4d05-9d19-c8329915b572'](AF_initDataKeys['70b56b89-9b62-4d05-9d19-c8329915b572'], AF_initDataChunkQueue['70b56b89-9b62-4d05-9d19-c8329915b572'], AF_dataServiceRequests['70b56b89-9b62-4d05-9d19-c8329915b572']);}if (!AF_initDataCallback['70b56b89-9b62-4d05-9d19-c8329915b572']) {AF_initDataCallback['70b56b89-9b62-4d05-9d19-c8329915b572'] = function(chunk) {AF_initDataChunkQueue['70b56b89-9b62-4d05-9d19-c8329915b572'].push(chunk);};}</script></head><app-root></app-root><noscript><pre>&gt; ## AI Agent Context
+&gt; - Full documentation index: https://aistudio.google.com/llms.txt
+&gt; - Gemini Docs MCP server (consistent live info): https://gemini-api-docs-mcp.dev
+&gt; - Coding agent skills &amp; setup guide: https://aistudio.google.com/docs/coding-agents.md
+
+# Release notes
+
+This page documents updates to the Gemini API.
+
+## November 19, 2026  {% id=&quot;11-19-2026&quot; %}
+
+*   **Genie 4 (`genie-4`) generally available (GA)**: Released
+    [Genie 4](/docs/models/genie-4) (`genie-4`) on the
+    [Interactions API](/docs/genie) (`v1beta`) for real-time interactive world
+    generation, streaming steerable 24 fps 16:9 video with synchronized
+    48 kHz stereo audio over WebRTC and WebSockets. Seed worlds from text, a
+    16:9 reference image, or both, and steer live with WASD/arrow keys and
+    mid-session text events. Available on the paid tier at
+    [pricing](/docs/pricing#genie-4) of $1.50 per 1M input tokens, $9.00
+    per 1M text output tokens, and $17.50 per 1M video output tokens
+    (~$0.10/sec, stereo audio included); see
+    [Interactive world generation with Genie 4](/docs/genie), the
+    [Genie 4 prompt and controls guide](/docs/genie-prompting), and
+    [rate limits](/docs/rate-limits#genie-4).
+
+*   **Tool retrieval (Preview)**: The Interactions API can now search your tool
+    library and load function schemas on demand, so large tool sets no longer
+    have to be sent in full on every request. Mark tools with `defer_loading:
+    true` and add a `{&quot;type&quot;: &quot;tool_search&quot;}` tool to let Gemini retrieve
+    schemas for you, or set `execution: &quot;client&quot;` to run your own retrieval
+    logic. Remote MCP servers support `defer_loading` as well.
+
+    Tool Retrieval works with Gemini 3.6 and later models, including all Gemini
+    4 models, in the Interactions API. See the
+    [Tool retrieval](/docs/tool-retrieval) guide.
+
+
+## November 18, 2026  {% id=&quot;11-18-2026&quot; %}
+
+*   **Gemini 4 Neon (`gemini-4-neon`) generally available (GA)**: Released
+    [Gemini 4 Neon](/docs/models/gemini-4-neon) (`gemini-4-neon`), bringing
+    frontier-level intelligence with fast end-to-end task completion across
+    complex software engineering, knowledge work, and science workflows.
+    Available on the paid tier at [pricing](/docs/pricing#gemini-4-neon) of
+    $3.00 per 1M input tokens and $15.00 per 1M output tokens, `gemini-4-neon`
+    supports four [thinking levels](/docs/thinking#understanding-thinking-levels)
+    (`low`, `medium`, default `high`, and `xhigh`), a unified 1M-token context
+    window, and long decode up to 1M tokens. See
+    [What&#39;s new in Gemini 4 Neon](/docs/whats-new-gemini-4-neon) to get started.
+
+*   **Multimodal file processing and slicing**: You can now pass Microsoft
+    Office and OpenDocument files (Word, PowerPoint, and Excel) directly to the
+    Gemini API, and slice documents, spreadsheets, videos, and audio in user
+    prompts and [function responses](/docs/function-calling#file-inspection-options).
+    Select specific page ranges, worksheet tabs, cell ranges, time intervals, or
+    content layers (such as page images, extracted text, formulas, or video
+    transcripts) so you only process and pay for the content you need.
+
+    To get started, see [Document understanding](/docs/document-processing#customize-document-processing),
+    [Video understanding](/docs/video-understanding#customize-video-processing),
+    and [Audio understanding](/docs/audio#clipping-intervals).
+
+
+## November 17, 2026  {% id=&quot;11-17-2026&quot; %}
+
+*   **Voice editing in Gemini 3.5 Transcribe**:
+    [`gemini-3.5-transcribe`](/docs/models/gemini-3.5-transcribe) and
+    `gemini-3.5-transcribe-live` now support voice-driven editing, rewriting,
+    and formatting of dictated speech or pre-existing text (`source_text`). See
+    the [Audio transcription](/docs/transcribe#voice-editing) and
+    [Live transcription](/docs/live-api/live-transcribe#voice-editing) guides.
+
+## November 12, 2026  {% id=&quot;11-12-2026&quot; %}
+
+*   **Gemini 4 Hydrogen (`gemini-4-hydrogen`) generally available (GA)**: Released
+    [Gemini 4 Hydrogen](/docs/models/gemini-4-hydrogen) (`gemini-4-hydrogen`),
+    bringing cutting-edge intelligence to everyone, with speed and efficiency
+    for everyday coding and agentic workflows.
+    Available on the free tier and at paid-tier
+    [pricing](/docs/pricing#gemini-4-hydrogen) of $1.50 per 1M input tokens and
+    $7.50 per 1M output tokens, `gemini-4-hydrogen` introduces a fourth
+    [`xhigh`](/docs/thinking#understanding-thinking-levels) thinking level alongside `low`,
+    `medium`, and default `high`, and is now the default model for the
+    [Antigravity agent](/docs/antigravity-agent) in Gemini Managed Agents. See
+    [What&#39;s new in Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen) for API
+    changes and migration guidance from Gemini 3.8 Flash.
+
+## November 11, 2026  {% id=&quot;11-11-2026&quot; %}
+
+*   **Gemini Decision 1 and the Decisions API**: Released
+    [Gemini Decision 1](/docs/models/gemini-decision-1) (`gemini-decision-1`) and
+    the [Decisions API](/docs/decisions-api) for fast, calibrated binary,
+    categorical, and rubric decisions across text, images, audio, video, and
+    PDFs with zero output tokens. View [pricing](/docs/pricing#gemini-decision)
+    and [rate limits](/docs/rate-limits#gemini-decision), or see the
+    [Decisions API guide](/docs/decisions-api) to get started.
+
+## November 10, 2026  {% id=&quot;11-10-2026&quot; %}
+
+*   **Gemini 4 Carbon (`gemini-4-carbon`) generally available (GA)**: Released
+    [Gemini 4 Carbon](/docs/models/gemini-4-carbon) (`gemini-4-carbon`), our
+    most capable reasoning model built for sustained agentic coding, multimodal
+    knowledge work, scientific reasoning, and cybersecurity defense, available
+    at introductory [pricing](/docs/pricing#gemini-4-carbon) of $2.00 per 1M
+    input tokens and $10.00 per 1M output tokens through November 30, 2026. See
+    [What&#39;s new in Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) to get started.
+
+## November 6, 2026  {% id=&quot;11-06-2026&quot; %}
+
+*   **Gemini Embedding 2 Preview deprecation**:
+    [`gemini-embedding-2-preview`](/docs/models/gemini-embedding-2-preview) is
+    [deprecated](/docs/deprecations#embedding-deprecated-models). Effective
+    November 6, 2026, API requests to `gemini-embedding-2-preview` route to
+    [`gemini-embedding-2`](/docs/models/gemini-embedding-2) at
+    [Gemini Embedding 2 rates](/docs/pricing#gemini-embedding-2). Update your
+    model string to `gemini-embedding-2`. `gemini-embedding-2` uses the same API
+    schema, pricing, and embedding space, so no other code changes or vector
+    re-indexing are needed.
+
+## November 5, 2026  {% id=&quot;11-05-2026&quot; %}
+
+*   **Gemini Omni 1.2 Flash generally available (GA)**: Released
+    [Gemini Omni 1.2 Flash](/docs/models/gemini-omni-flash)
+    (`gemini-omni-1.2-flash`), featuring up to 15-second video generation and
+    conversational editing (3 to 10 seconds for first and last frame
+    interpolation, and 3 to 10 seconds per-turn video extension up to 30 seconds
+    total length), improved character and subject consistency across up to 6
+    reference images, 30% lower video output
+    [pricing](/docs/pricing#gemini-omni-1.2-flash) ($12.00 per 1M tokens), and
+    doubled paid-tier [rate limits](/docs/rate-limits#gemini-omni-flash-rate-limits).
+    See the [Gemini Omni Flash guide](/docs/omni) to get started.
+
+*   **Gemini Omni 1.1 Flash automatic routing notice**: Effective **December 3,
+    2026**, API requests to `gemini-omni-1.1-flash` will automatically route to
+    `gemini-omni-1.2-flash` at
+    [Gemini Omni 1.2 Flash rates](/docs/pricing#gemini-omni-1.2-flash).
+
+*   **Expanded Office and OpenDocument file support**: The Gemini API now
+    accepts PowerPoint 97-2003 (PPT), OpenDocument Presentation (ODP), and
+    OpenDocument Spreadsheet (ODS) files as input, and adds page-image
+    processing for Word 97-2003 (DOC) files. DOC, PPT, and ODP files are
+    rendered as page images. For ODS files, the model receives the data and
+    formulas from the first sheet.
+    Processing for DOCX, DOTX, ODT, PPTX, XLSX, and XLS files is unchanged. See
+    [Office and OpenDocument files](/docs/document-processing#office-documents)
+    for how each format is processed.
+
+*   **More file types and file URIs in function responses**: Tools can now
+    return Office and OpenDocument files, audio, and video to the model.
+
+    *   **GenerateContent API**: Function response parts now accept audio,
+        video, and Office and OpenDocument files, in addition to images, PDFs,
+        and plain text. They also accept `fileData`, so tools can return a
+        Files API URI instead of inline bytes. `displayName` is now available
+        on both `inlineData` and `fileData`, and video parts accept
+        `mediaProcessing` (`STATIC` or `AGENTIC`).
+    *   **Interactions API**: `function_result` steps now accept `document`,
+        `audio`, and `video` content blocks, in addition to `text` and `image`,
+        by inline `data` or `uri`. Video blocks are available in `v1beta` and
+        `v1alpha` and accept `processing`.
+
+    See [Multimodal function responses](/docs/function-calling#multimodal)
+    for details.
+
+
+## November 4, 2026  {% id=&quot;11-04-2026&quot; %}
+
+*   **Voice remixing for Gemini 3.8 TTS**: Released
+    [Voice remixing](/docs/voice-remixing), which lets you modify an existing
+    prebuilt or [designed](/docs/voice-design) voice using natural-language
+    instructions to create a new, independent stored voice. Use
+    `POST /v1beta/voices` with `gemini-3.8-flash-tts` (or remix interactively in
+    [Google AI Studio](https://aistudio.google.com/generate-speech)) to generate
+    a `voice_...` ID, then synthesize speech with
+    [Gemini 3.8 Flash TTS](/docs/models/gemini-3.8-flash-tts) or
+    [Gemini 3.8 Flash-Lite TTS](/docs/models/gemini-3.8-flash-lite-tts). See the
+    [Voice remixing guide](/docs/voice-remixing) to get started.
+
+## November 2, 2026  {% id=&quot;11-02-2026&quot; %}
+
+*   **Gemini 2.5 Pro deprecation**:
+    [`gemini-2.5-pro`](/docs/models/gemini-2.5-pro) is
+    [deprecated](/docs/deprecations#gemini-2.5-pro-models) and is no longer
+    available to select in Google AI Studio. Effective December 1, 2026, all API
+    requests to `gemini-2.5-pro` will automatically route to
+    [`gemini-3.8-flash`](/docs/models/gemini-3.8-flash) and be billed at
+    [Gemini 3.8 Flash rates](/docs/pricing#gemini-3.8-flash). Before December 1,
+    2026, update your model string to `gemini-3.8-flash` and review the
+    [Gemini 3.8 Flash migration guide](/docs/whats-new-gemini-3.8#migrate-to-gemini-3-8-flash).
+    Breaking API changes include function calling and `thought_signature`
+    validation, `thinking_level` replacing `thinking_budget`, and removed
+    sampling parameters and prefilled model turns.
+*   **Gemini 2.5 Flash deprecation**:
+    [`gemini-2.5-flash`](/docs/models/gemini-2.5-flash) is
+    [deprecated](/docs/deprecations#gemini-2.5-flash-models) and is no longer
+    available to select in Google AI Studio. Effective December 1, 2026, all API
+    requests to `gemini-2.5-flash` will automatically route to
+    [`gemini-3.5-flash-lite`](/docs/models/gemini-3.5-flash-lite) and be billed
+    at [Gemini 3.5 Flash-Lite rates](/docs/pricing#gemini-3.5-flash-lite).
+    Before December 1, 2026, update your model string to `gemini-3.5-flash-lite`
+    and review the
+    [Gemini 3.5 Flash-Lite migration guide](/docs/whats-new-gemini-3.6#migrate-to-gemini-3-5-flash-lite).
+    Breaking API changes include function calling and `thought_signature`
+    validation, `thinking_level` replacing `thinking_budget`, and removed
+    sampling parameters and prefilled model turns.
+
+## October 30, 2026  {% id=&quot;10-30-2026&quot; %}
+
+*   **Computer Use generally available (GA)**: Released the
+    [Computer Use](/docs/computer-use) tool to general availability (GA) across
+    the Interactions and GenerateContent APIs.
+
+## October 27, 2026  {% id=&quot;10-27-2026&quot; %}
+
+*   **Gemini API CLI (`gemini-api`) beta**: Released the [Gemini API
+    CLI](/docs/cli) (`gemini-api`), a stateless, zero-dependency command-line
+    client for AI coding agents, scripts, and CI pipelines. Use `gemini-api` on
+    the [Interactions API](/docs/interactions-overview) to generate text and
+    media, analyze files, and run [Gemini managed agents](/docs/agents). See the
+    [Gemini API CLI guide](/docs/cli) to get started.
+
+## October 26, 2026  {% id=&quot;10-26-2026&quot; %}
+
+*   **Generate Content API storage on by default**: New projects using the
+    Generate Content API (`generateContent`, `streamGenerateContent`, and
+    `batchGenerateContent`) on the paid tier now store requests by default
+    (`store=true`), matching the Interactions API. Existing projects
+    keep their current setting. To opt out, set `store=false` on individual
+    requests or turn off Generate Content API logging in the **Settings** panel
+    of the [Logs and Datasets](/logs) dashboard. See
+    [Logs and datasets](/docs/logs-datasets#configure-logging) for details.
+
+## October 13, 2026  {% id=&quot;10-13-2026&quot; %}
+
+*   **Gemini 4 Argon (`gemini-4-argon`) generally available (GA)**: Released
+    [Gemini 4 Argon](/docs/models/gemini-4-argon) (`gemini-4-argon`), our most
+    capable model built for complex coding, agentic, math, and science tasks.
+
+    For API changes, pricing, and migration guidance, see
+    [What&#39;s new in Gemini 4 Argon](/docs/whats-new-gemini-4-argon).
+
+
+## October 8, 2026  {% id=&quot;10-08-2026&quot; %}
+
+*   **Gemini 3.7 Flash deprecation**:
+    [`gemini-3.7-flash`](/docs/whats-new-gemini-3.7) is deprecated and has been
+    replaced by [`gemini-3.8-flash`](/docs/whats-new-gemini-3.8). It is no longer
+    available to select in Google AI Studio, and API requests to
+    `gemini-3.7-flash` are automatically routed to `gemini-3.8-flash`. Update
+    your model string to `gemini-3.8-flash` and review the
+    [Gemini 3.8 Flash guide](/docs/whats-new-gemini-3.8).
+
+*   **Gemini 3.5 Flash deprecation**:
+    [`gemini-3.5-flash`](/docs/whats-new-gemini-3.5) is deprecated and has been
+    replaced by [`gemini-3.6-flash`](/docs/whats-new-gemini-3.6). It is no
+    longer available to select in Google AI Studio, and API requests to
+    `gemini-3.5-flash` are automatically routed to `gemini-3.6-flash`. Update
+    your model string to `gemini-3.6-flash` (or
+    [`gemini-3.8-flash`](/docs/whats-new-gemini-3.8)) and review the
+    [Gemini 3.6 Flash guide](/docs/whats-new-gemini-3.6).
+
+*   **Deep Research Agent `deep-research-pro-preview-12-2025` deprecation**:
+    The `deep-research-pro-preview-12-2025` agent is deprecated and will be
+    [shut down](/docs/deprecations#managed-agents) on **October 23, 2026**.
+
+    Migrate your requests to one of the newer [Deep
+    Research](/docs/deep-research) agent versions:
+
+    *   [`deep-research-preview-04-2026`](/docs/models/deep-research-preview-04-2026):
+        Designed for speed and efficiency, ideal to be streamed back to a client
+        UI.
+    *   [`deep-research-max-preview-04-2026`](/docs/models/deep-research-max-preview-04-2026):
+        Maximum comprehensiveness for automated context gathering and synthesis.
+
+    To migrate, update the `agent` parameter in your `interactions.create`
+    requests from `deep-research-pro-preview-12-2025` to
+    `deep-research-preview-04-2026` (or `deep-research-max-preview-04-2026`).
+
+
+## October 6, 2026  {% id=&quot;10-06-2026&quot; %}
+
+*   **Gemini Nano Banana 2.1 generally available (GA)**: Released
+    [Gemini Nano Banana 2.1](/docs/models/gemini-nano-banana-2.1)
+    (`gemini-nano-banana-2.1`), the latest high-efficiency image generation and
+    conversational editing model. An update to Nano Banana 2
+    ([`gemini-3.1-flash-image`](/docs/models/gemini-3.1-flash-image)), it
+    maintains Flash-level speed and cost efficiency while delivering significant
+    improvements in visual quality, prompt adherence, multi-turn character
+    consistency, text rendering, and wide and panoramic aspect ratio generation
+    (`1:4`, `4:1`, `1:8`, `8:1`) across `1K`, `2K`, and `4K` resolutions.
+
+    See the [Image generation guide](/docs/image-generation) to get started.
+
+*   **Deprecation announcement**: The `gemini-3.1-flash-image` model is
+    deprecated (no shutdown date announced). Migrate to
+    [`gemini-nano-banana-2.1`](/docs/models/gemini-nano-banana-2.1).
+
+
+## September 22, 2026  {% id=&quot;09-22-2026&quot; %}
+
+*   **Gemini 3.8 Flash TTS and Gemini 3.8 Flash-Lite TTS generally available
+    (GA)**: Released our next-generation text-to-speech (TTS) audio models and
+    the Gemini API Voices endpoint (`/v1beta/voices`):
+
+    *   **[Gemini 3.8 Flash TTS](/docs/models/gemini-3.8-flash-tts)
+        (`gemini-3.8-flash-tts`)**: Flagship creative TTS model engineered for
+        studio-grade voice fidelity, nuanced acting, regional dialects, and
+        long-form multi-turn stability.
+    *   **[Gemini 3.8 Flash-Lite TTS](/docs/models/gemini-3.8-flash-lite-tts)
+        (`gemini-3.8-flash-lite-tts`)**: Fast, cost-efficient TTS model built to
+        replace `gemini-3.1-flash-tts-preview` for high-throughput production
+        and real-time voice agent cascades.
+    *   **[Voice design](/docs/voice-design),
+        [Voice replication](/docs/voice-replication), and the
+        [Extended Voice Library](/docs/speech-generation#voice-library)**:
+        Create persistent custom vocal personas from text prompts, replicate
+        voices with consent verification, and query 150+ prebuilt and custom
+        voices.
+
+    See the [Text-to-speech guide](/docs/speech-generation) to get started.
+
+
+## September 18, 2026  {% id=&quot;09-18-2026&quot; %}
+
+*   **Gemini 2.5 models access update**: To ensure reliable performance for
+    everyone, we are limiting access to the 2.5 models to users who have
+    actively used them in the past. These models are not deprecated and will
+    continue to be served until further notice through the API. For any new
+    projects, use our latest models: 3.5 Flash-Lite or 3.8 Flash. This
+    helps us maintain sufficient capacity for both ongoing legacy workflows and
+    new applications.
+
+## September 17, 2026  {% id=&quot;09-17-2026&quot; %}
+
+*   **Antigravity Agent 09-2026**: Released `antigravity-preview-09-2026`,
+    which replaces and deprecates `antigravity-preview-05-2026`.
+
+    If you run on a remote sandbox (`environment: &quot;remote&quot;`) and read only
+    `output_text` or `model_output` steps, update the agent string and nothing
+    else changes.
+
+    If you run tools locally (`local_environment`) or parse `function_call`
+    steps, the built-in tools changed. Parameters use PascalCase instead of
+    snake_case, and file edits use line-range replacements instead of full
+    rewrites.
+
+    | Capability | 05-2026 | 09-2026 |
+    | :--- | :--- | :--- |
+    | File creation | `write_file(path, content)` | `write_to_file(TargetFile, CodeContent, Overwrite, Description)` |
+    | File editing | `write_file(path, content)`, full rewrite | `replace_file_content(TargetFile, StartLine, EndLine, TargetContent, ReplacementContent)` |
+    | File reading | `read_file(path, offset, limit)`, byte offsets | `view_file(AbsolutePath, StartLine, EndLine, ContentOffset)` |
+    | Directory listing | `list_files(path)` | `list_dir(DirectoryPath)` |
+    | File and code search | None, agents used shell commands | `find_by_name(SearchDirectory, Pattern, MaxDepth)` and `grep_search(SearchPath, Query, IsRegex)` |
+    | Shell execution | `code_execution(command, timeout_seconds)` | Unchanged |
+    | Web search | `google_search(queries)` | Unchanged |
+
+    See the [Antigravity Agent](/docs/antigravity-agent) guide.
+    `antigravity-preview-05-2026` shuts down on October 5, 2026, tracked on the
+    [deprecations](/docs/deprecations#managed-agents) page.
+
+
+## September 15, 2026  {% id=&quot;09-15-2026&quot; %}
+
+*   **Gemini 3.8 Live and Gemini 3.8 Live Extended Thinking generally available
+    (GA)**: Released our next-generation Live API models for real-time
+    multimodal dialogue and agentic tool use:
+
+    *   **[Gemini 3.8 Live](/docs/models/gemini-3.8-live) (`gemini-3.8-live`)**:
+        Engineered for sub-second conversational latency with native audio
+        understanding, affective dialogue, proactive audio, and
+        synchronous/asynchronous function calling.
+    *   **[Gemini 3.8 Live Extended Thinking](/docs/models/gemini-3.8-live-extended-thinking)
+        (`gemini-3.8-live-extended-thinking`)**: Specialized for complex
+        reasoning, multi-step planning, and long-horizon state tracking with
+        configurable thinking levels (`MINIMAL`, `LOW`, `MEDIUM`, `HIGH`) and
+        asynchronous function calling.
+
+    To get started, see the
+    [Thinking in the Live API guide](/docs/live-api/thinking) and the
+    [Live API overview](/docs/live-api).
+
+
+## September 3, 2026  {% id=&quot;09-03-2026&quot; %}
+
+*   **Lyria 3.5 generally available (GA)**: Released the next generation of
+    Google&#39;s music generation model:
+
+    *   [`lyria-3.5`](/docs/models/lyria-3.5):
+        Full-length song generation with improved musical coherence, natural
+        vocals, and fine-grained duration and structural control.
+
+    The model supports text and image inputs and generates high-fidelity 44.1
+    kHz stereo audio. See the [Music generation](/docs/music-generation)
+    guide for details and code samples.
+
+
+## September 2, 2026  {% id=&quot;09-02-2026&quot; %}
+
+*   **Gemini 3.8 Flash generally available (GA)**: Released `gemini-3.8-flash`,
+    our most intelligent Flash model, engineered for long-horizon software
+    engineering, autonomous agents, and complex enterprise workflows.
+
+    To get started, see the [Gemini 3.8 Flash](/docs/models/gemini-3.8-flash)
+    model page and the [Gemini 3.8 Flash guide](/docs/whats-new-gemini-3.8).
+
+
+## September 1, 2026  {% id=&quot;09-01-2026&quot; %}
+
+*   **Agentic video understanding**: Released agentic video understanding for
+    Gemini 3.7 Flash, 3.6 Flash, and 3.5 Flash-Lite across the Interactions and
+    GenerateContent APIs. The model dynamically navigates video timelines,
+    requesting transcripts, frames, or audio tracks on demand. This approach
+    uses up to 88% fewer tokens for long-form content compared to static
+    processing.
+
+    To get started, see the [Agentic video
+    understanding](/docs/video-understanding#agentic-video-understanding) guide.
+
+
+## August 27, 2026  {% id=&quot;08-27-2026&quot; %}
+
+*   **Gemini Omni Flash generally available (GA)**: Released
+    `gemini-omni-1.1-flash`, the GA version of our fast, conversational video
+    generation and editing model. This release includes significant new
+    capabilities:
+
+    *   **Video extension**: Seamlessly extend existing videos by generating
+        continuations at the end of a clip using the `extend` task or directly
+        with a prompt.
+    *   **Interpolation (first + last frame)**: Generate a video transitioning
+        between two images using the `image_to_video` task with up to 2 images.
+    *   **Resolution control**: New `resolution` parameter in `video_config`
+        supports `360p`, `720p` (default), `1080p`, and `4k` outputs.
+        1080p and 4K outputs are generated using upscaling.
+
+    The existing `gemini-omni-flash-preview` endpoint will be deprecated on
+    September 30, 2026.
+
+    To get started, see the [Gemini Omni Flash](/docs/models/gemini-omni-flash)
+    model page and the [omni guide](/docs/omni).
+
+
+## August 26, 2026  {% id=&quot;08-26-2026&quot; %}
+
+*   **Gemini 3.5 Transcribe generally available (GA)**: Released two dedicated
+    speech-to-text models based on Gemini&#39;s audio understanding:
+
+    *   **Gemini 3.5 Transcribe** (`gemini-3.5-transcribe`): High-accuracy,
+        low-latency non-streaming speech-to-text with utterance-based language
+        detection across 80+ languages, speaker diarization, word-level
+        timestamps, and custom vocabulary biasing (up to 1,000 terms).
+    *   **Gemini 3.5 Transcribe Live** (`gemini-3.5-transcribe-live`):
+        Low-latency, bidirectional streaming speech-to-text over WebSockets
+        using the Live API, supporting interim and finalized transcription
+        events, Smart transcription mode, and multiple Voice Activity Detection
+        (VAD) strategies.
+
+    To get started, see the [Audio transcription guide](/docs/transcribe), the
+    [Live transcription guide](/docs/live-api/live-transcribe), and the
+    [Gemini 3.5 Transcribe model page](/docs/models/gemini-3.5-transcribe).
+
+
+## August 13, 2026  {% id=&quot;08-13-2026&quot; %}
+
+*   **Gemini 3.7 Flash generally available (GA)**: Released our most intelligent
+    workhorse model yet for coding and agents:
+
+    *   **Gemini 3.7 Flash** (`gemini-3.7-flash`): Substantial improvements
+        across software engineering, web development, and agentic workflows,
+        available at an introductory price through December 31, 2026.
+
+    To get started, see the [Gemini 3.7 Flash](/docs/models/gemini-3.7-flash)
+    model page and the [Latest model guide](/docs/latest-model).
+
+
+## July 30, 2026  {% id=&quot;07-30-2026&quot; %}
+
+*   **Gemini Robotics ER 2 in public preview**: Released two new embodied
+    reasoning model endpoints for robotics:
+
+    *   `gemini-robotics-er-2-preview`: Advanced spatial reasoning, agentic code
+        execution, multi-step tool orchestration, video moment finding, progress
+        classification, and multi-robot coordination.
+    *   `gemini-robotics-er-2-streaming-preview`: Optimized for real-time text
+        streaming using the Live API, enabling low-latency robot agents with
+        bidirectional audio and video input.
+
+    Both model endpoints accept text, image, video, and audio inputs and support
+    function calling with blocking behavior for physical robot actions. To get
+    started, see the [Gemini Robotics ER overview](/docs/robotics-overview).
+    For real-time streaming use cases, see [Robotics with
+    streaming](/docs/robotics-streaming).
+
+*   **Deprecation announcement**: The `gemini-robotics-er-1.6-preview` model
+    will be [shut down](/docs/deprecations) on August 31, 2026.
+
+
+## July 21, 2026  {% id=&quot;07-21-2026&quot; %}
+
+*   **Gemini 3.6 Flash and Gemini 3.5 Flash-Lite generally available (GA)**:
+    Released stable, production-ready versions of our latest 3.x Flash models:
+
+    *   **Gemini 3.6 Flash** (`gemini-3.6-flash`): Features improved token
+        efficiency and code/agentic planning capabilities at a lower price point
+        than 3.5 Flash, resolving developer feedback around output verbosity.
+    *   **Gemini 3.5 Flash-Lite** (`gemini-3.5-flash-lite`): Offers a
+        low-latency, highly cost-effective subagent option designed for
+        high-volume automation.
+
+    To learn more, see the [Gemini 3.6 Flash guide](/docs/whats-new-gemini-3.6).
+
+*   **Deprecated parameters**: The sampling parameters `temperature`, `top_p`
+    and `top_k` are now deprecated. See the [Gemini 3.6 Flash
+    guide](/docs/whats-new-gemini-3.6#sampling-parameter-deprecation) for
+    details.
+
+
+## July 6, 2026  {% id=&quot;07-06-2026&quot; %}
+
+*   [Developer logs](/docs/logs-datasets) support for the Interactions API: logs
+    for supported Interactions API calls are now viewable in the [AI Studio
+    dashboard](https://aistudio.google.com/logs).
+
+## June 30, 2026  {% id=&quot;06-30-2026&quot; %}
+
+*   **Gemini Omni Flash in public preview**: Released
+    `gemini-omni-flash-preview`, a high-performance multimodal model designed
+    for high-speed video generation and conversational video editing. Using the
+    [Interactions API](/docs/interactions-overview), you can generate 3–10
+    second videos at 720p from text descriptions or animate still images, and
+    then conversationally edit and refine the outputs. To get started, see the
+    [Gemini Omni Flash](/docs/omni) guide and the [Gemini Omni
+    Flash](/docs/models/gemini-omni-flash) model card.
+
+*   Released `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite) to general
+    availability (GA), our built-in multimodal model optimized for ultra-low
+    latency and cost-effective image generation and editing. See the [Gemini 3.1
+    Flash Lite Image](/docs/models/gemini-3.1-flash-lite-image) model card and
+    the [Image generation](/docs/image-generation) guide.
+
+
+## June 24, 2026  {% id=&quot;06-24-2026&quot; %}
+
+*   **Computer Use**: Launched public preview support for the [Computer
+    Use](/docs/computer-use) tool in Gemini 3.5 Flash. This release includes
+    simplified actions with intents, built-in support for browser, mobile, and
+    desktop environments, configurable safety policies, and advanced prompt
+    injection detection.
+
+## June 17, 2026  {% id=&quot;06-17-2026&quot; %}
+
+*   **Streaming support for speech generation**: Streaming via
+    `streamGenerateContent` (and `stream: true` in the Interactions API) is now
+    supported for the `gemini-3.1-flash-tts-preview` model. To learn more, see
+    the [Text-to-Speech](/docs/speech-generation#streaming) guide.
+
+## June 15, 2026  {% id=&quot;06-15-2026&quot; %}
+
+*   **Deprecation announcement**: The following image generation models are
+    being deprecated and will be [shut down](/docs/deprecations) on
+    **August 17, 2026**:
+
+    *   **Imagen 4 and Gemini 3 Image models**:
+        *   `imagen-4.0-generate-001`
+        *   `imagen-4.0-ultra-generate-001`
+        *   `imagen-4.0-fast-generate-001`
+
+
+    To migrate your code to newer stable or preview endpoints, refer to the
+    [Gemini deprecations](/docs/deprecations#imagen-models) page.
+
+*   **Deprecation announcement**: The following video generation models are
+    being deprecated and will be [shut down](/docs/deprecations) on
+    **June 30, 2026**:
+
+    *   **Veo models**:
+        *   `veo-2.0-generate-001`
+        *   `veo-3.0-generate-001`
+        *   `veo-3.0-fast-generate-001`
+
+
+    Update your integration to either use the Veo 3.1 preview model IDs
+    (`veo-3.1-generate-preview`, `veo-3.1-fast-generate-preview`) or the
+    3.1 GA models available through the [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/veo/3-1-generate)
+    to avoid service interruptions.
+
+*   **Deprecation announcement**: The experimental GMP Contextual View tool (a
+    fixed interface for Grounding with Google Maps outputs) will [shut
+    down](/docs/deprecations) on **June 15, 2026**:
+
+
+## June 1, 2026  {% id=&quot;06-01-2026&quot; %}
+
+*   The following Gemini 2.0 models are now [shut down](/docs/deprecations):
+
+    *   `gemini-2.0-flash`
+    *   `gemini-2.0-flash-001`
+    *   `gemini-2.0-flash-lite`
+    *   `gemini-2.0-flash-lite-001`
+
+    Use [`gemini-3.5-flash`](/docs/models/gemini-3.5-flash) or
+    [`gemini-3.1-flash-lite`](/docs/models/gemini-3.1-flash-lite) instead.
+
+
+## May 28, 2026  {% id=&quot;05-28-2026&quot; %}
+
+*   Released `gemini-3.1-flash-image` (Nano Banana 2) and `gemini-3-pro-image`
+    (Nano Banana Pro), the generally available (GA) versions of our native
+    visual models, [Gemini 3.1 Flash Image](/docs/models/gemini-3.1-flash-image)
+    and [Gemini 3 Pro Image](/docs/models/gemini-3-pro-image).
+
+*   **Video-to-image generation support**: You can now pass a video file (via
+    direct upload or as a public YouTube URL) as multimodal context alongside a
+    text prompt to generate high-quality thumbnails, cinematic movie posters, or
+    summary infographics. This feature is supported exclusively on the
+    `gemini-3.1-flash-image` model. To learn more, see the [Video-to-image
+    generation](/docs/image-generation#video-to-image) guide.
+
+*   Deprecation announcement: The `gemini-3.1-flash-image-preview` and
+    `gemini-3-pro-image-preview` models are deprecated and will be [shut
+    down](/docs/deprecations) on June 25, 2026.
+
+
+## May 25, 2026  {% id=&quot;05-25-2026&quot; %}
+
+*   The `gemini-3.1-flash-lite-preview` model has been [shut
+    down](/docs/deprecations). Use
+    [`gemini-3.1-flash-lite`](/docs/models/gemini-3.1-flash-lite) instead.
+
+## May 19, 2026  {% id=&quot;05-19-2026&quot; %}
+
+*   Released `gemini-3.5-flash`, the generally available (GA) version of [Gemini
+    3.5 Flash](/docs/models/gemini-3.5-flash), our most intelligent model for
+    sustained frontier performance on agentic and coding tasks.
+
+*   Launched the **Managed Agents in the Gemini API** in public preview. This
+    enables developers to build and deploy autonomous, stateful agents that run
+    in secure, isolated Google-hosted Linux sandbox environments. To learn more,
+    see the [Agents overview](/docs/agents) page and the
+    [Quickstart](/docs/managed-agents-quickstart).
+
+*   Released the general-purpose **Antigravity Agent** managed agent,
+    [`antigravity-preview-05-2026`](/docs/models/antigravity-preview-05-2026),
+    in public preview. The Antigravity agent can autonomously plan, reason,
+    write and execute code, manage files, and browse the web inside its sandbox
+    container. See the [Antigravity Agent](/docs/antigravity-agent) guide for
+    code samples and specifications.
+
+
+## May 7, 2026  {% id=&quot;05-07-2026&quot; %}
+
+*   Released `gemini-3.1-flash-lite`, the generally available (GA) version of
+    [Gemini 3.1 Flash-Lite](/docs/models/gemini-3.1-flash-lite), optimized for
+    speed, scale, and cost efficiency.
+
+*   Deprecation announcement: The `gemini-3.1-flash-lite-preview` model is
+    deprecating on 5/11/26 and will be [shut down](/docs/deprecations) on May
+    25, 2026.
+
+
+## May 6, 2026  {% id=&quot;05-06-2026&quot; %}
+
+*   **Upcoming breaking change**: The [Interactions API](/docs/interactions-overview)
+    request and response schema (`outputs` → `steps`) and output format
+    configuration (`response_format`) are changing. The new schema becomes the
+    default on **May 26** and the legacy schema will be removed on **June 8**.
+    See the [migration guide](/docs/interactions-breaking-changes-may-2026) for
+    details.
+
+## May 5, 2026  {% id=&quot;05-05-2026&quot; %}
+
+*   Updated **File Search** to support multimodal search. You can now natively
+    embed and search through images using the `gemini-embedding-2` model.
+    Grounding metadata now includes `media_id` for visual citations and
+    `page_numbers` that indicate where information is found. To learn more, see
+    the [File Search](/docs/file-search) guide.
+
+## May 4, 2026  {% id=&quot;05-04-2026&quot; %}
+
+*   Launched event-driven [Webhooks](/docs/webhooks) support in the Gemini API
+    to replace polling workflows for the Batch API and long-running operations.
+
+## April 30, 2026  {% id=&quot;04-30-2026&quot; %}
+
+*   The `gemini-robotics-er-1.5-preview` model has been [shut
+    down](/docs/deprecations). Use
+    [`gemini-robotics-er-1.6-preview`](/docs/models/gemini-robotics-er-1.6-preview)
+    instead.
+
+## April 22, 2026  {% id=&quot;04-22-2026&quot; %}
+
+*   Released `gemini-embedding-2` as generally available (GA). To learn more,
+    see the [Embeddings](/docs/embeddings) page.
+
+## April 21, 2026  {% id=&quot;04-21-2026&quot; %}
+
+*   Released new versions of the [Deep Research](/docs/deep-research) agent with
+    collaborative planning, visualization support, MCP server integration, and
+    File Search:
+
+    *   [`deep-research-preview-04-2026`](/docs/models/deep-research-preview-04-2026):
+        Designed for speed and efficiency, ideal to be streamed back to a client
+        UI.
+
+    *   [`deep-research-max-preview-04-2026`](/docs/models/deep-research-max-preview-04-2026):
+        Maximum comprehensiveness for automated context gathering and synthesis.
+
+
+
+## April 15, 2026  {% id=&quot;04-15-2026&quot; %}
+
+*   Launched [Gemini 3.1 Flash TTS
+    Preview](/docs/models/gemini-3.1-flash-tts-preview), our cost-efficient,
+    expressive, and steerable text to speech model. Read the
+    [Text-to-Speech](/docs/speech-generation) docs to learn more.
+
+## April 14, 2026  {% id=&quot;04-14-2026&quot; %}
+
+*   Released `gemini-robotics-er-1.6-preview`, our updated robotics model. It
+    now has new capabilities like instrument reading, improved spatial and
+    physical reasoning capabilities. To learn more, see [Gemini
+    Robotics-ER](/docs/robotics-overview) page and the
+    [blog](https://deepmind.google/blog/gemini-robotics-er-1-6).
+
+*   Deprecation announcement: The `gemini-robotics-er-1.5-preview` model will be
+    [shut down](/docs/deprecations) on April 30, 2026 at 9AM PST.
+
+
+## April 2, 2026  {% id=&quot;04-02-2026&quot; %}
+
+*   Released `gemma-4-26b-a4b-it` and `gemma-4-31b-it`, available on [AI
+    Studio](https://aistudio.google.com) and through the Gemini API, as part of
+    the [Gemma 4](https://ai.google.dev/gemma/docs/core) launch.
+
+## April 1, 2026  {% id=&quot;04-01-2026&quot; %}
+
+*   Introduced the new [Flex](/docs/flex-inference) and
+    [Priority](/docs/priority-inference) inference tiers, offering more options
+    for optimizing cost or latency.
+
+## March 31, 2026  {% id=&quot;03-31-2026&quot; %}
+
+*   Launched Veo 3.1 Lite Preview,
+    [`veo-3.1-lite-generate-preview`](/docs/models/veo-3.1-lite-generate-preview),
+    our most cost-efficient [video generation](/docs/video) model, designed for
+    rapid iteration and building high-volume applications.
+
+*   The `gemini-2.5-flash-lite-preview-09-2025` model has been shut down. Use
+    [`gemini-3.1-flash-lite-preview`](/docs/models/gemini-3.1-flash-lite-preview)
+    instead.
+
+
+## March 26, 2026  {% id=&quot;03-26-2026&quot; %}
+
+*   Released
+    [`gemini-3.1-flash-live-preview`](/docs/models/gemini-3.1-flash-live-preview),
+    the latest audio-to-audio (A2A) model designed for real-time dialogue and
+    voice-first AI applications. Read the [Live API](/docs/live-api) docs to get
+    started.
+
+## March 25, 2026  {% id=&quot;03-25-2026&quot; %}
+
+*   Launched [Lyria 3](/docs/music-generation) music generation models:
+    [`lyria-3-clip-preview`](/docs/models/lyria-3-clip-preview) (30-second
+    clips) and [`lyria-3-pro-preview`](/docs/models/lyria-3-pro-preview)
+    (full-length songs). Both models accept text and image inputs and generate
+    high-quality, 48kHz stereo audio. See the [Music
+    generation](/docs/music-generation) guide for details and code samples.
+
+## March 23, 2026  {% id=&quot;03-23-2026&quot; %}
+
+*   Rolled out [Prepay and Postpay billing plans](/docs/billing) in AI Studio.
+    Existing accounts may be affected; read the [Billing](/docs/billing)
+    documentation for more information.
+
+## March 18, 2026  {% id=&quot;03-18-2026&quot; %}
+
+*   Released the new [Built-in Tools and Function Calling
+    Combination](/docs/tool-combination) feature, making it possible to use
+    Gemini&#39;s built-in tools alongside custom function calling tools in a single
+    API call.
+
+*   [Grounding with Google Maps](/docs/maps-grounding#supported-models) is now
+    supported for Gemini 3 models going forward.
+
+
+## March 16, 2026  {% id=&quot;03-16-2026&quot; %}
+
+*   Introduced revamped [Usage Tiers](/docs/billing#about-billing) and [Billing
+    Account spend caps](/docs/billing#tier-spend-caps) for a better user billing
+    experience.
+
+## March 12, 2026  {% id=&quot;03-12-2026&quot; %}
+
+*   Introduced [project-level spend caps](/docs/billing#project-spend-caps) to
+    billing in AI Studio.
+
+## March 10, 2026  {% id=&quot;03-10-2026&quot; %}
+
+*   Released `gemini-embedding-2-preview`, our first multimodal embedding model.
+    It supports text, image, video, audio, and PDF inputs, mapping all
+    modalities into a unified embedding space. To learn more, see
+    [Embeddings](/docs/embeddings).
+
+*   Deprecation announcement: The `gemini-2.5-flash-lite-preview-09-2025` model
+    will be [shut down](/docs/deprecations) on March 31, 2026.
+
+
+## March 9, 2026  {% id=&quot;03-09-2026&quot; %}
+
+*   The Gemini 3 Pro Preview model has been [shut down](/docs/deprecations). The
+    `gemini-3-pro-preview` now points to
+    [`gemini-3.1-pro-preview`](/docs/models/gemini-3.1-pro-preview).
+
+## March 3, 2026  {% id=&quot;03-03-2026&quot; %}
+
+*   Launched Gemini 3.1 Flash-Lite Preview, the first Flash-Lite model in the
+    Gemini 3 series. Read the [model
+    page](/docs/models/gemini-3.1-flash-lite-preview) for specs, specific
+    updates, and developer guidance.
+
+## February 26, 2026  {% id=&quot;02-26-2026&quot; %}
+
+*   Launched Nano Banana 2, [Gemini 3.1 Flash Image
+    Preview](/docs/models/gemini-3.1-flash-image), a high-efficiency
+    model optimized for speed and high-volume use cases.
+
+*   Deprecation announcement: Gemini 3 Pro Preview (`gemini-3-pro-preview`) will
+    be [shut down](/docs/deprecations) March 9, 2026.
+
+
+## February 19, 2026  {% id=&quot;02-19-2026&quot; %}
+
+*   Released [Gemini 3.1 Pro Preview](/docs/models/gemini-3.1-pro-preview), our
+    latest iteration in the new Gemini 3 series family.
+
+*   Launched a separate endpoint `gemini-3.1-pro-preview-customtools`, which is
+    better at prioritizing custom tools, for users building with a mix of bash
+    and tools.
+
+
+## February 18, 2026  {% id=&quot;02-18-2026&quot; %}
+
+*   Deprecation announcement: The following models will be [shut
+    down](/docs/deprecations) June 1, 2026:
+
+    *   `gemini-2.0-flash`
+    *   `gemini-2.0-flash-001`
+    *   `gemini-2.0-flash-lite`
+    *   `gemini-2.0-flash-lite-001`
+
+
+## February 17, 2026  {% id=&quot;02-17-2026&quot; %}
+
+*   The following models are [shut down](/docs/deprecations):
+
+    *   `gemini-2.5-flash-preview-09-25`
+    *   `imagen-4.0-generate-preview-06-06`
+    *   `imagen-4.0-ultra-generate-preview-06-06`
+
+
+## January 29, 2026  {% id=&quot;01-29-2026&quot; %}
+
+*   Launched support for the Computer Use tool in `gemini-3-pro-preview` and
+    `gemini-3-flash-preview`.
+
+## January 21, 2026  {% id=&quot;01-21-2026&quot; %}
+
+*   Changed the `latest` aliases:
+
+    *   `gemini-pro-latest` switched to `gemini-3-pro-preview`
+    *   `gemini-flash-latest` switched to `gemini-3-flash-preview`
+
+
+## January 15, 2026  {% id=&quot;01-15-2026&quot; %}
+
+*   Deprecation announcement: The following models will be [shut
+    down](/docs/deprecations) February 17, 2026:
+
+    *   `gemini-2.5-flash-preview-09-25`
+    *   `imagen-4.0-generate-preview-06-06`
+    *   `imagen-4.0-ultra-generate-preview-06-06`
+
+*   The `gemini-2.5-flash-image-preview` model has been shut down.
+
+
+## January 14, 2026  {% id=&quot;01-14-2026&quot; %}
+
+*   The `text-embedding-004` model has been [shut down](/docs/deprecations).
+
+## January 13, 2026  {% id=&quot;01-13-2026&quot; %}
+
+*   Added 4k output resolutions for [Veo](/docs/video) and more support for
+    portrait videos in all resolutions.
+
+## January 12, 2026  {% id=&quot;01-12-2026&quot; %}
+
+*   Launched model lifecycle feature. Some models will now specify the lifecycle
+    stage and deprecation timeline. See the following documentation for more
+    information:
+
+    *   [Model stages](/api-reference/generate-content)
+
+
+## January 8, 2026  {% id=&quot;01-08-2026&quot; %}
+
+*   Launched support for Cloud Storage buckets and any public and private DB
+    pre-signed URL as data input source for the Gemini API. The file size limit
+    has also increased from 20MB to 100MB. For details, see [File input methods
+    guide](/docs/file-input-methods).
+
+## December 19, 2025  {% id=&quot;12-19-2025&quot; %}
+
+*   Introduced a breaking change to the Interactions API in v1beta. The
+    `total_reasoning_tokens` field has been renamed to `total_thought_tokens` to
+    better align with the concept of &quot;thoughts&quot; in thinking models.
+
+## December 17, 2025  {% id=&quot;12-17-2025&quot; %}
+
+*   Launched Gemini 3 Flash Preview, `gemini-3-flash-preview`, delivering fast
+    frontier-class performance that rivals larger models at a fraction of the
+    cost. With upgraded visual and spatial reasoning, and agentic coding
+    capabilities. Read the documentation on some new features, including:
+
+    *   [Multimodal function responses](/docs/function-calling#multimodal)
+    *   [Code execution with images](/docs/code-execution#images)
+
+
+## December 12, 2025  {% id=&quot;12-12-2025&quot; %}
+
+*   Released `gemini-2.5-flash-native-audio-preview-12-2025`, a new native audio
+    model for the Live API. This update improves the model&#39;s ability to handle
+    complex workflows. To learn more, see the [Live API
+    guide](/docs/live-api/capabilities) and [Gemini 2.5 Flash Native
+    Audio](/docs/models/gemini-2.5-flash-native-audio-preview-12-2025).
+
+## December 11, 2025  {% id=&quot;12-11-2025&quot; %}
+
+*   Launched the Interactions API. This API provides a unified interface for
+    interacting with Gemini models and agents. To learn more, see the
+    [Interactions API](/docs/interactions-overview) guide.
+
+*   Launched the Gemini Deep Research agent in preview. It can autonomously
+    plan, execute, and synthesize results for multi-step research tasks. See the
+    [Deep Research](/docs/deep-research) guide for details.
+
+
+## December 10, 2025  {% id=&quot;12-10-2025&quot; %}
+
+*   Launched enhancements to our [text-to-speech
+    models](/docs/speech-generation), Gemini 2.5 Flash TTS preview (optimized
+    for low latency) and Gemini 2.5 Pro TTS preview (optimized for quality),
+    including enhanced expressivity, precision pacing, and seamless dialogue.
+
+## December 9, 2025  {% id=&quot;12-09-2025&quot; %}
+
+*   The following Gemini Live API models are now shut down:
+    -   `gemini-2.0-flash-live-001`
+    -   `gemini-live-2.5-flash-preview`
+
+
+## December 5, 2025  {% id=&quot;12-05-2025&quot; %}
+
+*   Gemini 3 billing for [Grounding with Google Search](/docs/google-search)
+    will begin on January 5, 2026.
+
+## December 4, 2025  {% id=&quot;12-04-2025&quot; %}
+
+*   Deprecation announcement: The `gemini-2.5-flash-image-preview` model will be
+    shut down January 15, 2026.
+
+## December 3, 2025  {% id=&quot;12-03-2025&quot; %}
+
+*   Deprecation announcement: The `text-embedding-004` model will be shut down
+    January 14, 2026.
+
+## November 20, 2025  {% id=&quot;11-20-2025&quot; %}
+
+*   Released Gemini 3 Pro Image Preview, `gemini-3-pro-image-preview`, the next
+    iteration to the Nano Banana model. Read the [Image
+    generation](/docs/image-generation) page for more details.
+
+## November 18, 2025  {% id=&quot;11-18-2025&quot; %}
+
+*   Launched the first Gemini 3 series model, `gemini-3-pro-preview`, our
+    state-of-the-art reasoning and multimodal understanding model with powerful
+    agentic and coding capabilities.
+
+    In addition to improvements in intelligence and performance, Gemini 3 Pro
+    Preview introduces new behavior around:
+
+    *   [Media resolution](/docs/media-resolution)
+    *   [Thought signatures](/docs/thinking#signatures)
+    *   [Thinking levels](/docs/thinking#thinking-levels)
+
+    Read the Gemini 3 Developer Guide for migration, new features, and specs.
+
+
+## November 11, 2025  {% id=&quot;11-11-2025&quot; %}
+
+*   Deprecation announcement: The following models will be shut down:
+
+    *   November 12:
+
+        -   `veo-3.0-fast-generate-preview`
+        -   `veo-3.0-generate-preview`
+
+    *   November 14:
+
+        -   `gemini-2.0-flash-exp-image-generation`
+        -   `gemini-2.0-flash-preview-image-generation`
+
+
+
+## November 10, 2025  {% id=&quot;11-10-2025&quot; %}
+
+*   The following model is shut down:
+
+    -   `imagen-3.0-generate-002`
+
+    Use [Imagen 4](/docs/image-generation) instead. Refer to the
+    [Gemini deprecations table](/docs/deprecations) for more details.
+
+
+## November 6, 2025  {% id=&quot;11-06-2025&quot; %}
+
+*   Launched the File Search API to public preview, enabling developers to
+    ground responses in their own data. Read the new [File
+    Search](/docs/file-search) page for more info.
+
+## November 4, 2025  {% id=&quot;11-04-2025&quot; %}
+
+*   For [Gemini 2.5 Flash Image](/docs/image-generation), the input token count
+    for images has been reduced from 1290 to 258, lowering the cost of image
+    editing.
+
+*   Deprecation announcement: The following models will be shut down:
+
+    *   November 18th:
+
+        -   `gemini-2.5-flash-lite-preview-06-17`
+        -   `gemini-2.5-flash-preview-05-20`
+
+    *   December 2nd:
+
+        -   `gemini-2.0-flash-thinking-exp`
+        -   `gemini-2.0-flash-thinking-exp-01-21`
+        -   `gemini-2.0-flash-thinking-exp-1219`
+        -   `gemini-2.5-pro-preview-03-25`
+        -   `gemini-2.5-pro-preview-05-06`
+        -   `gemini-2.5-pro-preview-06-05`
+
+    *   December 9th:
+
+        -   `gemini-2.0-flash-lite-preview`
+        -   `gemini-2.0-flash-lite-preview-02-05`
+        -   `gemini-2.0-flash-exp`
+        -   `gemini-2.0-pro-exp`
+        -   `gemini-2.0-pro-exp-02-05`
+
+
+
+## October 29, 2025  {% id=&quot;10-29-2025&quot; %}
+
+*   Launched the new [logging and datasets](/docs/logs-datasets) tool for the
+    Gemini API.
+
+## October 20, 2025  {% id=&quot;10-20-2025&quot; %}
+
+*   The following Gemini Live API models are now shut down:
+
+    -   `gemini-2.5-flash-preview-native-audio-dialog`
+    -   `gemini-2.5-flash-exp-native-audio-thinking-dialog`
+
+    You can use `gemini-2.5-flash-native-audio-preview-09-2025` instead.
+
+*   Deprecation announcement: Shut down for `gemini-2.0-flash-live-001` and
+    `gemini-live-2.5-flash-preview` coming December 09, 2025.
+
+
+## October 17, 2025  {% id=&quot;10-17-2025&quot; %}
+
+*   **Grounding with Google Maps** is now generally available. For more
+    information, see [Grounding with Google Maps](/docs/maps-grounding)
+    documentation.
+
+## October 15, 2025  {% id=&quot;10-15-2025&quot; %}
+
+*   Released [Veo 3.1 and 3.1 Fast](/docs/video) models in public
+    preview, with new features including:
+
+    -   Extending Veo-created videos.
+    -   Referencing up to three images to generate a video.
+    -   Providing first and last frame images to generate videos from.
+
+    This launch also added more options for Veo 3 output video durations: 4, 6,
+    and 8 seconds.
+
+*   Deprecation announcement: Shut down for `veo-3.0-generate-preview` and
+    `veo-3.0-fast-generate-preview` coming November 12, 2025.
+
+
+## October 7, 2025  {% id=&quot;10-07-2025&quot; %}
+
+*   Launched [Gemini 2.5 Computer Use Preview](/docs/computer-use)
+
+## October 2, 2025  {% id=&quot;10-02-2025&quot; %}
+
+*   Launched Gemini 2.5 Flash Image GA: [Image Generation with Gemini](/docs/image-generation)
+
+## September 29, 2025  {% id=&quot;09-29-2025&quot; %}
+
+*   The following Gemini 1.5 models are now shut down:
+    -   `gemini-1.5-pro`
+    -   `gemini-1.5-flash-8b`
+    -   `gemini-1.5-flash`
+
+
+## September 25, 2025  {% id=&quot;09-25-2025&quot; %}
+
+*   Released Gemini Robotics-ER 1.5 model in preview. See the [Robotics
+    overview](/docs/robotics-overview) to learn about how to use the model for
+    your robotics application.
+
+*   Launched following preview models:
+
+    -   `gemini-2.5-flash-preview-09-2025`
+    -   `gemini-2.5-flash-lite-preview-09-2025`
+
+    See the [Models](/docs/models) page for details.
+
+
+## September 23, 2025  {% id=&quot;09-23-2025&quot; %}
+
+*   Released `gemini-2.5-flash-native-audio-preview-09-2025`, a new native audio
+    model for the Live API with improved function calling and speech cut off
+    handling. To learn more, see the [Live API
+    guide](/docs/live-api/capabilities) and [Gemini 2.5 Flash Native
+    Audio](/docs/models).
+
+## September 16, 2025  {% id=&quot;09-16-2025&quot; %}
+
+*   Deprecation announcement: The following models will be shut down in October
+    2025:
+
+    -   `embedding-001`
+    -   `embedding-gecko-001`
+    -   `gemini-embedding-exp-03-07` (`gemini-embedding-exp`)
+
+    See the [Embeddings](/docs/embeddings) page for details on the latest embeddings
+    model.
+
+
+## September 10, 2025  {% id=&quot;09-10-2025&quot; %}
+
+*   Released support for the [Embeddings model in Batch
+    API](/docs/batch-api#batch-embedding), and added Batch API to the [OpenAI
+    compatibility library](/docs/openai#batch) for even easier ways to get
+    started with batch queries.
+
+## September 9, 2025  {% id=&quot;09-09-2025&quot; %}
+
+*   Launched Veo 3 and Veo 3 Fast GA, with lower pricing and new options for
+    aspect ratios, resolution, and seeding. Read the [Veo
+    documentation](/docs/video) for more information.
+
+## August 26, 2025  {% id=&quot;08-26-2025&quot; %}
+
+*   Launched [Gemini 2.5 Image
+    Preview](/docs/models), our latest native
+    image generation model.
+
+## August 18, 2025  {% id=&quot;08-18-2025&quot; %}
+
+*   Released [URL context tool](/docs/url-context) to general availability (GA),
+    a tool for providing URLs as additional context to prompts. Support for
+    using URL context with the `gemini-2.0-flash` model (available during
+    experimental release) will be discontinued in one week.
+
+## August 14, 2025  {% id=&quot;08-14-2025&quot; %}
+
+*   Released Imagen 4 Ultra, Standard and Fast models as generally available
+    (GA). To learn more, see the [Imagen](/docs/image-generation) page.
+
+## August 7, 2025  {% id=&quot;08-07-2025&quot; %}
+
+*   `allow_adult` setting in Image to Video generation are now available in
+    restricted regions. See the
+    [Veo](/docs/video?example=dialogue) page for details.
+
+## July 31, 2025  {% id=&quot;07-31-2025&quot; %}
+
+*   Launched image-to-video generation for the Veo 3 Preview model.
+*   Released Veo 3 Fast Preview model.
+*   To learn more about Veo 3, visit the [Veo](/docs/video) page.
+
+## July 22, 2025  {% id=&quot;07-22-2025&quot; %}
+
+*   Released `gemini-2.5-flash-lite`, our fast, low-cost, high-performance
+    Gemini
+    2.5 model. To learn more, see [Gemini 2.5
+    Flash-Lite](/docs/models#gemini-25-flash-lite).
+
+## July 17, 2025  {% id=&quot;07-17-2025&quot; %}
+
+*   Launched `veo-3.0-generate-preview`, the latest update to Veo introducing
+    video with audio generation. To learn more about Veo 3, visit the
+    [Veo](/docs/video) page.
+
+*   Increased rate limits for Imagen 4 Standard and Ultra. Visit the [Rate
+    limits](/docs/rate-limits) page for more details.
+
+
+## July 14, 2025  {% id=&quot;07-14-2025&quot; %}
+
+*   Released `gemini-embedding-001`, the stable version of our text embedding
+    model. To learn more, see [embeddings](/docs/embeddings). The
+    `gemini-embedding-exp-03-07` model will be deprecated on August 14, 2025.
+
+## July 7, 2025  {% id=&quot;07-07-2025&quot; %}
+
+*   Launched Gemini API Batch Mode. Batch up requests and send them to process
+    asynchronously. To learn more, see [Batch Mode](/docs/batch-api).
+
+## June 26, 2025  {% id=&quot;06-26-2025&quot; %}
+
+*   The preview models `gemini-2.5-pro-preview-05-06` and
+    `gemini-2.5-pro-preview-03-25` are now redirecting to the latest stable
+    version `gemini-2.5-pro`.
+
+*   `gemini-2.5-pro-exp-03-25` is shut down.
+
+
+## June 24, 2025  {% id=&quot;06-24-2025&quot; %}
+
+*   Released Imagen 4 Ultra and Standard Preview models. To learn more, see the
+    [Image generation](/docs/image-generation) page.
+
+## June 17, 2025  {% id=&quot;06-17-2025&quot; %}
+
+*   Released `gemini-2.5-pro`, the stable version of our most powerful model,
+    now with adaptive thinking. To learn more, see [Gemini 2.5
+    Pro](/docs/models#gemini-25-pro) and [Thinking](/docs/thinking).
+    `gemini-2.5-pro-preview-05-06` will be redirected to `gemini-2.5-pro` on
+    June 26, 2025.
+
+*   Released `gemini-2.5-flash`, our first stable 2.5 Flash model. To learn
+    more, see [Gemini 2.5 Flash](/docs/models#gemini-25-flash).
+    `gemini-2.5-flash-preview-04-17` will be deprecated on July 15, 2025.
+
+*   Released `gemini-2.5-flash-lite-preview-06-17`, a low-cost, high-performance
+    Gemini 2.5 model. To learn more, see [Gemini 2.5 Flash-Lite
+    Preview](/docs/models#gemini-25-flash-lite).
+
+
+## June 05, 2025  {% id=&quot;06-05-2025&quot; %}
+
+*   Released `gemini-2.5-pro-preview-06-05`, a new version of our most powerful
+    model, now with adaptive thinking. To learn more, see [Gemini 2.5 Pro
+    Preview](/docs/models) and
+    [Thinking](/docs/thinking). `gemini-2.5-pro-preview-05-06` will be
+    redirected to `gemini-2.5-pro` on June 26, 2025.
+
+## May 27, 2025  {% id=&quot;05-27-2025&quot; %}
+
+*   The last available tuning model, Gemini 1.5 Flash 001, has been shut down.
+    Tuning is no longer supported on any models. See [Fine tuning with the
+    Gemini API](/docs/model-tuning).
+
+## May 20, 2025  {% id=&quot;05-20-2025&quot; %}
+
+**API updates:**
+
+*   Launched support for [custom video preprocessing](/docs/video-understanding#customize-video-processing)
+    using clipping intervals and configurable frame rate sampling.
+
+*   Launched multi-tool use, which supports configuring [code
+    execution](/docs/code-execution) and [Grounding with Google
+    Search](/docs/google-search) on the same `generateContent` request.
+
+*   Launched support for [asynchronous function calls](/docs/live-api/tools#async-function-calling)
+    in the Live API.
+
+*   Launched an experimental [URL context tool](/docs/url-context) for providing
+    URLs as additional context to prompts.
+
+
+**Model updates:**
+
+*   Released `gemini-2.5-flash-preview-05-20`, a Gemini
+    [preview](/docs/models#model-versions) model optimized for price-performance
+    and adaptive thinking. To learn more, see [Gemini 2.5 Flash
+    Preview](/docs/models) and
+    [Thinking](/docs/thinking).
+
+*   Released the [`gemini-2.5-pro-preview-tts`](/docs/models)
+    and
+    [`gemini-2.5-flash-preview-tts`](/docs/models)
+    models, which are capable of [generating speech](/docs/speech-generation)
+    with one or two speakers.
+
+*   Released the `lyria-realtime-exp` model, which [generates
+    music](/docs/music-generation) in real time.
+
+*   Released `gemini-2.5-flash-preview-native-audio-dialog` and
+    `gemini-2.5-flash-exp-native-audio-thinking-dialog`, new Gemini models for
+    the Live API with native audio output capabilities. To learn more, see the
+    [Live API guide](/docs/live-api/capabilities#native-audio-output) and
+    [Gemini 2.5 Flash Native Audio](/docs/models).
+
+*   Released `gemma-3n-e4b-it` preview, available on [AI
+    Studio](https://aistudio.google.com) and through the Gemini API, as part of
+    the [Gemma 3n](https://ai.google.dev/gemma/docs/3n) launch.
+
+
+## May 7, 2025  {% id=&quot;05-07-2025&quot; %}
+
+*   Released `gemini-2.0-flash-preview-image-generation`, a preview model for
+    generating and editing images. To learn more, see [Image
+    generation](/docs/image-generation) and [Gemini 2.0
+    Flash Preview Image
+    Generation](/docs/models).
+
+## May 6, 2025  {% id=&quot;05-06-2025&quot; %}
+
+*   Released `gemini-2.5-pro-preview-05-06`, a new version of our most powerful
+    model, with improvements on code and function calling.
+    `gemini-2.5-pro-preview-03-25` will automatically point to the new version
+    of the model.
+
+## April 17, 2025  {% id=&quot;04-17-2025&quot; %}
+
+*   Released `gemini-2.5-flash-preview-04-17`, a Gemini
+    [preview](/docs/models#model-versions) model optimized for price-performance
+    and adaptive thinking. To learn more, see [Gemini 2.5 Flash
+    Preview](/docs/models) and
+    [Thinking](/docs/thinking).
+
+## April 16, 2025  {% id=&quot;04-16-2025&quot; %}
+
+*   Launched context caching for [Gemini 2.0
+    Flash](/docs/models).
+
+## April 9, 2025  {% id=&quot;04-09-2025&quot; %}
+
+**Model updates:**
+
+*   Released `veo-2.0-generate-001`, a generally available (GA) text- and
+    image-to-video model, capable of generating detailed and artistically
+    nuanced videos. To learn more, see the [Veo docs](/docs/video).
+
+*   Released `gemini-2.0-flash-live-001`, a public preview version of the [Live
+    API](/docs/live-api) model with billing enabled.
+
+    *   **Enhanced Session Management and Reliability**
+
+        *   **Session Resumption:** Keep sessions alive across temporary network
+            disruptions. The API now supports server-side session state storage
+            (for up to 24 hours) and provides handles (session_resumption) to
+            reconnect and resume where you left off.
+
+        *   **Longer Sessions via Context Compression:** Enable extended
+            interactions beyond previous time limits. Configure context window
+            compression with a sliding window mechanism to automatically manage
+            context length, preventing abrupt terminations due to context limits.
+
+        *   **Graceful Disconnect Notification:** Receive a `GoAway` server
+            message indicating when a connection is about to close, allowing for
+            graceful handling before termination.
+
+
+    *   **More Control over Interaction Dynamics**
+
+    *   **Configurable Voice Activity Detection (VAD):** Choose sensitivity
+        levels or disable automatic VAD entirely and use new client events
+        (`activityStart`, `activityEnd`) for manual turn control.
+
+    *   **Configurable Interruption Handling:** Decide whether user input should
+        interrupt the model&#39;s response.
+
+    *   **Configurable Turn Coverage:** Choose whether the API processes all
+        audio and video input continuously or only captures it when the end-user
+        is detected speaking.
+
+    *   **Configurable Media Resolution:** Optimize for quality or token usage
+        by selecting the resolution for input media.
+
+    *   **Richer Output and Features**
+
+    *   **Expanded Voice &amp; Language Options:** Choose from two new voices and
+        30 new languages for audio output. The output language is now configurable
+        within `speechConfig`.
+
+    *   **Text Streaming:** Receive text responses incrementally as they are
+        generated, enabling faster display to the user.
+
+    *   **Token Usage Reporting:** Gain insights into usage with detailed token
+        counts provided in the `usageMetadata` field of server messages, broken
+        down by modality and prompt or response phases.
+
+
+
+## April 4, 2025  {% id=&quot;04-04-2025&quot; %}
+
+*   Released `gemini-2.5-pro-preview-03-25`, a public preview Gemini 2.5 Pro
+    version with billing enabled. You can continue to use
+    `gemini-2.5-pro-exp-03-25` on sthe free tier.
+
+## March 25, 2025  {% id=&quot;03-25-2025&quot; %}
+
+*   Released `gemini-2.5-pro-exp-03-25`, a public experimental Gemini model with
+    thinking mode always on by default. To learn more, see [Gemini 2.5 Pro
+    Experimental](/docs/models).
+
+## March 12, 2025  {% id=&quot;03-12-2025&quot; %}
+
+**Model updates:**
+
+*   Launched an experimental [Gemini 2.0 Flash](/docs/image-generation)
+    model capable of image generation and editing.
+
+*   Released `gemma-3-27b-it`, available on [AI
+    Studio](https://aistudio.google.com) and through the Gemini API, as part of
+    the [Gemma 3](https://ai.google.dev/gemma/docs/core) launch.
+
+
+**API updates:**
+
+*   Added support for [YouTube URLs](/docs/image-understanding) as a
+    media source.
+
+*   Added support for including an [inline
+    video](/docs/image-understanding) of less than 20MB.
+
+
+## March 11, 2025  {% id=&quot;03-11-2025&quot; %}
+
+**SDK updates:**
+
+*   Released the [Google Gen AI SDK for TypeScript and JavaScript](https://googleapis.github.io/js-genai)
+    to public preview.
+
+## March 7, 2025  {% id=&quot;03-07-2025&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-embedding-exp-03-07`, an [experimental](/docs/models)
+    Gemini-based embeddings model in public preview.
+
+## February 28, 2025  {% id=&quot;02-28-2025&quot; %}
+
+**API updates:**
+
+*   Support for [Search as a tool](/docs/google-search) added to
+    `gemini-2.0-pro-exp-02-05`, an experimental model based on Gemini 2.0 Pro.
+
+## February 25, 2025  {% id=&quot;02-25-2025&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-2.0-flash-lite`, a generally available (GA) version of
+    [Gemini 2.0 Flash-Lite](/docs/models), which is
+    optimized for speed, scale, and cost efficiency.
+
+## February 19, 2025  {% id=&quot;02-19-2025&quot; %}
+
+**AI Studio updates:**
+
+*   Support for [additional regions](/docs/available-regions)
+    (Kosovo, Greenland and Faroe Islands).
+
+**API updates:**
+
+*   Support for [additional regions](/docs/available-regions)
+    (Kosovo, Greenland and Faroe Islands).
+
+## February 18, 2025  {% id=&quot;02-18-2025&quot; %}
+
+**Model updates:**
+
+*   Gemini 1.0 Pro is no longer supported. For the list of supported models, see
+    [Gemini models](/docs/models).
+
+## February 11, 2025  {% id=&quot;02-11-2025&quot; %}
+
+**API updates:**
+
+*   Updates on the [OpenAI libraries
+    compatibility](/docs/openai).
+
+## February 6, 2025  {% id=&quot;02-06-2025&quot; %}
+
+**Model updates:**
+
+*   Released `imagen-3.0-generate-002`, a generally available (GA) version of
+    [Imagen 3 in the Gemini API](/docs/image-generation).
+
+**SDK updates:**
+
+*   Released the [Google Gen AI SDK for Java](https://github.com/googleapis/java-genai)
+    for public preview.
+
+## February 5, 2025  {% id=&quot;02-05-2025&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-2.0-flash-001`, a generally available (GA) version of
+    [Gemini 2.0 Flash](/docs/models) that supports text-only
+    output.
+
+*   Released `gemini-2.0-pro-exp-02-05`, an [experimental](/docs/models) public
+    preview version of Gemini 2.0 Pro.
+
+*   Released `gemini-2.0-flash-lite-preview-02-05`, an experimental public
+    preview [model](/docs/models) optimized for cost
+    efficiency.
+
+
+**API updates:**
+
+*   Added [file input and graph output](/docs/code-execution#input-output)
+    support to code execution.
+
+**SDK updates:**
+
+*   Released the [Google Gen AI SDK for Python](https://googleapis.github.io/python-genai/)
+    to general availability (GA).
+
+## January 21, 2025  {% id=&quot;01-21-2025&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-2.0-flash-thinking-exp-01-21`, the latest preview version
+    of the model behind the [Gemini 2.0 Flash Thinking Model](/docs/thinking).
+
+## December 19, 2024  {% id=&quot;12-19-2024&quot; %}
+
+**Model updates:**
+
+*   Released Gemini 2.0 Flash Thinking Mode for public preview. Thinking Mode is
+    a test-time compute model that lets you see the model&#39;s thought process
+    while it generates a response, and produces responses with stronger
+    reasoning capabilities.
+
+    Read more about Gemini 2.0 Flash Thinking Mode in our [overview
+    page](/docs/thinking).
+
+
+## December 11, 2024  {% id=&quot;12-11-2024&quot; %}
+
+**Model updates:**
+
+*   Released [Gemini 2.0 Flash Experimental](/docs/models) for
+    public preview. Gemini 2.0 Flash Experimental&#39;s partial list of features
+    includes:
+
+    *   Twice as fast as Gemini 1.5 Pro
+    *   Bidirectional streaming with our Live API
+    *   Multimodal response generation in the form of text, images, and speech
+    *   Built-in tool use with multi-turn reasoning to use features like code
+        execution, Search, function calling, and more
+
+
+Read more about Gemini 2.0 Flash in our [overview page](/docs/models).
+
+## November 21, 2024  {% id=&quot;11-21-24&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-exp-1121`, an even more powerful experimental Gemini API
+    model.
+
+**Model updates:**
+
+*   Updated the `gemini-1.5-flash-latest` and `gemini-1.5-flash` model aliases
+    to use `gemini-1.5-flash-002`.
+
+    *   Change to `top_k` parameter: The `gemini-1.5-flash-002` model supports
+        `top_k` values between 1 and 41 (exclusive). Values greater than 40 will
+        be changed to 40.
+
+
+## November 14, 2024  {% id=&quot;11-14-24&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-exp-1114`, a powerful experimental Gemini API model.
+
+## November 8, 2024  {% id=&quot;11-08-24&quot; %}
+
+**API updates:**
+
+*   Added [support for Gemini](/docs/openai) in the OpenAI libraries / REST API.
+
+## October 31, 2024  {% id=&quot;10-31-24&quot; %}
+
+**API updates:**
+
+*   Added [support for Grounding with Google Search](/docs/google-search).
+
+## October 3, 2024  {% id=&quot;10-03-24&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-1.5-flash-8b-001`, a stable version of our smallest Gemini
+    API model.
+
+## September 24, 2024  {% id=&quot;09-24-24&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-1.5-pro-002` and `gemini-1.5-flash-002`, two new stable
+    versions of Gemini 1.5 Pro and 1.5 Flash, for general availability.
+
+*   Updated the `gemini-1.5-pro-latest` model code to use `gemini-1.5-pro-002`
+    and the `gemini-1.5-flash-latest` model code to use `gemini-1.5-flash-002`.
+
+*   Released `gemini-1.5-flash-8b-exp-0924` to replace
+    `gemini-1.5-flash-8b-exp-0827`.
+
+*   Released the [civic integrity safety filter](/docs/safety-settings#safety-filters)
+    for the Gemini API and AI Studio.
+
+*   Released support for two new parameters for Gemini 1.5 Pro and 1.5 Flash in
+    Python and NodeJS:
+    [`frequencyPenalty`](/api-reference/generate-content/generate-content#request-body)
+    and
+    [`presencePenalty`](/api-reference/generate-content/generate-content#request-body).
+
+
+## September 19, 2024  {% id=&quot;09-19-24&quot; %}
+
+**AI Studio updates:**
+
+*   Added thumb-up and thumb-down buttons to model responses, to enable users to
+    provide feedback on the quality of a response.
+
+**API updates:**
+
+*   Added support for Google Cloud credits, which can now be used towards Gemini
+    API usage.
+
+## September 17, 2024  {% id=&quot;09-17-24&quot; %}
+
+**AI Studio updates:**
+
+*   Added an **Open in Colab** button that exports a prompt – and the code
+    to run it – to a Colab notebook. The feature doesn&#39;t yet support
+    prompting with tools (JSON mode, function calling, or code execution).
+
+## September 13, 2024  {% id=&quot;09-13-24&quot; %}
+
+**AI Studio updates:**
+
+*   Added support for compare mode, which lets you compare responses across
+    models and prompts to find the best fit for your use case.
+
+## August 30, 2024  {% id=&quot;08-30-24&quot; %}
+
+**Model updates:**
+
+*   Gemini 1.5 Flash supports [supplying JSON schema through model
+    configuration](/docs/structured-output).
+
+## August 27, 2024  {% id=&quot;08-27-24&quot; %}
+
+**Model updates:**
+
+*   Released the following [experimental models](/docs/models):
+
+    *   `gemini-1.5-pro-exp-0827`
+    *   `gemini-1.5-flash-exp-0827`
+    *   `gemini-1.5-flash-8b-exp-0827`
+
+
+## August 9, 2024  {% id=&quot;08-09-24&quot; %}
+
+**API updates:**
+
+*   Added support for [PDF processing](/docs/document-processing).
+
+## August 5, 2024  {% id=&quot;08-05-24&quot; %}
+
+**Model updates:**
+
+*   Fine-tuning support released for Gemini 1.5 Flash.
+
+## August 1, 2024  {% id=&quot;08-01-24&quot; %}
+
+**Model updates:**
+
+*   Released `gemini-1.5-pro-exp-0801`, a new experimental version of [Gemini
+    1.5 Pro](/docs/models).
+
+## July 12, 2024  {% id=&quot;07-12-24&quot; %}
+
+**Model updates:**
+
+*   Support for Gemini 1.0 Pro Vision removed from Google AI services and tools.
+
+## June 27, 2024  {% id=&quot;06-27-24&quot; %}
+
+**Model updates:**
+
+*   General availability release for Gemini 1.5 Pro&#39;s 2M context window.
+
+**API updates:**
+
+*   Added support for [code execution](/docs/code-execution).
+
+## June 18, 2024  {% id=&quot;06-18-24&quot; %}
+
+**API updates:**
+
+*   Added support for [context caching](/docs/caching).
+
+## June 12, 2024  {% id=&quot;06-12-204&quot; %}
+
+**Model updates:**
+
+*   Gemini 1.0 Pro Vision deprecated.
+
+## May 23, 2024  {% id=&quot;05-23-24&quot; %}
+
+**Model updates:**
+
+*   [Gemini 1.5 Pro](/docs/models) (`gemini-1.5-pro-001`) is
+    generally available (GA).
+
+*   [Gemini 1.5 Flash](/docs/models) (`gemini-1.5-flash-001`)
+    is generally available (GA).
+
+
+## May 14, 2024  {% id=&quot;05-14-24&quot; %}
+
+**API updates:**
+
+*   Introduced a 2M context window for Gemini 1.5 Pro (waitlist).
+
+*   Introduced pay-as-you-go [billing](/docs/billing) for Gemini 1.0 Pro, with
+    Gemini 1.5 Pro and Gemini 1.5 Flash billing coming soon.
+
+*   Introduced increased rate limits for the upcoming paid tier of Gemini 1.5
+    Pro.
+
+*   Added built-in video support to the [File
+    API](/api-reference/files).
+
+*   Added plain text support to the [File
+    API](/api-reference/files).
+
+*   Added support for parallel function calling, which returns more than one
+    call at a time.
+
+
+## May 10, 2024  {% id=&quot;05-10-24&quot; %}
+
+**Model updates:**
+
+*   Released [Gemini 1.5 Flash](/docs/models)
+    (`gemini-1.5-flash-latest`) in preview.
+
+## April 9, 2024  {% id=&quot;04-09-24&quot; %}
+
+**Model updates:**
+
+*   Released [Gemini 1.5 Pro](/docs/models)
+    (`gemini-1.5-pro-latest`) in preview.
+
+*   Released a new text embedding model, `text-embeddings-004`, which supports
+    [elastic embedding](/docs/embeddings) sizes under 768.
+
+
+**API updates:**
+
+*   Released the [File API](/api-reference/files) for
+    temporarily storing media files for use in prompting.
+
+*   Added support for prompting with text, image, and audio data, also known as
+    *multimodal* prompting. To learn more, see [Prompting with
+    media](/docs/files#prompt-guide).
+
+*   Released [System instructions](/docs/text-generation) in beta.
+
+*   Added [Function calling mode](/docs/function-calling#function_calling_modes),
+    which defines the execution behavior for function calling.
+
+*   Added support for the `response_mime_type` configuration option, which lets
+    you request responses in [JSON format](/api-reference/generate-content/generate-content#request-body).
+
+
+## March 19, 2024  {% id=&quot;03-09-24&quot; %}
+
+**Model updates:**
+
+*   Added support for [tuning Gemini 1.0 Pro](https://developers.googleblog.com/en/tune-gemini-pro-in-google-ai-studio-or-with-the-gemini-api/)
+    in Google AI Studio or with the Gemini API.
+
+## December 13 2023  {% id=&quot;12-13-23&quot; %}
+
+**Model updates:**
+
+*   gemini-pro: New text model for a wide variety of tasks. Balances capability
+    and efficiency.
+
+*   gemini-pro-vision: New multimodal model for a wide variety of tasks.
+    Balances capability and efficiency.
+
+*   embedding-001: New embeddings model.
+
+*   aqa: A new specially tuned model that is trained to answer questions using
+    text passages for grounding generated answers.
+
+
+See [Gemini models](/docs/models) for more details.
+
+**API version updates:**
+
+*   v1: The stable API channel.
+*   v1beta: Beta channel. This channel has features that may be under
+    development.
+
+See [the API versions topic](/api-reference/api-versions) for more details.
+
+**API updates:**
+
+*   `GenerateContent` is a single unified endpoint for chat and text.
+
+*   Streaming available through the `StreamGenerateContent` method.
+
+*   Multimodal capability: Image is a new supported modality
+
+*   New beta features:
+
+    *   [Function Calling](/docs/function-calling)
+    *   Semantic Retriever
+    *   Attributed Question Answering (AQA)
+
+*   Updated candidate count: Gemini models only return 1 candidate.
+
+*   Different Safety Settings and SafetyRating categories. See [safety
+    settings](/docs/safety-settings) for more details.
+
+*   Tuning models is not yet supported for Gemini models (Work in progress).
+
+
+</pre></noscript><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TT9C75WP" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><script src="https://www.gstatic.com/_/mss/boq-makersuite/_/js/k=boq-makersuite.MakerSuite.en_US.xzCpJ7091eE.2018.O/am=QaSaAAYeHAI/d=1/excm=_b/ed=1/dg=0/wt=2/ujg=1/rs=AMOXD29UloSCZaB9vazrSK07ME85eU7Feg/dti=1/m=_b" id="base-js" data-scope-id="70b56b89-9b62-4d05-9d19-c8329915b572" nonce="ykyOlgCOy_GXWNkRSpmpsA"></script></body></html>
