@@ -422,6 +422,7 @@ class BaseAdapter(ABC):
 
             if parsed.get("parse_drops"):
                 last_metadata = {**last_metadata, "parse_drops": parsed["parse_drops"]}
+            last_metadata = {**last_metadata, "json_repaired": bool(parsed.get("json_repaired"))}
             latency = time.perf_counter() - start
             if attempt > 1:
                 logger.info(
@@ -482,6 +483,7 @@ class BaseAdapter(ABC):
             if first != -1 and last != -1 and last > first:
                 text = text[first : last + 1]
 
+        json_repaired = False
         try:
             data = json.loads(text)
         except json.JSONDecodeError as e:
@@ -494,6 +496,7 @@ class BaseAdapter(ABC):
             if repaired != text:
                 try:
                     data = json.loads(repaired)
+                    json_repaired = True
                     logger.info("parse: JSON repair succeeded (original: %s)", e)
                 except json.JSONDecodeError as e2:
                     raise ValueError(
@@ -595,4 +598,7 @@ class BaseAdapter(ABC):
             "cash_rationale": _str_or_none(data.get("cash_rationale")),
             "position_reviews": position_reviews,
             "no_trade_reason": _str_or_none(data.get("no_trade_reason")),
+            # Logging only (output_budget_equalization_ruling.md section 3): the
+            # text that was parsed is repair_json's output, not the model's.
+            "json_repaired": json_repaired,
         }

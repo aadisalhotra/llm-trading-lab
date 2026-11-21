@@ -96,6 +96,7 @@ from .logging.tick_admission import (
     record_withhold,
 )
 from .logging.venue_check import run_shadow_check
+from .logging.call_inputs import CallInput, alert_if_flagged, retain_call_inputs
 from .logging.decision_log import log_administrative_row, serialize_execution
 from .record_class import ADMIN_CLASS_EOD_POSITION_STOP, EOD_STOP_NOT_EXECUTABLE
 
@@ -582,6 +583,16 @@ def run_one_model(
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
     decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
 
+    # Call-input retention and response flags (logging class; 2026-11-21).
+    # Written from the very objects just handed to the adapter, so the file
+    # cannot differ from what was sent. Neither step can raise into the tick:
+    # a failed write is recorded on the row as input_retention_failed.
+    call_inputs = retain_call_inputs(
+        executor.cycle_id, model_key, run_date, prompt_version,
+        [CallInput("screen", screening_sys, screening_user),
+         CallInput("trade", system_prompt, user_prompt, list(images_for_call or []))])
+    alert_if_flagged(model_key, executor.cycle_id, decision_result, send_alert)
+
     # Surface retry activity in the pipeline log so we can see at a glance
     # whether a model recovered on a second attempt vs. succeeded on first.
     # The attempt field is set by BaseAdapter for every provider.
@@ -640,6 +651,7 @@ def run_one_model(
             fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
             screening_latency_seconds=_scr_latency,
             stop_dust_exempt=stop_dust_exempt,
+            call_inputs=call_inputs,
         )
         # Still bump the intraday counter (this run consumed a slot)
         portfolio.record_intraday_run(run_date.isoformat(), trades_executed=0)
@@ -754,6 +766,7 @@ def run_one_model(
         fetch_started_at=fetch_started_at.isoformat() if fetch_started_at else "",
         screening_latency_seconds=_scr_latency,
         stop_dust_exempt=stop_dust_exempt,
+        call_inputs=call_inputs,
     )
 
     benchmark_val = prices.get(settings["benchmark_ticker"])

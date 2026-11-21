@@ -15,6 +15,7 @@ from typing import Any
 
 from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR, load_settings
 from ..price_checks import is_finite_number
+from .call_inputs import response_flags
 
 _logger = logging.getLogger("llmlab.decision_log")
 
@@ -76,8 +77,13 @@ def log_decision_run(
     fetch_started_at: str = "",
     screening_latency_seconds: float | None = None,
     stop_dust_exempt: list[dict[str, Any]] | None = None,
+    call_inputs: dict[str, Any] | None = None,
 ) -> None:
-    """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened."""
+    """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened.
+
+    `call_inputs` is what src.logging.call_inputs.retain_call_inputs returned
+    for this model's calls this cycle. A caller that passes none records
+    input_retention_failed: true, which is what it means."""
     TRADES_DIR.mkdir(parents=True, exist_ok=True)
     month_str = run_date.strftime("%Y-%m")
     path = TRADES_DIR / f"{model_key}_{month_str}.jsonl"
@@ -188,6 +194,18 @@ def log_decision_run(
             (decision_result.raw_response or "")[:20000]
             if not decision_result.success else None
         ),
+        # Logging package 2026-11-21 (output_budget_equalization_ruling.md rev. 2
+        # section 3, hub ruling 2026-11-19): the model's full response text on
+        # every call, successful or not, uncapped. The failure field above keeps
+        # its 20,000-character cap for its existing readers; this one has none,
+        # because the longest responses are the ones the ruling is about.
+        "raw_response": decision_result.raw_response or "",
+        # The response ended on its output budget (a budget-stop finish reason:
+        # max_tokens / length / MAX_TOKENS), and the text that was parsed is
+        # repair_json's output rather than the model's. Either one on a
+        # successful call raises a WARN. Absent key = a record from before
+        # 2026-11-21, not "false".
+        **response_flags(decision_result),
         # News context — hash of the headline set the model saw, plus the
         # per-ticker compound sentiment dict at decision time. Lets us
         # correlate trades back to the exact news inputs they were made on.
@@ -216,6 +234,9 @@ def log_decision_run(
         # Two-step screening data — what the model chose to focus on
         "screening_shortlist": screening_shortlist,
         "screening_response": screening_response[:2000] if screening_response else "",
+        # The screening call's full response, uncapped (2026-11-21); the field
+        # above keeps its 2,000-character form for its existing readers.
+        "screening_raw_response": screening_response or "",
         "screening_cost_usd": (screening_metadata or {}).get("cost_usd"),
         "screening_tokens": (screening_metadata or {}).get("output_tokens"),
         # Screening INPUT tokens (added 2026-08-05, rider 1). Without this the
@@ -238,6 +259,17 @@ def log_decision_run(
         # `executions`: Gate 4 must never read it as an order or a skip. The
         # per-book, per-day count is the stop_dust_exemptions descriptor.
         "stop_dust_exempt": list(stop_dust_exempt or []),
+        # Call-input retention (rq6_harness_and_call_input_retention_ruling.md
+        # section 2): the sha256 of each text exactly as passed to the adapter,
+        # the trading call's image count and each image's sha256 and length.
+        # The texts themselves are in data/prompts/{YYYY-MM}/{cycle_id}.jsonl.
+        # input_retention_failed true = that file or an image write failed, so
+        # this decision point is not eligible for RQ6.
+        **(call_inputs if call_inputs is not None else {
+            "trade_system_sha256": None, "trade_user_sha256": None,
+            "screen_system_sha256": None, "screen_user_sha256": None,
+            "image_count": None, "images": [], "image_bytes_retained": False,
+            "input_retention_failed": True}),
     }
 
     with open(path, "a", encoding="utf-8") as f:
