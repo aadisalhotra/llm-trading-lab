@@ -202,6 +202,20 @@ def live_cohort_keys(settings: dict[str, Any] | None = None) -> list[str]:
 # imports this module.
 _VENUE_MODES = frozenset({"broker_paper", "live"})
 
+# Book keys of the five refreshed confirmatory arms (cohort_refresh_ruling.md
+# rev. 2), fixed by the hub on 2026-11-21. A book key names the state file, the
+# decision log and every per-book glob, so no key may be a prefix of another:
+# the proposed claude_opus_5_5 / grok_4_7 began with existing keys, the shape
+# of the April 2026 state-file commingling. Not wired to any book here; the
+# December plumbing adds them to the configuration.
+REFRESHED_BOOK_KEYS: dict[str, str] = {
+    "cb_sonnet": "claude-sonnet-5-5",
+    "cb_opus": "claude-opus-5-5",
+    "cb_astra": "gpt-6-astra",
+    "cb_grok": "grok-4.7",
+    "cb_argon": "gemini-4-argon",
+}
+
 
 def effective_mode(model_key: str, settings: dict[str, Any] | None = None) -> str:
     """The execution mode `model_key`'s book actually runs under.
