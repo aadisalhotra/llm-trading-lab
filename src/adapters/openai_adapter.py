@@ -5,8 +5,31 @@ import base64
 import os
 from typing import Any
 
+import logging
+
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+
+logger = logging.getLogger("llmlab.adapters.openai")
+
+# The refreshed confirmatory arm (cohort_refresh_ruling.md rev. 2, section 5).
+# gpt-6-astra cannot run without reasoning ("none" is not supported). No
+# default is documented on its pages, but the API reports one: the Responses
+# API returns reasoning.effort "medium" when the field is omitted (adapter
+# probe 2026-11-21). Section 5 sends a reported default explicitly; the hub
+# ruled "medium" explicit pending Research's confirmation. Keyed by the exact
+# identifier; gpt-5.4-2026-03-05 (the Phase A snapshot) keeps its request
+# byte for byte.
+REFRESHED_ARMS: dict[str, dict[str, str]] = {
+    "gpt-6-astra": {"reasoning_effort": "medium"},
+}
+# Reasoning counts against max_completion_tokens (probe: a 64-token cap ended
+# on "length" with 64 reasoning tokens). Calibration runs at the provider
+# maximum, 128,000 output tokens (model page saved 2026-11-21); the frozen cap,
+# 16,384 plus the measured allowance, replaces it before the first validated
+# session. Non-streaming: the request shape changes only if the allowance
+# ladder reaches rung 3 (reasoning_allowance_limit_ruling.md).
+REFRESHED_MAX_COMPLETION_TOKENS = 128_000
 
 
 class OpenAIAdapter(BaseAdapter):
@@ -44,9 +67,18 @@ class OpenAIAdapter(BaseAdapter):
 
         # Newer GPT models reject `max_tokens` and require `max_completion_tokens`.
         # The OpenAI SDK accepts the new param across all current chat models.
+        refreshed = REFRESHED_ARMS.get(self.model)
         extra: dict[str, Any] = {}
         if self.temperature is not None:
-            extra["temperature"] = self.temperature
+            if refreshed:
+                # Nothing is sent to a refreshed arm until Research rules
+                # (hub 2026-11-21); a value other than 1 is rejected anyway.
+                logger.warning("[%s] temperature %s not sent to a refreshed arm",
+                               self.model, self.temperature)
+            else:
+                extra["temperature"] = self.temperature
+        if refreshed:
+            extra["reasoning_effort"] = refreshed["reasoning_effort"]
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -55,10 +87,17 @@ class OpenAIAdapter(BaseAdapter):
             ],
             response_format={"type": "json_object"},
             # Budget equalization, 4096 -> 16384 (output_budget_equalization_ruling.md, 2026-11-19).
-            max_completion_tokens=16384,
+            max_completion_tokens=REFRESHED_MAX_COMPLETION_TOKENS if refreshed else 16384,
             **extra,
         )
-        text = response.choices[0].message.content or ""
+        message = response.choices[0].message
+        refusal = getattr(message, "refusal", None) if refreshed else None
+        if refusal:
+            # cohort_refresh_ruling.md rev. 2 section 6 item 2: its own class,
+            # never retried, never sent to another model.
+            raise ModelRefusal(f"refusal: model={getattr(response, 'model', self.model)} "
+                               f"text={str(refusal)[:300]}")
+        text = message.content or ""
         returned_id = getattr(response, "model", self.model)
 
         # OpenAI exposes usage on every successful chat completion
@@ -94,6 +133,10 @@ class OpenAIAdapter(BaseAdapter):
         # Reasoning tokens bill inside completion_tokens, the same semantics as
         # Gemini's thoughts_token_count, so they land on the same log field.
         metadata["thoughts_tokens"] = getattr(cdet, "reasoning_tokens", None) if cdet else None
+        if refreshed:
+            metadata["reasoning_effort_sent"] = refreshed["reasoning_effort"]
+            metadata["max_tokens_sent"] = REFRESHED_MAX_COMPLETION_TOKENS
+            metadata["transport"] = "non-streaming"
         # Prompt-cache split. cost_rates.py prices every call at the full input
         # rate; this is what would let that conservatism be measured.
         cached = getattr(pdet, "cached_tokens", None) if pdet else None

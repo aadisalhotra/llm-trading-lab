@@ -1,0 +1,150 @@
+{
+  "generated_utc": "2026-11-21T20:01:01+00:00",
+  "purpose": "cohort_refresh_ruling.md rev. 2 section 5 item 2: send/omit equivalence by reasoning-token counts. Preliminary; induced tests; enter no series.",
+  "arm": "gpt-6-astra",
+  "system": "Respond with one JSON object only: {\"decisions\": [], \"overall_reasoning\": \"<the answer as an integer>\"}. No prose, no code fences.",
+  "prompt": "Let N be the number of ordered pairs of integers (x, y) with x^2 + y^2 = 5^10 * 13^4 * 17^2. Also let M be the number of those pairs with x > 0 and y > 0 and gcd(x, y) = 1. Work it out and verify both counts. Put N + M in overall_reasoning.",
+  "pairs": 5,
+  "summary": {
+    "send": {
+      "n": 5,
+      "median": 192,
+      "min": 121,
+      "max": 276,
+      "values": [
+        192,
+        276,
+        133,
+        215,
+        121
+      ]
+    },
+    "omit": {
+      "n": 5,
+      "median": 139,
+      "min": 79,
+      "max": 190,
+      "values": [
+        92,
+        79,
+        190,
+        139,
+        163
+      ]
+    },
+    "models_echoed": [
+      "gpt-6-astra"
+    ],
+    "finishes": [
+      "stop"
+    ],
+    "failures": []
+  },
+  "records": [
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 192,
+      "output_tokens": 215,
+      "level_sent": "medium",
+      "error_class": null,
+      "error": null,
+      "latency_s": 21.98
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 92,
+      "output_tokens": 115,
+      "latency_s": 20.75
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 276,
+      "output_tokens": 299,
+      "level_sent": "medium",
+      "error_class": null,
+      "error": null,
+      "latency_s": 26.19
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 79,
+      "output_tokens": 102,
+      "latency_s": 20.47
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 133,
+      "output_tokens": 156,
+      "level_sent": "medium",
+      "error_class": null,
+      "error": null,
+      "latency_s": 6.04
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 190,
+      "output_tokens": 213,
+      "latency_s": 6.13
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 215,
+      "output_tokens": 238,
+      "level_sent": "medium",
+      "error_class": null,
+      "error": null,
+      "latency_s": 6.21
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 139,
+      "output_tokens": 162,
+      "latency_s": 4.82
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 121,
+      "output_tokens": 144,
+      "level_sent": "medium",
+      "error_class": null,
+      "error": null,
+      "latency_s": 4.7
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "gpt-6-astra",
+      "finish": "stop",
+      "reasoning_tokens": 163,
+      "output_tokens": 186,
+      "latency_s": 5.07
+    }
+  ]
+}

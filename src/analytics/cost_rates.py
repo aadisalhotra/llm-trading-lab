@@ -205,6 +205,18 @@ RATE_HISTORY: dict[str, list[dict]] = {
     # Claude Sonnet 5, except for prompt cache reads" (same folder,
     # anthropic_whats_new_sonnet_5_5.html), $2/$10. Thinking tokens bill as
     # output and are included in output_tokens.
+    # gpt-6-astra: "Price $10 / $50 Input / Output" (model page saved
+    # 2026-11-21, docs/ops/provider_pages_2026-11-21/openai_gpt_6_astra_model.html).
+    # Reasoning tokens bill inside completion_tokens. One tier: a long-context
+    # rate above some input size is reported by third parties but is not on the
+    # saved primary page, and lab prompts are about 10k tokens.
+    "gpt-6-astra": [
+        {
+            "effective_from": None,
+            "tiers": [{"max_input_tokens": None, "input": 10.00, "output": 50.00}],
+            "note": "$10/$50; provider page saved 2026-11-21.",
+        },
+    ],
     "claude-sonnet-5-5": [
         {
             "effective_from": None,
