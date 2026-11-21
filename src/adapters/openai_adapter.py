@@ -54,7 +54,8 @@ class OpenAIAdapter(BaseAdapter):
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=4096,
+            # Budget equalization, 4096 -> 16384 (output_budget_equalization_ruling.md, 2026-11-19).
+            max_completion_tokens=16384,
             **extra,
         )
         text = response.choices[0].message.content or ""

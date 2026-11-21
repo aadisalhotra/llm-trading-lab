@@ -48,7 +48,8 @@ class AnthropicAdapter(BaseAdapter):
             extra["temperature"] = self.temperature
         response = client.messages.create(
             model=self.model,
-            max_tokens=4096,
+            # Budget equalization, 4096 -> 16384 (output_budget_equalization_ruling.md, 2026-11-19).
+            max_tokens=16384,
             system=system_prompt,
             messages=[{"role": "user", "content": content}],
             **extra,
@@ -85,8 +86,8 @@ class AnthropicAdapter(BaseAdapter):
         #   stop_reason  — the finish reason. `max_tokens` vs `end_turn`
         #                  distinguishes a truncated decision from a complete
         #                  one, which is exactly the forensics the July Gemini
-        #                  completeness investigation lacked. Under a 4096-token
-        #                  cap that is a live risk, not a theoretical one.
+        #                  completeness investigation lacked. Under the 4096-token
+        #                  cap of 2026-04..11 it bound on 112 pilot responses.
         #   cache_read / cache_creation — Anthropic bills cache reads at a
         #                  discount and cache writes at a premium, and
         #                  cost_rates.py models neither.

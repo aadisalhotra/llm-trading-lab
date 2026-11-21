@@ -3843,6 +3843,40 @@
         }
       },
       {
+        "id": "output_budget_equalization",
+        "date": "2026-11-20",
+        "type": "model_call_configuration_boundary",
+        "class": "Not executor-class (ruling §2): it changes which decision the model returns, not the venue order a given decision produces. No S1 count is consumed. It is a regime boundary for the decision-level series of the four arms, like the Gemini budget entry of July.",
+        "authority": {
+          "ruling": {
+            "path": "docs/registrations/output_budget_equalization_ruling.md",
+            "revision": "rev. 2 (replaces d30a747c…, 12,704 B)",
+            "sha256": "05d53670b86597e88a1327739206b56e36e08218c19550e45ef056d00e489c40",
+            "bytes": 13614,
+            "where": "Deposit batch 3 (hub manifest, hash-verified 2026-11-20). Not yet in the repo; it lands with the deposit staging."
+          },
+          "hub": "HUB -> OPERATIONS 2026-11-19 night, F3: the budget commit alone (anthropic_adapter.py:51, openai_adapter.py:57, xai_adapter.py:49, 4096 -> 16384, plus their comments), demonstrations (a) and (c) off the validation record, this entry, and landing after the 2026-11-20 close on sign-off."
+        },
+        "pre_boundary_budgets": {
+          "claude (Sonnet 4.6), claude_opus (Opus 4.6)": "4096 (anthropic_adapter.py:51, max_tokens)",
+          "gpt (GPT-5.4)": "4096 (openai_adapter.py:57, max_completion_tokens)",
+          "grok (Grok 4.20)": "4096 (xai_adapter.py:49, max_tokens; reasoning tokens do not count against it)",
+          "gemini": "16384 since 2026-07-27, unchanged (shared with thinking)",
+          "deepseek": "16384, unchanged"
+        },
+        "post_boundary_budget": "16384 for all six model ids.",
+        "commit": "588a8aab1 (three constants and their comments; nothing else, ruling §2 condition 1). Companion commits on the same branch: f7e091ce3 (the request-invariance test names the 4096 -> 16384 substitution as the one registered request delta) and ee40b572a (demonstrations).",
+        "first_effective_cycle": "The first intraday tick of Monday 2026-11-23, if pushed after the 2026-11-20 close as signed off. If the push slips, this entry is corrected before it lands.",
+        "pilot_binding": "Ruling §0: 112 pilot responses ended on the 4096 budget between 2026-06-02 and 2026-11-04 (103 Sonnet, 9 Opus, 0 GPT, 0 Grok), each recorded as a success after repair_json closed the brackets. Disclosure and exclusions are under ruling §§3-4.",
+        "demonstrations": {
+          "record": "docs/ops/output_budget_2026-11-20/ (demos.json, demos_gpt_rerun1.json), scripts/demos/output_budget_demos.py, production adapters and model ids, non-streaming, off the validation record.",
+          "a_long_response_natural_finish_no_repair": "Sonnet 7,353 tokens end_turn PASS; Grok 6,449 visible tokens stop PASS; GPT-5.4 first call FAIL, not on the budget: it stopped at 2,010 tokens after its output degenerated inside a string at item 31 and then closed the JSON, so the text parsed while its content was corrupt; GPT-5.4 rerun 5,784 tokens stop PASS. Pass rule: output_tokens > 4096, natural finish, json.loads succeeds on the raw text, repair_json leaves it unchanged, all 90 items present, done = true.",
+          "c_non_streaming_at_16384": "Accepted for claude-sonnet-4-6, claude-opus-4-6, gpt-5.4-2026-03-05 and grok-4.20-0309-reasoning. The Anthropic client did not refuse 16384 non-streaming for either Claude model (Research's open item).",
+          "b_not_run": "(b), a small-budget call setting the §3 flags and raising the alert, needs the §3 logging commit, which is not part of this change."
+        },
+        "checks_owed": "Ruling §2 condition 3: finish-reason shares and the output-token distribution below 4096 after the boundary, against the venue sessions before it, for the four arms, on the Go/No-Go sheet. Condition 6: any response ending on its budget, or a timeout on a call whose partial output exceeded 4096 tokens, goes to the hub before Go/No-Go. Condition 4: the 300 s timeout sits below the budget (Sonnet reaches it near 13,600 tokens) and is not raised."
+      },
+      {
         "id": "failstop_live_probe_2026_11_20",
         "date": "2026-11-20",
         "type": "instrument_verification",
