@@ -329,3 +329,113 @@ def test_disable_step_acts_on_everything_but_exactly_clear(tmp_path, verdict, di
         assert "acted=true" in outputs and "disabled=true" in outputs
     else:
         assert calls == "" and "acted=false" in outputs
+
+
+# ------------------------------------- hardening (approved 2026-11-20, probe H Q3)
+# Probe H showed a run queued behind the failed one still starts after the
+# disable. A failed cancel, an unreadable listing, or a run still queued at the
+# re-query is therefore a failure that turns the job red and is paged, not a
+# warning. The stub curl below serves a queue per pass: the first four listing
+# calls are the cancel pass, the next four the re-query.
+
+_STUB_CURL = """#!/usr/bin/env bash
+echo "$@" >> "$STUB_DIR/curl.log"
+case "$*" in
+  *"/runs?status="*)
+    n=$(( $(cat "$STUB_DIR/n" 2>/dev/null || echo 0) + 1 )); echo $n > "$STUB_DIR/n"
+    [ "${STUB_LIST_FAIL:-0}" = 1 ] && exit 22
+    if [ $n -le 4 ]; then ids="$STUB_FIRST"; else ids="$STUB_AFTER"; fi
+    case "$*" in *"status=queued"*) ;; *) ids="";; esac
+    printf '{"workflow_runs":['; sep=""
+    for i in $ids; do printf '%s{"id":%s}' "$sep" "$i"; sep=","; done
+    printf ']}'
+    ;;
+  *"/cancel"*) [ "${STUB_CANCEL_FAIL:-0}" = 1 ] && exit 22; exit 0 ;;
+esac
+"""
+
+
+def _act(tmp_path, *, first="", after="", list_fail=False, cancel_fail=False):
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "curl").write_text(_STUB_CURL, encoding="utf-8", newline="\n")
+    (stub / "sleep").write_text("#!/usr/bin/env bash\n:\n", encoding="utf-8", newline="\n")
+    # jq stand-in for the one filter the step uses, failing on bad JSON as jq
+    # does; it keeps the test identical on machines without jq.
+    (stub / "jq_impl.py").write_text(
+        "import json, sys\n"
+        "assert sys.argv[1:] == ['-r', '.workflow_runs[].id'], sys.argv\n"
+        "for run in json.load(sys.stdin)['workflow_runs']:\n"
+        "    sys.stdout.buffer.write(f\"{run['id']}\\n\".encode())\n",
+        encoding="utf-8", newline="\n")
+    (stub / "jq").write_text(f'#!/usr/bin/env bash\nexec "{Path(sys.executable).as_posix()}" '
+                             f'"{(stub / "jq_impl.py").as_posix()}" "$@"\n',
+                             encoding="utf-8", newline="\n")
+    for f in ("curl", "sleep", "jq"):
+        (stub / f).chmod(0o755)
+    out = tmp_path / "gh_output"
+    script = tmp_path / "step.sh"
+    script.write_text(_disable_script(), encoding="utf-8", newline="\n")
+    env = dict(os.environ, VERDICT="disable", GH_TOKEN="t", REPO="o/r", SELF_RUN="7",
+               GITHUB_OUTPUT=out.as_posix(), STUB_DIR=tmp_path.as_posix(),
+               STUB_FIRST=first, STUB_AFTER=after,
+               STUB_LIST_FAIL="1" if list_fail else "0", STUB_CANCEL_FAIL="1" if cancel_fail else "0",
+               PATH=f"{stub.as_posix()}{os.pathsep}{os.environ.get('PATH', '')}")
+    r = subprocess.run([BASH, "--noprofile", "--norc", "-eo", "pipefail", script.as_posix()],
+                       env=env, capture_output=True, text=True)
+    outputs = dict(line.split("=", 1) for line in out.read_text(encoding="utf-8").splitlines())
+    log = (tmp_path / "curl.log").read_text(encoding="utf-8")
+    return r, outputs, log
+
+
+@pytest.mark.skipif(BASH is None, reason="needs bash")
+def test_queued_runs_are_cancelled_and_a_clean_requery_is_green(tmp_path):
+    r, out, log = _act(tmp_path, first="41 7 42", after="")
+    assert r.returncode == 0, r.stderr
+    assert "/runs/41/cancel" in log and "/runs/42/cancel" in log
+    assert "/runs/7/cancel" not in log                       # never this run
+    assert (out["cancel_failed"], out["remaining"]) == ("false", "")
+    assert log.count("/runs?status=") == 8                   # one pass, one re-query
+
+
+@pytest.mark.skipif(BASH is None, reason="needs bash")
+def test_a_failed_cancel_is_a_failure_not_a_warning(tmp_path):
+    r, out, log = _act(tmp_path, first="41", after="41", cancel_fail=True)
+    assert r.returncode == 0, r.stderr                       # the page and red steps still run
+    assert out["cancel_failed"] == "true" and out["remaining"] == "41"
+    assert "::error::Fail-stop could not cancel queued run 41" in r.stdout
+    assert "::warning::" not in r.stdout
+
+
+@pytest.mark.skipif(BASH is None, reason="needs bash")
+def test_a_run_still_queued_at_the_requery_is_named(tmp_path):
+    r, out, _ = _act(tmp_path, first="41", after="43 7")
+    assert out["cancel_failed"] == "false" and out["remaining"] == "43"
+    assert "still queued after the cancel loop: 43" in r.stdout
+
+
+@pytest.mark.skipif(BASH is None, reason="needs bash")
+def test_an_unlistable_queue_counts_as_not_clear(tmp_path):
+    r, out, _ = _act(tmp_path, list_fail=True)
+    assert r.returncode == 0, r.stderr
+    assert out["cancel_failed"] == "true"
+    assert out["remaining"] == "unlisted:queued unlisted:pending unlisted:waiting unlisted:requested"
+
+
+def test_red_step_covers_disable_cancel_and_queue():
+    red = _step(JOB_TEXT, "name: Red the job if the disable, a cancel or the queue check failed")
+    cond = red[red.index("if: >-"):red.index("run: exit 1")]
+    assert "always()" in cond and "steps.disable.outputs.acted == 'true'" in cond
+    for clause in ("steps.disable.outputs.disabled != 'true'",
+                   "steps.disable.outputs.cancel_failed != 'false'",   # unset (step died) is red too
+                   "steps.disable.outputs.remaining != ''"):
+        assert clause in cond
+    assert "        run: exit 1" in red
+
+
+def test_the_page_carries_the_cancel_and_queue_outcome():
+    page = _step(JOB_TEXT, "name: Page")
+    assert "        if: always() && steps.disable.outputs.acted == 'true'\n" in page
+    ctx = _env(page)["FAILED_CONTEXT"]
+    assert "cancel_failed=${{ steps.disable.outputs.cancel_failed }}" in ctx
+    assert "remaining=${{ steps.disable.outputs.remaining || 'none' }}" in ctx

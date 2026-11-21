@@ -771,19 +771,63 @@ jobs:
           echo "acted=true" >> "$GITHUB_OUTPUT"
           echo "disabled=${DISABLED}" >> "$GITHUB_OUTPUT"
           # A disabled workflow schedules nothing new, but a run already queued
-          # in the concurrency group would still start when this run ends.
-          for status in queued pending waiting requested; do
-            ids=$(curl -fsS "${AUTH[@]}" "${API}/workflows/intraday.yml/runs?status=${status}&per_page=100" \
-                  | jq -r '.workflow_runs[].id' 2>/dev/null || true)
+          # in the concurrency group would still start when this run ends
+          # (probe H, Q3, 2026-11-20). So every queued, pending, waiting or
+          # requested run other than this one is cancelled, and anything that
+          # cannot be listed or cancelled is a failure, not a warning
+          # (hardening approved 2026-11-20).
+          STATUSES="queued pending waiting requested"
+          CANCEL_FAILED=false
+          for status in $STATUSES; do
+            if ! listing=$(curl -fsS "${AUTH[@]}" "${API}/workflows/intraday.yml/runs?status=${status}&per_page=100"); then
+              echo "::error::Fail-stop could not list ${status} runs"
+              CANCEL_FAILED=true
+              continue
+            fi
+            if ! ids=$(printf '%s' "$listing" | jq -r '.workflow_runs[].id'); then
+              echo "::error::Fail-stop could not read the ${status} run listing"
+              CANCEL_FAILED=true
+              continue
+            fi
             for id in $ids; do
               [ "$id" = "$SELF_RUN" ] && continue
-              curl -fsS -X POST "${AUTH[@]}" "${API}/runs/${id}/cancel" >/dev/null \
-                && echo "Cancelled queued run ${id}" \
-                || echo "::warning::Could not cancel queued run ${id}"
+              if curl -fsS -X POST "${AUTH[@]}" "${API}/runs/${id}/cancel" >/dev/null; then
+                echo "Cancelled queued run ${id}"
+              else
+                echo "::error::Fail-stop could not cancel queued run ${id}"
+                CANCEL_FAILED=true
+              fi
             done
           done
+          # Re-query once, after a short settle: any run still in those states
+          # (or a listing that cannot be read) could still start.
+          sleep 15
+          REMAINING=""
+          for status in $STATUSES; do
+            if ! listing=$(curl -fsS "${AUTH[@]}" "${API}/workflows/intraday.yml/runs?status=${status}&per_page=100"); then
+              REMAINING="${REMAINING} unlisted:${status}"
+              continue
+            fi
+            if ! ids=$(printf '%s' "$listing" | jq -r '.workflow_runs[].id'); then
+              REMAINING="${REMAINING} unreadable:${status}"
+              continue
+            fi
+            for id in $ids; do
+              [ "$id" = "$SELF_RUN" ] && continue
+              REMAINING="${REMAINING} ${id}"
+            done
+          done
+          REMAINING="${REMAINING# }"
+          echo "cancel_failed=${CANCEL_FAILED}" >> "$GITHUB_OUTPUT"
+          echo "remaining=${REMAINING}" >> "$GITHUB_OUTPUT"
           if [ "$DISABLED" != "true" ]; then
             echo "::error::Fail-stop could NOT disable the workflow — a person must disable it now."
+          fi
+          if [ "$CANCEL_FAILED" = "true" ]; then
+            echo "::error::Fail-stop could not list or cancel every queued run — check the queue now."
+          fi
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Fail-stop: still queued after the cancel loop: ${REMAINING} — cancel them by hand now."
           fi
       - name: Page
         if: always() && steps.disable.outputs.acted == 'true'
@@ -792,14 +836,16 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
           RUN_MODE: fail-stop
-          FAILED_CONTEXT: "run=${{ needs.run.result }} verdict=${{ steps.determine.outputs.verdict || 'none' }} disabled=${{ steps.disable.outputs.disabled }}"
+          FAILED_CONTEXT: "run=${{ needs.run.result }} verdict=${{ steps.determine.outputs.verdict || 'none' }} disabled=${{ steps.disable.outputs.disabled }} cancel_failed=${{ steps.disable.outputs.cancel_failed }} remaining=${{ steps.disable.outputs.remaining || 'none' }}"
           FAILURE_SUMMARY: >-
             FAIL-STOP: this run failed or was cancelled and either submitted
             orders or could not be shown not to have. The intraday workflow has
             been DISABLED (see disabled= below; if false, disable it by hand now).
             Reconcile every venue book to the venue by order id, ledger the
-            repair and the re-enable, then re-enable the workflow. The verdict
-            file is in this run's fail-stop-verdict artifact.
+            repair and the re-enable, then re-enable the workflow. If
+            cancel_failed=true or remaining= names a run, a queued run may
+            still start: cancel it by hand now. The verdict file is in this
+            run's fail-stop-verdict artifact.
         run: python3 scripts/notify_failure.py
       - name: Keep the verdict
         if: always()
@@ -809,6 +855,10 @@ jobs:
           name: fail-stop-verdict
           path: fail_stop_verdict.json
           if-no-files-found: warn
-      - name: Red the job if the disable did not happen
-        if: always() && steps.disable.outputs.acted == 'true' && steps.disable.outputs.disabled != 'true'
+      - name: Red the job if the disable, a cancel or the queue check failed
+        if: >-
+          always() && steps.disable.outputs.acted == 'true' && (
+          steps.disable.outputs.disabled != 'true' ||
+          steps.disable.outputs.cancel_failed != 'false' ||
+          steps.disable.outputs.remaining != '')
         run: exit 1
