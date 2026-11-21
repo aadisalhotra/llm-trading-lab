@@ -78,6 +78,9 @@ def log_decision_run(
     screening_latency_seconds: float | None = None,
     stop_dust_exempt: list[dict[str, Any]] | None = None,
     call_inputs: dict[str, Any] | None = None,
+    prompt_frame: str | None = None,
+    prompt_frame_fallback_reason: str | None = None,
+    execution_frame_hash: str | None = None,
 ) -> None:
     """Append a single line to /data/trades/{model}_{YYYY-MM}.jsonl with everything that happened.
 
@@ -113,7 +116,16 @@ def log_decision_run(
         "execution_mode": execution_mode,
         "month_tag": _month_tag(run_date, inception_date),
         "prompt_version": prompt_version,
+        # Daily history restoration (hub GO 2026-11-21, rulings 3 and 5):
+        # data_inputs_hash is the sha256 of the frame the models saw;
+        # execution_frame_hash the sha256 of the guard's intraday frame that
+        # priced and executed. prompt_frame is "daily" or "intraday_fallback"
+        # (then the reason says why). Before this change data_inputs_hash was
+        # prompt_builder.hash_inputs (16 hex); absent new keys = an older row.
         "data_inputs_hash": data_inputs_hash,
+        "prompt_frame": prompt_frame,
+        "prompt_frame_fallback_reason": prompt_frame_fallback_reason,
+        "execution_frame_hash": execution_frame_hash,
         "api_success": decision_result.success,
         "api_error": decision_result.error,
         # Failure class (logging package 2026-11-15): TIMEOUT / API_ERROR /
