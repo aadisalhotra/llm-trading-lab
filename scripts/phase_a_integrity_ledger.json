@@ -3875,6 +3875,36 @@
           "b_not_run": "(b), a small-budget call setting the §3 flags and raising the alert, needs the §3 logging commit, which is not part of this change."
         },
         "checks_owed": "Ruling §2 condition 3: finish-reason shares and the output-token distribution below 4096 after the boundary, against the venue sessions before it, for the four arms, on the Go/No-Go sheet. Condition 6: any response ending on its budget, or a timeout on a call whose partial output exceeded 4096 tokens, goes to the hub before Go/No-Go. Condition 4: the 300 s timeout sits below the budget (Sonnet reaches it near 13,600 tokens) and is not raised."
+      },
+      {
+        "id": "failstop_live_probe_2026_11_20",
+        "date": "2026-11-20",
+        "type": "instrument_verification",
+        "class": "Operations instrument check. It touches no book, no venue and no validation record.",
+        "answers_for": "gate_a_and_fail_stop_2026_11_18, known_limits: the three GitHub behaviours the intraday fail-stop relies on, unproven live until now.",
+        "run": "failstop_probe.yml run 44656406954, mode cancel_test, dispatched by hand 2026-11-20 01:49:35Z and cancelled by hand. Its `run` job was cancelled 02:00:58Z. Its `fail-stop` job ran 02:01:01Z-02:09:09Z, conclusion success. Read from the public API by scripts/read_failstop_probe.py at 02:15Z. Record: docs/ops/failstop_probe_2026-11-20/answers.json.",
+        "Q1_always_job_after_cancel": "YES. After the workflow run was cancelled, the job with `if: always() && (needs.run.result == 'failure' || needs.run.result == 'cancelled' ...)` started and concluded success. intraday.yml's fail-stop job uses the same condition.",
+        "Q2_github_token_disables": "YES. PUT .../workflows/failstop_target.yml/disable with GITHUB_TOKEN (permissions actions: write) succeeded: the step concluded success, and the workflow's state afterwards is disabled_manually.",
+        "Q3_queued_runs_of_disabled_workflow": "NOT ANSWERED by this run. The cancel came about 11 minutes in, not about 1. Both target runs, each a 240 s sleep, had already finished (44656416185: 01:49:40Z-01:53:48Z; 44656457816: queued at 01:50:01Z and done by 01:57:52Z, both success) before the disable at about 02:01Z, so no queued run existed to observe. The open question stands: does a disabled workflow still start a run already pending in its concurrency group? Answering it needs the target re-enabled by hand and a second cancel_test cancelled within about 3 minutes.",
+        "intraday_yml": "state active at about 01:47Z (read after the main push, before the dispatch) and at 02:15Z (after). The probe workflow names only failstop_target.yml, so it cannot address intraday.yml. GitHub's API keeps no state history, so 'throughout' rests on those two reads plus that inspection.",
+        "target_left": "failstop_target.yml stays disabled_manually. The design re-enables nothing. The re-enable needed for a Q3 rerun, and the deletion of both throwaway files, wait for the hub's decision."
+      },
+      {
+        "id": "failstop_live_probe_q3_2026_11_20",
+        "date": "2026-11-20",
+        "type": "instrument_verification",
+        "class": "Operations instrument check. It touches no book, no venue and no validation record.",
+        "completes": "failstop_live_probe_2026_11_20, whose Q3 was not answered (that run's cancel came about 11 minutes in, after both target runs had finished).",
+        "attempts": {
+          "44837860673": "2026-11-20 23:35:03Z, no answer. failstop_target.yml was still disabled_manually from the first probe, so the dispatch step failed in under a second, no target run was created, and the fail-stop job started on a run FAILURE, not a cancellation. Its disable step failed against the already-disabled workflow. Recorded so this run is not read as evidence.",
+          "44838993845": "2026-11-20 23:44:34Z, the answering run, after the PI re-enabled the target. The probe's run job dispatched both targets and was cancelled by hand at 23:45:59Z, during 'Hold for cancellation' (about 85 s in). Its fail-stop job ran 23:46:04Z-23:54:12Z (success), and its disable step succeeded at 23:46:05Z-23:46:06Z."
+        },
+        "Q3_queued_runs_of_disabled_workflow": "YES, A QUEUED RUN STILL STARTS. Target run 44839043707 was created at 23:45:01Z and was pending behind run #1 in the target's concurrency group (cancel-in-progress false, as in intraday.yml) when the workflow was disabled at 23:46:06Z. Its job STARTED at 23:48:48Z, 2 min 42 s after the disable, and ran to success at 23:52:51Z. The in-progress run 44839003892 (job 23:44:42Z-23:48:46Z) also finished normally. Disabling a workflow therefore stops neither a run already in progress nor one already queued. (The API's run_started_at for the queued run reads its creation time; the job's started_at is the real start.)",
+        "Q1_Q2_reconfirmed": "Q1 yes (the always() fail-stop job ran after the cancellation) and Q2 yes (GITHUB_TOKEN disabled the target), as in the first run.",
+        "intraday_yml": "active at every read (23:43Z, 00:08Z, and the reads of the first probe). The probe names only failstop_target.yml.",
+        "consequence_for_the_intraday_fail_stop": "The fail-stop's cancel loop over queued, pending, waiting and requested runs after the disable (.github/workflows/intraday.yml, about lines 773-782) is NECESSARY, not belt-and-braces: without it a run queued behind the failed one would start once the fail-stop finished. The loop can reach that run because intraday's concurrency group is workflow-level and the fail-stop is a job inside the failed run, so the group stays held, and the queued run stays pending, until the fail-stop ends. Gap, proposed and NOT built: a failed cancel is only a ::warning::. Proposal: (1) a failed cancel turns the job red and pages, like a failed disable; (2) after the loop, re-query those four statuses and fail loudly if any run other than this one remains.",
+        "record": "docs/ops/failstop_probe_2026-11-20/answers_q3.json (scripts/read_failstop_probe.py --run-id 44838993845) and q3_run_44838993845_timeline.txt (every job and step of the latest probe run and every target run since 23:30Z, from the public API, read 2026-11-21 00:08Z).",
+        "target_left": "failstop_target.yml is disabled_manually. Both throwaway workflows (failstop_probe.yml, failstop_target.yml) are deleted in the commit that carries this entry, on the hub's instruction of 2026-11-20."
       }
     ]
   }
