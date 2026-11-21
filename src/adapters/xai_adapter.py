@@ -5,10 +5,30 @@ import base64
 import os
 from typing import Any
 
+import logging
+
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
+from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+
+logger = logging.getLogger("llmlab.adapters.xai")
+
+# The refreshed confirmatory arm (cohort_refresh_ruling.md rev. 2, section 5).
+# grok-4.7's documented default is "high" ("If not specified, reasoning_effort
+# defaults to 'high'. Reasoning cannot be disabled." -- xai_reasoning.html,
+# saved 2026-11-21), sent explicitly. Keyed by the exact identifier;
+# grok-4.20-0309-reasoning (the Phase A snapshot) keeps its request byte for
+# byte. Chat Completions works for grok-4.7 (adapter probe 2026-11-21).
+REFRESHED_ARMS: dict[str, dict[str, str]] = {
+    "grok-4.7": {"reasoning_effort": "high"},
+}
+# Reasoning does NOT count against max_tokens on grok-4.7 (probe: 9,432
+# reasoning tokens under a 64-token cap, finish stop), and the provider states
+# no text output limit. max_tokens therefore bounds only the answer, and stays
+# the registered answer budget (Tier 1, T1.4) in calibration and after; the
+# allowance rule has no cap to set for this arm.
+REFRESHED_MAX_TOKENS = 16384
 
 
 class XAIAdapter(BaseAdapter):
@@ -50,8 +70,18 @@ class XAIAdapter(BaseAdapter):
             "max_tokens": 16384,
             "response_format": {"type": "json_object"},
         }
+        refreshed = REFRESHED_ARMS.get(self.model)
         if self.temperature is not None:
-            payload["temperature"] = self.temperature
+            if refreshed:
+                # Nothing is sent to a refreshed arm until Research rules
+                # (hub 2026-11-21).
+                logger.warning("[%s] temperature %s not sent to a refreshed arm",
+                               self.model, self.temperature)
+            else:
+                payload["temperature"] = self.temperature
+        if refreshed:
+            payload["reasoning_effort"] = refreshed["reasoning_effort"]
+            payload["max_tokens"] = REFRESHED_MAX_TOKENS
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -65,13 +95,24 @@ class XAIAdapter(BaseAdapter):
         if not r.ok:
             raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
-        text = data["choices"][0]["message"]["content"]
+        message = data["choices"][0]["message"]
+        if refreshed and message.get("refusal"):
+            # cohort_refresh_ruling.md rev. 2 section 6 item 2.
+            raise ModelRefusal(f"refusal: model={data.get('model', self.model)} "
+                               f"text={str(message.get('refusal'))[:300]}")
+        text = message["content"]
         returned_id = data.get("model", self.model)
 
         usage = data.get("usage", {}) or {}
         in_tok = int(usage.get("prompt_tokens", 0) or 0)
         out_tok = int(usage.get("completion_tokens", 0) or 0)
-        cost = compute_call_cost_usd(returned_id, in_tok, out_tok)
+        reasoning_tok = int(((usage.get("completion_tokens_details") or {})
+                             .get("reasoning_tokens", 0)) or 0)
+        # grok-4.7 reports reasoning OUTSIDE completion_tokens (total_tokens =
+        # prompt + completion + reasoning) and bills it as output, so its cost
+        # prices both. The snapshot's cost line is left as it was.
+        cost = compute_call_cost_usd(returned_id, in_tok,
+                                     out_tok + (reasoning_tok if refreshed else 0))
         metadata: dict[str, Any] = {
             "input_tokens": in_tok,
             "output_tokens": out_tok,
@@ -106,5 +147,12 @@ class XAIAdapter(BaseAdapter):
         # log. These make it checkable per call. Raw values, None when absent:
         # 0 means xAI reported zero sources, None means it reported nothing.
         metadata["num_sources_used"] = usage.get("num_sources_used")
+        if refreshed:
+            metadata["reasoning_effort_sent"] = refreshed["reasoning_effort"]
+            metadata["max_tokens_sent"] = REFRESHED_MAX_TOKENS
+            metadata["transport"] = "non-streaming"
+            # xAI's own figure, in 1e-10 USD ticks, beside the modelled cost.
+            ticks = usage.get("cost_in_usd_ticks")
+            metadata["provider_cost_usd"] = (ticks / 1e10) if isinstance(ticks, (int, float)) else None
         metadata["citations"] = data.get("citations")
         return text, returned_id, metadata

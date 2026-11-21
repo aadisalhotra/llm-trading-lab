@@ -210,6 +210,17 @@ RATE_HISTORY: dict[str, list[dict]] = {
     # Reasoning tokens bill inside completion_tokens. One tier: a long-context
     # rate above some input size is reported by third parties but is not on the
     # saved primary page, and lab prompts are about 10k tokens.
+    # grok-4.7: $2.00 input, $0.50 cached input, $6.00 output per 1M tokens
+    # (xAI language-models API, 2026-11-21: 20000 / 5000 / 60000 in 1e-4 USD
+    # per 1M; grok_4_7.html saved 2026-11-21: "Input price $2.00 / 1M tokens,
+    # Output price $6.00 / 1M tokens"). Reasoning bills as output.
+    "grok-4.7": [
+        {
+            "effective_from": None,
+            "tiers": [{"max_input_tokens": None, "input": 2.00, "output": 6.00}],
+            "note": "$2/$6; xAI API and provider page, 2026-11-21.",
+        },
+    ],
     "gpt-6-astra": [
         {
             "effective_from": None,

@@ -1,0 +1,150 @@
+{
+  "generated_utc": "2026-11-21T20:16:51+00:00",
+  "purpose": "cohort_refresh_ruling.md rev. 2 section 5 item 2: send/omit equivalence by reasoning-token counts. Preliminary; induced tests; enter no series.",
+  "arm": "grok-4.7",
+  "system": "Respond with one JSON object only: {\"decisions\": [], \"overall_reasoning\": \"<the answer as an integer>\"}. No prose, no code fences.",
+  "prompt": "Let N be the number of ordered pairs of integers (x, y) with x^2 + y^2 = 5^10 * 13^4 * 17^2. Also let M be the number of those pairs with x > 0 and y > 0 and gcd(x, y) = 1. Work it out and verify both counts. Put N + M in overall_reasoning.",
+  "pairs": 5,
+  "summary": {
+    "send": {
+      "n": 5,
+      "median": 11940,
+      "min": 11258,
+      "max": 15041,
+      "values": [
+        11258,
+        15041,
+        11940,
+        11632,
+        13069
+      ]
+    },
+    "omit": {
+      "n": 5,
+      "median": 13956,
+      "min": 12027,
+      "max": 17042,
+      "values": [
+        12246,
+        16670,
+        12027,
+        13956,
+        17042
+      ]
+    },
+    "models_echoed": [
+      "grok-4.7"
+    ],
+    "finishes": [
+      "stop"
+    ],
+    "failures": []
+  },
+  "records": [
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 11258,
+      "output_tokens": 13,
+      "level_sent": "high",
+      "error_class": null,
+      "error": null,
+      "latency_s": 222.76
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 12246,
+      "output_tokens": 13,
+      "latency_s": 227.36
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 15041,
+      "output_tokens": 13,
+      "level_sent": "high",
+      "error_class": null,
+      "error": null,
+      "latency_s": 273.15
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 16670,
+      "output_tokens": 13,
+      "latency_s": 303.65
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 11940,
+      "output_tokens": 13,
+      "level_sent": "high",
+      "error_class": null,
+      "error": null,
+      "latency_s": 203.42
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 12027,
+      "output_tokens": 13,
+      "latency_s": 198.15
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 11632,
+      "output_tokens": 13,
+      "level_sent": "high",
+      "error_class": null,
+      "error": null,
+      "latency_s": 197.71
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 13956,
+      "output_tokens": 13,
+      "latency_s": 242.13
+    },
+    {
+      "arm": "send",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 13069,
+      "output_tokens": 13,
+      "level_sent": "high",
+      "error_class": null,
+      "error": null,
+      "latency_s": 223.53
+    },
+    {
+      "arm": "omit",
+      "ok": true,
+      "model": "grok-4.7",
+      "finish": "stop",
+      "reasoning_tokens": 17042,
+      "output_tokens": 13,
+      "latency_s": 300.24
+    }
+  ]
+}
