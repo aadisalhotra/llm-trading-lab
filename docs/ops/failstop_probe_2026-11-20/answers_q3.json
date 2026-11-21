@@ -1,0 +1,64 @@
+{
+  "read_at_utc": "2026-11-21T00:09:24.880317+00:00",
+  "probe_run": {
+    "id": 44838993845,
+    "status": "completed",
+    "conclusion": "cancelled",
+    "created_at": "2026-11-20T23:44:34Z",
+    "run_started_at": "2026-11-20T23:44:34Z",
+    "updated_at": "2026-11-20T23:54:13Z",
+    "html_url": "https://github.com/aadisalhotra/llm-trading-lab/actions/runs/44838993845"
+  },
+  "jobs": [
+    {
+      "name": "run",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "started_at": "2026-11-20T23:44:37Z",
+      "completed_at": "2026-11-20T23:46:01Z"
+    },
+    {
+      "name": "fail-stop",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T23:46:04Z",
+      "completed_at": "2026-11-20T23:54:12Z"
+    }
+  ],
+  "Q1_always_job_runs_after_cancel": {
+    "answer": "yes",
+    "fail_stop_job": {
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T23:46:04Z",
+      "completed_at": "2026-11-20T23:54:12Z"
+    }
+  },
+  "Q2_github_token_can_disable": {
+    "answer": "yes",
+    "target_state": "disabled_manually",
+    "disable_step": {
+      "name": "Disable the target with GITHUB_TOKEN (Q2)",
+      "conclusion": "success"
+    }
+  },
+  "Q3_queued_runs_of_disabled_workflow": [
+    {
+      "id": 44839003892,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-20T23:44:39Z",
+      "run_started_at": "2026-11-20T23:44:39Z",
+      "updated_at": "2026-11-20T23:48:46Z"
+    },
+    {
+      "id": 44839043707,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-20T23:45:01Z",
+      "run_started_at": "2026-11-20T23:45:01Z",
+      "updated_at": "2026-11-20T23:52:52Z"
+    }
+  ],
+  "intraday_yml_state": "active"
+}

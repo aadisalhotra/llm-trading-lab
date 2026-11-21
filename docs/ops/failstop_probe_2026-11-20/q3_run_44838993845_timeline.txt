@@ -1,0 +1,22 @@
+PROBE RUN 44838993845 workflow_dispatch completed cancelled created 2026-11-20T23:44:34Z started 2026-11-20T23:44:34Z updated 2026-11-20T23:54:13Z
+PROBE RUN 44837860673 workflow_dispatch completed cancelled created 2026-11-20T23:35:03Z started 2026-11-20T23:35:03Z updated 2026-11-20T23:43:21Z
+PROBE RUN 44656406954 workflow_dispatch completed cancelled created 2026-11-20T01:49:35Z started 2026-11-20T01:49:35Z updated 2026-11-20T02:09:10Z
+ JOB run completed cancelled 2026-11-20T23:44:37Z -> 2026-11-20T23:46:01Z
+    STEP 1 Set up job completed success 2026-11-20T23:44:38Z -> 2026-11-20T23:44:38Z
+    STEP 2 Dispatch the target twice (one running, one pending) completed success 2026-11-20T23:44:38Z -> 2026-11-20T23:45:21Z
+    STEP 3 Hold for cancellation completed cancelled 2026-11-20T23:45:21Z -> 2026-11-20T23:45:59Z
+    STEP 4 Complete job completed success 2026-11-20T23:45:59Z -> 2026-11-20T23:45:59Z
+ JOB fail-stop completed success 2026-11-20T23:46:04Z -> 2026-11-20T23:54:12Z
+    STEP 1 Set up job completed success 2026-11-20T23:46:04Z -> 2026-11-20T23:46:05Z
+    STEP 2 Record what this job saw completed success 2026-11-20T23:46:05Z -> 2026-11-20T23:46:05Z
+    STEP 3 Target runs before the disable completed success 2026-11-20T23:46:05Z -> 2026-11-20T23:46:05Z
+    STEP 4 Disable the target with GITHUB_TOKEN (Q2) completed success 2026-11-20T23:46:05Z -> 2026-11-20T23:46:06Z
+    STEP 5 Watch the target's runs after the disable (Q3) completed success 2026-11-20T23:46:06Z -> 2026-11-20T23:54:10Z
+    STEP 6 Complete job completed success 2026-11-20T23:54:10Z -> 2026-11-20T23:54:10Z
+TARGET RUN 44839043707 workflow_dispatch completed success created 2026-11-20T23:45:01Z started 2026-11-20T23:45:01Z updated 2026-11-20T23:52:52Z
+   job sleep completed success 2026-11-20T23:48:48Z -> 2026-11-20T23:52:51Z
+TARGET RUN 44839003892 workflow_dispatch completed success created 2026-11-20T23:44:39Z started 2026-11-20T23:44:39Z updated 2026-11-20T23:48:46Z
+   job sleep completed success 2026-11-20T23:44:42Z -> 2026-11-20T23:48:46Z
+target state: disabled_manually
+probe state: active
+intraday state: active
