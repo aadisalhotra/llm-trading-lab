@@ -1,0 +1,28 @@
+{
+  "created_utc": "2026-11-22",
+  "purpose": "Hub H-OPS-12; lifecycle_and_identity_ruling_2026-11-22.md section 2.3: xAI redirect probe. Off-cycle induced test, no orders, no series.",
+  "files": [
+    {
+      "file": "records.json",
+      "bytes": 17999,
+      "sha256": "926beccfda8f94ec1d8452c7a37d2150f8274c40b433cd740101c3dcd031bfa4"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3716,
+      "sha256": "f999366c07486e5228ef4aa1de283098ac388da3a58d7b3aa042376e12dbe7a8"
+    },
+    {
+      "file": "xai_may15_retirement.html",
+      "bytes": 366961,
+      "sha256": "0a4b8b78164d8a6614a241dc0671b97589939a20086dba4a5dc77d9f6dc9305c"
+    }
+  ],
+  "page": {
+    "file": "xai_may15_retirement.html",
+    "url": "https://docs.x.ai/developers/migration/may-15-retirement",
+    "fetched": "2026-11-22, HTTP 200, bytes as served"
+  },
+  "result": "Case A. All 6 redirected calls (grok-4-0709 x3, grok-3 x3) named the served model grok-4.3, not the requested slug. All 12 calls (redirected and direct grok-4.3 at low and none) carried system_fingerprint fp_eb3c003fc66c14ed. Also observed: grok-3, documented to redirect at none reasoning effort, reasoned 147-177 tokens (like the low-effort redirect), while grok-4.3 at none reasoned 0.",
+  "key_check": "In-process check (scripts/check_saved_pages_for_keys.py) of all three files against every .env value of 16+ characters (16 values): no match; 0 key-shaped strings in the files. Nothing secret printed or written (hub H-OPS-02)."
+}
