@@ -4004,20 +4004,16 @@
         "sweep_status": "PENDING: the date translations go through the deposit documents by the companion splice (amendment section 5 item 2), and config/settings.json phase dates still carry the 2026-12-01 boundary until a landing sweep changes them; this entry changes no file other than the ledger."
       },
       {
-        "id": "grok_420_fingerprint_change_2026_11_10",
+        "id": "fingerprint_classification_2026_11_22",
         "date": "2026-11-22",
-        "type": "candidate_identity_event",
-        "scope": "grok (grok-4.20-0309-reasoning), a registered Phase A fallback",
-        "authority": "Hub H-OPS-17 (2026-11-22); xai_probe_followup_ruling_2026-11-22.md section 3 (30845cb4...): a ledger entry with the two values, the last and first rows, and that no xAI announcement is known.",
-        "the_change": {
-          "before": "fp_00c95f2c6b, last row 2026-11-09T20:34:09Z (cycle 20261109T203237Z)",
-          "after": "fp_81c6f9bb90, first row 2026-11-10T14:34:23Z (cycle 20261110T143249Z); 115 rows through 2026-11-20T20:34:53Z",
-          "between": "the close of 2026-11-09 and the open of 2026-11-10; no session in between",
-          "announcement": "none known from xAI",
-          "model_named": "every row names grok-4.20-0309-reasoning, before and after"
-        },
-        "full_history_since_logging_began": {
-          "source": "data/trades/grok_2026-09..11.jsonl on main 3824cb758, field api_system_fingerprint (logged from 2026-09-10), rows in timestamp order",
+        "type": "fingerprint_classification",
+        "scope": "the system_fingerprint field of every arm that returns one: grok-4.20-0309-reasoning (xAI, a registered Phase A fallback) and deepseek-v4-pro. The other four providers return none.",
+        "authority": "Hub H-OPS-19 (2026-11-22); fingerprint_rotation_ruling_2026-11-22.md (sha256 2049d459ee4aefb8c3ff634a865fe214b03b1c9a9fe111b278405e9a165aa341), which supersedes section 1 (from the production table) and section 3 of xai_probe_followup_ruling_2026-11-22.md (30845cb4...).",
+        "doctrine": "One rule for every provider, on each field's own record (ruling section 3): rotating if at least two transitions in a record of at least 15 sessions, stable otherwise; a row without a fingerprint is not a transition. A transition on a stable field is a candidate identity event (ledger entry plus a profile reading against the control arm). A transition on a rotating field is logged and counted in the monthly data-integrity section, and is not by itself a candidate identity event; identity rests on the response model name under IDENTITY_MISMATCH, profile monitoring and the lifecycle monitor. A stable field making a second transition inside 15 sessions is reclassified rotating, with a ledger entry and the hub told. The snapshots and DeepSeek are classified now; the refreshed arms at the Go/No-Go from their December rows, shakedown included, with transitions logged until then.",
+        "source": "data/trades/grok_2026-09..11.jsonl and deepseek_2026-09..11.jsonl on origin/main 3824cb75, field api_system_fingerprint (logged from 2026-09-10), rows in timestamp order, through 2026-11-20",
+        "grok-4.20-0309-reasoning": {
+          "classification": "rotating",
+          "record": "663 rows with a fingerprint over 52 sessions: 12 runs, 11 transitions, 9 distinct values, 3 returns (fp_b965085801, fp_55c25385eb, fp_00c95f2c6b). Every transition fell between sessions. One 16-character value (fp_1fb66439292298c7) among 10-character ones. The model name was grok-4.20-0309-reasoning on every row.",
           "runs": [
             "fp_d44b4eeb21 2026-09-10 .. 2026-09-18, 90 rows",
             "fp_b965085801 2026-09-21 .. 2026-09-30, 102 rows",
@@ -4032,11 +4028,20 @@
             "fp_00c95f2c6b 2026-10-29 .. 2026-11-09, 101 rows (returned)",
             "fp_81c6f9bb90 2026-11-10 .. 2026-11-20, 115 rows"
           ],
-          "summary": "12 runs, 11 transitions, 9 distinct values in 2026-09-10 .. 2026-11-20. Every transition falls between sessions. Three values returned after another had replaced them (fp_b965085801, fp_55c25385eb, fp_00c95f2c6b). Every row names grok-4.20-0309-reasoning. Six rows carry no fingerprint, all failed calls (2026-09-17, 09-30, 10-09 twice, 10-27, 11-05).",
-          "correction_to_the_relayed_count": "The fp_00c95f2c6b run that the 2026-11-10 change ended began on 2026-10-29 (101 rows), not 2026-11-02: the 75 rows relayed count the November file only. Its earlier run, 2026-10-23 .. 10-26, is separate."
+          "the_2026_11_10_change": "fp_00c95f2c6b (last row 2026-11-09T20:34:09Z, cycle 20261109T203237Z) to fp_81c6f9bb90 (first row 2026-11-10T14:34:23Z, cycle 20261110T143249Z), between sessions, no xAI announcement known. It is the eleventh transition and one instance of the pattern, not a candidate identity event (ruling section 4.1). The fp_00c95f2c6b run it ended began on 2026-10-29 (101 rows); 75 is its November count only.",
+          "rows_without_a_fingerprint": "6, all failed calls (2026-09-17, 09-30, 10-09 twice, 10-27, 11-05)",
+          "probe_context": "The 2026-11-22 redirect probe found grok-4.3 at a tenth value, fp_eb3c003fc66c14ed (docs/ops/xai_redirect_probe_2026-11-22/)."
         },
-        "reading_for_research": "The 2026-11-10 change is the eleventh transition of this fingerprint since logging began, not a first. The fingerprint moves often, between sessions, and returns to earlier values, with the model name constant throughout. That is consistent with the follow-up ruling's statement that it is a corroborant that can move without a change of model; the ruling's table, built on the November file alone, says it 'changed once for one model' and 'stayed at the new value', which holds for November only. Whether the identity-monitoring table should state the full history is Research's to decide before the freeze.",
-        "follow_up": "The Grok behaviour reading (due Mon 2026-11-30) uses a baseline after both the 2026-11-06 venue cutover and 2026-11-10, and states whether the profile moved at 2026-11-10 relative to the control arm and how that relates to the 2026-11-16 shift."
+        "deepseek-v4-pro": {
+          "classification": "stable",
+          "record": "648 rows with a fingerprint over 52 sessions: 2 runs, 1 transition, 2 distinct values.",
+          "runs": [
+            "a307abda487cd1b463329ccb945ce396 2026-09-10 .. 2026-11-13, 584 rows, 47 sessions in the span (46 with a fingerprint: every call on 2026-11-04 failed, so that session has none)",
+            "d400d062347a13495558bb956f2a0a0c 2026-11-16 .. 2026-11-20, 64 rows"
+          ],
+          "the_2026_11_16_change": "A transition on a stable field: correctly treated as a candidate identity event (deepseek_fingerprint_event_ruling.md). Same doctrine as the grok reading above, different base rate (ruling section 4.2)."
+        },
+        "follow_up": "Fingerprint transitions are recorded per arm, refreshed arms included, and counted in the monthly data-integrity section. The Grok reading of Mon 2026-11-30 compares 2026-11-06 .. 11-13 with 2026-11-16 .. 11-20, descriptively, as control-arm context for DeepSeek's 2026-11-16 event; Grok's own transitions are not boundaries (ruling section 5)."
       }
     ]
   }
