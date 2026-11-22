@@ -33,6 +33,15 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # 2026-11-21); the frozen cap, 16,384 plus the measured allowance, replaces
 # this value before the first validated session.
 REFRESHED_MAX_TOKENS = 128_000
+# The response model names each refreshed arm accepts
+# (xai_probe_followup_ruling_2026-11-22.md section 2): the configured
+# identifier, plus any build string the provider returns for it once recorded
+# in calibration and the configuration verification. Listed by name, matched
+# exactly. Names are added only by hub ruling.
+ACCEPTED_NAMES: dict[str, tuple[str, ...]] = {
+    "claude-sonnet-5-5": ("claude-sonnet-5-5",),
+    "claude-opus-5-5": ("claude-opus-5-5",),
+}
 
 
 def thinking_tokens(details: Any) -> int | None:
@@ -115,6 +124,9 @@ class AnthropicAdapter(BaseAdapter):
     @property
     def refreshed(self) -> bool:
         return self.model in REFRESHED_ARMS
+
+    def accepted_names(self) -> tuple[str, ...]:
+        return ACCEPTED_NAMES.get(self.model, ())
 
     def _call_api(
         self,
@@ -273,6 +285,7 @@ class AnthropicAdapter(BaseAdapter):
         if refreshed:
             # The finish-reason rule, before any text leaves the adapter: only
             # end_turn is returned for parsing. The snapshots are unchanged.
+            self.check_identity(facts.get("model"), metadata)     # read from the stream
             fc = finish_class(stop_reason)
             metadata["finish_class"] = fc
             sd = getattr(response, "stop_details", None)

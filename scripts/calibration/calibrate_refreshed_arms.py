@@ -202,8 +202,10 @@ def run_call(arm: str, leg: str, setting: str, x: dict[str, Any], bound: float) 
         cls = {base.ERROR_CLASS_TICK_DEADLINE: BOUND, base.ERROR_CLASS_TIMEOUT: BOUND,
                base.ERROR_CLASS_DECISION_TRUNCATED: BUDGET,
                base.ERROR_CLASS_REFUSAL: INVALID, base.ERROR_CLASS_ABNORMAL_FINISH: INVALID,
-               base.ERROR_CLASS_STREAM_INCOMPLETE: INVALID}.get(ec, PROVIDER)
-        rec.update(cls=cls, error_class=ec, error=str(e)[:300], model_named=md.get("model"))
+               base.ERROR_CLASS_STREAM_INCOMPLETE: INVALID,
+               base.ERROR_CLASS_IDENTITY_MISMATCH: INVALID}.get(ec, PROVIDER)
+        rec.update(cls=cls, error_class=ec, error=str(e)[:300],
+                   model_named=md.get("model_named") or md.get("model"))
     rec["latency_s"] = round(time.monotonic() - t0, 3)
     out, reasoning = md.get("output_tokens"), md.get("thoughts_tokens")
     if out is not None:
@@ -355,6 +357,10 @@ def summarize_arm(arm: str, recs: list[dict[str, Any]], d_seconds: float) -> dic
                             for c in (VALID, BOUND, PROVIDER, INVALID, BUDGET)},
         "model_name_mismatches": sum(1 for r in omit if r["cls"] == VALID
                                      and r.get("model_named") != spec["model"]),
+        # Every model name the arm's responses carried, with counts: the
+        # evidence for the hub's ruling on any build string to accept.
+        "model_names_seen": {str(n): sum(1 for r in recs if r.get("model_named") == n)
+                             for n in sorted({r.get("model_named") for r in recs}, key=str)},
         "invalid_finishes": [{"input_id": r["input_id"], "leg": r["leg"],
                               "error_class": r["error_class"], "finish_reason": r["finish_reason"]}
                              for r in omit if r["cls"] == INVALID],

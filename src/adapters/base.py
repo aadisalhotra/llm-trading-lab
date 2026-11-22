@@ -78,6 +78,11 @@ ERROR_CLASS_TICK_DEADLINE = "TICK_DEADLINE"
 # parser runs, their text is discarded, and none is retried.
 ERROR_CLASS_DECISION_TRUNCATED = "DECISION_TRUNCATED"
 ERROR_CLASS_ABNORMAL_FINISH = "ABNORMAL_FINISH"
+# A response that names a model not on its arm's accepted list
+# (xai_probe_followup_ruling_2026-11-22.md section 2): a failed decision, not
+# parsed, executed or retried, on either leg; a candidate identity event
+# reported to the hub the same day.
+ERROR_CLASS_IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
 
 FINISH_NORMAL = "normal"
 FINISH_TRUNCATED = "truncated"
@@ -97,6 +102,10 @@ class CallFailed(RuntimeError):
 
 class StreamIncomplete(CallFailed):
     """A stream that ended without its terminal event."""
+
+
+class IdentityMismatch(CallFailed):
+    """The response named a model that is not on its arm's accepted list."""
 
 
 class TickDeadlineExceeded(CallFailed):
@@ -175,6 +184,8 @@ def finish_error_class(exc: BaseException) -> str | None:
     """The registered class of a classified call failure, else None."""
     if isinstance(exc, TickDeadlineExceeded):
         return ERROR_CLASS_TICK_DEADLINE
+    if isinstance(exc, IdentityMismatch):
+        return ERROR_CLASS_IDENTITY_MISMATCH
     if isinstance(exc, ModelRefusal):
         return ERROR_CLASS_REFUSAL
     if isinstance(exc, BudgetStop):
@@ -413,6 +424,21 @@ class DecisionResult:
     no_trade_reason: str | None = None
 
 
+def identity_failure_result(adapter: "BaseAdapter", exc: IdentityMismatch,
+                            leg: str) -> DecisionResult:
+    """The failed decision for an IDENTITY_MISMATCH caught on the screening
+    leg: no decision call is made for the tick (xai_probe_followup_ruling
+    section 2). The decision leg's own mismatch comes back from
+    generate_decision with the same class and identity_leg "decision"."""
+    named = exc.metadata.get("model_named")
+    return DecisionResult(
+        provider=adapter.provider_name, model_id_configured=adapter.model,
+        model_id_returned=named or adapter.model, decisions=[], overall_reasoning="",
+        raw_response="", latency_seconds=0.0, success=False,
+        error=f"{leg} leg: {exc}", error_class=ERROR_CLASS_IDENTITY_MISMATCH,
+        metadata={**exc.metadata, "attempt": 0, "identity_leg": leg})
+
+
 class BaseAdapter(ABC):
     """All provider adapters subclass this and implement `_call_api`.
 
@@ -450,6 +476,22 @@ class BaseAdapter(ABC):
         """True for a refreshed confirmatory arm. Each provider adapter keys
         this on its REFRESHED_ARMS table; the base has none."""
         return False
+
+    def accepted_names(self) -> tuple[str, ...]:
+        """The response model names this arm accepts. Each provider adapter
+        keys this on its ACCEPTED_NAMES table; the base accepts none."""
+        return ()
+
+    def check_identity(self, named: str | None, metadata: dict[str, Any]) -> None:
+        """Raise IdentityMismatch when a refreshed arm's response names a model
+        not on its accepted list, or names none. Exact names only: no pattern,
+        prefix or case folding. Names are added only by hub ruling."""
+        if not self.refreshed:
+            return
+        if named not in self.accepted_names():
+            raise IdentityMismatch(
+                f"response names {named!r}; {self.model} accepts {list(self.accepted_names())}",
+                {**metadata, "model_named": named, "finish_class": None})
 
     def remaining(self) -> float | None:
         """Seconds left before D for this arm's calls, or None without a
@@ -594,6 +636,8 @@ class BaseAdapter(ABC):
                     error_reason=(None if is_client_timeout(e) or finish_error_class(e)
                                   else account_state_reason(self.provider_name, str(e))),
                     metadata={**getattr(e, "metadata", {}), "attempt": attempt,
+                              **({"identity_leg": "decision"}
+                                 if isinstance(e, IdentityMismatch) else {}),
                               **({"first_parse_error": first_parse_error,
                                   "parse_retry": "cut_at_deadline"}
                                  if first_parse_error and isinstance(e, TickDeadlineExceeded)

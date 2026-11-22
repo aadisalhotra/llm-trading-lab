@@ -31,6 +31,14 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # the registered answer budget (Tier 1, T1.4) in calibration and after; the
 # allowance rule has no cap to set for this arm.
 REFRESHED_MAX_TOKENS = 16384
+# The response model names each refreshed arm accepts
+# (xai_probe_followup_ruling_2026-11-22.md section 2): the configured
+# identifier, plus any build string the provider returns for it once recorded
+# in calibration and the configuration verification. Listed by name, matched
+# exactly. Names are added only by hub ruling.
+ACCEPTED_NAMES: dict[str, tuple[str, ...]] = {
+    "grok-4.7": ("grok-4.7",),
+}
 # The finish-reason rule (OpenAI-compatible values): "stop" is normal; "length"
 # is a budget stop; "content_filter" and a message refusal are refusals;
 # anything else is ABNORMAL_FINISH.
@@ -46,6 +54,9 @@ class XAIAdapter(BaseAdapter):
     @property
     def refreshed(self) -> bool:
         return self.model in REFRESHED_ARMS
+
+    def accepted_names(self) -> tuple[str, ...]:
+        return ACCEPTED_NAMES.get(self.model, ())
 
     def _call_api(
         self,
@@ -164,6 +175,7 @@ class XAIAdapter(BaseAdapter):
             # xAI's own figure, in 1e-10 USD ticks, beside the modelled cost.
             ticks = usage.get("cost_in_usd_ticks")
             metadata["provider_cost_usd"] = (ticks / 1e10) if isinstance(ticks, (int, float)) else None
+            self.check_identity(data.get("model"), metadata)
             # The finish-reason rule, before any text leaves the adapter.
             fr = metadata.get("finish_reason")
             fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)

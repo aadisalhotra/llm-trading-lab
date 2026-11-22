@@ -32,6 +32,14 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # session. Non-streaming: the request shape changes only if the allowance
 # ladder reaches rung 3 (reasoning_allowance_limit_ruling.md).
 REFRESHED_MAX_COMPLETION_TOKENS = 128_000
+# The response model names each refreshed arm accepts
+# (xai_probe_followup_ruling_2026-11-22.md section 2): the configured
+# identifier, plus any build string the provider returns for it once recorded
+# in calibration and the configuration verification. Listed by name, matched
+# exactly. Names are added only by hub ruling.
+ACCEPTED_NAMES: dict[str, tuple[str, ...]] = {
+    "gpt-6-astra": ("gpt-6-astra",),
+}
 # The finish-reason rule: "stop" is the normal completion; "length" is a budget
 # stop; "content_filter" (the provider withheld output under its content rule)
 # and a message refusal are refusals; anything else is ABNORMAL_FINISH.
@@ -46,6 +54,9 @@ class OpenAIAdapter(BaseAdapter):
     @property
     def refreshed(self) -> bool:
         return self.model in REFRESHED_ARMS
+
+    def accepted_names(self) -> tuple[str, ...]:
+        return ACCEPTED_NAMES.get(self.model, ())
 
     def _call_api(
         self,
@@ -144,6 +155,7 @@ class OpenAIAdapter(BaseAdapter):
                                                  if self.level_sent else None)
             metadata["max_tokens_sent"] = REFRESHED_MAX_COMPLETION_TOKENS
             metadata["transport"] = "non-streaming"
+            self.check_identity(getattr(response, "model", None), metadata)
             # The finish-reason rule, before any text leaves the adapter.
             fr = metadata.get("finish_reason")
             fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)

@@ -43,6 +43,7 @@ from zoneinfo import ZoneInfo
 EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
+from .adapters.base import IdentityMismatch, identity_failure_result
 from .alerts import scan_macro_events, send_alert, send_daily_summary, send_heartbeat
 from .alerts import preflight
 from .alerts.preflight import assert_configured as alert_preflight
@@ -534,6 +535,7 @@ def run_one_model(
     shortlisted: list[str] = []
     screening_metadata: dict[str, Any] = {}
     _scr_latency: float | None = None
+    screen_identity: IdentityMismatch | None = None
     try:
         screening_raw, _scr_latency, screening_metadata = adapter.generate_raw(
             screening_sys, screening_user,
@@ -545,6 +547,12 @@ def run_one_model(
         logger.info("[%s] Screening shortlist (%d): %s",
                     model_key, len(shortlisted), ", ".join(shortlisted))
     except Exception as e:
+        if isinstance(e, IdentityMismatch):
+            # xai_probe_followup_ruling section 2: the screening response named
+            # another model, so this tick's decision for the arm has failed.
+            # No decision call is made; the row records the screening leg.
+            screen_identity = e
+            screening_metadata = {**e.metadata}
         logger.warning("[%s] Screening failed: %s — falling back to full universe", model_key, e)
         shortlisted = _universe_symbols()[:20]
 
@@ -599,7 +607,21 @@ def run_one_model(
     # Only send images to vision-capable models. Text-only adapters can
     # accept the kwarg but it's wasteful to base64-encode for nothing.
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
-    decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
+    if screen_identity is not None:
+        decision_result = identity_failure_result(adapter, screen_identity, "screening")
+    else:
+        decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
+    md = decision_result.metadata or {}
+    if md.get("identity_leg"):                       # set only on an IDENTITY_MISMATCH
+        send_alert("WARN", f"Candidate identity event: {model_key}",
+                   "A response named a model that is not on this arm's accepted list. The "
+                   "decision failed and was not executed (IDENTITY_MISMATCH, "
+                   "xai_probe_followup_ruling_2026-11-22.md section 2). Hub: rule on the name.",
+                   {"model": model_key, "configured": cfg["model"],
+                    "named": str(md.get("model_named")), "leg": md.get("identity_leg"),
+                    "cycle_id": executor.cycle_id},
+                   kind="identity_mismatch",
+                   dedup_key=f"identity_mismatch:{model_key}:{session_date_str}")
     if getattr(adapter, "refreshed", False) and tick_deadline_at is not None:
         decision_result.metadata = {**(decision_result.metadata or {}),
                                     "tick_deadline_seconds": tick_deadline_s}

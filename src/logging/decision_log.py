@@ -162,6 +162,10 @@ def log_decision_run(
         "tick_deadline_seconds": md.get("tick_deadline_seconds"),
         "deadline_cut": md.get("deadline_cut"),
         "parse_retry": md.get("parse_retry"),
+        # IDENTITY_MISMATCH (xai_probe_followup_ruling section 2): the model the
+        # response named, and the leg it was named on.
+        "response_model_named": md.get("model_named"),
+        "identity_leg": md.get("identity_leg"),
         "thoughts_tokens": md.get("thoughts_tokens"),
         # Provider-substitution telemetry (added 2026-09-09, DeepSeek today).
         # model_id_returned is only the alias echo, so it cannot see a provider

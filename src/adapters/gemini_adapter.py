@@ -37,6 +37,14 @@ REFRESHED_MAX_OUTPUT_TOKENS = 32768
 # stops and unknown ones included -- is ABNORMAL_FINISH. The content-rule stops
 # are the ruling's five plus the image siblings (hub H-OPS-14: the section 3.4
 # definition governs over its example list).
+# The response model names each refreshed arm accepts
+# (xai_probe_followup_ruling_2026-11-22.md section 2): the configured
+# identifier, plus any build string the provider returns for it once recorded
+# in calibration and the configuration verification. Listed by name, matched
+# exactly. Names are added only by hub ruling.
+ACCEPTED_NAMES: dict[str, tuple[str, ...]] = {
+    "gemini-4-argon": ("gemini-4-argon",),
+}
 REFUSAL_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII",
                                     "RECITATION", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT",
                                     "IMAGE_RECITATION"})
@@ -59,6 +67,9 @@ class GeminiAdapter(BaseAdapter):
     @property
     def refreshed(self) -> bool:
         return self.model in REFRESHED_ARMS
+
+    def accepted_names(self) -> tuple[str, ...]:
+        return ACCEPTED_NAMES.get(self.model, ())
 
     def _call_api(
         self,
@@ -247,6 +258,8 @@ class GeminiAdapter(BaseAdapter):
             max(0, in_tok - int(cached)) if cached is not None else None
         )
         if refreshed:
+            # The raw model_version, never the configured id it falls back to.
+            self.check_identity(model_version_raw, metadata)
             # The finish-reason rule, before any text leaves the adapter.
             fr_name = metadata.get("finish_reason")
             blocked = metadata.get("block_reason") is not None
