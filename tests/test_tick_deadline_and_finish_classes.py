@@ -247,8 +247,12 @@ def test_grok_finish_classes(monkeypatch, finish, cls):
     ("STOP", None, None), ("MAX_TOKENS", None, "DECISION_TRUNCATED"),
     ("SAFETY", None, "REFUSAL"), ("PROHIBITED_CONTENT", None, "REFUSAL"),
     ("BLOCKLIST", None, "REFUSAL"), ("SPII", None, "REFUSAL"), ("RECITATION", None, "REFUSAL"),
-    ("STOP", "SAFETY", "REFUSAL"), ("OTHER", None, "ABNORMAL_FINISH"),
-    ("IMAGE_SAFETY", None, "ABNORMAL_FINISH"), ("FOO", None, "ABNORMAL_FINISH")])
+    ("STOP", "SAFETY", "REFUSAL"), ("STOP", "OTHER", "REFUSAL"),       # any blocked prompt
+    ("IMAGE_SAFETY", None, "REFUSAL"), ("IMAGE_PROHIBITED_CONTENT", None, "REFUSAL"),
+    ("IMAGE_RECITATION", None, "REFUSAL"),                               # H-OPS-14
+    ("OTHER", None, "ABNORMAL_FINISH"), ("LANGUAGE", None, "ABNORMAL_FINISH"),
+    ("NO_IMAGE", None, "ABNORMAL_FINISH"), ("IMAGE_OTHER", None, "ABNORMAL_FINISH"),
+    ("MALFORMED_FUNCTION_CALL", None, "ABNORMAL_FINISH"), ("FOO", None, "ABNORMAL_FINISH")])
 def test_argon_finish_classes(monkeypatch, finish, block, cls):
     monkeypatch.setenv("GOOGLE_API_KEY", "k")
     usage = SimpleNamespace(prompt_token_count=1, candidates_token_count=1, thoughts_token_count=1,
@@ -267,7 +271,7 @@ def test_argon_finish_classes(monkeypatch, finish, block, cls):
 # ------------------------------------------------------------- config and wiring
 def test_d_is_one_configured_value():
     settings = json.loads((ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
-    assert tick_deadline_seconds(settings) == 780
+    assert tick_deadline_seconds(settings) == 840            # hub H-OPS-14
     assert tick_deadline_seconds({}) is None
     with pytest.raises(ValueError):
         tick_deadline_seconds({"tick_deadline": {"seconds": 775}})

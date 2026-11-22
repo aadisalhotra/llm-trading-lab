@@ -56,6 +56,10 @@ def test_timeout_rule():
     assert cal.derived_timeout([600.0], False, 780) == 780           # capped at D
     assert cal.derived_timeout([100.0], True, 780) == 780            # a call reached the bound
     assert cal.call_bound(780) == 900 and cal.call_bound(800) == 920
+    assert cal.call_bound(840) == 960                                 # D = 840 (H-OPS-14)
+    assert cal.configured_d(840) == 840.0
+    with pytest.raises(SystemExit):
+        cal.configured_d(None)
 
 
 # ---------------------------------------------------------------- send/omit

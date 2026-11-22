@@ -163,6 +163,13 @@ def load_images(x: dict[str, Any]) -> list[bytes]:
 
 
 # ------------------------------------------------------------------- a call
+def configured_d(value: float | None) -> float:
+    """D from config/settings.json; calibration does not run without it."""
+    if not value:
+        raise SystemExit("tick_deadline.seconds is not configured: calibration needs D")
+    return float(value)
+
+
 def call_bound(d_seconds: float) -> float:
     """calibration_bound_amendment section 2."""
     return max(900.0, d_seconds + 120.0)
@@ -395,7 +402,7 @@ def run(args) -> int:
     from src.adapters import base
     from src.config_loader import load_env, load_settings, tick_deadline_seconds
     load_env()
-    d = tick_deadline_seconds(load_settings()) or 780.0
+    d = configured_d(tick_deadline_seconds(load_settings()))
     bound = call_bound(d)
     base.API_CALL_TIMEOUT_SECONDS = bound      # transports and the Claude stream use the bound
     inputs = load_common_set(Path(args.inputs_dir), args.sessions)
@@ -440,7 +447,7 @@ def run(args) -> int:
 
 def summarize(args) -> int:
     from src.config_loader import load_settings, tick_deadline_seconds
-    d = tick_deadline_seconds(load_settings()) or 780.0
+    d = configured_d(tick_deadline_seconds(load_settings()))
     out = Path(args.out_dir)
     summary = {"label": args.label, "D_s": d, "bound_s": call_bound(d), "arms": {}}
     for arm in args.arms:

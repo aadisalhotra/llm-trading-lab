@@ -31,12 +31,15 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # to streaming under that ruling's section 3 conditions.
 REFRESHED_MAX_OUTPUT_TOKENS = 32768
 # The finish-reason rule for Argon (send_omit_measure_and_finish_reason_ruling
-# section 3, confirmed): STOP is the normal completion; MAX_TOKENS is a budget
-# stop; a blocked prompt and SAFETY, PROHIBITED_CONTENT, BLOCKLIST, SPII and
-# RECITATION are refusals; every other value -- OTHER and unknown ones included
-# -- is ABNORMAL_FINISH.
+# section 3): STOP is the normal completion; MAX_TOKENS is a budget stop; a
+# blocked prompt (any block reason) and every content-rule stop are refusals;
+# every other value -- OTHER, LANGUAGE, NO_IMAGE, IMAGE_OTHER, the tool-call
+# stops and unknown ones included -- is ABNORMAL_FINISH. The content-rule stops
+# are the ruling's five plus the image siblings (hub H-OPS-14: the section 3.4
+# definition governs over its example list).
 REFUSAL_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII",
-                                    "RECITATION"})
+                                    "RECITATION", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT",
+                                    "IMAGE_RECITATION"})
 
 
 def finish_class(finish_reason: str | None, blocked: bool) -> str:
