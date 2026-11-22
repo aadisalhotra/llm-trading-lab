@@ -10,6 +10,7 @@ import logging
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
+from . import base as _base
 from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
                    FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
@@ -90,7 +91,8 @@ class XAIAdapter(BaseAdapter):
             else:
                 payload["temperature"] = self.temperature
         if refreshed:
-            payload["reasoning_effort"] = refreshed["reasoning_effort"]
+            if self.level_sent:
+                payload["reasoning_effort"] = refreshed["reasoning_effort"]
             payload["max_tokens"] = REFRESHED_MAX_TOKENS
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -101,7 +103,7 @@ class XAIAdapter(BaseAdapter):
         # including a same-day 2026-09-17 occurrence, i.e. this was already
         # clipping real in-flight calls, not just a defensive bound.
         r = requests.post(self.BASE_URL, json=payload, headers=headers,
-                          timeout=self.transport_timeout(API_CALL_TIMEOUT_SECONDS))
+                          timeout=self.transport_timeout(_base.API_CALL_TIMEOUT_SECONDS))
         if not r.ok:
             raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
@@ -155,7 +157,8 @@ class XAIAdapter(BaseAdapter):
         # 0 means xAI reported zero sources, None means it reported nothing.
         metadata["num_sources_used"] = usage.get("num_sources_used")
         if refreshed:
-            metadata["reasoning_effort_sent"] = refreshed["reasoning_effort"]
+            metadata["reasoning_effort_sent"] = (refreshed["reasoning_effort"]
+                                                 if self.level_sent else None)
             metadata["max_tokens_sent"] = REFRESHED_MAX_TOKENS
             metadata["transport"] = "non-streaming"
             # xAI's own figure, in 1e-10 USD ticks, beside the modelled cost.

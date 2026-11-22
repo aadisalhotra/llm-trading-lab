@@ -432,6 +432,12 @@ class BaseAdapter(ABC):
         # rulings_2026-11-21.md section 1.5). None: no deadline (the snapshots
         # and DeepSeek through December, H-OPS-00).
         self.deadline_at: float | None = None
+        # Whether a refreshed arm's level field is sent. Production always
+        # sends it (the ruled default level, sent explicitly). Only the
+        # calibration tool sets False: calibration runs with the level omitted
+        # (streaming_and_send_omit_ruling_2026-11-21.md section 2.3 item 1),
+        # and the send/omit test compares the two settings.
+        self.level_sent: bool = True
         # Optional sampling temperature. ``None`` (the default for the live
         # pipeline) leaves the provider default untouched — adapters omit the
         # parameter entirely. The determinism probe (RQ6) sets this to 0.0 to

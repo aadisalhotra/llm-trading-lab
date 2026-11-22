@@ -174,13 +174,15 @@ class AnthropicAdapter(BaseAdapter):
             deadline_s = float(_base.API_CALL_TIMEOUT_SECONDS)
             # The tick's decision deadline D cuts the stream too, when it is
             # nearer than the call's own deadline (tick ruling section 1.5).
+            level = ({"output_config": {"effort": refreshed["effort"]}}
+                     if self.level_sent else {})
             with client.messages.stream(
                 model=self.model,
                 max_tokens=REFRESHED_MAX_TOKENS,
                 system=system_prompt,
                 messages=[{"role": "user", "content": content}],
                 thinking={"type": "adaptive"},
-                output_config={"effort": refreshed["effort"]},
+                **level,
                 timeout=self.transport_timeout(deadline_s),
             ) as stream:
                 call_left = max(0.0, deadline_s - (time.monotonic() - started))
@@ -252,7 +254,7 @@ class AnthropicAdapter(BaseAdapter):
             getattr(usage, "output_tokens_details", None) if usage else None)
         metadata["thoughts_tokens"] = thinking_tokens(details)
         if refreshed:
-            metadata["reasoning_effort_sent"] = refreshed["effort"]
+            metadata["reasoning_effort_sent"] = refreshed["effort"] if self.level_sent else None
             metadata["max_tokens_sent"] = REFRESHED_MAX_TOKENS
             metadata["transport"] = "stream"
             metadata["call_deadline_seconds"] = _base.API_CALL_TIMEOUT_SECONDS

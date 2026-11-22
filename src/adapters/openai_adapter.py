@@ -8,6 +8,7 @@ from typing import Any
 import logging
 
 from ..analytics.cost_rates import compute_call_cost_usd
+from . import base as _base
 from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
                    FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
@@ -58,7 +59,7 @@ class OpenAIAdapter(BaseAdapter):
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
 
-        client = OpenAI(api_key=api_key, timeout=self.transport_timeout(API_CALL_TIMEOUT_SECONDS))
+        client = OpenAI(api_key=api_key, timeout=self.transport_timeout(_base.API_CALL_TIMEOUT_SECONDS))
 
         # Build user content. With images, content becomes a list of typed
         # blocks (text + image_url). Without images, we keep the simple
@@ -87,7 +88,7 @@ class OpenAIAdapter(BaseAdapter):
                                self.model, self.temperature)
             else:
                 extra["temperature"] = self.temperature
-        if refreshed:
+        if refreshed and self.level_sent:
             extra["reasoning_effort"] = refreshed["reasoning_effort"]
         response = client.chat.completions.create(
             model=self.model,
@@ -139,7 +140,8 @@ class OpenAIAdapter(BaseAdapter):
         # Gemini's thoughts_token_count, so they land on the same log field.
         metadata["thoughts_tokens"] = getattr(cdet, "reasoning_tokens", None) if cdet else None
         if refreshed:
-            metadata["reasoning_effort_sent"] = refreshed["reasoning_effort"]
+            metadata["reasoning_effort_sent"] = (refreshed["reasoning_effort"]
+                                                 if self.level_sent else None)
             metadata["max_tokens_sent"] = REFRESHED_MAX_COMPLETION_TOKENS
             metadata["transport"] = "non-streaming"
             # The finish-reason rule, before any text leaves the adapter.

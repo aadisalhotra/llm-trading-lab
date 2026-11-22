@@ -7,6 +7,7 @@ from typing import Any
 import logging
 
 from ..analytics.cost_rates import compute_call_cost_usd
+from . import base as _base
 from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
                    FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
@@ -128,10 +129,10 @@ class GeminiAdapter(BaseAdapter):
                 system_instruction=system_prompt,
                 response_mime_type="application/json",
                 max_output_tokens=REFRESHED_MAX_OUTPUT_TOKENS,
-                thinking_config=genai_types.ThinkingConfig(
-                    thinking_level=refreshed["thinking_level"]),
+                thinking_config=(genai_types.ThinkingConfig(
+                    thinking_level=refreshed["thinking_level"]) if self.level_sent else None),
                 http_options=genai_types.HttpOptions(
-                    timeout=int(self.transport_timeout(API_CALL_TIMEOUT_SECONDS) * 1000)),
+                    timeout=int(self.transport_timeout(_base.API_CALL_TIMEOUT_SECONDS) * 1000)),
             )
 
         response = client.models.generate_content(
@@ -234,7 +235,8 @@ class GeminiAdapter(BaseAdapter):
         cached = getattr(usage, "cached_content_token_count", None) if usage else None
         if refreshed:
             metadata["thoughts_tokens"] = thought_tok
-            metadata["reasoning_effort_sent"] = refreshed["thinking_level"]
+            metadata["reasoning_effort_sent"] = (refreshed["thinking_level"]
+                                                 if self.level_sent else None)
             metadata["max_tokens_sent"] = REFRESHED_MAX_OUTPUT_TOKENS
             metadata["transport"] = "non-streaming"
         metadata["cache_hit_tokens"] = cached
