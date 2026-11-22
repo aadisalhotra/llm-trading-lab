@@ -8,7 +8,8 @@ from typing import Any
 import logging
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
+                   FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
 logger = logging.getLogger("llmlab.adapters.openai")
 
@@ -30,11 +31,20 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # session. Non-streaming: the request shape changes only if the allowance
 # ladder reaches rung 3 (reasoning_allowance_limit_ruling.md).
 REFRESHED_MAX_COMPLETION_TOKENS = 128_000
+# The finish-reason rule: "stop" is the normal completion; "length" is a budget
+# stop; "content_filter" (the provider withheld output under its content rule)
+# and a message refusal are refusals; anything else is ABNORMAL_FINISH.
+FINISH_CLASSES: dict[str, str] = {"stop": FINISH_NORMAL, "length": FINISH_TRUNCATED,
+                                  "content_filter": FINISH_REFUSAL}
 
 
 class OpenAIAdapter(BaseAdapter):
     provider_name = "openai"
     supports_vision = True
+
+    @property
+    def refreshed(self) -> bool:
+        return self.model in REFRESHED_ARMS
 
     def _call_api(
         self,
@@ -48,7 +58,7 @@ class OpenAIAdapter(BaseAdapter):
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
 
-        client = OpenAI(api_key=api_key, timeout=API_CALL_TIMEOUT_SECONDS)
+        client = OpenAI(api_key=api_key, timeout=self.transport_timeout(API_CALL_TIMEOUT_SECONDS))
 
         # Build user content. With images, content becomes a list of typed
         # blocks (text + image_url). Without images, we keep the simple
@@ -92,11 +102,6 @@ class OpenAIAdapter(BaseAdapter):
         )
         message = response.choices[0].message
         refusal = getattr(message, "refusal", None) if refreshed else None
-        if refusal:
-            # cohort_refresh_ruling.md rev. 2 section 6 item 2: its own class,
-            # never retried, never sent to another model.
-            raise ModelRefusal(f"refusal: model={getattr(response, 'model', self.model)} "
-                               f"text={str(refusal)[:300]}")
         text = message.content or ""
         returned_id = getattr(response, "model", self.model)
 
@@ -137,6 +142,12 @@ class OpenAIAdapter(BaseAdapter):
             metadata["reasoning_effort_sent"] = refreshed["reasoning_effort"]
             metadata["max_tokens_sent"] = REFRESHED_MAX_COMPLETION_TOKENS
             metadata["transport"] = "non-streaming"
+            # The finish-reason rule, before any text leaves the adapter.
+            fr = metadata.get("finish_reason")
+            fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)
+            metadata["finish_class"] = fc
+            raise_for_finish(fc, f"{fc} finish: finish_reason={fr} model={returned_id}"
+                                 + (f" refusal={str(refusal)[:300]}" if refusal else ""), metadata)
         # Prompt-cache split. cost_rates.py prices every call at the full input
         # rate; this is what would let that conservatism be measured.
         cached = getattr(pdet, "cached_tokens", None) if pdet else None

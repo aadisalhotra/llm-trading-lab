@@ -69,6 +69,10 @@
     "enabled": true,
     "min_minutes": 20
   },
+  "tick_deadline": {
+    "_note": "The decision deadline D (tick_deadline_and_calibration_rulings_2026-11-21.md section 1.5; calibration_contingencies_ruling_2026-11-21.md section 3 option (i)): one value for the whole cohort, in seconds from the pipeline's own start (after runner setup). A refreshed arm's call not returned at D is cancelled, streaming or not, as TICK_DEADLINE; a parse retry starts only before D; the cohort timeout is capped at D. D = 1800 - 720 - overhead - 60, rounded down to 30. One configured value, read through config_loader.tick_deadline_seconds(); frozen with the caps at the open of 2026-12-07.",
+    "seconds": 780
+  },
   "models": {
     "claude":      {"provider": "anthropic", "model": "claude-sonnet-4-6", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "Claude Sonnet 4.6", "_pin_status": "UNPINNED: Anthropic echoes the alias unchanged; current dated snapshot id unconfirmed. Resolve manually before pinning (a wrong id silently changes the running model)."},
     "gpt":         {"provider": "openai",    "model": "gpt-5.4-2026-03-05", "enabled": true, "vision_capable": true,  "cohort": "core",      "display_name": "GPT-5.4"},

@@ -66,10 +66,42 @@ ERROR_CLASS_REFUSAL = "REFUSAL"
 # (reasoning_allowance_limit_ruling.md section 3 item 5): a failed call of its
 # own class, never parsed or repaired as a success, never retried.
 ERROR_CLASS_STREAM_INCOMPLETE = "STREAM_INCOMPLETE"
+# A call not returned at the tick's decision deadline D
+# (tick_deadline_and_calibration_rulings_2026-11-21.md section 1.5): its own
+# class, distinct from TIMEOUT; a failed decision, never attempted again.
+ERROR_CLASS_TICK_DEADLINE = "TICK_DEADLINE"
+# The finish-reason rule (send_omit_measure_and_finish_reason_ruling_2026-11-21.md
+# section 3; calibration_contingencies_ruling_2026-11-21.md section 1): only a
+# normal completion is parsed. A stop on the output limit is a failed decision
+# flagged decision_truncated; every finish reason that is neither normal, a
+# budget stop nor a refusal is ABNORMAL_FINISH. All are classified before the
+# parser runs, their text is discarded, and none is retried.
+ERROR_CLASS_DECISION_TRUNCATED = "DECISION_TRUNCATED"
+ERROR_CLASS_ABNORMAL_FINISH = "ABNORMAL_FINISH"
+
+FINISH_NORMAL = "normal"
+FINISH_TRUNCATED = "truncated"
+FINISH_REFUSAL = "refusal"
+FINISH_ABNORMAL = "abnormal"
 
 
-class StreamIncomplete(RuntimeError):
+class CallFailed(RuntimeError):
+    """A provider call that failed in a classified way. Carries the metadata
+    read from the response (finish reason, usage), so the failed decision's
+    row still records them."""
+
+    def __init__(self, message: str, metadata: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.metadata = dict(metadata or {})
+
+
+class StreamIncomplete(CallFailed):
     """A stream that ended without its terminal event."""
+
+
+class TickDeadlineExceeded(CallFailed):
+    """The call had not returned at the tick's decision deadline D. Not a
+    TimeoutError on purpose: it is TICK_DEADLINE, never TIMEOUT."""
 
 
 class WallClockTimeout(TimeoutError):
@@ -115,12 +147,55 @@ class StreamDeadline:
         return False
 
 
-class ModelRefusal(RuntimeError):
+class FinishClassError(CallFailed):
+    """A response whose finish reason is not a normal completion, on an arm
+    under the finish-reason rule. Raised by _call_api before any text is
+    returned, so the parser never sees it; never retried."""
+
+
+class ModelRefusal(FinishClassError):
     """Raised by an adapter's _call_api when the provider reports a refusal.
 
     generate_decision returns it as a failed DecisionResult with error_class
     REFUSAL on the first attempt: a refusal is not a parse failure, so the
     parse-retry does not apply, and no other model is ever asked."""
+
+
+class AbnormalFinish(FinishClassError):
+    """Any finish reason that is neither normal, a budget stop nor a refusal,
+    unknown values included (ABNORMAL_FINISH)."""
+
+
+class BudgetStop(FinishClassError):
+    """The response ended on its output limit: a failed decision, flagged
+    decision_truncated, not parsed, repaired or executed (DECISION_TRUNCATED)."""
+
+
+def finish_error_class(exc: BaseException) -> str | None:
+    """The registered class of a classified call failure, else None."""
+    if isinstance(exc, TickDeadlineExceeded):
+        return ERROR_CLASS_TICK_DEADLINE
+    if isinstance(exc, ModelRefusal):
+        return ERROR_CLASS_REFUSAL
+    if isinstance(exc, BudgetStop):
+        return ERROR_CLASS_DECISION_TRUNCATED
+    if isinstance(exc, AbnormalFinish):
+        return ERROR_CLASS_ABNORMAL_FINISH
+    if isinstance(exc, StreamIncomplete):
+        return ERROR_CLASS_STREAM_INCOMPLETE
+    return None
+
+
+def raise_for_finish(finish_class: str, message: str, metadata: dict[str, Any]) -> None:
+    """Raise the exception for a non-normal finish class; return on normal."""
+    metadata = {**metadata, "finish_class": finish_class}
+    if finish_class == FINISH_NORMAL:
+        return
+    if finish_class == FINISH_REFUSAL:
+        raise ModelRefusal(message, metadata)
+    if finish_class == FINISH_TRUNCATED:
+        raise BudgetStop(message, metadata)
+    raise AbnormalFinish(message, metadata)
 # The lab's own account standing at the provider (an exhausted balance, credit
 # or spending limit, or an exhausted per-day quota):
 # docs/registrations/rossi_review_rulings.md section 2.4. Keyed on the error
@@ -352,12 +427,71 @@ class BaseAdapter(ABC):
 
     def __init__(self, model: str, temperature: float | None = None):
         self.model = model
+        # The tick's decision deadline D as a time.monotonic() instant, set by
+        # the pipeline for the refreshed arms (tick_deadline_and_calibration_
+        # rulings_2026-11-21.md section 1.5). None: no deadline (the snapshots
+        # and DeepSeek through December, H-OPS-00).
+        self.deadline_at: float | None = None
         # Optional sampling temperature. ``None`` (the default for the live
         # pipeline) leaves the provider default untouched — adapters omit the
         # parameter entirely. The determinism probe (RQ6) sets this to 0.0 to
         # request greedy decoding for its reruns. Only the probe ever sets it,
         # so the production decision path is unchanged.
         self.temperature = temperature
+
+    @property
+    def refreshed(self) -> bool:
+        """True for a refreshed confirmatory arm. Each provider adapter keys
+        this on its REFRESHED_ARMS table; the base has none."""
+        return False
+
+    def remaining(self) -> float | None:
+        """Seconds left before D for this arm's calls, or None without a
+        deadline. May be zero or negative once D has passed."""
+        if self.deadline_at is None or not self.refreshed:
+            return None
+        return self.deadline_at - time.monotonic()
+
+    def transport_timeout(self, default: float) -> float:
+        """A call's transport timeout: the configured figure, cut to the time
+        left before D so an abandoned call's connection closes at D too."""
+        left = self.remaining()
+        return default if left is None else max(1.0, min(float(default), left))
+
+    def _bounded_call(self, system_prompt: str, user_prompt: str,
+                      images: list[bytes] | None = None) -> tuple[str, str, dict[str, Any]]:
+        """_call_api, cancelled at D. Without a deadline this is _call_api.
+
+        With one, the call runs on a daemon thread and the tick waits for it
+        only until D. A call not returned by then raises TickDeadlineExceeded;
+        whatever it returns afterwards is discarded. This holds for streaming
+        and non-streaming calls alike; the adapters also close a stream at D
+        and give a non-streaming transport the remaining time as its timeout.
+        """
+        left = self.remaining()
+        if left is None:
+            return self._call_api(system_prompt, user_prompt, images)
+        if left <= 0:
+            raise TickDeadlineExceeded("the decision deadline had passed before the call",
+                                       {"deadline_cut": "before_call"})
+        import threading
+        box: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                box["value"] = self._call_api(system_prompt, user_prompt, images)
+            except BaseException as e:  # noqa: BLE001 -- re-raised in the caller
+                box["error"] = e
+        worker = threading.Thread(target=run, name=f"call-{self.model}", daemon=True)
+        worker.start()
+        worker.join(timeout=left)
+        if worker.is_alive():
+            raise TickDeadlineExceeded(f"call not returned at the decision deadline "
+                                       f"({left:.0f}s left when it started)",
+                                       {"deadline_cut": "in_call"})
+        if "error" in box:
+            raise box["error"]
+        return box["value"]
 
     @abstractmethod
     def _call_api(
@@ -389,7 +523,7 @@ class BaseAdapter(ABC):
         response schema differs from the trading-decision format.
         """
         start = time.perf_counter()
-        raw, _returned_id, metadata = self._call_api(system_prompt, user_prompt)
+        raw, _returned_id, metadata = self._bounded_call(system_prompt, user_prompt)
         latency = time.perf_counter() - start
         return raw, latency, metadata or {}
 
@@ -418,9 +552,10 @@ class BaseAdapter(ABC):
         last_raw: str = ""
         last_metadata: dict[str, Any] = {}
 
+        first_parse_error: str | None = None
         for attempt in range(1, _MAX_ATTEMPTS + 1):
             try:
-                raw, returned_id, call_meta = self._call_api(
+                raw, returned_id, call_meta = self._bounded_call(
                     system_prompt, user_prompt, images,
                 )
             except Exception as e:
@@ -442,15 +577,18 @@ class BaseAdapter(ABC):
                     error=str(e),
                     # Logging only: the fail-fast return above is identical
                     # for every class; the class changes attribution, never flow.
-                    error_class=(ERROR_CLASS_REFUSAL if isinstance(e, ModelRefusal)
-                                 else ERROR_CLASS_STREAM_INCOMPLETE if isinstance(e, StreamIncomplete)
-                                 else ERROR_CLASS_TIMEOUT if is_client_timeout(e)
-                                 else ERROR_CLASS_ACCOUNT_STATE
-                                 if is_account_state(self.provider_name, str(e))
-                                 else ERROR_CLASS_API_ERROR),
-                    error_reason=(None if is_client_timeout(e)
+                    error_class=(finish_error_class(e)
+                                 or (ERROR_CLASS_TIMEOUT if is_client_timeout(e)
+                                     else ERROR_CLASS_ACCOUNT_STATE
+                                     if is_account_state(self.provider_name, str(e))
+                                     else ERROR_CLASS_API_ERROR)),
+                    error_reason=(None if is_client_timeout(e) or finish_error_class(e)
                                   else account_state_reason(self.provider_name, str(e))),
-                    metadata={"attempt": attempt},
+                    metadata={**getattr(e, "metadata", {}), "attempt": attempt,
+                              **({"first_parse_error": first_parse_error,
+                                  "parse_retry": "cut_at_deadline"}
+                                 if first_parse_error and isinstance(e, TickDeadlineExceeded)
+                                 else {})},
                 )
 
             last_raw = raw
@@ -461,11 +599,35 @@ class BaseAdapter(ABC):
             except ValueError as e:
                 last_error = str(e)
                 if attempt < _MAX_ATTEMPTS:
+                    left = self.remaining()
+                    if left is not None and left <= _RETRY_DELAY_SECONDS:
+                        # A parse retry starts only before D (tick ruling
+                        # section 1.5 item 3); the record keeps the parse
+                        # failure and that the retry was not started.
+                        latency = time.perf_counter() - start
+                        logger.error("%s parse failure on attempt %d; retry not started: "
+                                     "the decision deadline is %.0fs away",
+                                     self.provider_name, attempt, max(left, 0.0))
+                        return DecisionResult(
+                            provider=self.provider_name,
+                            model_id_configured=self.model,
+                            model_id_returned=self.model,
+                            decisions=[],
+                            overall_reasoning="",
+                            raw_response=raw,
+                            latency_seconds=latency,
+                            success=False,
+                            error=last_error,
+                            error_class=ERROR_CLASS_PARSE_FAILURE,
+                            metadata={**last_metadata, "attempt": attempt,
+                                      "parse_retry": "not_started_deadline"},
+                        )
                     logger.warning(
                         "%s parse failure on attempt %d/%d: %s — retrying in %ds",
                         self.provider_name, attempt, _MAX_ATTEMPTS, e,
                         _RETRY_DELAY_SECONDS,
                     )
+                    first_parse_error = last_error
                     time.sleep(_RETRY_DELAY_SECONDS)
                     continue
                 latency = time.perf_counter() - start

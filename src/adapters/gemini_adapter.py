@@ -7,7 +7,8 @@ from typing import Any
 import logging
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
+                   FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
 logger = logging.getLogger("llmlab.adapters.gemini")
 
@@ -28,15 +29,32 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # this shape (L = 32,768, H = 16,384, so rung 1 needs R <= 8,192); rung 3 moves
 # to streaming under that ruling's section 3 conditions.
 REFRESHED_MAX_OUTPUT_TOKENS = 32768
-# Finish or block reasons that are the model declining, recorded as REFUSAL on
-# the refreshed arm (section 6 item 2). Gemini has no "refusal" stop reason;
-# this mapping is Operations' reading, flagged for Research.
-REFUSAL_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"})
+# The finish-reason rule for Argon (send_omit_measure_and_finish_reason_ruling
+# section 3, confirmed): STOP is the normal completion; MAX_TOKENS is a budget
+# stop; a blocked prompt and SAFETY, PROHIBITED_CONTENT, BLOCKLIST, SPII and
+# RECITATION are refusals; every other value -- OTHER and unknown ones included
+# -- is ABNORMAL_FINISH.
+REFUSAL_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII",
+                                    "RECITATION"})
+
+
+def finish_class(finish_reason: str | None, blocked: bool) -> str:
+    if blocked or finish_reason in REFUSAL_FINISH_REASONS:
+        return FINISH_REFUSAL
+    if finish_reason == "STOP":
+        return FINISH_NORMAL
+    if finish_reason == "MAX_TOKENS":
+        return FINISH_TRUNCATED
+    return FINISH_ABNORMAL
 
 
 class GeminiAdapter(BaseAdapter):
     provider_name = "google"
     supports_vision = True
+
+    @property
+    def refreshed(self) -> bool:
+        return self.model in REFRESHED_ARMS
 
     def _call_api(
         self,
@@ -112,7 +130,8 @@ class GeminiAdapter(BaseAdapter):
                 max_output_tokens=REFRESHED_MAX_OUTPUT_TOKENS,
                 thinking_config=genai_types.ThinkingConfig(
                     thinking_level=refreshed["thinking_level"]),
-                http_options=genai_types.HttpOptions(timeout=API_CALL_TIMEOUT_SECONDS * 1000),
+                http_options=genai_types.HttpOptions(
+                    timeout=int(self.transport_timeout(API_CALL_TIMEOUT_SECONDS) * 1000)),
             )
 
         response = client.models.generate_content(
@@ -120,17 +139,6 @@ class GeminiAdapter(BaseAdapter):
             contents=contents,
             config=config,
         )
-        if refreshed:
-            cands = list(getattr(response, "candidates", None) or [])
-            fr = getattr(cands[0], "finish_reason", None) if cands else None
-            fr_name = getattr(fr, "name", str(fr)) if fr is not None else None
-            fb = getattr(response, "prompt_feedback", None)
-            block = getattr(fb, "block_reason", None) if fb else None
-            if block is not None or fr_name in REFUSAL_FINISH_REASONS:
-                raise ModelRefusal(
-                    f"refusal: model={getattr(response, 'model_version', None) or self.model} "
-                    f"finish_reason={fr_name} block_reason="
-                    f"{getattr(block, 'name', block) if block is not None else None}")
 
         # response.text concatenates the visible text parts and is None — not
         # an exception — when the response has no usable part. An empty
@@ -233,4 +241,13 @@ class GeminiAdapter(BaseAdapter):
         metadata["cache_miss_tokens"] = (
             max(0, in_tok - int(cached)) if cached is not None else None
         )
+        if refreshed:
+            # The finish-reason rule, before any text leaves the adapter.
+            fr_name = metadata.get("finish_reason")
+            blocked = metadata.get("block_reason") is not None
+            fc = finish_class(fr_name, blocked)
+            metadata["finish_class"] = fc
+            raise_for_finish(fc, f"{fc} finish: finish_reason={fr_name} "
+                                 f"block_reason={metadata.get('block_reason')} model={returned_id}",
+                             metadata)
         return text, returned_id, metadata

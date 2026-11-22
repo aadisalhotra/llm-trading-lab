@@ -170,7 +170,8 @@ def test_a_refusal_is_its_own_class_and_is_not_retried(fake):
 
 def test_screening_call_raises_on_a_refusal(fake):
     fake(lambda kw: _message(kw["model"], stop="refusal", text=""))
-    with pytest.raises(aa.ModelRefusal):
+    from src.adapters.base import ModelRefusal
+    with pytest.raises(ModelRefusal):
         get_adapter("anthropic", "claude-opus-5-5").generate_raw("S", "U")
 
 

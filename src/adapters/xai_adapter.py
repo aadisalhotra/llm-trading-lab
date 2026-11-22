@@ -10,7 +10,8 @@ import logging
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal
+from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
+                   FINISH_TRUNCATED, BaseAdapter, raise_for_finish)
 
 logger = logging.getLogger("llmlab.adapters.xai")
 
@@ -29,12 +30,21 @@ REFRESHED_ARMS: dict[str, dict[str, str]] = {
 # the registered answer budget (Tier 1, T1.4) in calibration and after; the
 # allowance rule has no cap to set for this arm.
 REFRESHED_MAX_TOKENS = 16384
+# The finish-reason rule (OpenAI-compatible values): "stop" is normal; "length"
+# is a budget stop; "content_filter" and a message refusal are refusals;
+# anything else is ABNORMAL_FINISH.
+FINISH_CLASSES: dict[str, str] = {"stop": FINISH_NORMAL, "length": FINISH_TRUNCATED,
+                                  "content_filter": FINISH_REFUSAL}
 
 
 class XAIAdapter(BaseAdapter):
     provider_name = "xai"
     supports_vision = True   # grok-4 accepts image_url content blocks
     BASE_URL = "https://api.x.ai/v1/chat/completions"
+
+    @property
+    def refreshed(self) -> bool:
+        return self.model in REFRESHED_ARMS
 
     def _call_api(
         self,
@@ -91,15 +101,12 @@ class XAIAdapter(BaseAdapter):
         # including a same-day 2026-09-17 occurrence, i.e. this was already
         # clipping real in-flight calls, not just a defensive bound.
         r = requests.post(self.BASE_URL, json=payload, headers=headers,
-                          timeout=API_CALL_TIMEOUT_SECONDS)
+                          timeout=self.transport_timeout(API_CALL_TIMEOUT_SECONDS))
         if not r.ok:
             raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
         message = data["choices"][0]["message"]
-        if refreshed and message.get("refusal"):
-            # cohort_refresh_ruling.md rev. 2 section 6 item 2.
-            raise ModelRefusal(f"refusal: model={data.get('model', self.model)} "
-                               f"text={str(message.get('refusal'))[:300]}")
+        refusal = message.get("refusal") if refreshed else None
         text = message["content"]
         returned_id = data.get("model", self.model)
 
@@ -154,5 +161,11 @@ class XAIAdapter(BaseAdapter):
             # xAI's own figure, in 1e-10 USD ticks, beside the modelled cost.
             ticks = usage.get("cost_in_usd_ticks")
             metadata["provider_cost_usd"] = (ticks / 1e10) if isinstance(ticks, (int, float)) else None
+            # The finish-reason rule, before any text leaves the adapter.
+            fr = metadata.get("finish_reason")
+            fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)
+            metadata["finish_class"] = fc
+            raise_for_finish(fc, f"{fc} finish: finish_reason={fr} model={returned_id}"
+                                 + (f" refusal={str(refusal)[:300]}" if refusal else ""), metadata)
         metadata["citations"] = data.get("citations")
         return text, returned_id, metadata

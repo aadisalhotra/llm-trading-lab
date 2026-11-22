@@ -56,6 +56,7 @@ from .config_loader import (
     load_env,
     load_settings,
     load_universe,
+    tick_deadline_seconds,
     universe_symbols,
     venue_book_keys,
 )
@@ -414,6 +415,8 @@ def run_one_model(
     marks_by_book: dict[str, dict[str, tuple[float, str]]] | None = None,
     eod_stops_suspended: str | None = None,
     prompt_frame: PromptFrame | None = None,
+    tick_deadline_at: float | None = None,
+    tick_deadline_s: float | None = None,
 ) -> dict[str, Any]:
     logger.info("=== Running model: %s (%s/%s) ===", model_key, cfg["provider"], cfg["model"])
     # The prompt builders see the prompt frame (daily history + today's partial
@@ -464,6 +467,10 @@ def run_one_model(
 
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
+    # The decision deadline D (time.monotonic() instant). The adapter applies
+    # it to the refreshed arms only (H-OPS-00); the snapshots and DeepSeek are
+    # unchanged through December.
+    adapter.deadline_at = tick_deadline_at
     # data_inputs_hash: the sha256 of the frame the models see (daily history
     # ruling 3); the guard's intraday frame is hashed as execution_frame_hash.
     data_hash = (prompt_frame.data_inputs_hash if prompt_frame is not None
@@ -593,6 +600,9 @@ def run_one_model(
     # accept the kwarg but it's wasteful to base64-encode for nothing.
     images_for_call = images if (cfg.get("vision_capable", False) and adapter.supports_vision) else None
     decision_result = adapter.generate_decision(system_prompt, user_prompt, images=images_for_call)
+    if getattr(adapter, "refreshed", False) and tick_deadline_at is not None:
+        decision_result.metadata = {**(decision_result.metadata or {}),
+                                    "tick_deadline_seconds": tick_deadline_s}
 
     # Call-input retention and response flags (logging class; 2026-11-21).
     # Written from the very objects just handed to the adapter, so the file
@@ -964,6 +974,10 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
         force = True
 
     pipeline_start = time.monotonic()
+    # The decision deadline D runs from here, the pipeline's own start after
+    # the runner's setup (calibration_contingencies_ruling section 3 item 1).
+    tick_deadline_s = None if is_eod else tick_deadline_seconds(settings)
+    tick_deadline_at = (pipeline_start + tick_deadline_s) if tick_deadline_s else None
     logger.info("==== Pipeline start: %s | mode=%s | session=%s | exec_mode=%s | phase=%s | force=%s | force_trade=%s ====",
                 run_date.strftime("%Y-%m-%d %H:%M ET"),
                 mode,
@@ -1311,6 +1325,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                 marks_by_book=marks_by_book,
                 eod_stops_suspended=eod_stops_suspended,
                 prompt_frame=prompt_frame,
+                tick_deadline_at=tick_deadline_at,
+                tick_deadline_s=tick_deadline_s,
             )
         except Exception as e:
             logger.exception("[%s] unhandled error: %s", model_key, e)

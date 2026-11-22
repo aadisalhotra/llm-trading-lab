@@ -10,8 +10,9 @@ import logging
 
 from ..analytics.cost_rates import compute_call_cost_usd
 from . import base as _base
-from .base import (API_CALL_TIMEOUT_SECONDS, BaseAdapter, ModelRefusal, StreamDeadline,
-                   StreamIncomplete, WallClockTimeout)
+from .base import (API_CALL_TIMEOUT_SECONDS, FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL,
+                   FINISH_TRUNCATED, BaseAdapter, StreamDeadline, StreamIncomplete,
+                   TickDeadlineExceeded, WallClockTimeout, raise_for_finish)
 
 logger = logging.getLogger("llmlab.adapters.anthropic")
 
@@ -45,7 +46,18 @@ def thinking_tokens(details: Any) -> int | None:
     return getattr(details, "thinking_tokens", None)
 
 
-def read_stream(stream, deadline_seconds: float) -> dict[str, Any]:
+# The finish-reason rule for the refreshed Claude arms: end_turn is the
+# normal completion; max_tokens is a budget stop; refusal is a refusal; every
+# other value, unknown ones included, is ABNORMAL_FINISH.
+FINISH_CLASSES: dict[str, str] = {"end_turn": FINISH_NORMAL, "max_tokens": FINISH_TRUNCATED,
+                                  "refusal": FINISH_REFUSAL}
+
+
+def finish_class(stop_reason: str | None) -> str:
+    return FINISH_CLASSES.get(str(stop_reason), FINISH_ABNORMAL)
+
+
+def read_stream(stream, deadline_seconds: float, tick_deadline: bool = False) -> dict[str, Any]:
     """Consume a Messages stream under a total wall-clock deadline and return
     what the stream itself reports (reasoning_allowance_limit_ruling.md
     section 3): the model from message_start, the stop reason and the usage
@@ -76,11 +88,10 @@ def read_stream(stream, deadline_seconds: float) -> dict[str, Any]:
                     facts["message_stop"] = True
         except Exception as e:
             if deadline.expired:
-                raise WallClockTimeout(
-                    f"stream exceeded its {deadline.seconds:.0f}s total deadline") from e
+                raise _expired(deadline, tick_deadline) from e
             raise
         if deadline.expired:
-            raise WallClockTimeout(f"stream exceeded its {deadline.seconds:.0f}s total deadline")
+            raise _expired(deadline, tick_deadline)
     if not facts["message_stop"]:
         raise StreamIncomplete(
             f"stream ended without message_stop (model={facts['model']}, "
@@ -88,9 +99,22 @@ def read_stream(stream, deadline_seconds: float) -> dict[str, Any]:
     return facts
 
 
+def _expired(deadline: StreamDeadline, tick_deadline: bool) -> Exception:
+    """The exception for a stream closed at its deadline: TICK_DEADLINE when
+    the tick's decision deadline was the nearer bound, else the call timeout."""
+    if tick_deadline:
+        return TickDeadlineExceeded("stream cancelled at the decision deadline",
+                                    {"deadline_cut": "in_stream"})
+    return WallClockTimeout(f"stream exceeded its {deadline.seconds:.0f}s total deadline")
+
+
 class AnthropicAdapter(BaseAdapter):
     provider_name = "anthropic"
     supports_vision = True
+
+    @property
+    def refreshed(self) -> bool:
+        return self.model in REFRESHED_ARMS
 
     def _call_api(
         self,
@@ -148,6 +172,8 @@ class AnthropicAdapter(BaseAdapter):
             # called: opening the stream waits for the response headers (bounded
             # by the same figure), and only the remainder is left for the body.
             deadline_s = float(_base.API_CALL_TIMEOUT_SECONDS)
+            # The tick's decision deadline D cuts the stream too, when it is
+            # nearer than the call's own deadline (tick ruling section 1.5).
             with client.messages.stream(
                 model=self.model,
                 max_tokens=REFRESHED_MAX_TOKENS,
@@ -155,9 +181,13 @@ class AnthropicAdapter(BaseAdapter):
                 messages=[{"role": "user", "content": content}],
                 thinking={"type": "adaptive"},
                 output_config={"effort": refreshed["effort"]},
-                timeout=deadline_s,
+                timeout=self.transport_timeout(deadline_s),
             ) as stream:
-                facts = read_stream(stream, max(0.0, deadline_s - (time.monotonic() - started)))
+                call_left = max(0.0, deadline_s - (time.monotonic() - started))
+                tick_left = self.remaining()
+                tick_bound = tick_left is not None and tick_left <= call_left
+                bound = max(0.0, tick_left) if tick_bound else call_left
+                facts = read_stream(stream, bound, tick_deadline=tick_bound)
                 response = stream.get_final_message()
         else:
             response = client.messages.create(
@@ -170,14 +200,6 @@ class AnthropicAdapter(BaseAdapter):
             )
         # From the stream on the refreshed path; from the Message otherwise.
         stop_reason = facts["stop_reason"] if facts else getattr(response, "stop_reason", None)
-        # A refusal is its own class on the refreshed arms only (section 6
-        # item 2); the snapshots' response handling is unchanged.
-        if refreshed and stop_reason == "refusal":
-            details = getattr(response, "stop_details", None)
-            raise ModelRefusal(
-                f"refusal: model={facts.get('model') or getattr(response, 'model', self.model)} "
-                f"category={getattr(details, 'category', None)} "
-                f"explanation={getattr(details, 'explanation', None)}")
         # Concatenate text blocks
         parts: list[str] = []
         for block in response.content:
@@ -246,4 +268,13 @@ class AnthropicAdapter(BaseAdapter):
         metadata["cache_creation_tokens"] = (
             getattr(usage, "cache_creation_input_tokens", None) if usage else None
         )
+        if refreshed:
+            # The finish-reason rule, before any text leaves the adapter: only
+            # end_turn is returned for parsing. The snapshots are unchanged.
+            fc = finish_class(stop_reason)
+            metadata["finish_class"] = fc
+            sd = getattr(response, "stop_details", None)
+            raise_for_finish(fc, f"{fc} finish: stop_reason={stop_reason} model={returned_id} "
+                                 f"category={getattr(sd, 'category', None)} "
+                                 f"explanation={getattr(sd, 'explanation', None)}", metadata)
         return text, returned_id, metadata

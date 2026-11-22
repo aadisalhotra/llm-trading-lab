@@ -154,6 +154,14 @@ def log_decision_run(
         # thought tokens bill against the output cap, so together they make
         # a truncated response explainable from the log alone.
         "api_finish_reason": md.get("finish_reason"),
+        # The finish-reason rule and the decision deadline (refreshed arms;
+        # absent key = a row from before them, null = not under them):
+        # finish_class normal / truncated / refusal / abnormal; the D in force;
+        # where a deadline cut fell; what became of a parse retry.
+        "finish_class": md.get("finish_class"),
+        "tick_deadline_seconds": md.get("tick_deadline_seconds"),
+        "deadline_cut": md.get("deadline_cut"),
+        "parse_retry": md.get("parse_retry"),
         "thoughts_tokens": md.get("thoughts_tokens"),
         # Provider-substitution telemetry (added 2026-09-09, DeepSeek today).
         # model_id_returned is only the alias echo, so it cannot see a provider

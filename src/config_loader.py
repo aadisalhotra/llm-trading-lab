@@ -240,6 +240,20 @@ def effective_mode(model_key: str, settings: dict[str, Any] | None = None) -> st
     return mode if model_key in live_cohort_keys(settings) else "paper"
 
 
+def tick_deadline_seconds(settings: dict[str, Any] | None = None) -> float | None:
+    """The decision deadline D in seconds from the pipeline's start, or None
+    when no deadline is configured. A configured value must be a positive
+    multiple of 30 (the formula rounds down to 30 s)."""
+    settings = settings if settings is not None else load_settings()
+    block = settings.get("tick_deadline")
+    if not block:
+        return None
+    seconds = float(block["seconds"])
+    if seconds <= 0 or seconds % 30:
+        raise ValueError(f"tick_deadline.seconds must be a positive multiple of 30, got {seconds}")
+    return seconds
+
+
 def venue_book_keys(enabled_keys: list[str],
                     settings: dict[str, Any] | None = None) -> list[str]:
     """The enabled books that trade on the venue (order preserved). Empty
