@@ -266,6 +266,16 @@ def log_decision_run(
         # directly retires that dependency for all records from here forward.
         # All five adapters already return input_tokens in call metadata.
         "screening_input_tokens": (screening_metadata or {}).get("input_tokens"),
+        # Screening-leg identity (hub H-OPS-12; lifecycle_and_identity_ruling
+        # section 2.3: the two fields on both legs). The model the screening
+        # response names; system_fingerprint where the provider sends one
+        # (OpenAI, xAI, DeepSeek; null for Anthropic, which exposes the model
+        # only, and Google, whose equivalent is model_version_raw); and the
+        # screening finish reason. Absent keys = a row from before 2026-11-22.
+        "screening_model_returned": (screening_metadata or {}).get("model_returned"),
+        "screening_system_fingerprint": (screening_metadata or {}).get("system_fingerprint"),
+        "screening_model_version_raw": (screening_metadata or {}).get("model_version_raw"),
+        "screening_finish_reason": (screening_metadata or {}).get("finish_reason"),
         # Rolling memory impact — True when the model's reasoning on this
         # tick explicitly cites a prior decision ("already positioned",
         # "previously exited", etc.). Drives the monthly report's memory

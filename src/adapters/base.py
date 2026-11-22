@@ -529,9 +529,12 @@ class BaseAdapter(ABC):
         response schema differs from the trading-decision format.
         """
         start = time.perf_counter()
-        raw, _returned_id, metadata = self._bounded_call(system_prompt, user_prompt)
+        raw, returned_id, metadata = self._bounded_call(system_prompt, user_prompt)
         latency = time.perf_counter() - start
-        return raw, latency, metadata or {}
+        # The model named in the screening response, kept so the screening
+        # leg's identity is observed as the decision leg's is
+        # (lifecycle_and_identity_ruling_2026-11-22.md section 2.3).
+        return raw, latency, {**(metadata or {}), "model_returned": returned_id}
 
     def generate_decision(
         self,
