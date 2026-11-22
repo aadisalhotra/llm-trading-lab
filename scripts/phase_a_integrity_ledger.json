@@ -4002,6 +4002,41 @@
         },
         "does_not_move": "Amendment section 3: the v4 prompt freeze of 2026-10-30; the cohort's resolution date 2026-10-26; the venue cutover of 2026-11-06 and its November record; the daily-history, output-budget and call-input-retention boundaries of November 2026.",
         "sweep_status": "PENDING: the date translations go through the deposit documents by the companion splice (amendment section 5 item 2), and config/settings.json phase dates still carry the 2026-12-01 boundary until a landing sweep changes them; this entry changes no file other than the ledger."
+      },
+      {
+        "id": "grok_420_fingerprint_change_2026_11_10",
+        "date": "2026-11-22",
+        "type": "candidate_identity_event",
+        "scope": "grok (grok-4.20-0309-reasoning), a registered Phase A fallback",
+        "authority": "Hub H-OPS-17 (2026-11-22); xai_probe_followup_ruling_2026-11-22.md section 3 (30845cb4...): a ledger entry with the two values, the last and first rows, and that no xAI announcement is known.",
+        "the_change": {
+          "before": "fp_00c95f2c6b, last row 2026-11-09T20:34:09Z (cycle 20261109T203237Z)",
+          "after": "fp_81c6f9bb90, first row 2026-11-10T14:34:23Z (cycle 20261110T143249Z); 115 rows through 2026-11-20T20:34:53Z",
+          "between": "the close of 2026-11-09 and the open of 2026-11-10; no session in between",
+          "announcement": "none known from xAI",
+          "model_named": "every row names grok-4.20-0309-reasoning, before and after"
+        },
+        "full_history_since_logging_began": {
+          "source": "data/trades/grok_2026-09..11.jsonl on main 3824cb758, field api_system_fingerprint (logged from 2026-09-10), rows in timestamp order",
+          "runs": [
+            "fp_d44b4eeb21 2026-09-10 .. 2026-09-18, 90 rows",
+            "fp_b965085801 2026-09-21 .. 2026-09-30, 102 rows",
+            "fp_1fb66439292298c7 2026-10-01 .. 2026-10-05, 38 rows",
+            "fp_85f87ab3d3 2026-10-06 .. 2026-10-09, 50 rows",
+            "fp_b965085801 2026-10-12 .. 2026-10-16, 65 rows (returned)",
+            "fp_55c25385eb 2026-10-19, 13 rows",
+            "fp_285551eeb5 2026-10-20, 13 rows",
+            "fp_55c25385eb 2026-10-21 .. 2026-10-22, 25 rows (returned)",
+            "fp_00c95f2c6b 2026-10-23 .. 2026-10-26, 26 rows",
+            "fp_728dd03ecb 2026-10-27 .. 2026-10-28, 25 rows",
+            "fp_00c95f2c6b 2026-10-29 .. 2026-11-09, 101 rows (returned)",
+            "fp_81c6f9bb90 2026-11-10 .. 2026-11-20, 115 rows"
+          ],
+          "summary": "12 runs, 11 transitions, 8 distinct values in 2026-09-10 .. 2026-11-20. Every transition falls between sessions. Three values returned after another had replaced them (fp_b965085801, fp_55c25385eb, fp_00c95f2c6b). Every row names grok-4.20-0309-reasoning. Six rows carry no fingerprint, all failed calls (2026-09-17, 09-30, 10-09 twice, 10-27, 11-05).",
+          "correction_to_the_relayed_count": "The fp_00c95f2c6b run that the 2026-11-10 change ended began on 2026-10-29 (101 rows), not 2026-11-02: the 75 rows relayed count the November file only. Its earlier run, 2026-10-23 .. 10-26, is separate."
+        },
+        "reading_for_research": "The 2026-11-10 change is the eleventh transition of this fingerprint since logging began, not a first. The fingerprint moves often, between sessions, and returns to earlier values, with the model name constant throughout. That is consistent with the follow-up ruling's statement that it is a corroborant that can move without a change of model; the ruling's table, built on the November file alone, says it 'changed once for one model' and 'stayed at the new value', which holds for November only. Whether the identity-monitoring table should state the full history is Research's to decide before the freeze.",
+        "follow_up": "The Grok behaviour reading (due Mon 2026-11-30) uses a baseline after both the 2026-11-06 venue cutover and 2026-11-10, and states whether the profile moved at 2026-11-10 relative to the control arm and how that relates to the 2026-11-16 shift."
       }
     ]
   }
