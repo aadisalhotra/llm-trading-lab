@@ -1210,6 +1210,12 @@ def _data_integrity(model_keys, win_start, win_end, settings, ledger):
                          "that one. No averaging across segments."),
             }
         }
+    # Fingerprint transitions per arm (fingerprint_rotation_ruling_2026-11-22
+    # section 3.3; hub H-OPS-19). From November 2026 only, so every committed
+    # earlier layer rebuilds byte-identical.
+    if month_tag >= "2026-11":
+        from src.analytics.fingerprint_transitions import month_summary
+        out["fingerprint_transitions"] = month_summary(model_keys, win_start, win_end)
     return out
 
 

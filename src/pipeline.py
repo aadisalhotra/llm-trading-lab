@@ -44,6 +44,7 @@ EASTERN = ZoneInfo("America/New_York")
 
 from .adapters import get_adapter
 from .adapters.base import IdentityMismatch, identity_failure_result
+from .analytics.fingerprint_transitions import record_transitions as record_fingerprint_transitions
 from .alerts import scan_macro_events, send_alert, send_daily_summary, send_heartbeat
 from .alerts import preflight
 from .alerts.preflight import assert_configured as alert_preflight
@@ -1409,6 +1410,18 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                       str(e), {"cycle_id": executor.cycle_id},
                       kind="gbook_reconciliation_error",
                       dedup_key=f"gbook_reconciliation_error:{executor.cycle_id}")
+
+    # Fingerprint transitions, every arm (fingerprint_rotation_ruling 2026-11-22;
+    # hub H-OPS-19). Derived from the rows just written; a stable field's
+    # transition in this cycle WARNs as a candidate identity event.
+    try:
+        record_fingerprint_transitions(executor.cycle_id, [mk for mk, _ in enabled_models],
+                                       run_date, alert=send_alert)
+    except Exception as e:
+        logger.exception("Fingerprint transition record failed: %s", e)
+        send_alert("WARN", "Fingerprint transition record failed", str(e),
+                   {"cycle_id": executor.cycle_id}, kind="fingerprint_transition_error",
+                   dedup_key=f"fingerprint_transition_error:{run_date.strftime('%Y-%m-%d')}")
 
     # The standing intended-vs-expressed descriptor (ruling 5.4). Recomputed
     # from the decision logs every cycle, so it is current whenever the run ends.
