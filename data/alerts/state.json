@@ -41,13 +41,14 @@
   },
   "daily": {
     "date": "2026-11-23",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "macro_event:Geopolitical shock"
+      "macro_event:Geopolitical shock",
+      "budget:warn"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -64,6 +65,14 @@
         },
         "disposition": "sent",
         "dispatch_id": "a0469019feec"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-11-23T22:07:57.187356+00:00",
+        "disposition": "sent",
+        "dispatch_id": "5f47e0f7181e"
       }
     ]
   },
