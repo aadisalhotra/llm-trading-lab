@@ -221,6 +221,11 @@ def test_pair_intervals():
                                          "interval_s": 30.0}]
 
 
+def test_the_tool_commit_is_read_from_git():
+    tc = cal.tool_commit()
+    assert tc["commit"] and len(tc["commit"]) == 40 and tc["run_path_modified"] in (True, False)
+
+
 def test_every_arm_states_its_fields_before_its_runs():
     assert set(cal.ARMS) == {"cb_sonnet", "cb_opus", "cb_astra", "cb_grok", "cb_argon"}
     for spec in cal.ARMS.values():

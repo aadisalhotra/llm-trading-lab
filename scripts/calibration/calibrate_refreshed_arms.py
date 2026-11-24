@@ -231,6 +231,22 @@ def configured_d(value: float | None) -> float:
     return float(value)
 
 
+TOOL_COMMIT: str | None = None      # set by run(); written on every call record
+
+
+def tool_commit() -> dict[str, Any]:
+    """The commit the tool and adapters run from (hub H-OPS-26), and whether
+    the run path (scripts/calibration, src, config) differs from it."""
+    import subprocess
+    def git(*a):
+        p = subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True)
+        return p.stdout.strip() if p.returncode == 0 else None
+    head = git("rev-parse", "HEAD")
+    dirty = git("status", "--porcelain", "--untracked-files=no", "--",
+                "scripts/calibration", "src", "config")
+    return {"commit": head, "run_path_modified": bool(dirty) if dirty is not None else None}
+
+
 def call_bound(d_seconds: float) -> float:
     """calibration_bound_amendment section 2."""
     return max(900.0, d_seconds + 120.0)
@@ -247,7 +263,8 @@ def run_call(arm: str, leg: str, setting: str, x: dict[str, Any], bound: float) 
     images = load_images(x) if leg == "trade" else None
     a.deadline_at = time.monotonic() + bound
     t0 = time.monotonic()
-    rec: dict[str, Any] = {"arm": arm, "model_configured": spec["model"], "input_id": x["input_id"],
+    rec: dict[str, Any] = {"arm": arm, "model_configured": spec["model"], "tool_commit": TOOL_COMMIT,
+                           "input_id": x["input_id"],
                            "tick_index": x["tick_index"], "position": x["position"], "leg": leg,
                            "setting": setting, "bound_s": bound,
                            "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds")}
@@ -513,7 +530,14 @@ def run(args) -> int:
             "sessions": args.sessions, "inputs": len(inputs), "send_subset": len(subset),
             "D_s": d, "bound_s": bound, "calls_in_flight_per_arm": args.concurrency,
             "arms": {a: ARMS[a] for a in args.arms}}
+    global TOOL_COMMIT
+    tc = tool_commit()
+    TOOL_COMMIT = tc["commit"] + ("+modified" if tc["run_path_modified"] else "") if tc["commit"] else None
+    meta["tool_commit"] = tc
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    # Every run (one per night's increment, plus re-runs) is kept in order.
+    with open(out / "run_log.jsonl", "a", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps({k: v for k, v in meta.items() if k != "arms"}) + "\n")
     print(json.dumps({k: v for k, v in meta.items() if k != "arms"}))
 
     def run_arm(arm: str) -> str:
@@ -546,6 +570,10 @@ def summarize(args) -> int:
     d = configured_d(tick_deadline_seconds(load_settings()))
     out = Path(args.out_dir)
     summary = {"label": args.label, "D_s": d, "bound_s": call_bound(d), "arms": {}}
+    log = out / "run_log.jsonl"
+    summary["runs"] = ([json.loads(x) for x in log.read_text(encoding="utf-8").splitlines() if x.strip()]
+                       if log.exists() else [])
+    summary["summarized_by"] = tool_commit()
     for arm in args.arms:
         p = table_path(out, arm)
         if not p.exists():
