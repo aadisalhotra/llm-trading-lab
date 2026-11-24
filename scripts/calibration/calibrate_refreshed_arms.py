@@ -25,6 +25,14 @@ What it does
      send/omit test.
 Calibration calls are induced tests: off-cycle, no orders, no series.
 
+Cost (hub H-OPS-24): every per-call record carries cost_usd, the adapter's own
+call cost when it reports one, else the list rate in force on the call's UTC
+date applied to input_tokens and total_output (reasoning bills as output on all
+five arms); None when neither is known. The summary totals it per arm over
+every record written, a superseded provider failure included, since each was
+billed. Calibration cost lives only in these tables: nothing that computes a
+cost-per-decision figure reads them.
+
 Classes per call: valid (normal finish, inside the bound); bound_reached (cut at
 the bound: data, not retried, timeout -> D, excluded from R); provider_failure
 (API_ERROR / ACCOUNT_STATE: re-run once after the batch); invalid_finish
@@ -94,6 +102,18 @@ ARMS: dict[str, dict[str, Any]] = {
                            "candidates_token_count. Non-streaming (limit 32,768; 65,536 per "
                            "streaming segment)."},
 }
+
+BOUND_SLACK_S = 5.0     # a call cut at the bound ends within this of it
+
+
+def _redact(s: str) -> str:
+    """No key text in a written error: every configured key value is masked."""
+    import os
+    for k, v in os.environ.items():
+        if v and len(v) >= 12 and k.endswith(("_API_KEY", "_SECRET", "_TOKEN", "_KEY")):
+            s = s.replace(v, "[REDACTED]")
+    return s
+
 
 VALID, BOUND, PROVIDER, INVALID, BUDGET = ("valid", "bound_reached", "provider_failure",
                                           "invalid_finish", "budget_stop")
@@ -204,7 +224,14 @@ def run_call(arm: str, leg: str, setting: str, x: dict[str, Any], bound: float) 
                base.ERROR_CLASS_REFUSAL: INVALID, base.ERROR_CLASS_ABNORMAL_FINISH: INVALID,
                base.ERROR_CLASS_STREAM_INCOMPLETE: INVALID,
                base.ERROR_CLASS_IDENTITY_MISMATCH: INVALID}.get(ec, PROVIDER)
-        rec.update(cls=cls, error_class=ec, error=str(e)[:300],
+        # A "timeout" class is a bound only when the call ran to the bound.
+        # urllib3's NewConnectionError subclasses ConnectTimeoutError, so an
+        # unreachable network reads as a client timeout within seconds; that
+        # is a provider failure (re-run), never data for R, the timeout or D.
+        if cls == BOUND and time.monotonic() - t0 < bound - BOUND_SLACK_S:
+            cls = PROVIDER
+            rec["note"] = "timeout class before the bound (connection failure): re-run"
+        rec.update(cls=cls, error_class=ec, error=_redact(str(e))[:300],
                    model_named=md.get("model_named") or md.get("model"))
     rec["latency_s"] = round(time.monotonic() - t0, 3)
     out, reasoning = md.get("output_tokens"), md.get("thoughts_tokens")
@@ -216,7 +243,30 @@ def run_call(arm: str, leg: str, setting: str, x: dict[str, Any], bound: float) 
         rec.update(reasoning_tokens=reasoning, visible_tokens=None, total_output=None)
     rec.update(finish_reason=md.get("finish_reason"), finish_class=md.get("finish_class"),
                input_tokens=md.get("input_tokens"))
+    rec.update(call_cost(spec["model"], md, rec.get("total_output"), rec["started_utc"][:10]))
+    rec["provider_cost_usd"] = md.get("provider_cost_usd")    # xAI bills it back; else None
     return rec
+
+
+def call_cost(model: str, md: dict[str, Any], total_output: int | None,
+              on_date: str) -> dict[str, Any]:
+    """The call's cost (hub H-OPS-24): the adapter's figure, else list rates."""
+    if md.get("cost_usd") is not None:
+        return {"cost_usd": round(float(md["cost_usd"]), 6), "cost_source": "adapter"}
+    if md.get("input_tokens") is not None and total_output is not None:
+        from src.analytics.cost_rates import compute_call_cost_usd
+        c = compute_call_cost_usd(model, int(md["input_tokens"]), int(total_output), on_date=on_date)
+        if c is not None:
+            return {"cost_usd": round(c, 6), "cost_source": "list_rate"}
+    return {"cost_usd": None, "cost_source": None}
+
+
+def cost_totals(recs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Calibration spend over every record written (each one was billed)."""
+    known = [r["cost_usd"] for r in recs if r.get("cost_usd") is not None]
+    return {"cost_usd": round(sum(known), 4), "records_priced": len(known),
+            "records_unpriced": len(recs) - len(known),
+            "note": "calibration spend; never part of a cost-per-decision figure"}
 
 
 # --------------------------------------------------------------- the rules
@@ -396,12 +446,13 @@ def table_path(out_dir: Path, arm: str) -> Path:
 def done_keys(p: Path) -> set[tuple]:
     if not p.exists():
         return set()
-    keys = set()
-    for ln in p.read_text(encoding="utf-8").splitlines():
-        r = json.loads(ln)
-        if r["cls"] != PROVIDER:               # a provider failure is re-run
-            keys.add((r["input_id"], r["leg"], r["setting"]))
-    return keys
+    return done_keys_from(json.loads(ln) for ln in p.read_text(encoding="utf-8").splitlines()
+                          if ln.strip())
+
+
+def done_keys_from(recs) -> set[tuple]:
+    """Calls already in the table; a provider failure is re-run."""
+    return {(r["input_id"], r["leg"], r["setting"]) for r in recs if r["cls"] != PROVIDER}
 
 
 def run(args) -> int:
@@ -470,6 +521,7 @@ def summarize(args) -> int:
         s = summarize_arm(arm, list(latest.values()), d)
         s["table"] = {"file": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
                       "records": len(recs)}
+        s["calibration_cost"] = cost_totals(recs)
         summary["arms"][arm] = s
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({a: {k: s[k] for k in ("valid_trading_calls", "coverage_met", "R", "ladder",

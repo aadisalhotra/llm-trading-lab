@@ -145,6 +145,48 @@ def test_a_mismatched_model_name_is_not_valid():
     assert s["valid_trading_calls"] == 0 and s["model_name_mismatches"] == 1
 
 
+def test_call_cost_prefers_the_adapter_then_list_rates():
+    assert cal.call_cost("grok-4.7", {"cost_usd": 0.0123}, 500, "2026-11-23") == {
+        "cost_usd": 0.0123, "cost_source": "adapter"}
+    # gemini-4-argon at $2/$10 through 2026-11-30, $4/$20 from 2026-12-01
+    md = {"input_tokens": 10_000}
+    assert cal.call_cost("gemini-4-argon", md, 2_000, "2026-11-23") == {
+        "cost_usd": 0.04, "cost_source": "list_rate"}
+    assert cal.call_cost("gemini-4-argon", md, 2_000, "2026-12-01")["cost_usd"] == 0.08
+    assert cal.call_cost("gpt-6-astra", {}, None, "2026-11-23") == {
+        "cost_usd": None, "cost_source": None}
+
+
+def test_cost_totals_count_every_record_written():
+    recs = [{"cost_usd": 0.5}, {"cost_usd": 0.25}, {"cost_usd": None}]
+    t = cal.cost_totals(recs)
+    assert t["cost_usd"] == 0.75 and t["records_priced"] == 2 and t["records_unpriced"] == 1
+
+
+def test_a_fast_connection_failure_is_a_provider_failure_not_a_bound(monkeypatch):
+    """urllib3's NewConnectionError subclasses ConnectTimeoutError, so an
+    unreachable host reads as a client timeout at once: re-run it, never
+    count it as reaching the bound (smoke test 2026-11-23, api.x.ai)."""
+    import src.adapters as adapters
+
+    class ConnectTimeoutError(Exception):
+        pass
+
+    class FakeAdapter:
+        def _bounded_call(self, system, user, images):
+            raise ConnectTimeoutError("Failed to establish a new connection: [WinError 10051] "
+                                      "key sk-THISISNOTAREALKEY123 unreachable network")
+
+    monkeypatch.setattr(adapters, "get_adapter", lambda provider, model: FakeAdapter())
+    monkeypatch.setenv("XAI_API_KEY", "sk-THISISNOTAREALKEY123")
+    x = {"input_id": "c:claude", "tick_index": 0, "position": 1,
+         "trade": {"system": "s", "user": "u", "images": []}, "images_dir": "."}
+    rec = cal.run_call("cb_grok", "trade", "omit", x, 960.0)
+    assert rec["error_class"] == "TIMEOUT" and rec["cls"] == "provider_failure"
+    assert "THISISNOTAREALKEY" not in rec["error"]
+    assert ("c:claude", "trade", "omit") not in cal.done_keys_from([rec])
+
+
 def test_every_arm_states_its_fields_before_its_runs():
     assert set(cal.ARMS) == {"cb_sonnet", "cb_opus", "cb_astra", "cb_grok", "cb_argon"}
     for spec in cal.ARMS.values():
