@@ -171,6 +171,47 @@ def send_subset(inputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def job_order(inputs: list[dict[str, Any]], subset: list[dict[str, Any]],
+              done: set[tuple]) -> list[tuple[str, str, dict[str, Any]]]:
+    """The calls still to run, in run order (one call at a time per arm).
+
+    calibration_increments_ruling_2026-11-23 section 1: each send call runs
+    immediately before or after its omit partner in the same increment, send
+    first when the tick number k is even, omit first when k is odd. A call
+    already in the table is not run again, so a pair one of whose calls ran
+    in an earlier increment (Monday night's, all run as recorded) completes
+    on its own and its interval is reported, never re-run (section 1.3)."""
+    in_subset = {x["input_id"] for x in subset}
+    jobs: list[tuple[str, str, dict[str, Any]]] = []
+    for x in inputs:
+        legs = [("screen", "omit")] if x["screen"] else []
+        if x["input_id"] in in_subset:
+            legs += ([("trade", "send"), ("trade", "omit")] if x["tick_index"] % 2 == 0
+                     else [("trade", "omit"), ("trade", "send")])
+        else:
+            legs.append(("trade", "omit"))
+        jobs += [(leg, setting, x) for leg, setting in legs
+                 if (x["input_id"], leg, setting) not in done]
+    return jobs
+
+
+def pair_intervals(recs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each send/omit pair's interval: seconds from the first call's start to
+    the second's (section 1.3), from the calls that count."""
+    def ts(r):
+        return datetime.fromisoformat(r["started_utc"]).timestamp()
+    by = {(r["input_id"], r["setting"]): r for r in recs if r["leg"] == "trade"}
+    out = []
+    for (iid, setting), s in sorted(by.items(), key=lambda kv: kv[1]["tick_index"]):
+        o = by.get((iid, "omit"))
+        if setting != "send" or o is None:
+            continue
+        out.append({"input_id": iid, "k": s["tick_index"],
+                    "first": "send" if ts(s) <= ts(o) else "omit",
+                    "interval_s": round(abs(ts(s) - ts(o)), 1)})
+    return out
+
+
 def load_images(x: dict[str, Any]) -> list[bytes]:
     imgs = []
     for im in x["trade"].get("images") or []:
@@ -478,9 +519,7 @@ def run(args) -> int:
     def run_arm(arm: str) -> str:
         p = table_path(out, arm)
         done = done_keys(p)
-        jobs = [(leg, "omit", x) for x in inputs for leg in ("screen", "trade")
-                if (leg == "trade" or x["screen"]) and (x["input_id"], leg, "omit") not in done]
-        jobs += [("trade", "send", x) for x in subset if (x["input_id"], "trade", "send") not in done]
+        jobs = job_order(inputs, subset, done)
         lock = threading.Lock()
         with cf.ThreadPoolExecutor(max_workers=args.concurrency) as pool, \
                 open(p, "a", encoding="utf-8", newline="\n") as f:
@@ -522,6 +561,7 @@ def summarize(args) -> int:
         s["table"] = {"file": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
                       "records": len(recs)}
         s["calibration_cost"] = cost_totals(recs)
+        s["send_omit"]["pair_intervals"] = pair_intervals(list(latest.values()))
         summary["arms"][arm] = s
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({a: {k: s[k] for k in ("valid_trading_calls", "coverage_met", "R", "ladder",

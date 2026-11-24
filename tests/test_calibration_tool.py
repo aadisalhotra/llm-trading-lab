@@ -187,6 +187,40 @@ def test_a_fast_connection_failure_is_a_provider_failure_not_a_bound(monkeypatch
     assert ("c:claude", "trade", "omit") not in cal.done_keys_from([rec])
 
 
+def _inp(k, mk="claude", screen=True):
+    return {"input_id": f"c{k}:{mk}", "tick_index": k, "model_key": mk,
+            "screen": {"system": "s"} if screen else None}
+
+
+def test_pairs_run_back_to_back_send_first_when_k_is_even():
+    inputs = [_inp(0), _inp(0, "gpt"), _inp(1), _inp(1, "gpt")]
+    subset = [inputs[0], inputs[3]]
+    order = [(x["input_id"], leg, s) for leg, s, x in cal.job_order(inputs, subset, set())]
+    assert order == [("c0:claude", "screen", "omit"), ("c0:claude", "trade", "send"),
+                     ("c0:claude", "trade", "omit"),
+                     ("c0:gpt", "screen", "omit"), ("c0:gpt", "trade", "omit"),
+                     ("c1:claude", "screen", "omit"), ("c1:claude", "trade", "omit"),
+                     ("c1:gpt", "screen", "omit"), ("c1:gpt", "trade", "omit"),
+                     ("c1:gpt", "trade", "send")]
+
+
+def test_a_pair_half_run_earlier_is_completed_not_rerun():
+    inputs = [_inp(0)]
+    done = {("c0:claude", "screen", "omit"), ("c0:claude", "trade", "omit")}
+    assert [(leg, s) for leg, s, _ in cal.job_order(inputs, inputs, done)] == [("trade", "send")]
+
+
+def test_pair_intervals():
+    recs = [{"input_id": "c2:gpt", "tick_index": 2, "leg": "trade", "setting": "send",
+             "started_utc": "2026-11-24T01:00:00+00:00"},
+            {"input_id": "c2:gpt", "tick_index": 2, "leg": "trade", "setting": "omit",
+             "started_utc": "2026-11-24T01:00:30+00:00"},
+            {"input_id": "c3:gpt", "tick_index": 3, "leg": "trade", "setting": "omit",
+             "started_utc": "2026-11-24T01:01:00+00:00"}]
+    assert cal.pair_intervals(recs) == [{"input_id": "c2:gpt", "k": 2, "first": "send",
+                                         "interval_s": 30.0}]
+
+
 def test_every_arm_states_its_fields_before_its_runs():
     assert set(cal.ARMS) == {"cb_sonnet", "cb_opus", "cb_astra", "cb_grok", "cb_argon"}
     for spec in cal.ARMS.values():
