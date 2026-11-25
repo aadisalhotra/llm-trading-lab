@@ -41,13 +41,14 @@
   },
   "daily": {
     "date": "2026-11-25",
-    "sent_count": 1,
+    "sent_count": 2,
     "dedup_keys": [
-      "fill_overrun:claude:20261125T160337Z:claude-20261125T160337Z-00-a0"
+      "fill_overrun:claude:20261125T160337Z:claude-20261125T160337Z-00-a0",
+      "budget:warn"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "fill_overrun",
@@ -56,6 +57,14 @@
         "timestamp": "2026-11-25T16:05:53.538102+00:00",
         "disposition": "sent",
         "dispatch_id": "dd80f6c98ef1"
+      },
+      {
+        "kind": "budget",
+        "severity": "WARN",
+        "title": "Monthly API budget approaching cap",
+        "timestamp": "2026-11-25T22:08:00.227896+00:00",
+        "disposition": "sent",
+        "dispatch_id": "2c1755f1641e"
       }
     ]
   },
