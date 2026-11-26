@@ -1,0 +1,126 @@
+{
+ "night": 3,
+ "stage": "DONE",
+ "updated_utc": "2026-11-26T00:32:07+00:00",
+ "eod_commit": {
+  "commit": "75d8e2291496432b1d46d8bddfeb79ef0020dfbc",
+  "committed": "2026-11-25T22:08:01Z",
+  "subject": "end-of-day tick 2026-11-25T22:08:01Z"
+ },
+ "export": {
+  "dir": "C:\\Users\\Aadi\\projects\\llm-trading-lab-calib-inputs\\75d8e2291\\data\\prompts",
+  "commit": "75d8e2291496432b1d46d8bddfeb79ef0020dfbc",
+  "wednesday_tick_files": 13,
+  "files_total": 234
+ },
+ "identity_check": {
+  "against": "be838ae export (= 2b5e7791c for Monday)",
+  "files_checked": 156,
+  "differences": [],
+  "ok": true
+ },
+ "increment": {
+  "started_utc": "2026-11-25T22:10:06+00:00",
+  "ended_utc": "2026-11-26T00:17:11+00:00",
+  "rc": 0,
+  "hard_stop_hit": false
+ },
+ "reruns": [
+  {
+   "pass": 1,
+   "arms": [
+    "cb_sonnet",
+    "cb_opus",
+    "cb_grok"
+   ],
+   "started_utc": "2026-11-26T00:17:11+00:00",
+   "ended_utc": "2026-11-26T00:32:07+00:00",
+   "rc": 0,
+   "hard_stop_hit": false
+  }
+ ],
+ "stopped_arms": {},
+ "arms": {
+  "cb_sonnet": {
+   "records": 439,
+   "calls": 429,
+   "of": 429,
+   "wednesday_calls": 143,
+   "by_class": {
+    "valid": 429
+   },
+   "last_call_utc": "2026-11-26T00:17:11+00:00"
+  },
+  "cb_opus": {
+   "records": 441,
+   "calls": 429,
+   "of": 429,
+   "wednesday_calls": 143,
+   "by_class": {
+    "valid": 429
+   },
+   "last_call_utc": "2026-11-26T00:17:13+00:00"
+  },
+  "cb_astra": {
+   "records": 429,
+   "calls": 429,
+   "of": 429,
+   "wednesday_calls": 143,
+   "by_class": {
+    "valid": 429
+   },
+   "last_call_utc": "2026-11-25T23:22:20+00:00"
+  },
+  "cb_grok": {
+   "records": 482,
+   "calls": 429,
+   "of": 429,
+   "wednesday_calls": 143,
+   "by_class": {
+    "valid": 429
+   },
+   "last_call_utc": "2026-11-26T00:31:38+00:00"
+  },
+  "cb_argon": {
+   "records": 429,
+   "calls": 429,
+   "of": 429,
+   "wednesday_calls": 143,
+   "by_class": {
+    "valid": 429
+   },
+   "last_call_utc": "2026-11-25T23:07:40+00:00"
+  }
+ },
+ "final_computation": {
+  "rc": 0,
+  "ended_utc": "2026-11-26T00:32:07+00:00",
+  "summary": "summary.json",
+  "summary_sha256": "5fabe3b687909886c756d25d2dc8951092be746e62083a7dd44cba54eb5e367e",
+  "tables": {
+   "cb_sonnet": {
+    "file": "cb_sonnet_calls.jsonl",
+    "sha256": "168de3b290fffff06b4fa6e13c28fc218ec35e204d109f9fda57bccc4dc46e56"
+   },
+   "cb_opus": {
+    "file": "cb_opus_calls.jsonl",
+    "sha256": "6ee3a2a0c7d7347938b97467b5c48a0595362c64c1d38ed62f0b524d0ba33036"
+   },
+   "cb_astra": {
+    "file": "cb_astra_calls.jsonl",
+    "sha256": "2a10544a3a12d10ce2a4538c345faf4e89bf9dab32d47cca5abcdde3597d4def"
+   },
+   "cb_grok": {
+    "file": "cb_grok_calls.jsonl",
+    "sha256": "f609fce1b7c467fd4315d3aaa852f7a7232323590f478080836aa2184880fead"
+   },
+   "cb_argon": {
+    "file": "cb_argon_calls.jsonl",
+    "sha256": "0afe85f7da8ac065fb1d7305638298f84635b4e012412a2468c724f5e445e85d"
+   }
+  }
+ },
+ "problems": [],
+ "last_check_utc": "2026-11-25T22:10:05+00:00",
+ "last_fetch_error": "git fetch failed rc=128: fatal: unable to access 'https://github.com/aadisalhotra/llm-trading-lab.git/': Failed to connect to github.com port 443 after 21093 ms: Could not connect to server\n"
+}

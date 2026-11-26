@@ -1,0 +1,131 @@
+{"label": "calibration", "started_utc": "2026-11-24T00:50:41+00:00", "sessions": ["2026-11-23"], "inputs": 65, "send_subset": 13, "D_s": 840.0, "bound_s": 960.0, "calls_in_flight_per_arm": 1}
+cb_sonnet: 143 calls written to cb_sonnet_calls.jsonl
+cb_opus: 143 calls written to cb_opus_calls.jsonl
+cb_astra: 143 calls written to cb_astra_calls.jsonl
+cb_grok: 143 calls written to cb_grok_calls.jsonl
+cb_argon: 143 calls written to cb_argon_calls.jsonl
+{
+ "cb_sonnet": {
+  "valid_trading_calls": 62,
+  "coverage_met": false,
+  "R": 514,
+  "ladder": {
+   "rung": 1,
+   "R": 514,
+   "allowance": 4096,
+   "cap": 20480,
+   "L": 128000,
+   "H": 111616
+  },
+  "timeout_s": 300.0,
+  "counts_by_class": {
+   "valid": 122,
+   "bound_reached": 0,
+   "provider_failure": 8,
+   "invalid_finish": 0,
+   "budget_stop": 0
+  },
+  "send_omit": {
+   "n_pairs": 11,
+   "shown": false
+  }
+ },
+ "cb_opus": {
+  "valid_trading_calls": 59,
+  "coverage_met": false,
+  "R": 548,
+  "ladder": {
+   "rung": 1,
+   "R": 548,
+   "allowance": 4096,
+   "cap": 20480,
+   "L": 128000,
+   "H": 111616
+  },
+  "timeout_s": 300.0,
+  "counts_by_class": {
+   "valid": 122,
+   "bound_reached": 0,
+   "provider_failure": 8,
+   "invalid_finish": 0,
+   "budget_stop": 0
+  },
+  "send_omit": {
+   "n_pairs": 12,
+   "shown": false
+  }
+ },
+ "cb_astra": {
+  "valid_trading_calls": 65,
+  "coverage_met": false,
+  "R": 201,
+  "ladder": {
+   "rung": 1,
+   "R": 201,
+   "allowance": 4096,
+   "cap": 20480,
+   "L": 128000,
+   "H": 111616
+  },
+  "timeout_s": 300.0,
+  "counts_by_class": {
+   "valid": 130,
+   "bound_reached": 0,
+   "provider_failure": 0,
+   "invalid_finish": 0,
+   "budget_stop": 0
+  },
+  "send_omit": {
+   "n_pairs": 13,
+   "shown": false
+  }
+ },
+ "cb_grok": {
+  "valid_trading_calls": 56,
+  "coverage_met": false,
+  "R": 6652,
+  "ladder": {
+   "rung": null,
+   "note": "reasoning does not share the output cap: no allowance; max_tokens stays the answer budget",
+   "cap": 16384
+  },
+  "timeout_s": 300.0,
+  "counts_by_class": {
+   "valid": 115,
+   "bound_reached": 0,
+   "provider_failure": 15,
+   "invalid_finish": 0,
+   "budget_stop": 0
+  },
+  "send_omit": {
+   "n_pairs": 9,
+   "shown": false
+  }
+ },
+ "cb_argon": {
+  "valid_trading_calls": 65,
+  "coverage_met": false,
+  "R": 704,
+  "ladder": {
+   "rung": 1,
+   "R": 704,
+   "allowance": 4096,
+   "cap": 20480,
+   "L": 32768,
+   "H": 16384
+  },
+  "timeout_s": 300.0,
+  "counts_by_class": {
+   "valid": 130,
+   "bound_reached": 0,
+   "provider_failure": 0,
+   "invalid_finish": 0,
+   "budget_stop": 0
+  },
+  "send_omit": {
+   "n_pairs": 13,
+   "shown": false
+  }
+ }
+}
+exit 0

@@ -1,0 +1,28 @@
+{
+  "label": "calibration",
+  "started_utc": "2026-11-26T00:17:15+00:00",
+  "sessions": [
+    "2026-11-23",
+    "2026-11-24",
+    "2026-11-25"
+  ],
+  "inputs": 195,
+  "send_subset": 39,
+  "D_s": 840.0,
+  "bound_s": 960.0,
+  "calls_in_flight_per_arm": 1,
+  "arms": {
+    "cb_grok": {
+      "provider": "xai",
+      "model": "grok-4.7",
+      "L": null,
+      "shares_cap": false,
+      "output_includes_reasoning": false,
+      "fields": "total = usage.completion_tokens + completion_tokens_details.reasoning_tokens (reasoning reported outside completion_tokens); visible = completion_tokens. Reasoning does not count against max_tokens (16,384, the answer budget). Non-streaming."
+    }
+  },
+  "tool_commit": {
+    "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+    "run_path_modified": false
+  }
+}

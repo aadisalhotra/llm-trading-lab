@@ -1,0 +1,2061 @@
+{
+  "label": "calibration",
+  "D_s": 840.0,
+  "bound_s": 960.0,
+  "arms": {
+    "cb_sonnet": {
+      "arm": "cb_sonnet",
+      "model": "claude-sonnet-5-5",
+      "fields": "total = usage.output_tokens (includes thinking); reasoning = output_tokens_details.thinking_tokens (message_delta); visible = total - reasoning. Streamed.",
+      "calls": 429,
+      "omit_calls": 390,
+      "valid_trading_calls": 195,
+      "positions_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "coverage_met": true,
+      "counts_by_class": {
+        "valid": 390,
+        "bound_reached": 0,
+        "provider_failure": 0,
+        "invalid_finish": 0,
+        "budget_stop": 0
+      },
+      "model_name_mismatches": 0,
+      "model_names_seen": {
+        "claude-sonnet-5-5": 429
+      },
+      "invalid_finishes": [],
+      "R": 537,
+      "reasoning_median": 0.0,
+      "zero_reasoning_calls": 295,
+      "ladder": {
+        "rung": 1,
+        "R": 537,
+        "allowance": 4096,
+        "cap": 20480,
+        "L": 128000,
+        "H": 111616
+      },
+      "timeout_s": 300.0,
+      "max_valid_latency_s": 69.289,
+      "send_omit": {
+        "n_pairs": 39,
+        "margins": [
+          0.8,
+          1.25
+        ],
+        "shown": true,
+        "ratio_mean": 1.0293,
+        "ci90": [
+          0.9704,
+          1.0919
+        ],
+        "pairs_dropped": 0,
+        "send_reasoning_median": 0,
+        "send_zero_reasoning": 30,
+        "pair_intervals": [
+          {
+            "input_id": "20261123T143312Z:claude",
+            "k": 0,
+            "first": "omit",
+            "interval_s": 2242.0
+          },
+          {
+            "input_id": "20261123T150318Z:claude_opus",
+            "k": 1,
+            "first": "omit",
+            "interval_s": 2033.0
+          },
+          {
+            "input_id": "20261123T153243Z:gemini",
+            "k": 2,
+            "first": "omit",
+            "interval_s": 1749.0
+          },
+          {
+            "input_id": "20261123T160228Z:gpt",
+            "k": 3,
+            "first": "send",
+            "interval_s": 5109.0
+          },
+          {
+            "input_id": "20261123T163256Z:grok",
+            "k": 4,
+            "first": "omit",
+            "interval_s": 1371.0
+          },
+          {
+            "input_id": "20261123T170307Z:claude",
+            "k": 5,
+            "first": "omit",
+            "interval_s": 1362.0
+          },
+          {
+            "input_id": "20261123T173303Z:claude_opus",
+            "k": 6,
+            "first": "omit",
+            "interval_s": 1153.0
+          },
+          {
+            "input_id": "20261123T180324Z:gemini",
+            "k": 7,
+            "first": "omit",
+            "interval_s": 1010.0
+          },
+          {
+            "input_id": "20261123T183307Z:gpt",
+            "k": 8,
+            "first": "send",
+            "interval_s": 5056.0
+          },
+          {
+            "input_id": "20261123T190306Z:grok",
+            "k": 9,
+            "first": "omit",
+            "interval_s": 606.0
+          },
+          {
+            "input_id": "20261123T193309Z:claude",
+            "k": 10,
+            "first": "omit",
+            "interval_s": 597.0
+          },
+          {
+            "input_id": "20261123T200249Z:claude_opus",
+            "k": 11,
+            "first": "omit",
+            "interval_s": 408.0
+          },
+          {
+            "input_id": "20261123T203313Z:gemini",
+            "k": 12,
+            "first": "omit",
+            "interval_s": 291.0
+          },
+          {
+            "input_id": "20261124T143319Z:gpt",
+            "k": 13,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261124T150318Z:grok",
+            "k": 14,
+            "first": "send",
+            "interval_s": 15.0
+          },
+          {
+            "input_id": "20261124T153310Z:claude",
+            "k": 15,
+            "first": "omit",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261124T160253Z:claude_opus",
+            "k": 16,
+            "first": "send",
+            "interval_s": 9.0
+          },
+          {
+            "input_id": "20261124T163303Z:gemini",
+            "k": 17,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261124T170301Z:gpt",
+            "k": 18,
+            "first": "send",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261124T173246Z:grok",
+            "k": 19,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261124T180328Z:claude",
+            "k": 20,
+            "first": "send",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261124T183238Z:claude_opus",
+            "k": 21,
+            "first": "omit",
+            "interval_s": 6.0
+          },
+          {
+            "input_id": "20261124T190312Z:gemini",
+            "k": 22,
+            "first": "send",
+            "interval_s": 44.0
+          },
+          {
+            "input_id": "20261124T193320Z:gpt",
+            "k": 23,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261124T200316Z:grok",
+            "k": 24,
+            "first": "send",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261124T203304Z:claude",
+            "k": 25,
+            "first": "omit",
+            "interval_s": 6.0
+          },
+          {
+            "input_id": "20261125T143311Z:claude_opus",
+            "k": 26,
+            "first": "send",
+            "interval_s": 13.0
+          },
+          {
+            "input_id": "20261125T150326Z:gemini",
+            "k": 27,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261125T153237Z:gpt",
+            "k": 28,
+            "first": "send",
+            "interval_s": 36.0
+          },
+          {
+            "input_id": "20261125T160337Z:grok",
+            "k": 29,
+            "first": "omit",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261125T163324Z:claude",
+            "k": 30,
+            "first": "send",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261125T170317Z:claude_opus",
+            "k": 31,
+            "first": "omit",
+            "interval_s": 30.0
+          },
+          {
+            "input_id": "20261125T173344Z:gemini",
+            "k": 32,
+            "first": "send",
+            "interval_s": 23.0
+          },
+          {
+            "input_id": "20261125T180304Z:gpt",
+            "k": 33,
+            "first": "omit",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261125T183310Z:grok",
+            "k": 34,
+            "first": "send",
+            "interval_s": 43.0
+          },
+          {
+            "input_id": "20261125T190239Z:claude",
+            "k": 35,
+            "first": "omit",
+            "interval_s": 8.0
+          },
+          {
+            "input_id": "20261125T193315Z:claude_opus",
+            "k": 36,
+            "first": "send",
+            "interval_s": 36.0
+          },
+          {
+            "input_id": "20261125T200319Z:gemini",
+            "k": 37,
+            "first": "omit",
+            "interval_s": 7.0
+          },
+          {
+            "input_id": "20261125T203255Z:gpt",
+            "k": 38,
+            "first": "send",
+            "interval_s": 50.0
+          }
+        ]
+      },
+      "table": {
+        "file": "cb_sonnet_calls.jsonl",
+        "sha256": "168de3b290fffff06b4fa6e13c28fc218ec35e204d109f9fda57bccc4dc46e56",
+        "records": 439
+      },
+      "calibration_cost": {
+        "cost_usd": 12.702,
+        "records_priced": 429,
+        "records_unpriced": 10,
+        "note": "calibration spend; never part of a cost-per-decision figure"
+      }
+    },
+    "cb_opus": {
+      "arm": "cb_opus",
+      "model": "claude-opus-5-5",
+      "fields": "as cb_sonnet. Streamed.",
+      "calls": 429,
+      "omit_calls": 390,
+      "valid_trading_calls": 195,
+      "positions_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "coverage_met": true,
+      "counts_by_class": {
+        "valid": 390,
+        "bound_reached": 0,
+        "provider_failure": 0,
+        "invalid_finish": 0,
+        "budget_stop": 0
+      },
+      "model_name_mismatches": 0,
+      "model_names_seen": {
+        "claude-opus-5-5": 429
+      },
+      "invalid_finishes": [],
+      "R": 649,
+      "reasoning_median": 225.0,
+      "zero_reasoning_calls": 117,
+      "ladder": {
+        "rung": 1,
+        "R": 649,
+        "allowance": 4096,
+        "cap": 20480,
+        "L": 128000,
+        "H": 111616
+      },
+      "timeout_s": 300.0,
+      "max_valid_latency_s": 74.625,
+      "send_omit": {
+        "n_pairs": 39,
+        "margins": [
+          0.8,
+          1.25
+        ],
+        "shown": true,
+        "ratio_mean": 1.0074,
+        "ci90": [
+          0.9508,
+          1.0673
+        ],
+        "pairs_dropped": 0,
+        "send_reasoning_median": 252,
+        "send_zero_reasoning": 8,
+        "pair_intervals": [
+          {
+            "input_id": "20261123T143312Z:claude",
+            "k": 0,
+            "first": "omit",
+            "interval_s": 3413.0
+          },
+          {
+            "input_id": "20261123T150318Z:claude_opus",
+            "k": 1,
+            "first": "send",
+            "interval_s": 3993.0
+          },
+          {
+            "input_id": "20261123T153243Z:gemini",
+            "k": 2,
+            "first": "omit",
+            "interval_s": 2808.0
+          },
+          {
+            "input_id": "20261123T160228Z:gpt",
+            "k": 3,
+            "first": "omit",
+            "interval_s": 2472.0
+          },
+          {
+            "input_id": "20261123T163256Z:grok",
+            "k": 4,
+            "first": "omit",
+            "interval_s": 2141.0
+          },
+          {
+            "input_id": "20261123T170307Z:claude",
+            "k": 5,
+            "first": "omit",
+            "interval_s": 2127.0
+          },
+          {
+            "input_id": "20261123T173303Z:claude_opus",
+            "k": 6,
+            "first": "omit",
+            "interval_s": 1799.0
+          },
+          {
+            "input_id": "20261123T180324Z:gemini",
+            "k": 7,
+            "first": "omit",
+            "interval_s": 1521.0
+          },
+          {
+            "input_id": "20261123T183307Z:gpt",
+            "k": 8,
+            "first": "omit",
+            "interval_s": 1327.0
+          },
+          {
+            "input_id": "20261123T190306Z:grok",
+            "k": 9,
+            "first": "omit",
+            "interval_s": 1066.0
+          },
+          {
+            "input_id": "20261123T193309Z:claude",
+            "k": 10,
+            "first": "omit",
+            "interval_s": 1012.0
+          },
+          {
+            "input_id": "20261123T200249Z:claude_opus",
+            "k": 11,
+            "first": "omit",
+            "interval_s": 697.0
+          },
+          {
+            "input_id": "20261123T203313Z:gemini",
+            "k": 12,
+            "first": "omit",
+            "interval_s": 407.0
+          },
+          {
+            "input_id": "20261124T143319Z:gpt",
+            "k": 13,
+            "first": "omit",
+            "interval_s": 7386.0
+          },
+          {
+            "input_id": "20261124T150318Z:grok",
+            "k": 14,
+            "first": "send",
+            "interval_s": 18.0
+          },
+          {
+            "input_id": "20261124T153310Z:claude",
+            "k": 15,
+            "first": "omit",
+            "interval_s": 31.0
+          },
+          {
+            "input_id": "20261124T160253Z:claude_opus",
+            "k": 16,
+            "first": "send",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261124T163303Z:gemini",
+            "k": 17,
+            "first": "omit",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261124T170301Z:gpt",
+            "k": 18,
+            "first": "send",
+            "interval_s": 51.0
+          },
+          {
+            "input_id": "20261124T173246Z:grok",
+            "k": 19,
+            "first": "omit",
+            "interval_s": 53.0
+          },
+          {
+            "input_id": "20261124T180328Z:claude",
+            "k": 20,
+            "first": "send",
+            "interval_s": 26.0
+          },
+          {
+            "input_id": "20261124T183238Z:claude_opus",
+            "k": 21,
+            "first": "omit",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261124T190312Z:gemini",
+            "k": 22,
+            "first": "send",
+            "interval_s": 18.0
+          },
+          {
+            "input_id": "20261124T193320Z:gpt",
+            "k": 23,
+            "first": "omit",
+            "interval_s": 53.0
+          },
+          {
+            "input_id": "20261124T200316Z:grok",
+            "k": 24,
+            "first": "send",
+            "interval_s": 51.0
+          },
+          {
+            "input_id": "20261124T203304Z:claude",
+            "k": 25,
+            "first": "omit",
+            "interval_s": 9.0
+          },
+          {
+            "input_id": "20261125T143311Z:claude_opus",
+            "k": 26,
+            "first": "send",
+            "interval_s": 20.0
+          },
+          {
+            "input_id": "20261125T150326Z:gemini",
+            "k": 27,
+            "first": "omit",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261125T153237Z:gpt",
+            "k": 28,
+            "first": "send",
+            "interval_s": 52.0
+          },
+          {
+            "input_id": "20261125T160337Z:grok",
+            "k": 29,
+            "first": "omit",
+            "interval_s": 15.0
+          },
+          {
+            "input_id": "20261125T163324Z:claude",
+            "k": 30,
+            "first": "send",
+            "interval_s": 16.0
+          },
+          {
+            "input_id": "20261125T170317Z:claude_opus",
+            "k": 31,
+            "first": "omit",
+            "interval_s": 16.0
+          },
+          {
+            "input_id": "20261125T173344Z:gemini",
+            "k": 32,
+            "first": "send",
+            "interval_s": 10.0
+          },
+          {
+            "input_id": "20261125T180304Z:gpt",
+            "k": 33,
+            "first": "omit",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261125T183310Z:grok",
+            "k": 34,
+            "first": "send",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261125T190239Z:claude",
+            "k": 35,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261125T193315Z:claude_opus",
+            "k": 36,
+            "first": "send",
+            "interval_s": 13.0
+          },
+          {
+            "input_id": "20261125T200319Z:gemini",
+            "k": 37,
+            "first": "omit",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261125T203255Z:gpt",
+            "k": 38,
+            "first": "send",
+            "interval_s": 13.0
+          }
+        ]
+      },
+      "table": {
+        "file": "cb_opus_calls.jsonl",
+        "sha256": "6ee3a2a0c7d7347938b97467b5c48a0595362c64c1d38ed62f0b524d0ba33036",
+        "records": 441
+      },
+      "calibration_cost": {
+        "cost_usd": 27.8307,
+        "records_priced": 429,
+        "records_unpriced": 12,
+        "note": "calibration spend; never part of a cost-per-decision figure"
+      }
+    },
+    "cb_astra": {
+      "arm": "cb_astra",
+      "model": "gpt-6-astra",
+      "fields": "total = usage.completion_tokens (includes reasoning); reasoning = completion_tokens_details.reasoning_tokens; visible = total - reasoning. Non-streaming.",
+      "calls": 429,
+      "omit_calls": 390,
+      "valid_trading_calls": 195,
+      "positions_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "coverage_met": true,
+      "counts_by_class": {
+        "valid": 390,
+        "bound_reached": 0,
+        "provider_failure": 0,
+        "invalid_finish": 0,
+        "budget_stop": 0
+      },
+      "model_name_mismatches": 0,
+      "model_names_seen": {
+        "gpt-6-astra": 429
+      },
+      "invalid_finishes": [],
+      "R": 232,
+      "reasoning_median": 95.5,
+      "zero_reasoning_calls": 77,
+      "ladder": {
+        "rung": 1,
+        "R": 232,
+        "allowance": 4096,
+        "cap": 20480,
+        "L": 128000,
+        "H": 111616
+      },
+      "timeout_s": 300.0,
+      "max_valid_latency_s": 133.451,
+      "send_omit": {
+        "n_pairs": 39,
+        "margins": [
+          0.8,
+          1.25
+        ],
+        "shown": true,
+        "ratio_mean": 0.9833,
+        "ci90": [
+          0.9651,
+          1.0019
+        ],
+        "pairs_dropped": 0,
+        "send_reasoning_median": 48,
+        "send_zero_reasoning": 17,
+        "pair_intervals": [
+          {
+            "input_id": "20261123T143312Z:claude",
+            "k": 0,
+            "first": "omit",
+            "interval_s": 4946.0
+          },
+          {
+            "input_id": "20261123T150318Z:claude_opus",
+            "k": 1,
+            "first": "omit",
+            "interval_s": 4486.0
+          },
+          {
+            "input_id": "20261123T153243Z:gemini",
+            "k": 2,
+            "first": "omit",
+            "interval_s": 4026.0
+          },
+          {
+            "input_id": "20261123T160228Z:gpt",
+            "k": 3,
+            "first": "omit",
+            "interval_s": 3590.0
+          },
+          {
+            "input_id": "20261123T163256Z:grok",
+            "k": 4,
+            "first": "omit",
+            "interval_s": 3171.0
+          },
+          {
+            "input_id": "20261123T170307Z:claude",
+            "k": 5,
+            "first": "omit",
+            "interval_s": 3015.0
+          },
+          {
+            "input_id": "20261123T173303Z:claude_opus",
+            "k": 6,
+            "first": "omit",
+            "interval_s": 2716.0
+          },
+          {
+            "input_id": "20261123T180324Z:gemini",
+            "k": 7,
+            "first": "omit",
+            "interval_s": 2272.0
+          },
+          {
+            "input_id": "20261123T183307Z:gpt",
+            "k": 8,
+            "first": "omit",
+            "interval_s": 1815.0
+          },
+          {
+            "input_id": "20261123T190306Z:grok",
+            "k": 9,
+            "first": "omit",
+            "interval_s": 1407.0
+          },
+          {
+            "input_id": "20261123T193309Z:claude",
+            "k": 10,
+            "first": "omit",
+            "interval_s": 1319.0
+          },
+          {
+            "input_id": "20261123T200249Z:claude_opus",
+            "k": 11,
+            "first": "omit",
+            "interval_s": 841.0
+          },
+          {
+            "input_id": "20261123T203313Z:gemini",
+            "k": 12,
+            "first": "omit",
+            "interval_s": 421.0
+          },
+          {
+            "input_id": "20261124T143319Z:gpt",
+            "k": 13,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261124T150318Z:grok",
+            "k": 14,
+            "first": "send",
+            "interval_s": 32.0
+          },
+          {
+            "input_id": "20261124T153310Z:claude",
+            "k": 15,
+            "first": "omit",
+            "interval_s": 104.0
+          },
+          {
+            "input_id": "20261124T160253Z:claude_opus",
+            "k": 16,
+            "first": "send",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261124T163303Z:gemini",
+            "k": 17,
+            "first": "omit",
+            "interval_s": 10.0
+          },
+          {
+            "input_id": "20261124T170301Z:gpt",
+            "k": 18,
+            "first": "send",
+            "interval_s": 22.0
+          },
+          {
+            "input_id": "20261124T173246Z:grok",
+            "k": 19,
+            "first": "omit",
+            "interval_s": 20.0
+          },
+          {
+            "input_id": "20261124T180328Z:claude",
+            "k": 20,
+            "first": "send",
+            "interval_s": 23.0
+          },
+          {
+            "input_id": "20261124T183238Z:claude_opus",
+            "k": 21,
+            "first": "omit",
+            "interval_s": 47.0
+          },
+          {
+            "input_id": "20261124T190312Z:gemini",
+            "k": 22,
+            "first": "send",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261124T193320Z:gpt",
+            "k": 23,
+            "first": "omit",
+            "interval_s": 41.0
+          },
+          {
+            "input_id": "20261124T200316Z:grok",
+            "k": 24,
+            "first": "send",
+            "interval_s": 78.0
+          },
+          {
+            "input_id": "20261124T203304Z:claude",
+            "k": 25,
+            "first": "omit",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261125T143311Z:claude_opus",
+            "k": 26,
+            "first": "send",
+            "interval_s": 33.0
+          },
+          {
+            "input_id": "20261125T150326Z:gemini",
+            "k": 27,
+            "first": "omit",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261125T153237Z:gpt",
+            "k": 28,
+            "first": "send",
+            "interval_s": 42.0
+          },
+          {
+            "input_id": "20261125T160337Z:grok",
+            "k": 29,
+            "first": "omit",
+            "interval_s": 85.0
+          },
+          {
+            "input_id": "20261125T163324Z:claude",
+            "k": 30,
+            "first": "send",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261125T170317Z:claude_opus",
+            "k": 31,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261125T173344Z:gemini",
+            "k": 32,
+            "first": "send",
+            "interval_s": 54.0
+          },
+          {
+            "input_id": "20261125T180304Z:gpt",
+            "k": 33,
+            "first": "omit",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261125T183310Z:grok",
+            "k": 34,
+            "first": "send",
+            "interval_s": 18.0
+          },
+          {
+            "input_id": "20261125T190239Z:claude",
+            "k": 35,
+            "first": "omit",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261125T193315Z:claude_opus",
+            "k": 36,
+            "first": "send",
+            "interval_s": 10.0
+          },
+          {
+            "input_id": "20261125T200319Z:gemini",
+            "k": 37,
+            "first": "omit",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261125T203255Z:gpt",
+            "k": 38,
+            "first": "send",
+            "interval_s": 25.0
+          }
+        ]
+      },
+      "table": {
+        "file": "cb_astra_calls.jsonl",
+        "sha256": "2a10544a3a12d10ce2a4538c345faf4e89bf9dab32d47cca5abcdde3597d4def",
+        "records": 429
+      },
+      "calibration_cost": {
+        "cost_usd": 44.9341,
+        "records_priced": 429,
+        "records_unpriced": 0,
+        "note": "calibration spend; never part of a cost-per-decision figure"
+      }
+    },
+    "cb_grok": {
+      "arm": "cb_grok",
+      "model": "grok-4.7",
+      "fields": "total = usage.completion_tokens + completion_tokens_details.reasoning_tokens (reasoning reported outside completion_tokens); visible = completion_tokens. Reasoning does not count against max_tokens (16,384, the answer budget). Non-streaming.",
+      "calls": 429,
+      "omit_calls": 390,
+      "valid_trading_calls": 195,
+      "positions_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "coverage_met": true,
+      "counts_by_class": {
+        "valid": 390,
+        "bound_reached": 0,
+        "provider_failure": 0,
+        "invalid_finish": 0,
+        "budget_stop": 0
+      },
+      "model_name_mismatches": 0,
+      "model_names_seen": {
+        "grok-4.7": 429
+      },
+      "invalid_finishes": [],
+      "R": 10462,
+      "reasoning_median": 2322.0,
+      "zero_reasoning_calls": 0,
+      "ladder": {
+        "rung": null,
+        "note": "reasoning does not share the output cap: no allowance; max_tokens stays the answer budget",
+        "cap": 16384
+      },
+      "timeout_s": 300.0,
+      "max_valid_latency_s": 172.451,
+      "send_omit": {
+        "n_pairs": 39,
+        "margins": [
+          0.8,
+          1.25
+        ],
+        "shown": true,
+        "ratio_mean": 0.9312,
+        "ci90": [
+          0.8725,
+          0.9939
+        ],
+        "pairs_dropped": 0,
+        "send_reasoning_median": 3265,
+        "send_zero_reasoning": 0,
+        "pair_intervals": [
+          {
+            "input_id": "20261123T143312Z:claude",
+            "k": 0,
+            "first": "omit",
+            "interval_s": 7350.0
+          },
+          {
+            "input_id": "20261123T150318Z:claude_opus",
+            "k": 1,
+            "first": "omit",
+            "interval_s": 5923.0
+          },
+          {
+            "input_id": "20261123T153243Z:gemini",
+            "k": 2,
+            "first": "omit",
+            "interval_s": 5337.0
+          },
+          {
+            "input_id": "20261123T160228Z:gpt",
+            "k": 3,
+            "first": "send",
+            "interval_s": 1076.0
+          },
+          {
+            "input_id": "20261123T163256Z:grok",
+            "k": 4,
+            "first": "omit",
+            "interval_s": 4289.0
+          },
+          {
+            "input_id": "20261123T170307Z:claude",
+            "k": 5,
+            "first": "omit",
+            "interval_s": 4226.0
+          },
+          {
+            "input_id": "20261123T173303Z:claude_opus",
+            "k": 6,
+            "first": "omit",
+            "interval_s": 3635.0
+          },
+          {
+            "input_id": "20261123T180324Z:gemini",
+            "k": 7,
+            "first": "omit",
+            "interval_s": 3032.0
+          },
+          {
+            "input_id": "20261123T183307Z:gpt",
+            "k": 8,
+            "first": "omit",
+            "interval_s": 2525.0
+          },
+          {
+            "input_id": "20261123T190306Z:grok",
+            "k": 9,
+            "first": "omit",
+            "interval_s": 2098.0
+          },
+          {
+            "input_id": "20261123T193309Z:claude",
+            "k": 10,
+            "first": "omit",
+            "interval_s": 2047.0
+          },
+          {
+            "input_id": "20261123T200249Z:claude_opus",
+            "k": 11,
+            "first": "omit",
+            "interval_s": 69.0
+          },
+          {
+            "input_id": "20261123T203313Z:gemini",
+            "k": 12,
+            "first": "send",
+            "interval_s": 1011.0
+          },
+          {
+            "input_id": "20261124T143319Z:gpt",
+            "k": 13,
+            "first": "omit",
+            "interval_s": 7185.0
+          },
+          {
+            "input_id": "20261124T150318Z:grok",
+            "k": 14,
+            "first": "send",
+            "interval_s": 7168.0
+          },
+          {
+            "input_id": "20261124T153310Z:claude",
+            "k": 15,
+            "first": "omit",
+            "interval_s": 28.0
+          },
+          {
+            "input_id": "20261124T160253Z:claude_opus",
+            "k": 16,
+            "first": "send",
+            "interval_s": 83.0
+          },
+          {
+            "input_id": "20261124T163303Z:gemini",
+            "k": 17,
+            "first": "omit",
+            "interval_s": 5615.0
+          },
+          {
+            "input_id": "20261124T170301Z:gpt",
+            "k": 18,
+            "first": "send",
+            "interval_s": 68.0
+          },
+          {
+            "input_id": "20261124T173246Z:grok",
+            "k": 19,
+            "first": "omit",
+            "interval_s": 87.0
+          },
+          {
+            "input_id": "20261124T180328Z:claude",
+            "k": 20,
+            "first": "send",
+            "interval_s": 28.0
+          },
+          {
+            "input_id": "20261124T183238Z:claude_opus",
+            "k": 21,
+            "first": "omit",
+            "interval_s": 3089.0
+          },
+          {
+            "input_id": "20261124T190312Z:gemini",
+            "k": 22,
+            "first": "send",
+            "interval_s": 36.0
+          },
+          {
+            "input_id": "20261124T193320Z:gpt",
+            "k": 23,
+            "first": "omit",
+            "interval_s": 82.0
+          },
+          {
+            "input_id": "20261124T200316Z:grok",
+            "k": 24,
+            "first": "send",
+            "interval_s": 65.0
+          },
+          {
+            "input_id": "20261124T203304Z:claude",
+            "k": 25,
+            "first": "omit",
+            "interval_s": 40.0
+          },
+          {
+            "input_id": "20261125T143311Z:claude_opus",
+            "k": 26,
+            "first": "send",
+            "interval_s": 104.0
+          },
+          {
+            "input_id": "20261125T150326Z:gemini",
+            "k": 27,
+            "first": "send",
+            "interval_s": 6678.0
+          },
+          {
+            "input_id": "20261125T153237Z:gpt",
+            "k": 28,
+            "first": "send",
+            "interval_s": 78.0
+          },
+          {
+            "input_id": "20261125T160337Z:grok",
+            "k": 29,
+            "first": "send",
+            "interval_s": 5290.0
+          },
+          {
+            "input_id": "20261125T163324Z:claude",
+            "k": 30,
+            "first": "send",
+            "interval_s": 65.0
+          },
+          {
+            "input_id": "20261125T170317Z:claude_opus",
+            "k": 31,
+            "first": "omit",
+            "interval_s": 63.0
+          },
+          {
+            "input_id": "20261125T173344Z:gemini",
+            "k": 32,
+            "first": "omit",
+            "interval_s": 3929.0
+          },
+          {
+            "input_id": "20261125T180304Z:gpt",
+            "k": 33,
+            "first": "omit",
+            "interval_s": 70.0
+          },
+          {
+            "input_id": "20261125T183310Z:grok",
+            "k": 34,
+            "first": "omit",
+            "interval_s": 2757.0
+          },
+          {
+            "input_id": "20261125T190239Z:claude",
+            "k": 35,
+            "first": "omit",
+            "interval_s": 64.0
+          },
+          {
+            "input_id": "20261125T193315Z:claude_opus",
+            "k": 36,
+            "first": "omit",
+            "interval_s": 2080.0
+          },
+          {
+            "input_id": "20261125T200319Z:gemini",
+            "k": 37,
+            "first": "omit",
+            "interval_s": 40.0
+          },
+          {
+            "input_id": "20261125T203255Z:gpt",
+            "k": 38,
+            "first": "send",
+            "interval_s": 36.0
+          }
+        ]
+      },
+      "table": {
+        "file": "cb_grok_calls.jsonl",
+        "sha256": "f609fce1b7c467fd4315d3aaa852f7a7232323590f478080836aa2184880fead",
+        "records": 482
+      },
+      "calibration_cost": {
+        "cost_usd": 15.288,
+        "records_priced": 429,
+        "records_unpriced": 53,
+        "note": "calibration spend; never part of a cost-per-decision figure"
+      }
+    },
+    "cb_argon": {
+      "arm": "cb_argon",
+      "model": "gemini-4-argon",
+      "fields": "total = usage_metadata.candidates_token_count + thoughts_token_count; reasoning = thoughts_token_count; visible = candidates_token_count. Non-streaming (limit 32,768; 65,536 per streaming segment).",
+      "calls": 429,
+      "omit_calls": 390,
+      "valid_trading_calls": 195,
+      "positions_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "coverage_met": true,
+      "counts_by_class": {
+        "valid": 390,
+        "bound_reached": 0,
+        "provider_failure": 0,
+        "invalid_finish": 0,
+        "budget_stop": 0
+      },
+      "model_name_mismatches": 0,
+      "model_names_seen": {
+        "gemini-4-argon": 429
+      },
+      "invalid_finishes": [],
+      "R": 858,
+      "reasoning_median": 0.0,
+      "zero_reasoning_calls": 228,
+      "ladder": {
+        "rung": 1,
+        "R": 858,
+        "allowance": 4096,
+        "cap": 20480,
+        "L": 32768,
+        "H": 16384
+      },
+      "timeout_s": 300.0,
+      "max_valid_latency_s": 160.588,
+      "send_omit": {
+        "n_pairs": 39,
+        "margins": [
+          0.8,
+          1.25
+        ],
+        "shown": true,
+        "ratio_mean": 0.9483,
+        "ci90": [
+          0.8695,
+          1.0342
+        ],
+        "pairs_dropped": 0,
+        "send_reasoning_median": 141,
+        "send_zero_reasoning": 14,
+        "pair_intervals": [
+          {
+            "input_id": "20261123T143312Z:claude",
+            "k": 0,
+            "first": "omit",
+            "interval_s": 3504.0
+          },
+          {
+            "input_id": "20261123T150318Z:claude_opus",
+            "k": 1,
+            "first": "omit",
+            "interval_s": 3142.0
+          },
+          {
+            "input_id": "20261123T153243Z:gemini",
+            "k": 2,
+            "first": "omit",
+            "interval_s": 2941.0
+          },
+          {
+            "input_id": "20261123T160228Z:gpt",
+            "k": 3,
+            "first": "omit",
+            "interval_s": 2619.0
+          },
+          {
+            "input_id": "20261123T163256Z:grok",
+            "k": 4,
+            "first": "omit",
+            "interval_s": 2309.0
+          },
+          {
+            "input_id": "20261123T170307Z:claude",
+            "k": 5,
+            "first": "omit",
+            "interval_s": 2289.0
+          },
+          {
+            "input_id": "20261123T173303Z:claude_opus",
+            "k": 6,
+            "first": "omit",
+            "interval_s": 1982.0
+          },
+          {
+            "input_id": "20261123T180324Z:gemini",
+            "k": 7,
+            "first": "omit",
+            "interval_s": 1698.0
+          },
+          {
+            "input_id": "20261123T183307Z:gpt",
+            "k": 8,
+            "first": "omit",
+            "interval_s": 1516.0
+          },
+          {
+            "input_id": "20261123T190306Z:grok",
+            "k": 9,
+            "first": "omit",
+            "interval_s": 1209.0
+          },
+          {
+            "input_id": "20261123T193309Z:claude",
+            "k": 10,
+            "first": "omit",
+            "interval_s": 1227.0
+          },
+          {
+            "input_id": "20261123T200249Z:claude_opus",
+            "k": 11,
+            "first": "omit",
+            "interval_s": 872.0
+          },
+          {
+            "input_id": "20261123T203313Z:gemini",
+            "k": 12,
+            "first": "omit",
+            "interval_s": 516.0
+          },
+          {
+            "input_id": "20261124T143319Z:gpt",
+            "k": 13,
+            "first": "omit",
+            "interval_s": 40.0
+          },
+          {
+            "input_id": "20261124T150318Z:grok",
+            "k": 14,
+            "first": "send",
+            "interval_s": 13.0
+          },
+          {
+            "input_id": "20261124T153310Z:claude",
+            "k": 15,
+            "first": "omit",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261124T160253Z:claude_opus",
+            "k": 16,
+            "first": "send",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261124T163303Z:gemini",
+            "k": 17,
+            "first": "omit",
+            "interval_s": 10.0
+          },
+          {
+            "input_id": "20261124T170301Z:gpt",
+            "k": 18,
+            "first": "send",
+            "interval_s": 58.0
+          },
+          {
+            "input_id": "20261124T173246Z:grok",
+            "k": 19,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261124T180328Z:claude",
+            "k": 20,
+            "first": "send",
+            "interval_s": 54.0
+          },
+          {
+            "input_id": "20261124T183238Z:claude_opus",
+            "k": 21,
+            "first": "omit",
+            "interval_s": 39.0
+          },
+          {
+            "input_id": "20261124T190312Z:gemini",
+            "k": 22,
+            "first": "send",
+            "interval_s": 13.0
+          },
+          {
+            "input_id": "20261124T193320Z:gpt",
+            "k": 23,
+            "first": "omit",
+            "interval_s": 42.0
+          },
+          {
+            "input_id": "20261124T200316Z:grok",
+            "k": 24,
+            "first": "send",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261124T203304Z:claude",
+            "k": 25,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261125T143311Z:claude_opus",
+            "k": 26,
+            "first": "send",
+            "interval_s": 20.0
+          },
+          {
+            "input_id": "20261125T150326Z:gemini",
+            "k": 27,
+            "first": "omit",
+            "interval_s": 12.0
+          },
+          {
+            "input_id": "20261125T153237Z:gpt",
+            "k": 28,
+            "first": "send",
+            "interval_s": 40.0
+          },
+          {
+            "input_id": "20261125T160337Z:grok",
+            "k": 29,
+            "first": "omit",
+            "interval_s": 32.0
+          },
+          {
+            "input_id": "20261125T163324Z:claude",
+            "k": 30,
+            "first": "send",
+            "interval_s": 11.0
+          },
+          {
+            "input_id": "20261125T170317Z:claude_opus",
+            "k": 31,
+            "first": "omit",
+            "interval_s": 66.0
+          },
+          {
+            "input_id": "20261125T173344Z:gemini",
+            "k": 32,
+            "first": "send",
+            "interval_s": 32.0
+          },
+          {
+            "input_id": "20261125T180304Z:gpt",
+            "k": 33,
+            "first": "omit",
+            "interval_s": 10.0
+          },
+          {
+            "input_id": "20261125T183310Z:grok",
+            "k": 34,
+            "first": "send",
+            "interval_s": 14.0
+          },
+          {
+            "input_id": "20261125T190239Z:claude",
+            "k": 35,
+            "first": "omit",
+            "interval_s": 17.0
+          },
+          {
+            "input_id": "20261125T193315Z:claude_opus",
+            "k": 36,
+            "first": "send",
+            "interval_s": 9.0
+          },
+          {
+            "input_id": "20261125T200319Z:gemini",
+            "k": 37,
+            "first": "omit",
+            "interval_s": 36.0
+          },
+          {
+            "input_id": "20261125T203255Z:gpt",
+            "k": 38,
+            "first": "send",
+            "interval_s": 42.0
+          }
+        ]
+      },
+      "table": {
+        "file": "cb_argon_calls.jsonl",
+        "sha256": "0afe85f7da8ac065fb1d7305638298f84635b4e012412a2468c724f5e445e85d",
+        "records": 429
+      },
+      "calibration_cost": {
+        "cost_usd": 9.5808,
+        "records_priced": 429,
+        "records_unpriced": 0,
+        "note": "calibration spend; never part of a cost-per-decision figure"
+      }
+    }
+  },
+  "runs": [
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T00:50:41+00:00",
+      "sessions": [
+        "2026-11-23"
+      ],
+      "inputs": 65,
+      "send_subset": 13,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "64689c8bc5b6d43648ad542de4672519895f7743",
+        "run_path_modified": false,
+        "recorded": "after the start (hub H-OPS-26): the run began 2026-11-24T00:50:41Z, 18 s after 64689c8bc was committed (00:50:23Z) with no other change in the run path; the next commit to the tool, 79a150911, came at 01:14:31Z, after the process had loaded the code"
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T02:53:45+00:00",
+      "sessions": [
+        "2026-11-23"
+      ],
+      "inputs": 65,
+      "send_subset": 13,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T03:11:24+00:00",
+      "sessions": [
+        "2026-11-23"
+      ],
+      "inputs": 65,
+      "send_subset": 13,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T23:55:32+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T23:55:34+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T23:55:36+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T23:55:38+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-24T23:55:40+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:01:16+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:01:18+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:01:20+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:01:22+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:01:24+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:11:07+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:11:09+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:11:11+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:11:13+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T02:11:15+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24"
+      ],
+      "inputs": 130,
+      "send_subset": 26,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "kind": "runner",
+      "recorded_utc": "2026-11-25T04:15:51+00:00",
+      "note": "recorded after the fact (hub H-OPS-34): governed the 2026-11-24 increment and its re-run passes; per-arm processes, billing/quota stop, 14:20Z hard stop",
+      "runs_governed": [
+        "2026-11-24T23:55:31+00:00 increment",
+        "2026-11-25T02:01Z-02:13Z re-run passes 1-2"
+      ],
+      "watcher": {
+        "path": "runner/calib_night.py",
+        "sha256": "53903e99e02b7c62ffa6148c23d006085bd63261785c527fe52763869a06cec9"
+      },
+      "wrapper": {
+        "path": "runner/calib_run.py",
+        "sha256": "8597c07af5e6030ec37ba4a81b6d4c7ce97d491927521f289169d459004c9f36",
+        "role": "loads .env values into the process environment (never printed) and runs the tool"
+      },
+      "monday_2026-11-23": "single process, all arms, wrapper only, no watcher"
+    },
+    {
+      "kind": "runner",
+      "recorded_utc": "2026-11-25T22:10:06+00:00",
+      "note": "night 3 (2026-11-25), unattended, hub H-OPS-36",
+      "orchestrator": {
+        "path": "runner/night3.py",
+        "sha256": "a3a4b5098980fe60088f66f5f603cd1a22e167ea3124ed021c137db2199a5c14"
+      },
+      "watcher": {
+        "path": "runner/calib_night.py",
+        "sha256": "8250ef009acaabe2afa9e60cfa540fb280fcbfa7a315c586a0d866c33585da5e"
+      },
+      "wrapper": {
+        "path": "runner/calib_run.py",
+        "sha256": "8597c07af5e6030ec37ba4a81b6d4c7ce97d491927521f289169d459004c9f36"
+      },
+      "inputs_commit": "75d8e2291496432b1d46d8bddfeb79ef0020dfbc",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "hard_stop_utc": "2026-11-26T14:20:00+00:00"
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T22:10:07+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T22:10:08+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T22:10:10+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T22:10:12+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-25T22:10:14+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-26T00:17:11+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-26T00:17:13+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    },
+    {
+      "label": "calibration",
+      "started_utc": "2026-11-26T00:17:15+00:00",
+      "sessions": [
+        "2026-11-23",
+        "2026-11-24",
+        "2026-11-25"
+      ],
+      "inputs": 195,
+      "send_subset": 39,
+      "D_s": 840.0,
+      "bound_s": 960.0,
+      "calls_in_flight_per_arm": 1,
+      "tool_commit": {
+        "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+        "run_path_modified": false
+      }
+    }
+  ],
+  "summarized_by": {
+    "commit": "37852027395a151ac9e25faf765ab6283f1273c0",
+    "run_path_modified": false
+  }
+}
