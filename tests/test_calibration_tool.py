@@ -230,3 +230,37 @@ def test_every_arm_states_its_fields_before_its_runs():
     assert set(cal.ARMS) == {"cb_sonnet", "cb_opus", "cb_astra", "cb_grok", "cb_argon"}
     for spec in cal.ARMS.values():
         assert spec["fields"] and "total" in spec["fields"] or "as cb_sonnet" in spec["fields"]
+
+
+# ---- H-OPS-39 item 4: a pair with a re-run call is re-run as a pair
+def _r(iid, setting, cls, t, leg="trade"):
+    return {"input_id": iid, "leg": leg, "setting": setting, "cls": cls, "tick_index": 2,
+            "started_utc": f"2026-11-27T01:00:{t:02d}+00:00"}
+
+
+def test_a_failed_send_puts_its_valid_omit_partner_back_in_the_queue():
+    recs = [_r("c2:gpt", "omit", "valid", 0, leg="screen"), _r("c2:gpt", "send", "valid", 1),
+            _r("c2:gpt", "omit", "provider_failure", 2)]
+    done = cal.done_keys_from(recs, {"c2:gpt"})
+    assert done == {("c2:gpt", "screen", "omit")}
+    order = [(leg, s) for leg, s, _ in cal.job_order([_inp(2, "gpt")], [_inp(2, "gpt")], done)]
+    assert order == [("trade", "send"), ("trade", "omit")]          # back to back, k even
+
+
+def test_outside_the_subset_only_the_failed_call_reruns():
+    recs = [_r("c3:gpt", "omit", "provider_failure", 1), _r("c3:gpt", "omit", "valid", 0, leg="screen")]
+    assert cal.done_keys_from(recs, set()) == {("c3:gpt", "screen", "omit")}
+
+
+def test_the_pair_rerun_supersedes_both_earlier_calls():
+    recs = [_r("c2:gpt", "send", "valid", 1), _r("c2:gpt", "omit", "provider_failure", 2),
+            _r("c2:gpt", "send", "valid", 30), _r("c2:gpt", "omit", "valid", 31)]
+    latest = cal.latest_records(recs)
+    assert latest[("c2:gpt", "trade", "send")]["started_utc"].endswith("01:00:30+00:00")
+    assert latest[("c2:gpt", "trade", "omit")]["started_utc"].endswith("01:00:31+00:00")
+    assert cal.pair_intervals(list(latest.values()))[0]["interval_s"] == 1.0
+
+
+def test_a_later_failure_does_not_displace_a_valid_record():
+    recs = [_r("c2:gpt", "send", "valid", 1), _r("c2:gpt", "send", "provider_failure", 9)]
+    assert cal.latest_records(recs)[("c2:gpt", "trade", "send")]["cls"] == "valid"

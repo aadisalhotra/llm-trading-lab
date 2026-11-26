@@ -501,16 +501,44 @@ def table_path(out_dir: Path, arm: str) -> Path:
     return out_dir / f"{arm}_calls.jsonl"
 
 
-def done_keys(p: Path) -> set[tuple]:
+def done_keys(p: Path, pair_ids: set[str] | None = None) -> set[tuple]:
     if not p.exists():
         return set()
-    return done_keys_from(json.loads(ln) for ln in p.read_text(encoding="utf-8").splitlines()
-                          if ln.strip())
+    return done_keys_from([json.loads(ln) for ln in p.read_text(encoding="utf-8").splitlines()
+                           if ln.strip()], pair_ids)
 
 
-def done_keys_from(recs) -> set[tuple]:
-    """Calls already in the table; a provider failure is re-run."""
-    return {(r["input_id"], r["leg"], r["setting"]) for r in recs if r["cls"] != PROVIDER}
+def done_keys_from(recs, pair_ids: set[str] | None = None) -> set[tuple]:
+    """Calls already in the table; a provider failure is re-run.
+
+    calibration_outcomes_rulings_2026-11-26 (hub H-OPS-39 item 4): from now
+    on a send/omit pair with a re-run call is re-run AS A PAIR. When the
+    latest record of either trade call of a pair input (`pair_ids`) is a
+    provider failure, both calls of the pair leave the done set, so
+    job_order runs them back to back in the pair's order. The earlier valid
+    partner stays in the table and is superseded by the re-run (latest_records).
+    """
+    last: dict[tuple, dict] = {}
+    for r in recs:
+        last[(r["input_id"], r["leg"], r["setting"])] = r
+    done = {k for k, r in last.items() if r["cls"] != PROVIDER}
+    for iid in pair_ids or ():
+        pair = [(iid, "trade", "send"), (iid, "trade", "omit")]
+        if any(k in last and last[k]["cls"] == PROVIDER for k in pair):
+            done.difference_update(pair)
+    return done
+
+
+def latest_records(recs) -> dict[tuple, dict]:
+    """The record that counts for each call: the last one that is not a
+    provider failure, else the last failure. A pair re-run (H-OPS-39 item 4)
+    therefore supersedes both earlier calls of the pair."""
+    latest: dict[tuple, dict] = {}
+    for r in recs:
+        k = (r["input_id"], r["leg"], r["setting"])
+        if k not in latest or r["cls"] != PROVIDER or latest[k]["cls"] == PROVIDER:
+            latest[k] = r
+    return latest
 
 
 def run(args) -> int:
@@ -542,7 +570,7 @@ def run(args) -> int:
 
     def run_arm(arm: str) -> str:
         p = table_path(out, arm)
-        done = done_keys(p)
+        done = done_keys(p, {x["input_id"] for x in subset})
         jobs = job_order(inputs, subset, done)
         lock = threading.Lock()
         with cf.ThreadPoolExecutor(max_workers=args.concurrency) as pool, \
@@ -579,12 +607,9 @@ def summarize(args) -> int:
         if not p.exists():
             continue
         recs = [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
-        # A provider failure re-run later supersedes the failed record.
-        latest: dict[tuple, dict] = {}
-        for r in recs:
-            k = (r["input_id"], r["leg"], r["setting"])
-            if k not in latest or latest[k]["cls"] == PROVIDER:
-                latest[k] = r
+        # A provider failure re-run later supersedes the failed record; a pair
+        # re-run supersedes both calls of the pair (latest_records).
+        latest = latest_records(recs)
         s = summarize_arm(arm, list(latest.values()), d)
         s["table"] = {"file": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
                       "records": len(recs)}
