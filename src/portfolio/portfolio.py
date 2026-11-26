@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..config_loader import STATE_DIR, effective_mode, load_settings, starting_capital
+from ..config_loader import STATE_DIR, book_inception_capital, effective_mode, load_settings
 from .settlement import SettlementLedger
 from ..price_checks import is_valid_price
 
@@ -458,10 +458,13 @@ def init_portfolio(model_key: str, mode: str | None = None) -> Portfolio:
 
     Capital comes from the guarded lookup, so a mode whose per-book figure has
     not been confirmed raises instead of seeding six books at a stale default.
+    A book configured with inception_capital "registered_book_capital" incepts
+    at the registered Phase B book capital even on internal paper (plumbing
+    (f); config_loader.book_inception_capital).
     """
     settings = load_settings()
     mode = mode or effective_mode(model_key, settings)
-    capital = starting_capital(settings, mode)
+    capital = book_inception_capital(model_key, settings, mode)
     # Local import: the market-data module pulls in yfinance and pandas, which
     # nothing else in this module needs.
     from ..data.market_data import inception_session_date

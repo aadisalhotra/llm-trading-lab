@@ -115,6 +115,45 @@ def starting_capital(settings: dict[str, Any] | None = None,
     return float(value)
 
 
+# Plumbing (f), hub H-OPS-37 Batch 4 (c). The registered Phase B book capital
+# (BOOK_CAPITAL_PHASE_B, $2,000, landed c693b91d) is the broker_paper figure of
+# starting_capital; it is read from there, through the guard, so there is one
+# number. A book whose settings carry
+#   "inception_capital": "registered_book_capital"
+# incepts at it even on internal paper: the five snapshot books' fresh
+# internal-paper books at the 2026-12-05/06 handover, and the refreshed arms'
+# shakedown books from 2026-12-01 (cohort_refresh_ruling.md section 3 item 8
+# and section 4 item 4: "at the registered Phase B book capital"). Without the
+# key, a book incepts at starting_capital(its mode), as before: DeepSeek's
+# paper book stays $100,000.
+REGISTERED_BOOK_CAPITAL_MODE = "broker_paper"
+INCEPTION_CAPITAL_BASES = ("registered_book_capital",)
+
+
+def registered_book_capital(settings: dict[str, Any] | None = None) -> float:
+    """The registered Phase B per-book capital, through the pending guard."""
+    return starting_capital(settings, REGISTERED_BOOK_CAPITAL_MODE)
+
+
+def book_inception_capital(model_key: str, settings: dict[str, Any] | None = None,
+                           mode: str | None = None) -> float:
+    """The capital `model_key`'s book incepts at.
+
+    `models.<key>.inception_capital` absent: starting_capital(mode), the
+    behaviour every book had before. "registered_book_capital": the registered
+    Phase B book capital whatever the mode. Any other value raises: a typo must
+    not fall back to a $100,000 paper book."""
+    settings = settings if settings is not None else load_settings()
+    mode = mode or effective_mode(model_key, settings)
+    basis = ((settings.get("models") or {}).get(model_key) or {}).get("inception_capital")
+    if basis is None:
+        return starting_capital(settings, mode)
+    if basis == "registered_book_capital":
+        return registered_book_capital(settings)
+    raise ValueError(f"models.{model_key}.inception_capital is {basis!r}; "
+                     f"expected one of {INCEPTION_CAPITAL_BASES} or absent")
+
+
 class PendingCohortError(RuntimeError):
     """The live cohort's composition has not been confirmed.
 
