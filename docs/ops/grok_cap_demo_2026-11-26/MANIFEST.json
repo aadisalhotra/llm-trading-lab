@@ -1,0 +1,18 @@
+{
+  "demo": "grok cap demonstration, hub H-OPS-39 item 1",
+  "run_utc": "2026-11-26T14:35:39+00:00",
+  "model": "grok-4.7",
+  "max_tokens": 1024,
+  "level_sent": true,
+  "tool_commit": "23a2822417d42a2da0a8365f0a9f756fdfb99bb8",
+  "inputs_dir": "C:\\Users\\Aadi\\projects\\llm-trading-lab-calib-inputs\\75d8e2291\\data\\prompts",
+  "inputs": [
+    "20261123T143312Z:claude",
+    "20261123T143312Z:claude_opus",
+    "20261123T143312Z:gemini"
+  ],
+  "calls": 4,
+  "rule": "shown if every call ends normally with reasoning above 1,024",
+  "shown": false,
+  "note": "call 3 failed to connect to api.x.ai (42 s, provider_failure) and was re-run once, as every calibration provider failure is; the re-run record is appended. Outcome per input on the last record: 1 normal (reasoning 2,309, visible 501), 2 stopped on length with visible = 1,024 (reasoning 7,444 and 6,924)."
+}
