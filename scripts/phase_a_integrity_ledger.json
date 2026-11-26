@@ -4042,6 +4042,18 @@
           "the_2026_11_16_change": "A transition on a stable field: correctly treated as a candidate identity event (deepseek_fingerprint_event_ruling.md). Same doctrine as the grok reading above, different base rate (ruling section 4.2)."
         },
         "follow_up": "Fingerprint transitions are recorded per arm, refreshed arms included, and counted in the monthly data-integrity section. The Grok reading of Mon 2026-11-30 compares 2026-11-06 .. 11-13 with 2026-11-16 .. 11-20, descriptively, as control-arm context for DeepSeek's 2026-11-16 event; Grok's own transitions are not boundaries (ruling section 5)."
+      },
+      {
+        "id": "calibration_image_window_2026_11_23_25",
+        "date": "2026-11-25",
+        "type": "retention_window",
+        "scope": "chart image bytes of every trading call of the five Phase A image-carrying snapshots (claude, claude_opus, gemini, gpt, grok) at every scheduled tick of the sessions of 2026-11-23, 2026-11-24 and 2026-11-25. DeepSeek's inputs carry no image and are outside it.",
+        "authority": "tick_deadline_and_calibration_rulings_2026-11-21.md section 2 (sha256 a44473aef9abf99fd6585e93b0e66f6258baacbb3ccb8360875e0b3b1684b606), a dated exception to rq6_harness_and_call_input_retention_ruling.md rev. 3 section 2 item 4; its item 1 requires this entry. Hub 2026-11-21 item (a); hub H-OPS-35 and H-OPS-37 (Batch 4 item a).",
+        "window": "2026-11-23T00:00:00-05:00 to 2026-11-25T16:00:00-05:00 (src/logging/call_inputs.py FULL_IMAGE_RETENTION_START / FULL_IMAGE_RETENTION_END, landed on main 3824cb758 via 7a4ab05b4). The switch-off is in code: keeps_image_bytes() returns the two rotation slots only from 2026-11-25 16:00 ET (checked 2026-11-26: 2026-11-27 slots 4 and 10, 2026-11-30 slots 5 and 11).",
+        "bytes_kept": "195 PNG files, 28,400,522 bytes, in data/prompts/2026-11/images at origin/main 75d8e2291 (the 2026-11-25 end-of-day commit): 39 ticks x 5 images, every one referenced by a tick file of the window, none unreferenced. Of these, 30 files (4,368,196 bytes) are the section 2.4 rotation slots (2026-11-23 slots 1 and 7, 2026-11-24 slots 2 and 8, 2026-11-25 slots 3 and 9) and would have been kept anyway; 165 files (24,032,326 bytes) are what the window added. The ruling's estimate was about 25 MB.",
+        "row_tags": "data/trades/<model>_2026-11.jsonl field image_bytes_reason, each image-carrying snapshot: 2 rq6_rotation + 11 calibration_window rows on each of the three sessions (39 rows per model, image_bytes_retained true on all 39); deepseek 13 rows per session with image_bytes_reason null. Only the rq6_rotation rows are eligible for RQ6 (ruling section 2 item 4).",
+        "use": "The calibration set of cohort_refresh_ruling.md rev. 2 section 5, fixed by ruling item 3: 195 trading-call inputs, each with its screening call, all retained. Replayed byte for byte in the calibration of 2026-11-23..25 (docs/ops/calibration_2026-11-25/ on review/adapters-claude-5-5-2026-11-21; inputs exported at 2b5e7791c, be838ae and 75d8e2291, Monday's and Tuesday's files byte-identical across exports).",
+        "evidence": "Counts from git at 75d8e2291 (tick files, image files and sizes, trade rows); window check by calling src/logging/call_inputs.keeps_image_bytes at main 3824cb758."
       }
     ]
   }
