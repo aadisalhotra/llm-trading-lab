@@ -65,7 +65,7 @@
     "halt_on_stop_loss": true
   },
   "tick_spacing": {
-    "_note": "Minimum minutes between cohort decision ticks. Implements the registered ~30-minute cadence; it is not a change to it. Measured against the last COMPLETED decision in the committed logs, so a backup run filling a genuine gap still runs. `enabled: false` reverts to pre-guard behaviour without a code change.",
+    "_note": "Spacing guard keyed on slot identity (slot_identity_guard_ruling_2026-11-21). A run decides only if its slot (the one it starts in) has no model-call record and it starts within the first 30 - min_minutes = 10 minutes of the slot; a later start decides nothing and the slot is recorded once as missed (data/state/missed_slots.jsonl). Consecutive ticks start at least min_minutes apart by construction. Rows carry slot_id and late_start (> 8.5 min in). `enabled: false` reverts to pre-guard behaviour without a code change.",
     "enabled": true,
     "min_minutes": 20
   },

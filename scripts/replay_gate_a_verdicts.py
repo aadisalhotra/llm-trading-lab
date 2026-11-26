@@ -44,6 +44,7 @@ logger = logging.getLogger("llmlab.replay_gate_a")
 BASE = "71d025fb4"
 SUBJECT = re.compile(r"^intraday tick (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)$")
 CYCLE_FMT = "%Y%m%dT%H%M%SZ"
+SLOT_REASON = {"spaced": "slot_open", "too_soon": "slot_taken", "no_prior_tick": "no_prior_tick"}
 EASTERN = "America/New_York"
 
 
@@ -131,8 +132,10 @@ def main(argv: list[str] | None = None) -> int:
             handled = new_ledger.is_boundary_handled(n_led, day, slot)
             ov = old_spacing.check_spacing(settings, start, trades)
             nv = new_spacing.check_spacing(settings, start, trades)
+        # Slot identity (2026-11-26) renamed the verdicts: an open slot was
+        # "spaced", a slot the cohort already decided was "too_soon". Same skip.
         ok = (n_err is None and o_err is None and not nv.withhold and not handled
-              and (nv.skip, nv.reason) == (ov.skip, ov.reason))
+              and (nv.skip, nv.reason) == (ov.skip, SLOT_REASON.get(ov.reason, ov.reason)))
         failures += not ok
         rows.append((commit[:9], start.strftime("%Y-%m-%d %H:%M:%SZ"), f"{day} {slot}",
                      "ok" if n_err is None else f"ERR {n_err}",

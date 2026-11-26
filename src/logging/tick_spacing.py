@@ -1,4 +1,30 @@
-"""Minimum-spacing guard — no two decision ticks closer than N minutes.
+"""Spacing guard keyed on scheduled-slot identity (slot_identity_guard_ruling_2026-11-21).
+
+SLOT IDENTITY (hub decision 2026-11-21 14:31 ET; Research's ruling of the same
+day, which this module implements):
+
+  * A run's slot is the 30-minute slot in which the run STARTS (ruling 1.1),
+    never the slot that triggered it.
+  * A slot is taken once any model-call record exists for it, for any arm
+    (ruling 1.2). A withheld-tick record does not take it.
+  * A run decides only if it starts within the first W minutes of its slot,
+    W = 30 - tick_spacing.min_minutes = 10 (ruling 2). A later start decides
+    nothing; the slot is recorded once as missed, with its cause
+    (data/state/missed_slots.jsonl). Consecutive ticks therefore start at
+    least min_minutes apart, start to start, by construction.
+  * No test against the previous run's end: that test is what withheld
+    on-schedule ticks behind a long run (ruling 2, last paragraph). The
+    elapsed-time skip described below is REPLACED by the two slot tests; the
+    elapsed time is still recorded on the verdict.
+  * Every decision row carries its slot (slot_fields(), ruling 3.1), and a
+    run that starts more than 8.5 minutes into its slot is flagged on its rows
+    (late_start, hub H-OPS-05).
+  * The EOD pass keeps its own key and is outside this rule (ruling 3.3).
+
+The original elapsed-time design follows, kept for the record; its Gate A
+(fail-closed) part is unchanged.
+
+Minimum-spacing guard — no two decision ticks closer than N minutes.
 
 Complements the per-boundary idempotency ledger; it does not replace it. The two
 catch different duplicates:
@@ -51,6 +77,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, NamedTuple
+from zoneinfo import ZoneInfo
 
 from ..config_loader import STATE_DIR, TRADES_DIR
 from ..record_class import is_administrative_row
@@ -58,8 +85,18 @@ from ..record_class import is_administrative_row
 logger = logging.getLogger("llmlab.tick_spacing")
 
 SKIP_LOG_FILENAME = "spacing_guard_skips.jsonl"
+MISSED_LOG_FILENAME = "missed_slots.jsonl"
 DEFAULT_MIN_MINUTES = 20
 KEEP_SKIP_ROWS = 200
+KEEP_MISSED_ROWS = 5000
+
+EASTERN = ZoneInfo("America/New_York")
+SLOT_MINUTES = 30                 # the registered cadence
+FIRST_SLOT_MINUTES = 9 * 60 + 30  # 09:30 ET is slot 1
+TICKS_PER_SESSION = 13
+# Hub H-OPS-05: a run whose pipeline starts more than 8.5 minutes into its slot
+# is flagged on its rows. It still decides if it is inside the start window.
+LATE_START_FLAG_SECONDS = 510
 
 # Tail read size. Decision-log rows carry full model reasoning and run 2-5 MB
 # per model-month, so the last row is read by seeking from the end rather than
@@ -88,6 +125,13 @@ class SpacingVerdict(NamedTuple):
     # Gate A: True when a registered blocking condition holds. Defaulted so
     # every existing construction keeps working.
     withhold: bool = False
+    # Slot identity (ruling sections 1-2). slot_id is "YYYY-MM-DDTHH:MM" (ET,
+    # the slot's start), None off the 13-slot grid. `missed` is True when the
+    # run started after the start window: the slot is recorded once as missed.
+    slot_id: str | None = None
+    start_offset_s: float | None = None
+    window_minutes: int | None = None
+    missed: bool = False
 
 
 def _settings_block(settings: dict[str, Any] | None) -> dict[str, Any]:
@@ -104,6 +148,51 @@ def min_spacing_minutes(settings: dict[str, Any] | None = None) -> int:
                      raw, DEFAULT_MIN_MINUTES)
         return DEFAULT_MIN_MINUTES
     return value if value > 0 else 0
+
+
+def start_window_minutes(settings: dict[str, Any] | None = None) -> int:
+    """W = cadence - registered spacing minimum (ruling 2): 30 - 20 = 10."""
+    return max(0, SLOT_MINUTES - min_spacing_minutes(settings))
+
+
+def slot_identity(when: datetime) -> tuple[str | None, int | None, float | None]:
+    """(slot_id, slot index 1..13, seconds since the slot's start) for a start
+    time. A naive `when` is read as UTC (the decision logs' convention); the
+    pipeline's run_date is ET-aware. Off the 13-slot grid: (None, None, None).
+    The id is the boundary ledger's (day, "HH:MM") key joined with "T"."""
+    t = (when if when.tzinfo else when.replace(tzinfo=timezone.utc)).astimezone(EASTERN)
+    minutes = t.hour * 60 + t.minute
+    k = (minutes - FIRST_SLOT_MINUTES) // SLOT_MINUTES + 1
+    if not 1 <= k <= TICKS_PER_SESSION:
+        return None, None, None
+    start_min = FIRST_SLOT_MINUTES + (k - 1) * SLOT_MINUTES
+    start = t.replace(hour=start_min // 60, minute=start_min % 60, second=0, microsecond=0)
+    return (f"{t.strftime('%Y-%m-%d')}T{start.strftime('%H:%M')}", k,
+            round((t - start).total_seconds(), 3))
+
+
+def slot_fields(run_date: datetime) -> dict[str, Any]:
+    """The per-row slot fields (ruling 3.1; hub H-OPS-05 late-start flag).
+    `run_date` is the pipeline's start time, the instant the slot is read from."""
+    sid, k, off = slot_identity(run_date)
+    return {"slot_id": sid, "slot_index": k, "slot_start_offset_s": off,
+            "late_start": (off > LATE_START_FLAG_SECONDS) if off is not None else None}
+
+
+def _row_slot(row: dict[str, Any] | None) -> str | None:
+    """The slot a model-call row decided for: its slot_id, or, on rows written
+    before the slot fields existed, the slot of its fetch start (the run's
+    start to within seconds), else of its timestamp."""
+    if not isinstance(row, dict):
+        return None
+    sid = row.get("slot_id")
+    if isinstance(sid, str) and sid:
+        return sid
+    for key in ("fetch_started_at", "timestamp"):
+        stamp = _parse_utc(row.get(key)) if row.get(key) else None
+        if stamp is not None:
+            return slot_identity(stamp)[0]
+    return None
 
 
 def is_enabled(settings: dict[str, Any] | None = None) -> bool:
@@ -176,6 +265,7 @@ class _LogScan(NamedTuple):
     usable: int                  # present logs that yielded a usable final row
     raised: tuple[str, ...]      # present logs whose read raised (OSError / bad UTF-8)
     torn: tuple[str, ...]        # present logs whose final row is not usable
+    slots: tuple[str, ...] = ()  # slot of each book's last model-call row
 
 
 def _scan_logs(
@@ -195,6 +285,7 @@ def _scan_logs(
     present = usable = 0
     raised: list[str] = []
     torn: list[str] = []
+    slots: list[str] = []
     for model_key, cfg in models.items():
         if not (cfg or {}).get("enabled"):
             continue
@@ -230,17 +321,26 @@ def _scan_logs(
             # about readability, and it is readable), but it records no model
             # call, so it is not "last decided" (eod_stop ruling §1). Rare --
             # an EOD stop row, a boundary force-cover -- so a full read is fine.
-            stamp = _last_model_call_stamp(path)
+            stamp, row = _last_model_call_row(path)
             if stamp is None:
                 continue
+        sid = _row_slot(row)
+        if sid:
+            slots.append(sid)
         if latest is None or stamp > latest:
             latest = stamp
-    return _LogScan(latest, present, usable, tuple(raised), tuple(torn))
+    return _LogScan(latest, present, usable, tuple(raised), tuple(torn), tuple(slots))
 
 
 def _last_model_call_stamp(path: Path) -> datetime | None:
     """Timestamp of the last parseable model-call row in `path`, or None."""
+    return _last_model_call_row(path)[0]
+
+
+def _last_model_call_row(path: Path) -> tuple[datetime | None, dict[str, Any] | None]:
+    """(timestamp, row) of the last parseable model-call row in `path`."""
     best: datetime | None = None
+    best_row: dict[str, Any] | None = None
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             if not line.strip():
@@ -252,8 +352,8 @@ def _last_model_call_stamp(path: Path) -> datetime | None:
             if isinstance(row, dict) and not is_administrative_row(row):
                 stamp = _parse_utc(row.get("timestamp"))
                 if stamp is not None:
-                    best = stamp
-    return best
+                    best, best_row = stamp, row
+    return best, best_row
 
 
 def last_cohort_decision_utc(
@@ -289,8 +389,11 @@ def check_spacing(
     now_utc: datetime,
     trades_dir: Path | None = None,
 ) -> SpacingVerdict:
-    """Decide whether this tick may run, is too close to the last decision, or
-    must be withheld because the guard cannot answer (Gate A)."""
+    """Decide whether this tick may run (its slot is open and it started inside
+    the start window), must not decide (slot taken, or started too late: a
+    missed slot), or must be withheld because the guard cannot answer (Gate A).
+
+    `now_utc` is the run's start. Gate A's blocking conditions are unchanged."""
     minimum = min_spacing_minutes(settings)
     if not is_enabled(settings):
         return SpacingVerdict(False, "disabled", None, None, minimum)
@@ -309,22 +412,63 @@ def check_spacing(
         logger.error("No present decision log yields a usable final row "
                      "(%d present) — WITHHOLDING the tick", scan.present)
         return SpacingVerdict(False, "no_usable_row", None, None, minimum, named, True)
-    if scan.latest is None:
-        # Nothing present at all: the first tick of a month. Normal; proceed.
-        return SpacingVerdict(False, "no_prior_tick", None, None, minimum, named)
-
     last = scan.latest
-    gap = (now_utc - last).total_seconds() / 60.0
-    if gap < 0:
-        # A future-dated last tick means clock skew or a hand-edited log. The
-        # guard did read its files, so this is an answer, not an unreadable
-        # guard: say so and proceed.
-        logger.error("Last decision (%s) is ahead of now (%s) — ignoring for spacing",
-                     last.isoformat(), now_utc.isoformat())
-        return SpacingVerdict(False, "future_timestamp", last, gap, minimum, named)
-    if gap < minimum:
-        return SpacingVerdict(True, "too_soon", last, gap, minimum, named)
-    return SpacingVerdict(False, "spaced", last, gap, minimum, named)
+    gap = (now_utc - last).total_seconds() / 60.0 if last is not None else None
+    window = start_window_minutes(settings)
+    sid, _k, off = slot_identity(now_utc)
+    slot = dict(slot_id=sid, start_offset_s=off, window_minutes=window)
+    if sid is None:
+        # Off the 13-slot grid (a run outside 09:30-16:00 ET reaching here).
+        # There is no slot to key on; the market-hours gate decides.
+        return SpacingVerdict(False, "off_grid", last, gap, minimum, named, **slot)
+    # Ruling 1.2: any arm's model-call record for this slot takes it.
+    if sid in scan.slots:
+        return SpacingVerdict(True, "slot_taken", last, gap, minimum, named, **slot)
+    # Ruling 2: decide only inside the first W minutes of the slot.
+    if off >= window * 60:
+        return SpacingVerdict(True, "late_start", last, gap, minimum, named,
+                              missed=True, **slot)
+    reason = "no_prior_tick" if last is None else "slot_open"
+    return SpacingVerdict(False, reason, last, gap, minimum, named, **slot)
+
+
+def record_missed_slot(
+    verdict: SpacingVerdict,
+    now_utc: datetime,
+    path: Path | None = None,
+) -> bool:
+    """Record a missed slot ONCE (ruling 2): one row per slot_id, with its
+    cause. A second late run in the same slot writes nothing. Best-effort, as
+    record_skip. Returns True when a row was written."""
+    target = path or (STATE_DIR / MISSED_LOG_FILENAME)
+    row = {
+        "event": "slot_missed",
+        "slot_id": verdict.slot_id,
+        "cause": "late_start",
+        "start_utc": now_utc.isoformat(),
+        "start_offset_s": verdict.start_offset_s,
+        "window_minutes": verdict.window_minutes,
+        "last_decision": verdict.last_decision.isoformat() if verdict.last_decision else None,
+    }
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        existing: list[str] = []
+        if target.is_file():
+            with open(target, "r", encoding="utf-8") as f:
+                existing = [ln for ln in f.read().splitlines() if ln.strip()]
+        for ln in existing:
+            try:
+                if json.loads(ln).get("slot_id") == verdict.slot_id:
+                    return False
+            except (json.JSONDecodeError, AttributeError):
+                continue
+        existing.append(json.dumps(row, sort_keys=True))
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("\n".join(existing[-KEEP_MISSED_ROWS:]) + "\n")
+        return True
+    except Exception as e:  # noqa: BLE001 — never crash a tick that decides nothing
+        logger.error("Failed to record slot_missed (non-fatal): %s", e)
+        return False
 
 
 def record_skip(
@@ -345,6 +489,8 @@ def record_skip(
         "gap_minutes": round(verdict.gap_minutes, 3) if verdict.gap_minutes is not None else None,
         "min_minutes": verdict.min_minutes,
         "reason": verdict.reason,
+        "slot_id": verdict.slot_id,
+        "start_offset_s": verdict.start_offset_s,
     }
     try:
         target.parent.mkdir(parents=True, exist_ok=True)

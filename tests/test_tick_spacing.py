@@ -83,7 +83,10 @@ def test_backup_run_filling_a_genuine_gap_is_not_suppressed(tmp_path):
         _write_log(tmp_path, m, last)
     v = check_spacing(_settings(), now, tmp_path)
     assert v.skip is False
-    assert v.reason == "spaced"
+    # Slot identity (2026-11-26): the backup starts 5:51 into the 11:30 ET
+    # slot, which no arm has decided: open, and inside the 10-minute window.
+    assert v.reason == "slot_open"
+    assert v.slot_id == "2026-08-17T11:30"
     assert v.gap_minutes == pytest.approx(62.17, abs=0.05)
 
 
@@ -98,16 +101,18 @@ def test_eod_and_force_trade_bypass_the_guard_at_the_call_site():
 
 # ------------------------------------------------------------------ core behaviour
 
-def test_duplicate_minutes_later_in_a_different_slot_is_skipped(tmp_path):
-    """10:59 and 11:01 are two boundaries — the ledger permits both."""
-    last = datetime(2026, 8, 17, 14, 59, 0, tzinfo=timezone.utc)
-    now = datetime(2026, 8, 17, 15, 1, 0, tzinfo=timezone.utc)
+def test_duplicate_minutes_later_in_a_different_slot_cannot_both_decide(tmp_path):
+    """10:59 and 11:01 ET are two boundaries — the ledger permits both. Under
+    slot identity (ruling section 2) the 10:59 run is 29 minutes into the 10:30
+    slot, so it is a MISSED slot and decides nothing; the 11:01 run then decides
+    for 11:00. Two decisions minutes apart cannot occur."""
+    at_1059 = datetime(2026, 8, 17, 14, 59, 0, tzinfo=timezone.utc)
     for m in COHORT:
-        _write_log(tmp_path, m, last)
-    v = check_spacing(_settings(), now, tmp_path)
-    assert v.skip is True
-    assert v.reason == "too_soon"
-    assert v.gap_minutes == pytest.approx(2.0)
+        _write_log(tmp_path, m, at_1059 - timedelta(minutes=57))   # decided at 10:02
+    v = check_spacing(_settings(), at_1059, tmp_path)
+    assert (v.skip, v.missed, v.reason) == (True, True, "late_start")
+    v = check_spacing(_settings(), at_1059 + timedelta(minutes=2), tmp_path)
+    assert (v.skip, v.reason, v.slot_id) == (False, "slot_open", "2026-08-17T11:00")
 
 
 def test_no_prior_tick_never_skips(tmp_path):
@@ -117,16 +122,17 @@ def test_no_prior_tick_never_skips(tmp_path):
     assert v.last_decision is None
 
 
-@pytest.mark.parametrize("gap_min,expected_skip", [
-    (19.9, True),    # inside the window
-    (20.0, False),   # exactly at the minimum is spaced enough
-    (20.1, False),
+@pytest.mark.parametrize("offset_s,expected_skip", [
+    (599.9, False),  # inside the first 10 minutes of the slot
+    (600.0, True),   # 10:00 into the slot is outside the window
+    (600.1, True),
 ])
-def test_threshold_is_inclusive_at_the_minimum(tmp_path, gap_min, expected_skip):
-    last = NOW - timedelta(minutes=gap_min)
+def test_start_window_is_the_first_ten_minutes(tmp_path, offset_s, expected_skip):
+    slot_start = datetime(2026, 8, 17, 15, 0, 0, tzinfo=timezone.utc)   # 11:00 ET
     for m in COHORT:
-        _write_log(tmp_path, m, last)
-    assert check_spacing(_settings(), NOW, tmp_path).skip is expected_skip
+        _write_log(tmp_path, m, slot_start - timedelta(minutes=28))
+    v = check_spacing(_settings(), slot_start + timedelta(seconds=offset_s), tmp_path)
+    assert v.skip is expected_skip and v.missed is expected_skip
 
 
 def test_cohort_wide_uses_the_most_recent_model(tmp_path):
@@ -183,12 +189,13 @@ def test_all_logs_unparseable_withholds(tmp_path):
 
 
 def test_future_timestamp_proceeds(tmp_path):
-    """Clock skew or a hand-edited log must not wedge trading shut."""
+    """Clock skew or a hand-edited log must not wedge trading shut: a row dated
+    in a later slot does not take this one."""
     for m in COHORT:
         _write_log(tmp_path, m, NOW + timedelta(minutes=30))
     v = check_spacing(_settings(), NOW, tmp_path)
     assert v.skip is False
-    assert v.reason == "future_timestamp"
+    assert v.reason == "slot_open"
 
 
 def test_all_present_logs_empty_withholds(tmp_path):
@@ -207,7 +214,7 @@ def test_one_empty_log_beside_readable_logs_still_answers(tmp_path):
         _write_log(tmp_path, m, NOW - timedelta(minutes=40))
     (tmp_path / f"{COHORT[-1]}_2026-08.jsonl").write_text("", encoding="utf-8")
     v = check_spacing(_settings(), NOW, tmp_path)
-    assert (v.withhold, v.skip, v.reason) == (False, False, "spaced")
+    assert (v.withhold, v.skip, v.reason) == (False, False, "slot_open")
 
 
 # --------------------------------------------------------------- timestamp handling
@@ -283,7 +290,8 @@ def test_record_skip_writes_a_spacing_guard_skip_event(tmp_path):
     assert record_skip(v, NOW, target) is True
     row = json.loads(target.read_text(encoding="utf-8").strip())
     assert row["event"] == "spacing_guard_skip"
-    assert row["reason"] == "too_soon"
+    assert row["reason"] == "slot_taken"
+    assert row["slot_id"] == "2026-08-17T11:00"
     assert row["min_minutes"] == 20
     assert row["gap_minutes"] == pytest.approx(3.0)
     assert row["timestamp"] == NOW.isoformat()

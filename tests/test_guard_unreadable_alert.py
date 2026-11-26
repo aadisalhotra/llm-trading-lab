@@ -22,7 +22,9 @@ from src.logging import tick_spacing as new
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "71d025fb4"     # this package's base: the guard code before the change
-NOW = datetime(2026, 11, 17, 15, 10, tzinfo=timezone.utc)
+# 10:05 ET: inside the slot-identity start window (2026-11-26). At 15:10Z, the
+# value before, every scenario would be a late start: 10:10 is the window's end.
+NOW = datetime(2026, 11, 17, 15, 5, tzinfo=timezone.utc)
 SETTINGS = {"tick_spacing": {"min_minutes": 20},
             "models": {b: {"enabled": True} for b in ("claude", "gpt", "grok")}}
 
@@ -69,13 +71,20 @@ SCENARIOS = {
 # scenario must be decided exactly as before.
 GATE_A_CHANGED = {"all_torn"}
 
+# Slot identity (slot_identity_guard_ruling_2026-11-21) replaced the elapsed-time
+# skip with two slot tests. On these scenarios it decides as BASE did (same skip,
+# same withhold), under the new names: an open slot was "spaced", a slot this
+# run's cohort already decided was "too_soon".
+SLOT_REASON = {"spaced": "slot_open", "too_soon": "slot_taken", "no_prior_tick": "no_prior_tick"}
+
 
 @pytest.mark.parametrize("name", sorted(set(SCENARIOS) - GATE_A_CHANGED))
 def test_decision_fields_identical_to_the_base_commit(tmp_path, name):
     _write(tmp_path, SCENARIOS[name])
     o = OLD.check_spacing(SETTINGS, NOW, tmp_path)
     n = new.check_spacing(SETTINGS, NOW, tmp_path)
-    assert tuple(n)[:5] == tuple(o), (name, n, o)
+    assert (n.skip, SLOT_REASON.get(o.reason), n.last_decision, n.gap_minutes, n.min_minutes) ==         (o.skip, n.reason, o.last_decision, o.gap_minutes, o.min_minutes), (name, n, o)
+    assert not n.withhold and not n.missed
 
 
 def test_torn_rows_are_named_and_still_proceed(tmp_path):

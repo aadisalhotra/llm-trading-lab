@@ -16,6 +16,7 @@ from typing import Any
 from ..config_loader import TRADES_DIR, PERFORMANCE_DIR, INTRADAY_DIR, load_settings
 from ..price_checks import is_finite_number
 from .call_inputs import response_flags
+from .tick_spacing import slot_fields
 
 _logger = logging.getLogger("llmlab.decision_log")
 
@@ -95,6 +96,12 @@ def log_decision_run(
     record = {
         "date": run_date.strftime("%Y-%m-%d"),
         "timestamp": datetime.utcnow().isoformat(),
+        # Slot identity (slot_identity_guard_ruling_2026-11-21 section 3.1):
+        # slot_id, slot_index, slot_start_offset_s, and late_start (hub
+        # H-OPS-05: the run's pipeline started more than 8.5 min into its
+        # slot). From run_date, the pipeline's start. Tick position in every
+        # analysis is slot_id from here on, never inferred from timestamps.
+        **slot_fields(run_date),
         # The Executor's cycle_id (added 2026-09-16, empty on every record
         # before this) -- the join key between this book's executions and
         # that cycle's level-2 reconciliation record (data/reconciliation/),

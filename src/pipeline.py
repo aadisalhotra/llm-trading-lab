@@ -82,6 +82,7 @@ from .logging import (
     detect_memory_hit,
     boundary_parts,
     check_spacing,
+    record_missed_slot,
     record_skip,
     load_ledger,
     is_boundary_handled,
@@ -1109,13 +1110,22 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
                            files=list(verdict.unreadable), reason=verdict.reason,
                            boundary=boundary_parts(run_date))
             return 0
+        if verdict.skip and verdict.missed:
+            # slot_identity_guard_ruling section 2: started after the first
+            # window_minutes of its slot, so it decides nothing; the slot is
+            # recorded once as missed, with its cause. Counts as a missed
+            # decision for every arm (section 3.2).
+            logger.warning(
+                "Slot guard: run started %.0f s into slot %s (window %d min) — "
+                "slot MISSED, deciding nothing (no models prompted, no trades)",
+                verdict.start_offset_s, verdict.slot_id, verdict.window_minutes)
+            record_missed_slot(verdict, run_date.astimezone(timezone.utc))
+            return 0
         if verdict.skip:
+            # slot_taken: a model-call record for this slot exists (section 1.2).
             logger.info(
-                "Spacing guard: last cohort decision %s was %.1f min ago "
-                "(minimum %d) — skipping tick (no models prompted, no trades)",
-                verdict.last_decision.isoformat(), verdict.gap_minutes,
-                verdict.min_minutes,
-            )
+                "Slot guard: slot %s already has a model-call record — skipping "
+                "duplicate run (no models prompted, no trades)", verdict.slot_id)
             record_skip(verdict, run_date.astimezone(timezone.utc))
             return 0
 
