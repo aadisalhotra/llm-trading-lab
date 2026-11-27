@@ -41,14 +41,16 @@
   },
   "daily": {
     "date": "2026-11-27",
-    "sent_count": 2,
+    "sent_count": 4,
     "dedup_keys": [
       "macro_event:Geopolitical shock",
-      "fill_overrun:gpt:20261127T150235Z:gpt-20261127T150235Z-01-a0"
+      "fill_overrun:gpt:20261127T150235Z:gpt-20261127T150235Z-01-a0",
+      "state_cash:gpt",
+      "budget:critical"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": false,
+    "digest_sent": true,
     "fired_log": [
       {
         "kind": "macro_event",
@@ -73,10 +75,26 @@
         "timestamp": "2026-11-27T15:04:05.983202+00:00",
         "disposition": "sent",
         "dispatch_id": "fb9971e2ff0c"
+      },
+      {
+        "kind": "state_anomaly",
+        "severity": "WARN",
+        "title": "State anomaly (cash): GPT-5.4",
+        "timestamp": "2026-11-27T22:07:24.527162+00:00",
+        "disposition": "sent",
+        "dispatch_id": "9ee7a720019d"
+      },
+      {
+        "kind": "budget",
+        "severity": "CRITICAL",
+        "title": "Monthly API budget exceeded",
+        "timestamp": "2026-11-27T22:07:27.751154+00:00",
+        "disposition": "sent",
+        "dispatch_id": "dc0445f1d0f1"
       }
     ]
   },
   "reported_once": {
-    "state_cash:gpt": "-0.0105|0.025523"
+    "state_cash:gpt": "-0.2863|0.287443"
   }
 }
