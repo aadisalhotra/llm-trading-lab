@@ -40,31 +40,39 @@
     ]
   },
   "daily": {
-    "date": "2026-11-25",
+    "date": "2026-11-27",
     "sent_count": 2,
     "dedup_keys": [
-      "fill_overrun:claude:20261125T160337Z:claude-20261125T160337Z-00-a0",
-      "budget:warn"
+      "macro_event:Geopolitical shock",
+      "fill_overrun:gpt:20261127T150235Z:gpt-20261127T150235Z-01-a0"
     ],
     "overflow": [],
     "continuing": [],
-    "digest_sent": true,
+    "digest_sent": false,
     "fired_log": [
+      {
+        "kind": "macro_event",
+        "severity": "CRITICAL",
+        "title": "Major Market Event Detected",
+        "timestamp": "2026-11-27T15:02:35.601236+00:00",
+        "trigger": {
+          "headline": "Norse Atlantic's Norwegian unit files for bankruptcy as Iran war jolts airlines - Reuters",
+          "source": "Reuters",
+          "headline_time": "2026-11-27T07:39:00+00:00",
+          "category": "Geopolitical shock",
+          "matched_term": "war",
+          "score": -0.8402
+        },
+        "disposition": "sent",
+        "dispatch_id": "694f50ed2be1"
+      },
       {
         "kind": "fill_overrun",
         "severity": "WARN",
-        "title": "FILL_OVERRUN: claude ABT",
-        "timestamp": "2026-11-25T16:05:53.538102+00:00",
+        "title": "FILL_OVERRUN: gpt SLB",
+        "timestamp": "2026-11-27T15:04:05.983202+00:00",
         "disposition": "sent",
-        "dispatch_id": "dd80f6c98ef1"
-      },
-      {
-        "kind": "budget",
-        "severity": "WARN",
-        "title": "Monthly API budget approaching cap",
-        "timestamp": "2026-11-25T22:08:00.227896+00:00",
-        "disposition": "sent",
-        "dispatch_id": "2c1755f1641e"
+        "dispatch_id": "fb9971e2ff0c"
       }
     ]
   },
