@@ -169,10 +169,20 @@ def test_model_version_fallback_to_configured_id(stub_client):
     assert returned_id == MODEL
 
 
-def test_zero_thoughts_omitted(stub_client):
-    """thoughts_tokens is only recorded when nonzero, matching the pre-migration
-    metadata shape (the legacy SDK reported 0/absent)."""
+def test_a_reported_zero_is_recorded_as_zero(stub_client):
+    """Hub H-OPS-40 (2026-11-27): the reported value is recorded, 0 included.
+    Until then a reported 0 was omitted (the pre-migration metadata shape), so
+    zero and absent could not be told apart."""
     _StubClient.reply = _response(thoughts_tokens=0)
     adapter = GeminiAdapter(MODEL)
     _text, _rid, meta = adapter._call_api("SYS", "USER")
-    assert "thoughts_tokens" not in meta
+    assert meta["thoughts_tokens"] == 0
+
+
+def test_a_missing_thoughts_count_is_recorded_as_none(stub_client):
+    reply = _response(thoughts_tokens=0)
+    reply.usage_metadata.thoughts_token_count = None       # field absent in the reply
+    _StubClient.reply = reply
+    adapter = GeminiAdapter(MODEL)
+    _text, _rid, meta = adapter._call_api("SYS", "USER")
+    assert "thoughts_tokens" in meta and meta["thoughts_tokens"] is None

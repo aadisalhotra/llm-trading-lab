@@ -60,6 +60,17 @@ def finish_class(finish_reason: str | None, blocked: bool) -> str:
     return FINISH_ABNORMAL
 
 
+
+def reported_thoughts(usage: Any) -> int | None:
+    """usage_metadata.thoughts_token_count as reported: an int (0 included),
+    or None when usage or the field is missing (hub H-OPS-40: absent is not
+    zero). Argon's 242 calibration zeros could not be told from absent
+    because the old code wrote int(... or 0)."""
+    if usage is None:
+        return None
+    raw = getattr(usage, "thoughts_token_count", None)
+    return int(raw) if raw is not None else None
+
 class GeminiAdapter(BaseAdapter):
     provider_name = "google"
     supports_vision = True
@@ -194,6 +205,10 @@ class GeminiAdapter(BaseAdapter):
         # outside candidates_token_count, are priced too; the snapshot's cost
         # line is left as it was.
         thought_tok = int(getattr(usage, "thoughts_token_count", 0) or 0) if usage else 0
+        # What the provider REPORTED (hub H-OPS-40): an int, 0 included, or None
+        # when usage_metadata carries no thoughts_token_count. thought_tok above
+        # stays 0 for the cost line; the logged field must not turn absent into 0.
+        thoughts_reported = reported_thoughts(usage)
         cost = compute_call_cost_usd(self.model, in_tok,
                                      out_tok + (thought_tok if refreshed else 0))
         metadata: dict[str, Any] = {
@@ -218,9 +233,9 @@ class GeminiAdapter(BaseAdapter):
             if fr is not None:
                 metadata["finish_reason"] = getattr(fr, "name", str(fr))
         if usage:
-            thoughts = int(getattr(usage, "thoughts_token_count", 0) or 0)
-            if thoughts:
-                metadata["thoughts_tokens"] = thoughts
+            # Was: set only when non-zero, so a reported 0 logged as absent.
+            # Now the reported value, 0 included; None when the field is missing.
+            metadata["thoughts_tokens"] = thoughts_reported
 
         # --- retention audit 2026-09-09 -------------------------------------
         # Gemini exposes no build fingerprint; model_version above is the
@@ -248,7 +263,7 @@ class GeminiAdapter(BaseAdapter):
         metadata["block_reason"] = getattr(br, "name", str(br)) if br is not None else None
         cached = getattr(usage, "cached_content_token_count", None) if usage else None
         if refreshed:
-            metadata["thoughts_tokens"] = thought_tok
+            metadata["thoughts_tokens"] = thoughts_reported
             metadata["reasoning_effort_sent"] = (refreshed["thinking_level"]
                                                  if self.level_sent else None)
             metadata["max_tokens_sent"] = REFRESHED_MAX_OUTPUT_TOKENS

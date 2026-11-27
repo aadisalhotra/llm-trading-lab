@@ -109,3 +109,29 @@ def test_rates_move_on_december_1():
                                  on_date="2026-11-30") == pytest.approx(12.0)
     assert compute_call_cost_usd("gemini-4-argon", 1_000_000, 1_000_000,
                                  on_date="2026-12-01") == pytest.approx(24.0)
+
+
+# ---- hub H-OPS-40: absent is not zero, in calibration and production
+def test_reported_thoughts_keeps_zero_and_absent_apart():
+    from src.adapters.gemini_adapter import reported_thoughts
+    assert reported_thoughts(SimpleNamespace(thoughts_token_count=0)) == 0
+    assert reported_thoughts(SimpleNamespace(thoughts_token_count=None)) is None
+    assert reported_thoughts(SimpleNamespace()) is None
+    assert reported_thoughts(None) is None
+    assert reported_thoughts(SimpleNamespace(thoughts_token_count=742)) == 742
+
+
+@pytest.mark.parametrize("thoughts,expected", [(None, None), (0, 0), (812, 812)])
+def test_argon_logs_the_reported_thoughts(fake, thoughts, expected):
+    fake(lambda model, config: _response(model, thoughts=thoughts))
+    md = get_adapter("google", "gemini-4-argon").generate_decision("SYS", "USER").metadata
+    assert md["thoughts_tokens"] == expected
+    assert md["cost_usd"] is not None                  # the cost line still prices 0 for absent
+
+
+@pytest.mark.parametrize("thoughts,expected", [(None, None), (0, 0)])
+def test_the_snapshot_logs_the_reported_thoughts_too(fake, thoughts, expected):
+    fake(lambda model, config: _response(model, thoughts=thoughts))
+    md = get_adapter("google", "gemini-3.1-pro").generate_decision("SYS", "USER").metadata
+    assert md.get("thoughts_tokens", "MISSING") == expected
+
