@@ -30,6 +30,13 @@ on:
         description: "Slot start, UTC: YYYY-MM-DDTHH:(00|30):00Z"
         required: true
         type: string
+      close_et:
+        # Hub H-OPS-41: the day's NYSE close from the chain's gate, so a slot at
+        # or after an early close (or on a day with no session) is not watched.
+        description: "The day's NYSE close, ET HH:MM, or 'closed' (empty = full session)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -58,7 +65,8 @@ jobs:
           # into the script. The script also validates it against a strict
           # pattern before using it.
           SLOT: ${{ github.event.inputs.slot }}
+          CLOSE_ET: ${{ github.event.inputs.close_et }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}
-        run: python scripts/check_slot_cycle.py --slot "$SLOT"
+        run: python scripts/check_slot_cycle.py --slot "$SLOT" --close-et "$CLOSE_ET"

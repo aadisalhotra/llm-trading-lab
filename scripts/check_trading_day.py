@@ -7,7 +7,9 @@ sleep-and-dispatch loop and the pages deploy are pure churn (the pipeline
 no-ops every tick), so the workflow skips them; the run job itself still fires
 from the backup crons and stays the authority on market state.
 
-Decision source: src.data.market_data.is_market_open_today — the SAME
+Decision source: src.nyse_calendar (2026-11-27; was src.data.market_data,
+whose yfinance import failed in this job, so the gate failed open every day:
+hub H-OPS-41) — the SAME
 pandas_market_calendars NYSE calendar the pipeline's own is_market_open_now()
 gate uses, evaluated on the America/New_York date.
 
@@ -19,13 +21,13 @@ value contract).
 
 With --close it prints the day's NYSE close instead, as ET wall-clock "HH:MM"
 (e.g. "13:00" on the 2026-11-27 early close), read from the same calendar via
-src.data.market_data.session_bounds. The chain job schedules its last intraday
+src.nyse_calendar.session. The chain job schedules its last intraday
 slot and the EOD dispatch from it. FAIL-OPEN to "16:00", a full session, which
 was the chain's behaviour before this flag existed; the pipeline's own
 is_market_open_now() stays the authority on whether a tick trades.
 
-Run:  python scripts/check_trading_day.py
-      python scripts/check_trading_day.py --close
+Run:  python scripts/check_trading_day.py [--date YYYY-MM-DD]
+      python scripts/check_trading_day.py --close [--date YYYY-MM-DD]
 """
 from __future__ import annotations
 
@@ -41,14 +43,22 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO,
 logger = logging.getLogger("llmlab.trading_day_gate")
 
 
+def _reference() -> datetime:
+    """Now in ET, or the ET date given by --date YYYY-MM-DD (tests, replays)."""
+    from zoneinfo import ZoneInfo
+    et = ZoneInfo("America/New_York")
+    args = sys.argv[1:]
+    if "--date" in args:
+        d = datetime.strptime(args[args.index("--date") + 1], "%Y-%m-%d")
+        return d.replace(hour=12, tzinfo=et)
+    return datetime.now(et)
+
+
 def close_main() -> int:
     try:
-        from zoneinfo import ZoneInfo
-
-        from src.data.market_data import session_bounds
-
-        et_now = datetime.now(ZoneInfo("America/New_York"))
-        bounds = session_bounds(et_now)
+        from src.nyse_calendar import session
+        et_now = _reference()
+        bounds = session(et_now)
         close = bounds[1].strftime("%H:%M") if bounds else "16:00"
         logger.info("ET date %s -> NYSE close: %s%s", et_now.date(), close,
                     "" if bounds else " (no session; default)")
@@ -63,12 +73,9 @@ def main() -> int:
     if "--close" in sys.argv[1:]:
         return close_main()
     try:
-        from zoneinfo import ZoneInfo
-
-        from src.data.market_data import is_market_open_today
-
-        et_now = datetime.now(ZoneInfo("America/New_York"))
-        open_today = bool(is_market_open_today(et_now))
+        from src.nyse_calendar import is_session_day
+        et_now = _reference()
+        open_today = bool(is_session_day(et_now))
         logger.info("ET date %s -> NYSE session: %s", et_now.date(), open_today)
         print("true" if open_today else "false")
     except Exception:

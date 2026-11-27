@@ -64,6 +64,28 @@ DEADLINE = timedelta(minutes=15)
 FIRST_LOOK = timedelta(minutes=3)      # no tick has ever committed before slot + 4 min
 POLL_SECONDS = 60
 SLOT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:(00|30):00Z$")
+# The day's NYSE close as the chain's gate read it (hub H-OPS-41): "HH:MM", or
+# "closed" on a day with no session. Empty = not given (full session assumed,
+# the behaviour before this input existed).
+CLOSE_RE = re.compile(r"^(closed|\d{2}:\d{2})$")
+EASTERN = ZoneInfo("America/New_York")
+
+
+def outside_session(slot: datetime, close_et: str) -> str | None:
+    """Why `slot` has no session to watch, or None. A slot starting at or
+    after the day's close cannot produce a cycle: the pipeline's own market-
+    open check skips it, and a watch would page CRITICAL for nothing (the
+    13:00-15:30 pages after the 2026-11-27 early close). On a day with no
+    session ("closed") every slot is outside it (the 2026-11-26 pages)."""
+    if not close_et:
+        return None
+    if close_et == "closed":
+        return "no NYSE session today"
+    hh, mm = (int(x) for x in close_et.split(":"))
+    et = slot.astimezone(EASTERN)
+    if (et.hour, et.minute) >= (hh, mm):
+        return f"slot starts at or after the {close_et} ET close"
+    return None
 
 Reader = Callable[[list[str], datetime], "dict[str, list[str]] | None"]
 # The slot's admission file lines, read from the same fetch; None = unreadable.
@@ -208,11 +230,20 @@ def main(argv: list[str] | None = None) -> int:
     force_utf8_console()
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--slot", required=True, help="slot start, UTC, YYYY-MM-DDTHH:(00|30):00Z")
+    ap.add_argument("--close-et", default="", help="the day's NYSE close, ET HH:MM, or 'closed'")
     args = ap.parse_args(argv)
     # The value arrives from a workflow_dispatch input: validate strictly.
     if not SLOT_RE.match(args.slot or ""):
         logger.error("--slot must be YYYY-MM-DDTHH:(00|30):00Z, got %r", args.slot)
         return 2
+    close_et = (args.close_et or "").strip()
+    if close_et and not CLOSE_RE.match(close_et):
+        logger.error("--close-et must be HH:MM or 'closed', got %r", close_et)
+        return 2
+    why = outside_session(parse_utc(args.slot), close_et)
+    if why:
+        summary(f"SKIP slot {slot_label(parse_utc(args.slot))} ET: {why}; not watched")
+        return 0
     load_env()
     settings = load_settings()
     books = enabled_books(settings)

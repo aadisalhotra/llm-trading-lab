@@ -256,7 +256,9 @@ def test_slot_watch_workflow_is_read_only_and_outside_the_production_group():
     assert re.search(r"^permissions:\n  contents: read\n", wf, re.M)
     assert "SLOT: ${{ github.event.inputs.slot }}" in wf
     run_line = [l for l in wf.splitlines() if l.strip().startswith("run:")]
-    assert run_line == ['        run: python scripts/check_slot_cycle.py --slot "$SLOT"']
+    # Both dispatch inputs bound to env, never interpolated (close_et: H-OPS-41).
+    assert "CLOSE_ET: ${{ github.event.inputs.close_et }}" in wf
+    assert run_line == ['        run: python scripts/check_slot_cycle.py --slot "$SLOT" --close-et "$CLOSE_ET"']
     code = [l for l in wf.splitlines() if not l.strip().startswith("#")]
     assert not any("pip install" in l for l in code)
 
