@@ -33,7 +33,10 @@ DeepSeek is not touched: its paper book continues.
 Nothing here places, cancels or changes anything at the venue. The venue is
 read once, before any change: the account the broker_paper keys resolve to
 must hold no position and no open order, and its cash must agree with the
-registered unallocated baseline plus the five fresh books.
+registered unallocated baseline plus the five fresh books. It must also be
+the pinned account (venue_account.broker_paper.account_sha256, committed under
+review before the run; src/execution/account_pin.py), with the pin's `since`
+set, so the probe's cash is counted from the new account's start.
 
 Modes:
   --plan                print the steps for this checkout; change nothing
@@ -219,6 +222,9 @@ def venue_reading(client, settings_after: dict) -> dict[str, Any]:
     opens = client._request("GET", "/v2/orders", params={"status": "open", "limit": 500})
     acct = client._request("GET", "/v2/account")
     cash = float(acct.get("cash"))
+    from src.execution.account_pin import account_fingerprint, pin
+    want = pin(settings_after, "broker_paper")
+    number = acct.get("account_number")
     capital = cl.registered_book_capital(settings_after)
     books_cash = capital * len(settings_after["capital_structure"]["live_cohort_keys"])
     baseline = cl.reconciliation_params(settings_after, "broker_paper")["unallocated_cash_usd"]
@@ -227,7 +233,13 @@ def venue_reading(client, settings_after: dict) -> dict[str, Any]:
             "five_fresh_books_cash": books_cash, "registered_unallocated": baseline,
             "implied_unallocated": round(cash - books_cash, 2),
             "cash_agrees": abs((cash - books_cash) - baseline) <= tol,
-            "flat": not positions and not opens}
+            "flat": not positions and not opens,
+            # The pin (account_pin.py): the new account must be pinned, under
+            # review, before the switch, and the keys must reach it.
+            "account_pinned": want["account_sha256"] is not None,
+            "account_matches_pin": bool(number) and want["account_sha256"] is not None
+            and account_fingerprint(number) == want["account_sha256"],
+            "pin_since": want["since"]}
 
 
 # ---------------------------------------------------------- preconditions
@@ -351,6 +363,13 @@ def run(root: Path, repo: Path, settings: dict, endpoint: str, first_session: st
             (blocking if strict else notes).append(msg)
         else:
             notes.append(msg)
+        if not reading.get("account_matches_pin"):
+            (blocking if strict else notes).append(
+                "the venue account is not pinned" if not reading.get("account_pinned")
+                else "the broker keys reach an account other than the pinned one")
+        pin_since = reading.get("pin_since")
+        if strict and (not pin_since or datetime.fromisoformat(pin_since) > now):
+            blocking.append("venue_account.broker_paper.since is not set to an instant at or before now")
     elif strict and not any("could not be read" in b for b in blocking):
         blocking.append("the venue was not read")
     head = git_head(repo)

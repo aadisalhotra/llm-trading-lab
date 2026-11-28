@@ -462,9 +462,13 @@ def run_post_cycle_reconciliation(broker: BrokerClient, cycle_id: str,
     # Both readers return nothing for any mode but broker_paper, so a live
     # cycle never counts a probe term.
     mode = settings.get("mode", "paper")
+    # Counted from the pinned account's start (account_pin.since), so probe
+    # runs on an earlier account are not charged to this one.
+    from .account_pin import since as _account_since
+    start = _account_since(settings, mode)
     result = reconcile(portfolios, broker, cycle_id, **params,
-                       probe_cash_usd=administrative_cash_usd(mode),
-                       probe_positions=administrative_positions(mode))
+                       probe_cash_usd=administrative_cash_usd(mode, since=start),
+                       probe_positions=administrative_positions(mode, since=start))
     _check_book_fill_aggregates(result, settings, broker)
     record_reconciliation(result)
     handle_reconciliation_result(result, portfolios)

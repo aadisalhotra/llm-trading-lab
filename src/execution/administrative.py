@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from ..config_loader import DATA_DIR
@@ -84,14 +85,28 @@ def probe_records(probe_dir: Path | None = None) -> list[dict]:
 PROBE_MODE = "broker_paper"
 
 
-def _finished(mode: str, probe_dir: Path | None) -> list[dict]:
+def _finished(mode: str, probe_dir: Path | None, since: datetime | None = None) -> list[dict]:
+    """FINISHED records for `mode`; with `since`, only runs that started at or
+    after it (the pinned account's start, account_pin.since): a run on an
+    earlier account left its cash and positions there, not in this one."""
     if mode != PROBE_MODE:
         return []
-    return [r for r in probe_records(probe_dir)
-            if r.get("phase") == "FINISHED" and r.get("mode") == PROBE_MODE]
+    out = [r for r in probe_records(probe_dir)
+           if r.get("phase") == "FINISHED" and r.get("mode") == PROBE_MODE]
+    if since is None:
+        return out
+    kept = []
+    for r in out:
+        started = r.get("started_utc")
+        if not started:
+            raise ValueError(f"probe record {r.get('cycle_id')} has no started_utc; cannot scope it")
+        if datetime.fromisoformat(str(started).replace("Z", "+00:00")) >= since:
+            kept.append(r)
+    return kept
 
 
-def administrative_positions(mode: str, probe_dir: Path | None = None) -> dict[str, float]:
+def administrative_positions(mode: str, probe_dir: Path | None = None,
+                             since: datetime | None = None) -> dict[str, float]:
     """Net shares, by ticker, the committed probe runs account for as open.
 
     The sum of `position_delta` over FINISHED records. A run whose delta is
@@ -99,13 +114,14 @@ def administrative_positions(mode: str, probe_dir: Path | None = None) -> dict[s
     accounted one, so if it exists, level 2 reports it as unexplained.
     """
     totals: dict[str, float] = {}
-    for r in _finished(mode, probe_dir):
+    for r in _finished(mode, probe_dir, since):
         for ticker, q in (r.get("position_delta") or {}).items():
             totals[ticker] = totals.get(ticker, 0.0) + float(q)
     return {t: round(q, 9) for t, q in totals.items() if abs(q) > 1e-9}
 
 
-def administrative_cash_usd(mode: str, probe_dir: Path | None = None) -> float:
+def administrative_cash_usd(mode: str, probe_dir: Path | None = None,
+                            since: datetime | None = None) -> float:
     """Net cash the committed probe runs have left in the `mode` account.
 
     The sum of `residual_cash_usd` over FINISHED records for that mode. A run
@@ -113,7 +129,7 @@ def administrative_cash_usd(mode: str, probe_dir: Path | None = None) -> float:
     moved is unattributed, and level 2 is right to report it.
     """
     total = 0.0
-    for r in _finished(mode, probe_dir):
+    for r in _finished(mode, probe_dir, since):
         v = r.get("residual_cash_usd")
         if v is not None:
             total += float(v)

@@ -342,6 +342,13 @@ class Executor:
             logger.info("Broker execution ACTIVE: mode=%s endpoint=%s deadline=%ds",
                         self.mode, self.broker.base_url,
                         self.broker.fill_deadline_seconds)
+            # The pinned account (account_pin.py): with a pin set, the keys must
+            # reach that account before any book runs. A mismatch raises
+            # VenueAccountMismatch here, before the first order.
+            from .account_pin import check_venue_account
+            pinned = check_venue_account(self.broker, self.settings, self.mode)
+            if pinned["pinned"]:
+                logger.info("Venue account matches the pinned venue_account.%s", self.mode)
 
     @property
     def broker_enabled(self) -> bool:

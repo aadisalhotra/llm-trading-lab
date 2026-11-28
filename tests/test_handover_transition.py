@@ -24,7 +24,15 @@ ARMS = list(cl.REFRESHED_BOOK_KEYS)
 ENDPOINT = "2026-12-04"
 FIRST = "2026-12-07"
 SAT = datetime(2026, 12, 5, 15, 0, tzinfo=timezone.utc)          # Sat 10:00 ET
-SETTINGS_BYTES = (ROOT / "config" / "settings.json").read_bytes()
+# The shipped settings with the new account pinned, as the PI commits them
+# before the run (scripts/venue_account_pin.py).
+from src.execution.account_pin import account_fingerprint  # noqa: E402
+NEW_ACCOUNT = "PAFAKE00001"
+_PIN = '"broker_paper": {"account_sha256": null, "since": null}'
+SETTINGS_BYTES = (ROOT / "config" / "settings.json").read_bytes().replace(
+    _PIN.encode(), ('"broker_paper": {"account_sha256": "%s", "since": "2026-12-05T14:00:00+00:00"}'
+                    % account_fingerprint(NEW_ACCOUNT)).encode())
+assert SETTINGS_BYTES != (ROOT / "config" / "settings.json").read_bytes()
 SETTINGS = json.loads(SETTINGS_BYTES)
 
 
@@ -72,7 +80,8 @@ def world(tmp_path):
 def good_venue(settings_after):
     return {"positions": 0, "open_orders": 0, "cash": 99_999.99, "five_fresh_books_cash": 10_000.0,
             "registered_unallocated": 89_999.99, "implied_unallocated": 89_999.99,
-            "cash_agrees": True, "flat": True}
+            "cash_agrees": True, "flat": True, "account_pinned": True,
+            "account_matches_pin": True, "pin_since": "2026-12-05T14:00:00+00:00"}
 
 
 def snapshot_bytes(root: Path) -> dict[str, bytes]:
@@ -231,3 +240,32 @@ def test_the_script_never_writes_to_the_venue():
     src = (ROOT / "scripts" / "handover_transition.py").read_text(encoding="utf-8")
     calls = [line for line in src.splitlines() if "_request(" in line]
     assert calls and all('"GET"' in line for line in calls)
+
+
+def test_refuses_an_unpinned_account(world):
+    _refused(world, "not pinned", venue=lambda s: {**good_venue(s), "account_pinned": False,
+                                                   "account_matches_pin": False})
+
+
+def test_refuses_keys_that_reach_another_account(world):
+    _refused(world, "other than the pinned one", venue=lambda s: {**good_venue(s),
+                                                                  "account_matches_pin": False})
+
+
+def test_refuses_a_pin_without_since(world):
+    _refused(world, "since is not set", venue=lambda s: {**good_venue(s), "pin_since": None})
+
+
+def test_the_venue_reading_compares_the_fingerprint_and_never_returns_the_number():
+    class Client:
+        def _request(self, method, path, params=None):
+            assert method == "GET"
+            return {"/v2/positions": [], "/v2/orders": [],
+                    "/v2/account": {"cash": "99999.99", "account_number": NEW_ACCOUNT}}[path]
+    after = json.loads(ht.switch_cohort_text(SETTINGS_BYTES, SNAPS, ARMS))
+    r = ht.venue_reading(Client(), after)
+    assert r["account_pinned"] and r["account_matches_pin"] and r["flat"] and r["cash_agrees"]
+    assert NEW_ACCOUNT not in json.dumps(r)
+    other = json.loads(json.dumps(after))
+    other["venue_account"]["broker_paper"]["account_sha256"] = account_fingerprint("PAOTHER0002")
+    assert ht.venue_reading(Client(), other)["account_matches_pin"] is False

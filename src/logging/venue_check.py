@@ -281,9 +281,11 @@ def _quantity_test(broker: Any, books: list[str], cycle_id: str,
         portfolios = [load_portfolio(k) for k in books]
     else:
         portfolios = load_portfolios(books)
+    from ..execution.account_pin import since as _account_since
+    start = _account_since(settings, mode)
     return reconcile(portfolios, broker, cycle_id, **reconciliation_params(settings),
-                     probe_cash_usd=administrative_cash_usd(mode),
-                     probe_positions=administrative_positions(mode))
+                     probe_cash_usd=administrative_cash_usd(mode, since=start),
+                     probe_positions=administrative_positions(mode, since=start))
 
 
 def run_check(broker: Any, books: list[str], now_utc: datetime, *, scope: str,

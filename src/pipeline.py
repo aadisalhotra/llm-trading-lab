@@ -66,6 +66,7 @@ from .config_loader import (
     venue_book_keys,
 )
 from .dashboard import build_dashboard_payload
+from .execution.account_pin import VenueAccountMismatch
 from .data import (
     fetch_index_data,
     fetch_intraday_data,
@@ -1302,7 +1303,16 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     except Exception as e:
         logger.exception("Macro market-event scan failed: %s — pipeline continues", e)
 
-    executor = Executor()
+    try:
+        executor = Executor()
+    except VenueAccountMismatch as e:
+        # The keys reach an account other than the pinned one: no book runs and
+        # no order is placed. The tick fails, so the workflow's fail-stop runs
+        # as for any failed tick.
+        send_alert("CRITICAL", "Venue account mismatch: tick stopped before any order", str(e),
+                   kind="venue_account_mismatch",
+                   dedup_key=f"venue_account_mismatch:{run_date.strftime('%Y-%m-%d')}")
+        raise
 
     # Randomize universe ticker order ONCE per pipeline run — all models see
     # the same shuffled order for fairness, but the order differs across runs
