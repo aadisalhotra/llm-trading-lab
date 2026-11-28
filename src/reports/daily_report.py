@@ -33,6 +33,7 @@ from ..analytics import (
     compute_spy_benchmark_metrics,
 )
 from ..config_loader import (
+    public_model_keys,
     starting_capital as _starting_capital_guarded,
     INTRADAY_DIR,
     LEADERBOARD_DIR,
@@ -1371,7 +1372,11 @@ def generate_daily_report(
     DAILY_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     target_path = DAILY_REPORTS_DIR / f"{run_date.strftime('%Y-%m-%d')}.md"
 
-    model_keys = [k for k, cfg in settings["models"].items() if cfg.get("enabled", True)]
+    # The daily report is public (reports/daily/, linked from the dashboard):
+    # only books public on run_date (config_loader.public_model_keys). Hub
+    # H-OPS-07 ruling 1: no cb_* book before the 2026-12-07 open, so the
+    # shakedown books never appear.
+    model_keys = public_model_keys(settings, run_date)
 
     # ---- Build sections ----
     header = _header(run_date, settings, index_data)

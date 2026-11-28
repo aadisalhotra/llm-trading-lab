@@ -19,7 +19,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from ..config_loader import DATA_DIR, load_settings
+from ..config_loader import DATA_DIR, active_model_keys, load_settings
 from .alert_state import ensure_daily, load_state, save_state
 from .email_alerts import send_email
 from .events import _DISPATCH_LOCK
@@ -356,7 +356,7 @@ def build_digest(summary: dict[str, Any], settings: dict[str, Any] | None = None
 
     model_keys = [m.get("model_key") for m in summary.get("models", []) if m.get("model_key")]
     if not model_keys:
-        model_keys = [k for k, c in settings.get("models", {}).items() if c.get("enabled", True)]
+        model_keys = active_model_keys(settings)
 
     total_trades = sum(int(m.get("trades_today", 0) or 0) for m in summary.get("models", []))
     _, total_cost = _api_cost_today(model_keys)

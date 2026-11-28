@@ -58,6 +58,9 @@ from .config_loader import (
     load_env,
     load_settings,
     load_universe,
+    active_model_keys,
+    handover_rules_apply,
+    public_model_keys,
     tick_deadline_seconds,
     universe_symbols,
     venue_book_keys,
@@ -180,7 +183,17 @@ def _compute_agreement_counts(
     # Collect holdings across all models
     from .portfolio import load_portfolio as _lp
     all_holdings: dict[str, set[str]] = {}  # ticker -> set of model_keys holding it
-    for key in settings["models"]:
+    # Active books only: load_portfolio incepts a missing book, and a book
+    # before its first session (models.<key>.active_from) must not exist yet.
+    # Peers are the book's own cohort: from 2026-12-01 the five refreshed arms
+    # count among themselves and the six running books among themselves, so
+    # the logged agreement count keeps the population it had (no cross-cohort
+    # pairs; cohort_refresh_ruling.md rev. 2, hub H-OPS-07).
+    models = settings.get("models") or {}
+    refreshed = (models.get(model_key) or {}).get("cohort") == "refreshed"
+    peers = [k for k in active_model_keys(settings)
+             if ((models.get(k) or {}).get("cohort") == "refreshed") is refreshed]
+    for key in peers:
         try:
             p = _lp(key)
             for ticker in p.holdings:
@@ -470,9 +483,11 @@ def run_one_model(
     snapshot_before = portfolio.snapshot(prices)
     adapter = get_adapter(cfg["provider"], cfg["model"])
     # The decision deadline D (time.monotonic() instant). The adapter applies
-    # it to the refreshed arms only (H-OPS-00); the snapshots and DeepSeek are
-    # unchanged through December.
+    # it, with the finish-reason rule, to the refreshed arms from their first
+    # session and to the snapshots and DeepSeek from the handover date
+    # (settings handover.date; hub H-OPS-14).
     adapter.deadline_at = tick_deadline_at
+    adapter.handover_rules = handover_rules_apply(settings, run_date)
     # data_inputs_hash: the sha256 of the frame the models see (daily history
     # ruling 3); the guard's intraday frame is hashed as execution_frame_hash.
     data_hash = (prompt_frame.data_inputs_hash if prompt_frame is not None
@@ -623,7 +638,7 @@ def run_one_model(
                     "cycle_id": executor.cycle_id},
                    kind="identity_mismatch",
                    dedup_key=f"identity_mismatch:{model_key}:{session_date_str}")
-    if getattr(adapter, "refreshed", False) and tick_deadline_at is not None:
+    if getattr(adapter, "tick_rules", False) and tick_deadline_at is not None:
         decision_result.metadata = {**(decision_result.metadata or {}),
                                     "tick_deadline_seconds": tick_deadline_s}
 
@@ -875,7 +890,7 @@ def _eod_skip_reason(settings: dict[str, Any], run_date: datetime) -> str | None
     if bounds is not None and run_date.timetz().replace(tzinfo=None) < bounds[1]:
         return f"session has not closed ({bounds[1]} ET)"
     day = run_date.strftime("%Y-%m-%d")
-    enabled = [mk for mk, cfg in settings["models"].items() if cfg.get("enabled", True)]
+    enabled = active_model_keys(settings, run_date)
     if enabled and all(eod_row_exists(mk, day) for mk in enabled):
         return f"every enabled book already has its {day} row"
     return None
@@ -895,7 +910,7 @@ def _withhold_tick(settings: dict[str, Any], run_date: datetime, *, guard: str,
     and the /fail ping are the page. Never raises.
     """
     try:
-        books = [mk for mk, cfg in settings["models"].items() if (cfg or {}).get("enabled", True)]
+        books = active_model_keys(settings, run_date)
         row = build_withhold_event(
             TICK_WITHHELD_GUARD_UNREADABLE, guard=guard,
             now_utc=run_date.astimezone(timezone.utc), books=books, files=files,
@@ -934,7 +949,7 @@ def _eod_admission(settings: dict[str, Any], run_date: datetime, force_trade: bo
             record_withhold(build_withhold_event(
                 TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_BOUNDARY_LEDGER,
                 now_utc=run_date.astimezone(timezone.utc),
-                books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                books=active_model_keys(settings, run_date),
                 files=["data/state/handled_boundaries.json"], reason="ledger_unreadable",
                 detail=str(_eledger_err), boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
         except Exception as e:  # noqa: BLE001 — the sweep is suspended regardless
@@ -963,7 +978,7 @@ def _eod_admission(settings: dict[str, Any], run_date: datetime, force_trade: bo
                 record_withhold(build_withhold_event(
                     TICK_WITHHELD_GUARD_UNREADABLE, guard=GUARD_SPACING,
                     now_utc=run_date.astimezone(timezone.utc),
-                    books=[mk for mk, c in settings["models"].items() if c.get("enabled", True)],
+                    books=active_model_keys(settings, run_date),
                     files=list(e_verdict.unreadable), reason=e_verdict.reason,
                     boundary=(e_day, EOD_SLOT), scope=SCOPE_EOD))
             except Exception as e:  # noqa: BLE001
@@ -1182,8 +1197,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # path are untouched.
     if settings.get("mode") in _VENUE_MODES:
         try:
-            _vbooks = venue_book_keys(
-                [mk for mk, c in settings["models"].items() if c.get("enabled", True)], settings)
+            _vbooks = venue_book_keys(active_model_keys(settings, run_date), settings)
             run_shadow_check(
                 settings, _vbooks, datetime.now(timezone.utc),
                 scope=SCOPE_EOD if is_eod else SCOPE_INTRADAY,
@@ -1245,7 +1259,7 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     if is_eod:
         eod_bad_closes = _eod_unvaluable_closes(
             prices, settings,
-            [mk for mk, c in settings["models"].items() if c.get("enabled", True)])
+            active_model_keys(settings, run_date))
         if eod_bad_closes:
             day = run_date.strftime("%Y-%m-%d")
             logger.critical("EOD valuation aborted for %s: non-finite closes for %d names: %s",
@@ -1303,13 +1317,15 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
     # is the alerts.jsonl append path — Python's file append + the stdlib
     # logging module are already thread-safe, so no extra lock is needed.
     # The dashboard build below runs only after all threads have joined.
+    # Active books (config_loader.active_model_keys): enabled, and on or after
+    # the book's first session. The refreshed arms join on their active_from.
+    _active = set(active_model_keys(settings, run_date))
     enabled_models = [
-        (mk, cfg) for mk, cfg in settings["models"].items()
-        if cfg.get("enabled", True)
+        (mk, cfg) for mk, cfg in settings["models"].items() if mk in _active
     ]
     for mk, cfg in settings["models"].items():
-        if not cfg.get("enabled", True):
-            logger.info("[%s] disabled — skipping", mk)
+        if mk not in _active:
+            logger.info("[%s] not active on %s — skipping", mk, run_date.strftime("%Y-%m-%d"))
 
     # P1 cross-book submission barrier (docs/prereg/tier2_novel_sections.md,
     # "Cross-book submission barrier"). One instance per cycle, shared by
@@ -1514,7 +1530,8 @@ def run_pipeline(mode: str = "intraday", force: bool = False,
             send_alert("WARN", "Daily report generation failed", str(e),
                        kind="report_failure", dedup_key="report_failure")
 
-        leaderboard = build_leaderboard(list(settings["models"].keys()))
+        # The day's leaderboard snapshot is public: public books only (H-OPS-07).
+        leaderboard = build_leaderboard(public_model_keys(settings, run_date))
         summary = {
             "date": run_date.strftime("%Y-%m-%d"),
             "mode": settings["mode"],

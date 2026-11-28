@@ -119,7 +119,7 @@ class XAIAdapter(BaseAdapter):
             raise RuntimeError(f"xAI API {r.status_code}: {r.text[:500]}")
         data = r.json()
         message = data["choices"][0]["message"]
-        refusal = message.get("refusal") if refreshed else None
+        refusal = message.get("refusal") if self.tick_rules else None
         text = message["content"]
         returned_id = data.get("model", self.model)
 
@@ -176,7 +176,9 @@ class XAIAdapter(BaseAdapter):
             ticks = usage.get("cost_in_usd_ticks")
             metadata["provider_cost_usd"] = (ticks / 1e10) if isinstance(ticks, (int, float)) else None
             self.check_identity(data.get("model"), metadata)
-            # The finish-reason rule, before any text leaves the adapter.
+        if self.tick_rules:
+            # The finish-reason rule, before any text leaves the adapter
+            # (snapshot from the handover, H-OPS-14).
             fr = metadata.get("finish_reason")
             fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)
             metadata["finish_class"] = fc

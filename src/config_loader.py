@@ -9,8 +9,10 @@ import json
 import logging
 import os
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 try:
     from dotenv import load_dotenv
@@ -291,6 +293,107 @@ def tick_deadline_seconds(settings: dict[str, Any] | None = None) -> float | Non
     if seconds <= 0 or seconds % 30:
         raise ValueError(f"tick_deadline.seconds must be a positive multiple of 30, got {seconds}")
     return seconds
+
+
+# ---------------------------------------------------------------- December
+# plumbing (a)/(c), cohort_refresh_ruling.md rev. 2 sections 3 and 4.
+#
+# Three dates govern a book, each read here and nowhere else:
+#   models.<key>.active_from  ET date of the book's first session. Before it the
+#       book is not run, valued, reconciled, reported or watched: it does not
+#       exist yet. The refreshed arms' shakedown starts 2026-12-01 (section 3
+#       item 8). Absent: active whenever enabled (every pre-December book).
+#   models.<key>.public_from  ISO instant from which the book may appear on a
+#       public surface (dashboard, leaderboard, daily report). Hub H-OPS-07
+#       ruling 1: no cb_* book is public before the open of 2026-12-07; the
+#       shakedown books never are. Absent: public whenever active.
+#   handover.date             ET date from which the snapshots and DeepSeek
+#       come under the tick deadline D and the finish-reason rule (H-OPS-14),
+#       as the refreshed arms are from their first session. The venue cohort
+#       itself moves by the transition script (capital_structure.
+#       live_cohort_keys), which archives the state files the epoch guard
+#       would otherwise refuse; this date only switches the call rules.
+EASTERN = ZoneInfo("America/New_York")
+
+
+def _et_date(on: datetime | date | None) -> date:
+    if isinstance(on, date) and not isinstance(on, datetime):
+        return on
+    now = on or datetime.now(EASTERN)
+    now = now.replace(tzinfo=EASTERN) if now.tzinfo is None else now.astimezone(EASTERN)
+    return now.date()
+
+
+def _model_cfg(model_key: str, settings: dict[str, Any]) -> dict[str, Any]:
+    return (settings.get("models") or {}).get(model_key) or {}
+
+
+def book_active_from(model_key: str, settings: dict[str, Any] | None = None) -> date | None:
+    """The book's first session date (models.<key>.active_from), or None."""
+    settings = settings if settings is not None else load_settings()
+    raw = _model_cfg(model_key, settings).get("active_from")
+    return date.fromisoformat(raw) if raw else None
+
+
+def book_active(model_key: str, settings: dict[str, Any] | None = None,
+                on: datetime | date | None = None) -> bool:
+    """True if `model_key` is enabled and its first session (active_from) is
+    on or before the ET date of `on` (default: now)."""
+    settings = settings if settings is not None else load_settings()
+    cfg = _model_cfg(model_key, settings)
+    if not cfg.get("enabled", True):
+        return False
+    start = book_active_from(model_key, settings)
+    return start is None or _et_date(on) >= start
+
+
+def active_model_keys(settings: dict[str, Any] | None = None,
+                      on: datetime | date | None = None) -> list[str]:
+    """Every active book on the ET date of `on`, in settings order. The one
+    answer to "which books run today": the pipeline, the EOD sweep, the slot
+    watch and the reports all read it, so a book cannot be run but unwatched."""
+    settings = settings if settings is not None else load_settings()
+    return [k for k in (settings.get("models") or {}) if book_active(k, settings, on)]
+
+
+def book_public(model_key: str, settings: dict[str, Any] | None = None,
+                at: datetime | None = None) -> bool:
+    """True if `model_key` may appear on a public surface at `at` (default
+    now): active, and at or after models.<key>.public_from when set."""
+    settings = settings if settings is not None else load_settings()
+    at = at or datetime.now(EASTERN)
+    at = at.replace(tzinfo=EASTERN) if at.tzinfo is None else at
+    if not book_active(model_key, settings, at):
+        return False
+    raw = _model_cfg(model_key, settings).get("public_from")
+    if not raw:
+        return True
+    start = datetime.fromisoformat(raw)
+    if start.tzinfo is None:
+        raise ValueError(f"models.{model_key}.public_from must carry a UTC offset, got {raw!r}")
+    return at >= start
+
+
+def public_model_keys(settings: dict[str, Any] | None = None,
+                      at: datetime | None = None) -> list[str]:
+    """Every book a public surface may show at `at`, in settings order."""
+    settings = settings if settings is not None else load_settings()
+    return [k for k in (settings.get("models") or {}) if book_public(k, settings, at)]
+
+
+def handover_date(settings: dict[str, Any] | None = None) -> date | None:
+    settings = settings if settings is not None else load_settings()
+    raw = (settings.get("handover") or {}).get("date")
+    return date.fromisoformat(raw) if raw else None
+
+
+def handover_rules_apply(settings: dict[str, Any] | None = None,
+                         on: datetime | date | None = None) -> bool:
+    """True from handover.date (ET): the snapshots and DeepSeek then run under
+    the tick deadline and the finish-reason rule (hub H-OPS-14)."""
+    settings = settings if settings is not None else load_settings()
+    start = handover_date(settings)
+    return start is not None and _et_date(on) >= start
 
 
 def venue_book_keys(enabled_keys: list[str],

@@ -275,7 +275,9 @@ class GeminiAdapter(BaseAdapter):
         if refreshed:
             # The raw model_version, never the configured id it falls back to.
             self.check_identity(model_version_raw, metadata)
-            # The finish-reason rule, before any text leaves the adapter.
+        if self.tick_rules:
+            # The finish-reason rule, before any text leaves the adapter
+            # (snapshot from the handover, H-OPS-14).
             fr_name = metadata.get("finish_reason")
             blocked = metadata.get("block_reason") is not None
             fc = finish_class(fr_name, blocked)

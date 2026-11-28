@@ -52,7 +52,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from ..config_loader import STATE_DIR, TRADES_DIR
+from ..config_loader import STATE_DIR, TRADES_DIR, book_active
 from ..record_class import is_administrative_row
 
 logger = logging.getLogger("llmlab.tick_spacing")
@@ -197,6 +197,9 @@ def _scan_logs(
     torn: list[str] = []
     for model_key, cfg in models.items():
         if not (cfg or {}).get("enabled"):
+            continue
+        if not book_active(model_key, settings, now_utc):
+            # Before its first session (models.<key>.active_from).
             continue
         path = directory / f"{model_key}_{month}.jsonl"
         if not path.exists():

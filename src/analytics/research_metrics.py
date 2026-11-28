@@ -39,6 +39,7 @@ from typing import Any, Callable, Iterable
 import numpy as np
 
 from ..config_loader import (
+    active_model_keys,
     DATA_DIR,
     PERFORMANCE_DIR,
     TRADES_DIR,
@@ -116,7 +117,7 @@ _ACTION_CODE = {"BUY": 0, "SELL": 1, "HOLD": 2}
 
 def get_model_keys(settings: dict[str, Any] | None = None) -> list[str]:
     settings = settings or load_settings()
-    return [k for k, cfg in settings["models"].items() if cfg.get("enabled", True)]
+    return active_model_keys(settings)
 
 
 def _parse_ts(ts: str) -> datetime | None:

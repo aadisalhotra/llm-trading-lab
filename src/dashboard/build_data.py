@@ -29,6 +29,7 @@ from ..config_loader import (
     TRADES_DIR,
     load_settings,
     load_universe,
+    public_model_keys,
 )
 from ..data.market_data import fetch_universe_data, INDEX_SYMBOLS
 from ..portfolio import load_portfolio
@@ -1150,7 +1151,14 @@ def build_dashboard_payload(prices: dict[str, float] | None = None,
                             run_date: datetime | None = None) -> dict[str, Any]:
     settings = load_settings()
     universe = load_universe()
-    model_keys = list(settings["models"].keys())
+    # Public books only (config_loader.public_model_keys). Hub H-OPS-07 ruling
+    # 1: no cb_* book on any panel before the open of 2026-12-07, so the
+    # shakedown books (12-01..12-04) never appear. Every panel below
+    # (leaderboard, portfolios, trade feed, cost tracker, ticker tape, market
+    # brief, correlation, consensus) is built from this list. It also keeps
+    # load_portfolio, which incepts a missing book, away from a book that has
+    # not started.
+    model_keys = public_model_keys(settings, run_date)
 
     leaderboard = build_leaderboard(model_keys)
     # Recent trade summaries per model — used by the leaderboard hover tooltip
@@ -1311,7 +1319,7 @@ def build_dashboard_payload(prices: dict[str, float] | None = None,
         "intraday_curves": intraday_curves,
         "intraday_session_date": session_date,
         "universe": universe,
-        "models": settings["models"],
+        "models": {k: settings["models"][k] for k in model_keys},
         "benchmark_ticker": settings["benchmark_ticker"],
         "max_positions": settings.get("portfolio_rules", {}).get("max_positions", 10),
         "prompt_version": settings["prompt_version"],

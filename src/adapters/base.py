@@ -454,10 +454,16 @@ class BaseAdapter(ABC):
     def __init__(self, model: str, temperature: float | None = None):
         self.model = model
         # The tick's decision deadline D as a time.monotonic() instant, set by
-        # the pipeline for the refreshed arms (tick_deadline_and_calibration_
-        # rulings_2026-11-21.md section 1.5). None: no deadline (the snapshots
-        # and DeepSeek through December, H-OPS-00).
+        # the pipeline (tick_deadline_and_calibration_rulings_2026-11-21.md
+        # section 1.5). It binds an arm under the tick rules (`tick_rules`).
+        # None: no deadline.
         self.deadline_at: float | None = None
+        # True from the venue-path handover (settings handover.date; hub
+        # H-OPS-14): the snapshots and DeepSeek then come under D and the
+        # finish-reason rule, as the refreshed arms are from their first
+        # session. Set by the pipeline; identity checks and level fields stay
+        # refreshed-only.
+        self.handover_rules: bool = False
         # Whether a refreshed arm's level field is sent. Production always
         # sends it (the ruled default level, sent explicitly). Only the
         # calibration tool sets False: calibration runs with the level omitted
@@ -476,6 +482,12 @@ class BaseAdapter(ABC):
         """True for a refreshed confirmatory arm. Each provider adapter keys
         this on its REFRESHED_ARMS table; the base has none."""
         return False
+
+    @property
+    def tick_rules(self) -> bool:
+        """True when D and the finish-reason rule bind this arm: a refreshed
+        arm always, any other arm from the handover."""
+        return self.refreshed or self.handover_rules
 
     def accepted_names(self) -> tuple[str, ...]:
         """The response model names this arm accepts. Each provider adapter
@@ -496,7 +508,7 @@ class BaseAdapter(ABC):
     def remaining(self) -> float | None:
         """Seconds left before D for this arm's calls, or None without a
         deadline. May be zero or negative once D has passed."""
-        if self.deadline_at is None or not self.refreshed:
+        if self.deadline_at is None or not self.tick_rules:
             return None
         return self.deadline_at - time.monotonic()
 

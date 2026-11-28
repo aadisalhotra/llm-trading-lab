@@ -14,9 +14,18 @@ from typing import Any
 import requests
 
 from ..analytics.cost_rates import compute_call_cost_usd
-from .base import API_CALL_TIMEOUT_SECONDS, BaseAdapter
+from . import base as _base
+from .base import (FINISH_ABNORMAL, FINISH_NORMAL, FINISH_REFUSAL, FINISH_TRUNCATED,
+                   BaseAdapter, raise_for_finish)
 
 logger = logging.getLogger("llmlab.adapter.deepseek")
+
+# The finish-reason rule, from the venue-path handover (hub H-OPS-14). DeepSeek
+# follows the OpenAI chat-completions schema: "stop" is the normal completion,
+# "length" a budget stop, "content_filter" a refusal; anything else
+# (including "insufficient_system_resource") is ABNORMAL_FINISH.
+FINISH_CLASSES: dict[str, str] = {"stop": FINISH_NORMAL, "length": FINISH_TRUNCATED,
+                                  "content_filter": FINISH_REFUSAL}
 
 
 class DeepSeekAdapter(BaseAdapter):
@@ -70,8 +79,10 @@ class DeepSeekAdapter(BaseAdapter):
         }
         # Raised from 120s to the shared cross-adapter constant (Hub
         # registration, 2026-09-17) -- see base.py for the reasoning.
+        # Under the tick rules the transport timeout is cut to the time left
+        # before D; otherwise it is the shared constant, as before.
         r = requests.post(self.BASE_URL, json=payload, headers=headers,
-                          timeout=API_CALL_TIMEOUT_SECONDS)
+                          timeout=self.transport_timeout(_base.API_CALL_TIMEOUT_SECONDS))
         if not r.ok:
             # Surface the response body so the decision log captures the actual error,
             # not just "400 Bad Request" with no detail.
@@ -124,4 +135,10 @@ class DeepSeekAdapter(BaseAdapter):
         metadata["cache_hit_tokens"] = usage.get("prompt_cache_hit_tokens")
         metadata["cache_miss_tokens"] = usage.get("prompt_cache_miss_tokens")
 
+        if self.tick_rules:
+            # The finish-reason rule, before any text leaves the adapter.
+            fr = metadata.get("finish_reason")
+            fc = FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)
+            metadata["finish_class"] = fc
+            raise_for_finish(fc, f"{fc} finish: finish_reason={fr} model={returned_id}", metadata)
         return text, returned_id, metadata

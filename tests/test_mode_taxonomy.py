@@ -256,9 +256,12 @@ def test_a_named_cohort_must_agree_with_the_registered_count():
     """Count and composition must agree -- the base is computed from the count."""
     settings = json.load(open(REPO / "config" / "settings.json", encoding="utf-8"))
     named = json.loads(json.dumps(settings))
+    # Eleven books are configured from the December plumbing (six running,
+    # five refreshed arms from 2026-12-01); five fund either way.
     keys = list(named["models"])
-    assert len(keys) == 6, "six books are configured; five fund"
-    named["capital_structure"]["live_cohort_keys"] = keys  # all six
+    assert len(keys) == 11, "eleven books are configured; five fund"
+    keys = keys[:6]
+    named["capital_structure"]["live_cohort_keys"] = keys  # six
     with pytest.raises(PendingCohortError, match="names 6 books"):
         live_cohort_keys(named)
 

@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 def render() -> str:
     from src.adapters import anthropic_adapter as aa
+    from src.adapters import deepseek_adapter as da
     from src.adapters import gemini_adapter as ga
     from src.adapters import openai_adapter as oa
     from src.adapters import xai_adapter as xa
@@ -54,6 +55,34 @@ def render() -> str:
         "|---|---|---|---|---|---|",
     ]
     lines += [f"| `{a}` | `{m}` | {f} | {n} | {t} | {r} |" for a, m, f, n, t, r in rows]
+
+    # From the handover (settings handover.date; plumbing (a)): the same
+    # provider tables, read by the same adapters, plus DeepSeek's own.
+    snaps = []
+    for book, model, mod, extra in (
+            ("claude", "claude-sonnet-4-6", aa, ""), ("claude_opus", "claude-opus-4-6", aa, ""),
+            ("gpt", "gpt-5.4-2026-03-05", oa, "; a non-null `message.refusal`"),
+            ("grok", "grok-4.20-0309-reasoning", xa, "; a non-null `message.refusal`"),
+            ("deepseek", "deepseek-v4-pro", da, "")):
+        t = mod.FINISH_CLASSES
+        snaps.append((book, model, f"`{'stop_reason' if mod is aa else 'finish_reason'}`",
+                      by(t, FINISH_NORMAL), by(t, FINISH_TRUNCATED), by(t, FINISH_REFUSAL) + extra))
+    snaps.insert(4, ("gemini", "gemini-3.1-pro-preview",
+                     "`finish_reason` (enum name); `prompt_feedback.block_reason`", "`STOP`", "`MAX_TOKENS`",
+                     ", ".join(f"`{n}`" for n in sorted(ga.REFUSAL_FINISH_REASONS))
+                     + "; any non-null `prompt_feedback.block_reason` (a blocked prompt)"))
+    lines += [
+        "",
+        "## From the handover: the five snapshots and DeepSeek",
+        "",
+        "From `handover.date` in `config/settings.json` (2026-12-05), the same rule binds the",
+        "snapshots and DeepSeek (hub H-OPS-14). The identity check and the level fields stay",
+        "refreshed-only.",
+        "",
+        "| Book | Identifier | Field read | Normal (parsed) | Budget stop → `DECISION_TRUNCATED` | `REFUSAL` (listed by name) |",
+        "|---|---|---|---|---|---|",
+    ]
+    lines += [f"| `{a}` | `{m}` | {f} | {n} | {t} | {r} |" for a, m, f, n, t, r in snaps]
     lines += [
         "",
         "**Every other value is `ABNORMAL_FINISH`**, unknown and absent values included. No value is",

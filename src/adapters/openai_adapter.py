@@ -113,7 +113,7 @@ class OpenAIAdapter(BaseAdapter):
             **extra,
         )
         message = response.choices[0].message
-        refusal = getattr(message, "refusal", None) if refreshed else None
+        refusal = getattr(message, "refusal", None) if self.tick_rules else None
         text = message.content or ""
         returned_id = getattr(response, "model", self.model)
 
@@ -156,7 +156,9 @@ class OpenAIAdapter(BaseAdapter):
             metadata["max_tokens_sent"] = REFRESHED_MAX_COMPLETION_TOKENS
             metadata["transport"] = "non-streaming"
             self.check_identity(getattr(response, "model", None), metadata)
-            # The finish-reason rule, before any text leaves the adapter.
+        if self.tick_rules:
+            # The finish-reason rule, before any text leaves the adapter
+            # (snapshot from the handover, H-OPS-14).
             fr = metadata.get("finish_reason")
             fc = FINISH_REFUSAL if refusal else FINISH_CLASSES.get(str(fr), FINISH_ABNORMAL)
             metadata["finish_class"] = fc

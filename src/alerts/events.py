@@ -38,6 +38,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from ..config_loader import (
+    active_model_keys,
     DATA_DIR,
     NEWS_CACHE_DIR,
     PERFORMANCE_DIR,
@@ -533,8 +534,9 @@ def _compact(event_record: dict[str, Any]) -> dict[str, Any]:
 # ===========================================================================
 
 def _enabled_model_keys(settings: dict[str, Any]) -> list[str]:
-    return [k for k, cfg in (settings.get("models") or {}).items()
-            if cfg.get("enabled", True)]
+    """The books active now (config_loader.active_model_keys): a refreshed arm
+    is not swept before its first session."""
+    return active_model_keys(settings)
 
 
 def _display_name(settings: dict[str, Any], key: str) -> str:

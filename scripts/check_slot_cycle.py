@@ -52,7 +52,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.alerts.email_alerts import send_email  # noqa: E402
 from src.alerts.events import render_event_html  # noqa: E402
-from src.config_loader import force_utf8_console, load_env, load_settings  # noqa: E402
+from src.config_loader import active_model_keys, force_utf8_console, load_env, load_settings  # noqa: E402
 from src.cycle_watch import (  # noqa: E402
     SLOT, admission_log_name, books_in_slot, classify_slot, month_log_name, parse_utc,
     slot_label, withhold_in_slot,
@@ -71,9 +71,11 @@ AdmissionReader = Callable[[datetime], "list[str] | None"]
 Sender = Callable[[str, str, str], bool]
 
 
-def enabled_books(settings: dict) -> list[str]:
-    return sorted(k for k, cfg in (settings.get("models") or {}).items()
-                  if (cfg or {}).get("enabled", True))
+def enabled_books(settings: dict, on: datetime | None = None) -> list[str]:
+    """The books the slot must produce a row for: those active on the slot's
+    ET date (config_loader.active_model_keys), so a refreshed arm is expected
+    from its first session and not before."""
+    return sorted(active_model_keys(settings, on))
 
 
 def git_reader(repo: Path) -> Reader:
@@ -215,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     load_env()
     settings = load_settings()
-    books = enabled_books(settings)
+    books = enabled_books(settings, parse_utc(args.slot))
     if not books:
         logger.error("no enabled books in settings; nothing to watch")
         return 2

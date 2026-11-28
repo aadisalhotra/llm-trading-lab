@@ -103,8 +103,14 @@ def test_an_incepted_book_reads_its_own_state_whatever_the_key_says(lab):
     assert performance.book_epoch("cb_argon", s) == ("2026-12-01", 2000.0)
 
 
-def test_shipped_settings_set_no_key_yet():
-    """Nothing changes on main until the transition (snapshots) or the
-    adapter branch (refreshed arms) sets the key."""
+def test_shipped_settings_set_the_key_on_the_ten_cohort_books_only():
+    """Plumbing (a)/(c) sets the key on the five snapshots (their fresh
+    internal-paper books at the handover) and the five refreshed arms (their
+    shakedown and venue books). DeepSeek has none: its book stays $100,000.
+    A book already incepted reads its own state file, so no running book's
+    capital moves."""
     shipped = config_loader.load_settings()
-    assert not any("inception_capital" in (v or {}) for v in shipped["models"].values())
+    keyed = sorted(k for k, v in shipped["models"].items() if "inception_capital" in (v or {}))
+    assert keyed == sorted(["claude", "gpt", "gemini", "grok", "claude_opus",
+                            "cb_sonnet", "cb_opus", "cb_astra", "cb_grok", "cb_argon"])
+    assert all(shipped["models"][k]["inception_capital"] == "registered_book_capital" for k in keyed)

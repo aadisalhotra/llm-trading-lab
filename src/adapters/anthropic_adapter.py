@@ -282,10 +282,12 @@ class AnthropicAdapter(BaseAdapter):
         metadata["cache_creation_tokens"] = (
             getattr(usage, "cache_creation_input_tokens", None) if usage else None
         )
-        if refreshed:
+        if self.tick_rules:
             # The finish-reason rule, before any text leaves the adapter: only
-            # end_turn is returned for parsing. The snapshots are unchanged.
-            self.check_identity(facts.get("model"), metadata)     # read from the stream
+            # end_turn is returned for parsing. The snapshots come under it at
+            # the handover (H-OPS-14); identity stays refreshed-only (a
+            # snapshot echoes its alias, so check_identity is a no-op there).
+            self.check_identity(facts.get("model") if facts else None, metadata)
             fc = finish_class(stop_reason)
             metadata["finish_class"] = fc
             sd = getattr(response, "stop_details", None)
