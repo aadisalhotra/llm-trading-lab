@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from ..config_loader import DATA_DIR
 
@@ -39,6 +40,17 @@ PROMPTS_DIR = DATA_DIR / "prompts"
 RETENTION_BOUNDARY_SESSION = "2026-11-23"
 TICKS_PER_SESSION = 13
 FIRST_SLOT_MINUTES = 9 * 60 + 30
+
+# Calibration window (hub 2026-11-21, item (a); Research's agreement on rq6
+# section 2.4 is the landing condition). The refreshed cohort's calibration
+# set is drawn from the snapshots' retained inputs of 2026-11-23..25 and must
+# cover all thirteen tick positions with the exact images sent. Inside this
+# window every scheduled tick keeps its image bytes; outside it the section
+# 2.4 two-slot rotation applies unchanged. The window closes by itself at the
+# close of Wednesday 2026-11-25: no revert needs to land.
+ET = ZoneInfo("America/New_York")
+FULL_IMAGE_RETENTION_START = datetime(2026, 11, 23, 0, 0, tzinfo=ET)
+FULL_IMAGE_RETENTION_END = datetime(2026, 11, 25, 16, 0, tzinfo=ET)
 
 # output_budget_equalization_ruling.md §3: a budget stop, by provider.
 BUDGET_STOP_REASONS = frozenset({"max_tokens", "length", "MAX_TOKENS"})
@@ -119,11 +131,39 @@ def tick_slot(run_date: datetime) -> int | None:
     return k if 1 <= k <= TICKS_PER_SESSION else None
 
 
-def keeps_image_bytes(run_date: datetime) -> bool:
-    """True when this tick is one of today's two retained slots."""
+def in_full_retention_window(run_date: datetime) -> bool:
+    """True from the 2026-11-23 session through the close of 2026-11-25 (ET).
+    A naive run_date is read as ET, as the pipeline's run date is."""
+    t = run_date if run_date.tzinfo else run_date.replace(tzinfo=ET)
+    return FULL_IMAGE_RETENTION_START <= t < FULL_IMAGE_RETENTION_END
+
+
+# Why a tick kept its image bytes (per-row field image_bytes_reason, hub
+# H-OPS-00 Batch 1). The registered section 2.4 rotation is named first: a
+# rotation slot inside the window would have kept its bytes anyway, so
+# "calibration_window" marks exactly the bytes the window adds.
+REASON_RQ6_ROTATION = "rq6_rotation"
+REASON_CALIBRATION_WINDOW = "calibration_window"
+
+
+def image_bytes_reason(run_date: datetime) -> str | None:
+    """rq6_rotation, calibration_window, or None when this tick keeps no
+    image bytes."""
     n = session_index(run_date.date())
     slot = tick_slot(run_date)
-    return n is not None and slot is not None and slot in retained_slots(n)
+    if n is None or slot is None:
+        return None
+    if slot in retained_slots(n):
+        return REASON_RQ6_ROTATION
+    if in_full_retention_window(run_date):
+        return REASON_CALIBRATION_WINDOW
+    return None
+
+
+def keeps_image_bytes(run_date: datetime) -> bool:
+    """True when this tick keeps its image bytes: every scheduled tick inside
+    the calibration window, otherwise only today's two retained slots."""
+    return image_bytes_reason(run_date) is not None
 
 
 # --------------------------------------------------------------- retention
@@ -164,7 +204,7 @@ def retain_call_inputs(cycle_id: str, model_key: str, run_date: datetime,
         "trade_system_sha256": None, "trade_user_sha256": None,
         "screen_system_sha256": None, "screen_user_sha256": None,
         "image_count": 0, "images": [], "image_bytes_retained": False,
-        "input_retention_failed": False,
+        "image_bytes_reason": None, "input_retention_failed": False,
     }
     try:
         lines = [_line(cycle_id, model_key, prompt_version, c) for c in calls]
@@ -187,7 +227,8 @@ def retain_call_inputs(cycle_id: str, model_key: str, run_date: datetime,
             with open(d / f"{cycle_id}.jsonl", "a", encoding="utf-8", newline="\n") as f:
                 f.write(payload)
         trade = next((c for c in calls if c.stage == "trade"), None)
-        if trade and trade.images and keeps_image_bytes(run_date):
+        reason = image_bytes_reason(run_date)
+        if trade and trade.images and reason is not None:
             img_dir = d / "images"
             img_dir.mkdir(parents=True, exist_ok=True)
             for b in trade.images:
@@ -195,6 +236,7 @@ def retain_call_inputs(cycle_id: str, model_key: str, run_date: datetime,
                 if not p.exists():
                     p.write_bytes(b)
             fields["image_bytes_retained"] = True
+            fields["image_bytes_reason"] = reason
     except Exception:  # noqa: BLE001 — logging must never cost the tick
         logger.exception("[%s] call-input retention write failed for cycle %s",
                          model_key, cycle_id)

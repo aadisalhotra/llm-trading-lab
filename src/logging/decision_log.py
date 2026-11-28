@@ -303,7 +303,7 @@ def log_decision_run(
             "trade_system_sha256": None, "trade_user_sha256": None,
             "screen_system_sha256": None, "screen_user_sha256": None,
             "image_count": None, "images": [], "image_bytes_retained": False,
-            "input_retention_failed": True}),
+            "image_bytes_reason": None, "input_retention_failed": True}),
     }
 
     with open(path, "a", encoding="utf-8") as f:

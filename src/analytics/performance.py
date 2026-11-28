@@ -15,7 +15,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, effective_mode, load_settings,
+from ..config_loader import (PERFORMANCE_DIR, TRADES_DIR, book_inception_capital,
+                             effective_mode, load_settings,
                              starting_capital as _starting_capital_guarded)
 from ..portfolio.portfolio import read_book_inception
 from ..record_class import is_administrative_row
@@ -138,7 +139,9 @@ def book_epoch(
     if book is not None:
         return max(book[0], start), book[1]
     mode = effective_mode(model_key, settings)
-    capital = _starting_capital_guarded(settings, mode)
+    # The capital the book WILL incept at (plumbing (f)): a registered-capital
+    # internal-paper book is measured against $2,000, never the paper figure.
+    capital = book_inception_capital(model_key, settings, mode)
     if mode == "paper":
         return start, capital
     from ..data.market_data import inception_session_date  # heavy; only this path needs it
